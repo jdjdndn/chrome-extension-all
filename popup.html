@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Extension Popup</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        width: 320px;
+        min-height: 400px;
+        padding: 16px;
+        margin: 0;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+        background: linear-gradient(135deg, #f5f7fa 0%, #f8f9fa 100%);
+        color: #212529;
+      }
+
+      .header {
+        margin-bottom: 16px;
+        text-align: center;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 600;
+        color: #1a1a1a;
+        letter-spacing: -0.3px;
+      }
+
+      h2 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 12px 0;
+        color: #343a40;
+      }
+
+      h3 {
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: #495057;
+      }
+
+      .status {
+        margin: 12px 0;
+        padding: 10px 12px;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 500;
+        text-align: center;
+        transition: all 0.2s ease;
+      }
+
+      .status.active {
+        background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+        color: #155724;
+        border: 1px solid #b8dacc;
+      }
+
+      .status.inactive {
+        background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+        color: #721c24;
+        border: 1px solid #f1b0b7;
+      }
+
+      button {
+        padding: 8px 16px;
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 4px rgba(0, 123, 255, 0.2);
+      }
+
+      button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
+      }
+
+      button:active {
+        transform: translateY(0);
+      }
+
+      #toggle-btn {
+        width: 100%;
+        margin-top: 8px;
+      }
+
+      .settings {
+        margin-top: 16px;
+        padding: 16px;
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      }
+
+      .setting-item {
+        margin-bottom: 14px;
+      }
+
+      .setting-item:last-child {
+        margin-bottom: 0;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 13px;
+        font-weight: 500;
+        color: #495057;
+      }
+
+      input[type="text"],
+      input[type="number"],
+      select {
+        width: 100%;
+        padding: 8px 10px;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        font-size: 13px;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        background: #f8f9fa;
+      }
+
+      input[type="text"]:focus,
+      input[type="number"]:focus,
+      select:focus {
+        outline: none;
+        border-color: #007bff;
+        box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+        background: white;
+      }
+
+      .toggle-container {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 6px 0;
+      }
+
+      input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+        accent-color: #007bff;
+      }
+
+      /* Input group with fixed width input and button */
+      .input-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .input-group input[type="text"] {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .input-group button {
+        flex: 0 0 60px;
+        margin: 0;
+        padding: 8px 12px;
+        white-space: nowrap;
+      }
+
+      .input-group button.warning-btn {
+        background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+        color: #212529;
+        box-shadow: 0 2px 4px rgba(255, 193, 7, 0.3);
+      }
+
+      .input-group button.warning-btn:hover {
+        box-shadow: 0 4px 8px rgba(255, 193, 7, 0.4);
+      }
+
+      /* Blocked domain list styles */
+      .domain-list {
+        margin-top: 12px;
+        max-height: 200px;
+        overflow-y: auto;
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 8px;
+      }
+
+      /* Custom scrollbar */
+      .domain-list::-webkit-scrollbar {
+        width: 6px;
+      }
+
+      .domain-list::-webkit-scrollbar-track {
+        background: #e9ecef;
+        border-radius: 3px;
+      }
+
+      .domain-list::-webkit-scrollbar-thumb {
+        background: #adb5bd;
+        border-radius: 3px;
+      }
+
+      .domain-list::-webkit-scrollbar-thumb:hover {
+        background: #6c757d;
+      }
+
+      .domain-list-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px;
+        margin-bottom: 4px;
+        background: white;
+        border-radius: 6px;
+        transition: box-shadow 0.2s ease;
+      }
+
+      .domain-list-item:hover {
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+      }
+
+      .domain-list-item:last-child {
+        margin-bottom: 0;
+      }
+
+      .domain-text {
+        flex: 1;
+        min-width: 0;
+        font-size: 12px;
+        font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo,
+          monospace;
+        color: #495057;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .domain-remove-btn {
+        flex: 0 0 50px;
+        padding: 4px 8px;
+        margin: 0;
+        font-size: 11px;
+        background-color: #dc3545;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .domain-remove-btn:hover {
+        background-color: #c82333;
+        transform: scale(1.05);
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 20px 12px;
+        color: #6c757d;
+        font-size: 13px;
+      }
+
+      /* Label with clear button */
+      .label-with-action {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 6px;
+      }
+
+      .label-with-action label {
+        margin-bottom: 0;
+        flex: 1;
+      }
+
+      .label-with-action h3 {
+        margin-bottom: 0;
+        flex: 1;
+      }
+
+      .clear-btn {
+        flex: 0 0 auto;
+        padding: 4px 10px;
+        margin: 0;
+        font-size: 11px;
+        background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        white-space: nowrap;
+      }
+
+      .clear-btn:hover {
+        background: linear-gradient(135deg, #5a6268 0%, #343a40 100%);
+        transform: scale(1.05);
+      }
+
+      .clear-btn:active {
+        transform: scale(0.98);
+      }
+
+      .clear-btn:disabled {
+        background: #dee2e6;
+        color: #adb5bd;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      /* Info box */
+      .info-box {
+        background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+        padding: 12px;
+        border-radius: 8px;
+        margin-top: 12px;
+        border-left: 3px solid #007bff;
+      }
+
+      .info-box strong {
+        color: #343a40;
+        font-size: 13px;
+      }
+
+      .info-box small {
+        color: #6c757d;
+        font-size: 12px;
+        line-height: 1.5;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>My Extension</h1>
+    </div>
+
+    <div id="status" class="status inactive">Inactive</div>
+
+    <button id="toggle-btn">Enable Extension</button>
+
+    <!-- Douyin Script Control -->
+    <div class="settings" style="margin-top: 12px;" id="douyin-keywords-section">
+      <h2 style="font-size: 16px; margin: 0 0 12px 0">抖音脚本关键词</h2>
+
+      <!-- Not Interested Keywords Editor -->
+      <div class="setting-item">
+        <div class="label-with-action">
+          <label for="not-interested-keywords">不感兴趣关键词</label>
+          <button id="save-keywords-btn" class="clear-btn">保存</button>
+        </div>
+        <textarea
+          id="not-interested-keywords"
+          rows="6"
+          style="width: 100%; padding: 8px; border: 1px solid #dee2e6; border-radius: 6px; font-size: 12px; font-family: monospace; resize: vertical; background: #f8f9fa;"
+          placeholder="关键词1 关键词2 关键词3"></textarea>
+        <div class="info-box" style="margin-top: 8px;">
+          <small>用空格分隔多个关键词，无需引号或逗号</small>
+        </div>
+      </div>
+
+      <!-- Auto Follow Keywords Editor -->
+      <div class="setting-item" style="margin-top: 12px;">
+        <div class="label-with-action">
+          <label for="auto-follow-keywords">自动关注关键词</label>
+          <button id="save-follow-keywords-btn" class="clear-btn">保存</button>
+        </div>
+        <textarea
+          id="auto-follow-keywords"
+          rows="3"
+          style="width: 100%; padding: 8px; border: 1px solid #dee2e6; border-radius: 6px; font-size: 12px; font-family: monospace; resize: vertical; background: #f8f9fa;"
+          placeholder="关键词1 关键词2 关键词3"></textarea>
+      </div>
+    </div>
+
+    <!-- Hide Elements Feature -->
+    <div class="settings" style="margin-top: 12px;">
+      <h2 style="font-size: 16px; margin: 0 0 12px 0">隐藏元素</h2>
+
+      <div class="setting-item">
+        <div class="toggle-container">
+          <label for="hide-elements-enabled">启用隐藏元素功能</label>
+          <input type="checkbox" id="hide-elements-enabled" />
+        </div>
+      </div>
+
+      <div class="setting-item" id="hide-elements-editor" style="display: none;">
+        <div class="label-with-action">
+          <label for="hide-elements-selectors">CSS 选择器</label>
+          <button id="save-hide-elements-btn" class="clear-btn">保存</button>
+        </div>
+        <textarea
+          id="hide-elements-selectors"
+          rows="4"
+          style="width: 100%; padding: 8px; border: 1px solid #dee2e6; border-radius: 6px; font-size: 12px; font-family: monospace; resize: vertical; background: #f8f9fa;"
+          placeholder=".class-name #id-name div.class"></textarea>
+        <div class="info-box" style="margin-top: 8px;">
+          <small>用空格分隔多个 CSS 选择器，匹配的元素将被隐藏</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings">
+      <h2 style="font-size: 16px; margin: 0 0 12px 0">Settings</h2>
+
+      <div class="setting-item">
+        <label for="api-key">API Key:</label>
+        <input type="text" id="api-key" placeholder="Enter your API key" />
+      </div>
+
+      <div class="setting-item">
+        <div class="toggle-container">
+          <label for="debug-mode">Debug Mode:</label>
+          <input type="checkbox" id="debug-mode" />
+        </div>
+      </div>
+    </div>
+
+    <div class="settings">
+      <h2>Blocked Domains</h2>
+
+      <div class="setting-item">
+        <label>添加阻止的域名</label>
+        <div class="input-group">
+          <input
+            type="text"
+            id="domain-input"
+            placeholder="例如: tracking.example.com"
+          />
+          <button id="add-domain-btn">Add</button>
+        </div>
+      </div>
+
+      <div class="setting-item">
+        <div class="label-with-action">
+          <label>已阻止的域名列表</label>
+          <button id="clear-domains-btn" class="clear-btn" title="清空所有阻止的域名">清空</button>
+        </div>
+        <div id="blocked-domains-list" class="domain-list">
+          <!-- Blocked domains will be rendered here -->
+        </div>
+      </div>
+
+      <div class="setting-item">
+        <div class="label-with-action">
+          <h3>阻止接口返回的域名</h3>
+          <button id="clear-response-domains-btn" class="clear-btn" title="清空所有阻止的接口域名">清空</button>
+        </div>
+        <div class="input-group">
+          <input
+            type="text"
+            id="response-domain-input"
+            placeholder="例如: api.example.com"
+          />
+          <button id="add-response-domain-btn" class="warning-btn">Add</button>
+        </div>
+        <div id="blocked-response-domains-list" class="domain-list" style="margin-top: 8px">
+          <!-- Blocked response domains will be rendered here -->
+        </div>
+      </div>
+
+      <div class="setting-item">
+        <div class="info-box">
+          <strong>说明：</strong><br />
+          <small>
+            <strong style="color: #dc3545">阻止的域名</strong>不会被访问，包括：<br />
+            • 从被阻止域名发出的请求<br />
+            • 请求到被阻止域名<br />
+            • API调用会被拦截并返回错误信息<br /><br />
+            <strong style="color: #e0a800">阻止接口返回的域名</strong>：<br />
+            • 来自这些域名的API响应会被拦截<br />
+            • 页面将无法接收来自这些域名的数据
+          </small>
+        </div>
+      </div>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
