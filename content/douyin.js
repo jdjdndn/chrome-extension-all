@@ -36,17 +36,97 @@ const DEFAULT_HIDE_SELECTORS = [
   // 可以添加抖音网站默认需要隐藏的选择器
 ];
 
+// 网络请求拦截域名列表
+const BLOCKED_DOMAINS = [
+  'mcs.zijieapi.com/list',
+  'vc-gate-edge.ndcpp.com/sdk/get_peer',
+  'security.zijieapi.com/api/metrics/emit',
+  'tnc0-aliec2.zijieapi.com/get_domains'
+];
+
 // 不感兴趣关键词列表 - 包含这些关键词的视频会自动下滑
 const NOT_INTERESTED_KEYWORDS = [
-  '抽象', '漫画', '国漫', '修仙', '玄幻', '系统', '动画', '动漫', '小说', '黑神话',
-  '解说', '好剧', '儿童', '孩子', '观影', '案件', '国学', '狗', '猫', '宠物', '娃',
-  '王者荣耀', '射手', '对抗路', '中单', '上单', '打野', '巅峰赛', '游戏日常', '综艺', '游戏',
-  '美食', '测评', '小品', '春晚', '相亲', '恋爱', '情侣日常', '国服', '驾照', '考试', '结婚',
-  '率土之滨', '程序员', '前端', '动物', '电商', '追剧', '军旅', '短剧', '小说', '恐怖',
-  '影视', '电影', '司机', '工地', '情侣', '原生家庭', '影娱', '好片', '亲子', '幼儿园',
-  '育儿', '育婴', '宝宝', '母婴', '妈妈', '父母', '爸妈', '早教', '幼教', '学前',
-  '儿童', '音乐', '热歌', '电视剧'
-];
+  "抽象",
+  "漫画",
+  "国漫",
+  "修仙",
+  "玄幻",
+  "系统",
+  "动画",
+  "动漫",
+  "小说",
+  "黑神话",
+  "解说",
+  "好剧",
+  "儿童",
+  "孩子",
+  "观影",
+  "案件",
+  "国学",
+  "狗",
+  "猫",
+  "宠物",
+  "娃",
+  "王者荣耀",
+  "射手",
+  "对抗路",
+  "中单",
+  "上单",
+  "打野",
+  "巅峰赛",
+  "游戏日常",
+  "综艺",
+  "游戏",
+  "美食",
+  "测评",
+  "小品",
+  "春晚",
+  "相亲",
+  "恋爱",
+  "情侣日常",
+  "国服",
+  "驾照",
+  "考试",
+  "结婚",
+  "率土之滨",
+  "程序员",
+  "前端",
+  "动物",
+  "电商",
+  "追剧",
+  "军旅",
+  "短剧",
+  "恐怖",
+  "影视",
+  "电影",
+  "司机",
+  "工地",
+  "情侣",
+  "原生家庭",
+  "影娱",
+  "好片",
+  "亲子",
+  "幼儿园",
+  "育儿",
+  "育婴",
+  "宝宝",
+  "母婴",
+  "妈妈",
+  "父母",
+  "爸妈",
+  "早教",
+  "幼教",
+  "学前",
+  "音乐",
+  "热歌",
+  "健身",
+  "分手",
+  "股票",
+  "情感",
+  "驾驶",
+  "街头",
+  "手势"
+]
 
 // 自动关注关键词列表
 const AUTO_FOLLOW_KEYWORDS = ['ootd'];
@@ -1059,6 +1139,29 @@ function processCurrentVideo() {
 }
 
 // ========== 初始化 ==========
+/**
+ * 向 background.js 注册当前域名的 blockedDomains 配置
+ */
+async function registerBlockedDomains() {
+  if (typeof chrome === 'undefined' || !chrome.runtime) {
+    console.log('[抖音脚本] 非扩展环境，跳过注册 blockedDomains');
+    return;
+  }
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: 'REGISTER_BLOCKED_DOMAINS',
+      domain: 'douyin.com',
+      blockedDomains: BLOCKED_DOMAINS
+    });
+    if (response && response.success) {
+      console.log('[抖音脚本] 已向 background 注册 blockedDomains');
+    }
+  } catch (error) {
+    console.error('[抖音脚本] 注册 blockedDomains 失败:', error);
+  }
+}
+
 function init() {
   // 防止重复初始化
   if (window.DouyinScript.isInitialized) {
@@ -1069,6 +1172,9 @@ function init() {
 
   // Load domain-specific hide settings and apply
   loadDomainHideSettings();
+
+  // 向 background.js 注册 blockedDomains
+  registerBlockedDomains();
 
   // 注册评论区时间跳转功能
   TimerManager.register(setVideoTime());
@@ -1120,7 +1226,8 @@ window.DouyinScriptConfig = {
   AD_SVG_PATHS,
   AI_KEYWORDS,
   THROTTLE_CONFIG,
-  DEFAULT_HIDE_SELECTORS
+  DEFAULT_HIDE_SELECTORS,
+  BLOCKED_DOMAINS
 };
 
 // ========== Chrome Extension Message Handler ==========
@@ -1143,6 +1250,16 @@ if (typeof chrome !== 'undefined' && chrome.runtime) {
           NOT_INTERESTED_KEYWORDS.length = 0;
           NOT_INTERESTED_KEYWORDS.push(...[...new Set(keywords.NOT_INTERESTED_KEYWORDS)]);
           console.log('[抖音脚本] 不感兴趣关键词已更新:', NOT_INTERESTED_KEYWORDS);
+          // 清除当前视频的处理记录，强制重新检测
+          const videoBody = findOne('.playerContainer');
+          if (videoBody) {
+            const videoId = getVideoUUID(videoBody);
+            const skipKey = `not_interested_${videoId}`;
+            processedVideos.delete(skipKey);
+            console.log('[抖音脚本] 已清除当前视频的不感兴趣处理记录，准备重新检测');
+            // 立即执行一次检测
+            setTimeout(() => handleNotInterested(videoBody), 100);
+          }
         }
         if (keywords.AUTO_FOLLOW_KEYWORDS) {
           AUTO_FOLLOW_KEYWORDS.length = 0;

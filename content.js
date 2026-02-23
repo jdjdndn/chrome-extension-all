@@ -1,7 +1,57 @@
 // Content script runs in the context of the web page
 // Can access and modify the DOM
 
-console.log('Extension content script loaded');
+// ========== 彩色日志工具 ==========
+// 生成随机颜色（避开白色/浅色）
+function getRandomColor() {
+  const hue = Math.floor(Math.random() * 360);
+  // 饱和度 60-100%，亮度 30-60%（避免白色/太浅）
+  const saturation = 60 + Math.floor(Math.random() * 40);
+  const lightness = 30 + Math.floor(Math.random() * 30);
+  return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+}
+
+function coloredLog(tag, message, ...args) {
+  const tagStyle = `color: ${getRandomColor()}; font-weight: bold;`;
+  const styledArgs = args.map((arg) => {
+    return [`%c${String(arg)}`, `color: ${getRandomColor()}`];
+  }).flat();
+  if (styledArgs.length > 0) console.log(`%c${tag} ${message}`, tagStyle, ...styledArgs);
+  else console.log(`%c${tag} ${message}`, tagStyle);
+}
+
+const originalConsole = {
+  log: console.log.bind(console),
+  error: console.error.bind(console),
+  warn: console.warn.bind(console)
+};
+console.log = function(...args) {
+  const firstArg = args[0];
+  if (typeof firstArg === 'string') {
+    const tagMatch = firstArg.match(/^\[([^\]]+)\]/);
+    if (tagMatch) {
+      const tag = `[${tagMatch[1]}]`;
+      const message = firstArg.slice(tag.length).trim() || '';
+      coloredLog(tag, message, ...args.slice(1));
+      return;
+    }
+  }
+  originalConsole.log(...args);
+};
+console.error = function(...args) {
+  const firstArg = args[0];
+  if (typeof firstArg === 'string') {
+    const tagMatch = firstArg.match(/^\[([^\]]+)\]/);
+    if (tagMatch) {
+      const tag = `[${tagMatch[1]}]`;
+      originalConsole.error(`%c${tag} ${firstArg.slice(tag.length).trim()}`, 'color: #F44336; font-weight: bold;', ...args.slice(1));
+      return;
+    }
+  }
+  originalConsole.error(...args);
+};
+
+console.log('[Extension] Extension content script loaded');
 
 // Get extension settings from storage
 let settings = {

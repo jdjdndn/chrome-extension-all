@@ -1,7 +1,38 @@
 // Script injected directly into the page context
 // This script runs in the same context as the web page
 
-console.log('Extension injected script loaded');
+// ========== 彩色日志工具 ==========
+// 生成随机颜色（避开白色/浅色）
+function getRandomColor() {
+  const hue = Math.floor(Math.random() * 360);
+  const saturation = 60 + Math.floor(Math.random() * 40);
+  const lightness = 30 + Math.floor(Math.random() * 30);
+  return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+}
+function coloredLog(tag, message, ...args) {
+  const tagStyle = `color: ${getRandomColor()}; font-weight: bold;`;
+  const styledArgs = args.map((arg) => {
+    return [`%c${String(arg)}`, `color: ${getRandomColor()}`];
+  }).flat();
+  if (styledArgs.length > 0) console.log(`%c${tag} ${message}`, tagStyle, ...styledArgs);
+  else console.log(`%c${tag} ${message}`, tagStyle);
+}
+const originalConsole = { log: console.log.bind(console) };
+console.log = function(...args) {
+  const firstArg = args[0];
+  if (typeof firstArg === 'string') {
+    const tagMatch = firstArg.match(/^\[([^\]]+)\]/);
+    if (tagMatch) {
+      const tag = `[${tagMatch[1]}]`;
+      const message = firstArg.slice(tag.length).trim() || '';
+      coloredLog(tag, message, ...args.slice(1));
+      return;
+    }
+  }
+  originalConsole.log(...args);
+};
+
+console.log('[Extension] Extension injected script loaded');
 
 // Page-specific functionality can be added here
 // This script can access page variables and functions that are not available in content scripts

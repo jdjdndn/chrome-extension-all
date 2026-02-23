@@ -25,6 +25,9 @@ const DEFAULT_HIDE_SELECTORS = [
   '.kkm-content'  // 4hu.tv 默认隐藏的元素
 ];
 
+// 网络请求拦截域名列表
+const BLOCKED_DOMAINS = [];
+
 /**
  * Update hide elements by creating/updating style tag
  * @param {string[]} selectors - Array of CSS selectors to hide
@@ -152,6 +155,9 @@ function init() {
   // Load domain-specific hide settings and apply
   loadDomainHideSettings();
 
+  // 向 background.js 注册 blockedDomains
+  registerBlockedDomains();
+
   // Run on page load
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
@@ -165,9 +171,33 @@ function init() {
   setupObserver();
 }
 
+/**
+ * 向 background.js 注册当前域名的 blockedDomains 配置
+ */
+async function registerBlockedDomains() {
+  if (typeof chrome === 'undefined' || !chrome.runtime) {
+    console.log('[4hu脚本] 非扩展环境，跳过注册 blockedDomains');
+    return;
+  }
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: 'REGISTER_BLOCKED_DOMAINS',
+      domain: '4hu.tv',
+      blockedDomains: BLOCKED_DOMAINS
+    });
+    if (response && response.success) {
+      console.log('[4hu脚本] 已向 background 注册 blockedDomains');
+    }
+  } catch (error) {
+    console.error('[4hu脚本] 注册 blockedDomains 失败:', error);
+  }
+}
+
 // 导出配置供外部使用
 window.Hu4ScriptConfig = {
-  DEFAULT_HIDE_SELECTORS
+  DEFAULT_HIDE_SELECTORS,
+  BLOCKED_DOMAINS
 };
 
 // ========== Chrome Extension Message Handler ==========

@@ -1,5 +1,38 @@
 // Popup script runs in the context of the popup window
 
+// ========== 彩色日志工具 ==========
+// 生成随机颜色（避开白色/浅色）
+function getRandomColor() {
+  const hue = Math.floor(Math.random() * 360);
+  const saturation = 60 + Math.floor(Math.random() * 40);
+  const lightness = 30 + Math.floor(Math.random() * 30);
+  return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+}
+
+function coloredLog(tag, message, ...args) {
+  const tagStyle = `color: ${getRandomColor()}; font-weight: bold;`;
+  const styledArgs = args.map((arg) => {
+    return [`%c${String(arg)}`, `color: ${getRandomColor()}`];
+  }).flat();
+  if (styledArgs.length > 0) console.log(`%c${tag} ${message}`, tagStyle, ...styledArgs);
+  else console.log(`%c${tag} ${message}`, tagStyle);
+}
+
+const originalConsole = { log: console.log.bind(console) };
+console.log = function(...args) {
+  const firstArg = args[0];
+  if (typeof firstArg === 'string') {
+    const tagMatch = firstArg.match(/^\[([^\]]+)\]/);
+    if (tagMatch) {
+      const tag = `[${tagMatch[1]}]`;
+      const message = firstArg.slice(tag.length).trim() || '';
+      coloredLog(tag, message, ...args.slice(1));
+      return;
+    }
+  }
+  originalConsole.log(...args);
+};
+
 // Default settings
 const defaultSettings = {
   enabled: false,
@@ -806,7 +839,7 @@ async function saveHideElementsSettings() {
       chrome.tabs.sendMessage(tabs[0].id, {
         type: 'UPDATE_HIDE_ELEMENTS',
         enabled,
-        selectors
+        selectors: mergedSelectors
       }).catch(() => {});
     }
   } catch (error) {
@@ -831,6 +864,37 @@ document.addEventListener('DOMContentLoaded', () => {
   loadHideElementsSettings().catch(console.error);
 });
 
+// Add copy event listener for keywords textareas - copy as array format
+function setupCopyAsArray(textarea) {
+  if (!textarea) return;
+
+  textarea.addEventListener('copy', (e) => {
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+
+    // Get selected text, or full textarea value if no selection
+    let selectedText = selection.toString();
+    if (!selectedText) {
+      selectedText = textarea.value;
+    }
+
+    // Parse as keywords array
+    const keywords = parseKeywords(selectedText);
+
+    // Format as JSON array
+    const arrayFormat = JSON.stringify(keywords, null, 2);
+
+    // Set clipboard data
+    e.preventDefault();
+    e.clipboardData.setData('text/plain', arrayFormat);
+    console.log('[复制] 已转换为数组格式:', arrayFormat);
+  });
+}
+
+// Setup copy listeners for keywords textareas
+setupCopyAsArray(notInterestedKeywordsTextarea);
+setupCopyAsArray(autoFollowKeywordsTextarea);
+
 // Add event listeners for save buttons
 if (saveKeywordsBtn) {
   saveKeywordsBtn.addEventListener('click', saveKeywords);
@@ -846,6 +910,13 @@ function isDouyinDomain(domain) {
   return douyinDomains.some(d => domain === d || domain.endsWith('.' + d));
 }
 
+// Check if current domain is Bilibili-related
+function isBilibiliDomain(domain) {
+  if (!domain) return false;
+  const biliDomains = ['bilibili.com', 'www.bilibili.com'];
+  return biliDomains.some(d => domain === d || domain.endsWith('.' + d));
+}
+
 // Show/hide Douyin keywords section based on current domain
 async function updateDouyinKeywordsVisibility() {
   const domain = await getCurrentDomain();
@@ -859,11 +930,111 @@ async function updateDouyinKeywordsVisibility() {
   }
 }
 
+// ========== Bilibili Keywords Management ==========
+const biliNotInterestedKeywordsTextarea = document.getElementById('bili-not-interested-keywords');
+const biliSaveKeywordsBtn = document.getElementById('bili-save-keywords-btn');
+
+// Default keywords from bili.js
+const defaultBiliNotInterestedKeywords = [
+  "原神", "崩坏", "星铁", "鸣潮", "王者", "荣耀", "LOL", "英雄联盟", "绝区零",
+  "火影", "海贼", "柯南", "漫威", "DC", "漫展", "cos", "COS", "Cos",
+  "直播", "带货", "广告", "推广"
+];
+
+/**
+ * Load Bilibili keywords from storage
+ */
+async function loadBiliKeywords() {
+  // Only load keywords for Bilibili domains
+  const domain = await getCurrentDomain();
+  if (!isBilibiliDomain(domain)) {
+    return;
+  }
+
+  const result = await chrome.storage.local.get(['biliKeywords']);
+  const keywords = result.biliKeywords || {
+    notInterested: defaultBiliNotInterestedKeywords
+  };
+
+  // Update textarea
+  if (biliNotInterestedKeywordsTextarea) {
+    biliNotInterestedKeywordsTextarea.value = formatKeywords(keywords.notInterested);
+  }
+}
+
+/**
+ * Save Bilibili keywords to storage and notify content script
+ */
+async function saveBiliKeywords() {
+  if (!biliNotInterestedKeywordsTextarea) return;
+
+  // Only save keywords for Bilibili domains
+  const domain = await getCurrentDomain();
+  if (!isBilibiliDomain(domain)) {
+    console.log('非B站域名，跳过保存关键词');
+    return;
+  }
+
+  // Parse textarea content
+  const keywords = parseKeywords(biliNotInterestedKeywordsTextarea.value);
+
+  await chrome.storage.local.set({
+    biliKeywords: {
+      notInterested: keywords
+    }
+  });
+
+  console.log('B站不感兴趣关键词已保存:', keywords.length, '个');
+
+  // Update textarea with deduplicated keywords
+  biliNotInterestedKeywordsTextarea.value = formatKeywords(keywords);
+
+  // Notify content script to update keywords
+  try {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tabs[0]?.id) {
+      chrome.tabs.sendMessage(tabs[0].id, {
+        type: 'UPDATE_KEYWORDS',
+        keywords: {
+          NOT_INTERESTED_KEYWORDS: keywords
+        }
+      }).catch(() => {
+        // Content script may not be loaded
+      });
+    }
+  } catch (error) {
+    console.error('Failed to notify content script:', error);
+  }
+}
+
+// Show/hide Bilibili keywords section based on current domain
+async function updateBilibiliKeywordsVisibility() {
+  const domain = await getCurrentDomain();
+  const biliSection = document.getElementById('bili-keywords-section');
+  if (biliSection) {
+    if (isBilibiliDomain(domain)) {
+      biliSection.style.display = 'block';
+    } else {
+      biliSection.style.display = 'none';
+    }
+  }
+}
+
+// Add event listener for Bilibili save button
+if (biliSaveKeywordsBtn) {
+  biliSaveKeywordsBtn.addEventListener('click', saveBiliKeywords);
+}
+
+// Setup copy listener for Bilibili keywords textarea
+setupCopyAsArray(biliNotInterestedKeywordsTextarea);
+
 // Load keywords when popup opens
 document.addEventListener('DOMContentLoaded', () => {
   loadKeywords().catch(console.error);
-  // Update Douyin keywords section visibility
+  loadBiliKeywords().catch(console.error);
+  // Update keywords sections visibility
   updateDouyinKeywordsVisibility().catch(console.error);
+  updateBilibiliKeywordsVisibility().catch(console.error);
 });
 
 // Load blocked domains when popup opens

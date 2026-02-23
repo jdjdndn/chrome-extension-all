@@ -30,6 +30,9 @@ const DEFAULT_HIDE_SELECTORS = [
   '#welcome'
 ];
 
+// 网络请求拦截域名列表
+const BLOCKED_DOMAINS = [];
+
 /**
  * Update hide elements by creating/updating style tag
  * @param {string[]} selectors - Array of CSS selectors to hide
@@ -136,6 +139,9 @@ function init() {
   // Load domain-specific hide settings and apply
   loadDomainHideSettings();
 
+  // 向 background.js 注册 blockedDomains
+  registerBlockedDomains();
+
   // Run on page load
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
@@ -146,9 +152,33 @@ function init() {
   }
 }
 
+/**
+ * 向 background.js 注册当前域名的 blockedDomains 配置
+ */
+async function registerBlockedDomains() {
+  if (typeof chrome === 'undefined' || !chrome.runtime) {
+    console.log('[Pornhub脚本] 非扩展环境，跳过注册 blockedDomains');
+    return;
+  }
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: 'REGISTER_BLOCKED_DOMAINS',
+      domain: 'pornhub.com',
+      blockedDomains: BLOCKED_DOMAINS
+    });
+    if (response && response.success) {
+      console.log('[Pornhub脚本] 已向 background 注册 blockedDomains');
+    }
+  } catch (error) {
+    console.error('[Pornhub脚本] 注册 blockedDomains 失败:', error);
+  }
+}
+
 // 导出配置供外部使用
 window.PornScriptConfig = {
-  DEFAULT_HIDE_SELECTORS
+  DEFAULT_HIDE_SELECTORS,
+  BLOCKED_DOMAINS
 };
 
 // ========== Chrome Extension Message Handler ==========

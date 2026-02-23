@@ -1,7 +1,38 @@
 // Background service worker (Manifest V3)
 // Runs in the background and handles extension lifecycle events
 
-console.log('Extension service worker started');
+// ========== 彩色日志工具 ==========
+// 生成随机颜色（避开白色/浅色）
+function getRandomColor() {
+  const hue = Math.floor(Math.random() * 360);
+  const saturation = 60 + Math.floor(Math.random() * 40);
+  const lightness = 30 + Math.floor(Math.random() * 30);
+  return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+}
+function coloredLog(tag, message, ...args) {
+  const tagStyle = `color: ${getRandomColor()}; font-weight: bold;`;
+  const styledArgs = args.map((arg) => {
+    return [`%c${String(arg)}`, `color: ${getRandomColor()}`];
+  }).flat();
+  if (styledArgs.length > 0) console.log(`%c${tag} ${message}`, tagStyle, ...styledArgs);
+  else console.log(`%c${tag} ${message}`, tagStyle);
+}
+const originalConsole = { log: console.log.bind(console) };
+console.log = function(...args) {
+  const firstArg = args[0];
+  if (typeof firstArg === 'string') {
+    const tagMatch = firstArg.match(/^\[([^\]]+)\]/);
+    if (tagMatch) {
+      const tag = `[${tagMatch[1]}]`;
+      const message = firstArg.slice(tag.length).trim() || '';
+      coloredLog(tag, message, ...args.slice(1));
+      return;
+    }
+  }
+  originalConsole.log(...args);
+};
+
+console.log('[Extension] Extension service worker started');
 const SETTINE = 'cy_settings';
 
 // Helper to get current active tab's domain
@@ -23,17 +54,24 @@ async function getCurrentTabDomain() {
 }
 
 // Internal storage for domain-specific blocked lists
-const _domainBlockedData = {
-  blockedDomains: {
-    'douyin.com': [
-      'mcs.zijieapi.com/list',
-      'vc-gate-edge.ndcpp.com/sdk/get_peer',
-      'security.zijieapi.com/api/metrics/emit',
-      'tnc0-aliec2.zijieapi.com/get_domains'
-    ],
-  },      // { domain: [blockedDomains] }
-  blockedResponseDomains: {} // { domain:[blockedResponseDomains] }
-};
+// blockedDomains 通过 content scripts 向 background 注册
+function createDomainBlockedData() {
+  return {
+    blockedDomains: {},
+    blockedResponseDomains: {}
+  };
+}
+
+const _domainBlockedData = createDomainBlockedData();
+
+// 初始化函数（保留用于存储加载时合并配置）
+function initDomainBlockedData() {
+  // 配置已直接定义在 _domainBlockedData 中
+  // 此函数保留用于未来可能的扩展
+}
+
+// 执行初始化
+initDomainBlockedData();
 
 // Extension state
 let extensionState = {
@@ -599,6 +637,21 @@ async function handleMessage(message, sender, sendResponse) {
 
     case 'GET_DOMAIN_SCRIPT_MAP':
       sendResponse({ domainScriptMap: extensionState.domainScriptMap });
+      break;
+
+    case 'REGISTER_BLOCKED_DOMAINS':
+      // 注册 content script 的 blockedDomains 配置
+      if (message.domain && message.blockedDomains) {
+        _domainBlockedData.blockedDomains[message.domain] = message.blockedDomains;
+        console.log(`[Extension] Registered blockedDomains for ${message.domain}:`, message.blockedDomains);
+        // 持久化到 storage
+        await persistDomainBlockedData();
+        // 更新网络规则
+        await updateNetworkRules();
+        sendResponse({ success: true });
+      } else {
+        sendResponse({ success: false, error: 'Missing domain or blockedDomains' });
+      }
       break;
 
     case 'ADD_BLOCKED_RESPONSE_DOMAIN':
