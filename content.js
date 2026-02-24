@@ -1,59 +1,30 @@
 // Content script runs in the context of the web page
 // Can access and modify the DOM
+// 依赖: content/utils/logger.js, storage.js, dom.js, messaging.js
 
-// ========== 彩色日志工具 ==========
-// 生成随机颜色（避开白色/浅色）
-function getRandomColor() {
-  const hue = Math.floor(Math.random() * 360);
-  // 饱和度 60-100%，亮度 30-60%（避免白色/太浅）
-  const saturation = 60 + Math.floor(Math.random() * 40);
-  const lightness = 30 + Math.floor(Math.random() * 30);
-  return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+'use strict';
+
+// ========== Domain-specific Default Hide Selectors ==========
+const DOMAIN_DEFAULT_HIDE_SELECTORS = {
+  '4hu.tv': ['.kkm-content'],
+  'www.4hu.tv': ['.kkm-content']
+};
+
+/**
+ * Get default hide selectors for current domain
+ */
+function getDomainDefaultHideSelectors() {
+  const domain = DOMUtils.getCurrentDomain();
+  return DOMAIN_DEFAULT_HIDE_SELECTORS[domain] || [];
 }
 
-function coloredLog(tag, message, ...args) {
-  const tagStyle = `color: ${getRandomColor()}; font-weight: bold;`;
-  const styledArgs = args.map((arg) => {
-    return [`%c${String(arg)}`, `color: ${getRandomColor()}`];
-  }).flat();
-  if (styledArgs.length > 0) console.log(`%c${tag} ${message}`, tagStyle, ...styledArgs);
-  else console.log(`%c${tag} ${message}`, tagStyle);
-}
-
-const originalConsole = {
-  log: console.log.bind(console),
-  error: console.error.bind(console),
-  warn: console.warn.bind(console)
-};
-console.log = function(...args) {
-  const firstArg = args[0];
-  if (typeof firstArg === 'string') {
-    const tagMatch = firstArg.match(/^\[([^\]]+)\]/);
-    if (tagMatch) {
-      const tag = `[${tagMatch[1]}]`;
-      const message = firstArg.slice(tag.length).trim() || '';
-      coloredLog(tag, message, ...args.slice(1));
-      return;
-    }
-  }
-  originalConsole.log(...args);
-};
-console.error = function(...args) {
-  const firstArg = args[0];
-  if (typeof firstArg === 'string') {
-    const tagMatch = firstArg.match(/^\[([^\]]+)\]/);
-    if (tagMatch) {
-      const tag = `[${tagMatch[1]}]`;
-      originalConsole.error(`%c${tag} ${firstArg.slice(tag.length).trim()}`, 'color: #F44336; font-weight: bold;', ...args.slice(1));
-      return;
-    }
-  }
-  originalConsole.error(...args);
-};
+// ========== Domain-specific Script Loading ==========
+// 域名脚本通过 manifest.json 的 content_scripts 配置加载
+// 此处仅保留注释说明，实际加载由 manifest.json 管理
 
 console.log('[Extension] Extension content script loaded');
 
-// Get extension settings from storage
+// Extension settings
 let settings = {
   enabled: false,
   debugMode: false
@@ -61,12 +32,9 @@ let settings = {
 
 // Collected URLs set (for deduplication)
 const collectedUrls = new Set();
-
-// Throttle timer for printing URLs
 let printTimer = null;
-const PRINT_THROTTLE_DELAY = 3000; // 3 seconds
+const PRINT_THROTTLE_DELAY = 3000;
 
-// Throttled print function
 function throttledPrintUrls() {
   if (printTimer || !settings.debugMode) return;
 
@@ -83,80 +51,16 @@ function throttledPrintUrls() {
 
 // Load settings from storage
 async function loadSettings() {
-  const result = await chrome.storage.sync.get('settings');
+  const result = await StorageUtils.getSync('settings');
   if (result.settings) {
     settings = { ...settings, ...result.settings };
     console.log('Settings loaded:', settings);
   }
 }
 
-// Listen for messages from popup and background
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  // Handle hide elements update
-  if (message.type === 'UPDATE_HIDE_ELEMENTS') {
-    const { enabled, selectors } = message;
-    updateHideElements(enabled, selectors);
-    sendResponse({ success: true, message: '隐藏元素设置已更新' });
-    return true;
-  }
-
-  // Handle extension toggle
-  if (message.type === 'TOGGLE_EXTENSION') {
-    settings.enabled = message.enabled;
-    settings.debugMode = message.debugMode || false;
-    sendResponse({ success: true });
-    return true;
-  }
-
-  // Return false for unhandled messages (let other scripts handle them)
-  return false;
-});
-
-// Intercept fetch calls to collect URLs and check domain blocking
-if (!window._originalFetch) {
-  window._originalFetch = window.fetch;
-  window.fetch = async function (url, options = {}) {
-    // Check if URL should be blocked
-    const currentDomain = new URL(window.location.href).hostname;
-    const requestDomain = new URL(url).hostname;
-
-    try {
-      const result = await chrome.runtime.sendMessage({
-        type: 'CHECK_DOMAIN_BLOCKED',
-        currentDomain: currentDomain,
-        requestDomain: requestDomain
-      });
-
-      if (result.blocked) {
-        // Log blocked request in debug mode
-        if (settings.debugMode) {
-          console.log(`Fetch blocked: ${url}`, result);
-        }
-
-        // Return a rejected promise with error
-        return Promise.reject(new Error(`API request blocked: ${result.blockedReason}`));
-      }
-
-      // Collect unblocked URLs (deduplicated)
-      if (typeof url === 'string' && !collectedUrls.has(url)) {
-        collectedUrls.add(url);
-        throttledPrintUrls();
-      }
-
-      // If not blocked, proceed with original fetch
-      return window._originalFetch(url, options);
-    } catch (error) {
-      // If message sending fails, proceed with original fetch
-      return window._originalFetch(url, options);
-    }
-  };
-}
-
 // ========== Hide Elements Functionality ==========
-// Style tag ID for identification
 const HIDE_ELEMENTS_STYLE_ID = 'extension-hide-elements-style';
 
-// State management for hide elements
 let hideElementsState = {
   enabled: false,
   selectors: []
@@ -164,112 +68,67 @@ let hideElementsState = {
 
 /**
  * Apply hide elements by creating/updating style tag
- * @param {string[]} selectors - CSS selectors to hide
  */
 function applyHideElementsStyle(selectors) {
-  // Remove existing style tag if present
-  const existingStyle = document.getElementById(HIDE_ELEMENTS_STYLE_ID);
-  if (existingStyle) {
-    existingStyle.remove();
-  }
-
-  // If no selectors, don't create new style tag
   if (!selectors || selectors.length === 0) {
+    DOMUtils.removeStyle(HIDE_ELEMENTS_STYLE_ID);
     return;
   }
 
-  // Create and insert new style tag
-  const style = document.createElement('style');
-  style.id = HIDE_ELEMENTS_STYLE_ID;
-
-  // Build CSS rules
-  const cssRules = selectors
-    .filter(s => s && s.trim())
-    .map(selector => `${selector} { display: none !important; }`)
-    .join('\n');
-
-  style.textContent = cssRules;
-  document.head?.appendChild(style) || document.documentElement.appendChild(style);
-
+  DOMUtils.applyHideStyle(HIDE_ELEMENTS_STYLE_ID, selectors);
   console.log(`[隐藏元素] 已应用隐藏规则，共 ${selectors.length} 个选择器`);
 }
 
 /**
- * Get current domain
- * @returns {string|null} Current domain or null
- */
-function getCurrentDomain() {
-  try {
-    return window.location.hostname;
-  } catch (error) {
-    console.error('[隐藏元素] 获取域名失败:', error);
-    return null;
-  }
-}
-
-/**
- * Update hide elements settings (domain-specific)
- * @param {boolean} enabled - Whether hide elements is enabled
- * @param {string[]} selectors - CSS selectors to hide
+ * Update hide elements settings
  */
 function updateHideElements(enabled, selectors) {
   console.log('[隐藏元素] 更新设置:', { enabled, selectors });
 
-  // Update state
   hideElementsState.enabled = enabled;
   hideElementsState.selectors = selectors;
 
-  // Apply or remove style based on enabled state
   if (enabled && selectors && selectors.length > 0) {
     applyHideElementsStyle(selectors);
   } else {
-    // Remove style tag if disabled or no selectors
-    const existingStyle = document.getElementById(HIDE_ELEMENTS_STYLE_ID);
-    if (existingStyle) {
-      existingStyle.remove();
-      console.log('[隐藏元素] 已移除隐藏规则');
-    }
+    DOMUtils.removeStyle(HIDE_ELEMENTS_STYLE_ID);
+    console.log('[隐藏元素] 已移除隐藏规则');
   }
 
-  // Save to storage for persistence (domain-specific)
-  const domain = getCurrentDomain();
+  // Save to storage
+  const domain = DOMUtils.getCurrentDomain();
   if (domain) {
-    chrome.storage.local.get(['hideElementsSettings'], (result) => {
-      const allSettings = result.hideElementsSettings || {};
-      allSettings[domain] = { enabled, selectors };
-      chrome.storage.local.set({ hideElementsSettings: allSettings }).catch(() => { });
-    });
+    StorageUtils.setDomainSettings('hideElementsSettings', domain, { enabled, selectors });
   }
 }
 
 /**
- * Initialize hide elements from storage (domain-specific)
+ * Initialize hide elements from storage
  */
 async function initHideElements() {
-  try {
-    const domain = getCurrentDomain();
-    if (!domain) {
-      console.log('[隐藏元素] 无法获取当前域名，跳过初始化');
-      return;
-    }
+  const domain = DOMUtils.getCurrentDomain();
+  if (!domain) {
+    console.log('[隐藏元素] 无法获取当前域名，跳过初始化');
+    return;
+  }
 
-    const result = await chrome.storage.local.get(['hideElementsSettings']);
-    const allSettings = result.hideElementsSettings || {};
-    const settings = allSettings[domain];
+  const defaultSelectors = getDomainDefaultHideSelectors();
+  const settings = await StorageUtils.getDomainSettings('hideElementsSettings', domain);
 
-    if (settings && settings.enabled) {
-      updateHideElements(settings.enabled, settings.selectors || []);
-      console.log(`[隐藏元素] 已加载 ${domain} 的设置:`, settings);
-    }
-  } catch (error) {
-    console.error('[隐藏元素] 初始化失败:', error);
+  if (settings && settings.enabled) {
+    const mergedSelectors = [...new Set([...defaultSelectors, ...(settings.selectors || [])])];
+    updateHideElements(settings.enabled, mergedSelectors);
+    console.log(`[隐藏元素] 已加载 ${domain} 的设置:`, { enabled: settings.enabled, selectors: mergedSelectors });
+  } else if (defaultSelectors.length > 0) {
+    hideElementsState.selectors = defaultSelectors;
+    console.log(`[隐藏元素] ${domain} 有默认选择器:`, defaultSelectors);
   }
 }
 
-// Initialize hide elements on script load
+// Initialize hide elements
 initHideElements();
 
-// Expose functions to page context via window object (if needed)
+// Expose API
 window.ExtensionAPI = {
   isEnabled: () => settings.enabled,
   getVersion: () => chrome.runtime.getManifest().version,
@@ -278,9 +137,63 @@ window.ExtensionAPI = {
 // Initialize
 loadSettings().catch(console.error);
 
-// Listen for storage changes from other contexts
-chrome.storage.onChanged.addListener((changes, areaName) => {
+// Listen for storage changes
+StorageUtils.onChanged((changes, areaName) => {
   if (areaName === 'sync' && changes.settings) {
     settings = { ...settings, ...changes.settings.newValue };
   }
 });
+
+// ========== Message Handler ==========
+MessagingUtils.createMessageHandler('content_main_handler', {
+  'GET_DEFAULT_HIDE_SELECTORS': () => {
+    const selectors = getDomainDefaultHideSelectors();
+    console.log('[Content] 返回默认隐藏选择器:', selectors);
+    return { success: true, selectors };
+  },
+
+  'GET_CURRENT_HIDE_SELECTORS': () => {
+    return { success: true, selectors: hideElementsState.selectors };
+  },
+
+  'UPDATE_HIDE_ELEMENTS': (message) => {
+    const { enabled, selectors } = message;
+    updateHideElements(enabled, selectors);
+    return { success: true, message: '隐藏元素设置已更新' };
+  },
+
+  'TOGGLE_EXTENSION': (message) => {
+    settings.enabled = message.enabled;
+    settings.debugMode = message.debugMode || false;
+    return { success: true };
+  }
+});
+
+// ========== Fetch Interception ==========
+if (!window._originalFetch) {
+  window._originalFetch = window.fetch;
+  window.fetch = async function (url, options = {}) {
+    try {
+      const currentDomain = new URL(window.location.href).hostname;
+      const requestDomain = new URL(url).hostname;
+
+      const result = await MessagingUtils.checkDomainBlocked(currentDomain, requestDomain);
+
+      if (result && result.blocked) {
+        if (settings.debugMode) {
+          console.log(`Fetch blocked: ${url}`, result);
+        }
+        return Promise.reject(new Error(`API request blocked: ${result.blockedReason}`));
+      }
+
+      if (typeof url === 'string' && !collectedUrls.has(url)) {
+        collectedUrls.add(url);
+        throttledPrintUrls();
+      }
+
+      return window._originalFetch(url, options);
+    } catch (error) {
+      return window._originalFetch(url, options);
+    }
+  };
+}

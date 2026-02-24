@@ -1,67 +1,37 @@
 // Content script for 4hu.tv
-// Hide elements with class .kkm-content
+// 依赖: content/utils/logger.js, storage.js, dom.js, messaging.js
 
-"use strict";
+'use strict';
 
 // ========== 全局命名空间 ==========
-// 使用 window 对象存储初始化状态，防止重复初始化
 if (!window.Hu4Script) {
-  window.Hu4Script = {};
-}
-if (!window.Hu4Script.isInitialized) {
-  window.Hu4Script.isInitialized = false;
+  window.Hu4Script = { isInitialized: false };
 }
 
-// Style tag ID for identification
+// ========== 配置 ==========
 const STYLE_TAG_ID = 'kkm-content-hide-style';
-
-// State management
 let observer = null;
-let currentSelectors = []; // Will be initialized from DEFAULT_HIDE_SELECTORS or storage
+let currentSelectors = [];
 
-// ========== Hide Elements Default Selectors ==========
-// 默认隐藏元素选择器列表（4hu.tv 专用）
-const DEFAULT_HIDE_SELECTORS = [
-  '.kkm-content'  // 4hu.tv 默认隐藏的元素
-];
-
-// 网络请求拦截域名列表
+const DEFAULT_HIDE_SELECTORS = ['.kkm-content'];
 const BLOCKED_DOMAINS = [];
 
-/**
- * Update hide elements by creating/updating style tag
- * @param {string[]} selectors - Array of CSS selectors to hide
- */
+// ========== 隐藏元素 ==========
 function updateHideElements(selectors) {
-  // Remove existing style tag if present
-  const existingStyle = document.getElementById(STYLE_TAG_ID);
-  if (existingStyle) {
-    existingStyle.remove();
-  }
+  DOMUtils.removeStyle(STYLE_TAG_ID);
+  currentSelectors = selectors?.length > 0 ? selectors : [];
 
-  // Update current selectors
-  currentSelectors = selectors && selectors.length > 0 ? selectors : [];
-
-  // Create and insert new style tag with all selectors
   if (currentSelectors.length > 0) {
-    const style = document.createElement('style');
-    style.id = STYLE_TAG_ID;
-    // Generate CSS rules for all selectors
-    const cssRules = currentSelectors
-      .map(selector => `${selector} { display: none !important; }`)
-      .join('\n');
-    style.textContent = cssRules;
-    document.head.appendChild(style);
+    DOMUtils.applyHideStyle(STYLE_TAG_ID, currentSelectors);
     console.log('[4hu脚本] 已隐藏元素:', currentSelectors);
   }
 }
 
-// Legacy function name for backward compatibility
 function hideKkmContent() {
   updateHideElements(DEFAULT_HIDE_SELECTORS);
 }
 
-// Function to auto-click #tiaozhuan element
+// ========== 自动点击 ==========
 function autoClickTiaozhuan() {
   const tiaozhuan = document.querySelector('#tiaozhuan');
   if (tiaozhuan) {
@@ -70,9 +40,7 @@ function autoClickTiaozhuan() {
   }
 }
 
-// Use MutationObserver to handle dynamically added #tiaozhuan element
 function setupObserver() {
-  // Disconnect existing observer if any
   if (observer) {
     observer.disconnect();
     observer = null;
@@ -81,13 +49,11 @@ function setupObserver() {
   observer = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
       mutation.addedNodes.forEach((node) => {
-        if (node.nodeType === 1) { // Element node
-          // Check if the added node is #tiaozhuan
+        if (node.nodeType === 1) {
           if (node.id === 'tiaozhuan') {
             node.click();
             console.log('[4hu脚本] 已自动点击动态添加的 #tiaozhuan');
           }
-          // Check children for #tiaozhuan
           const tiaozhuanInChildren = node.querySelectorAll?.('#tiaozhuan');
           tiaozhuanInChildren?.forEach(el => {
             el.click();
@@ -104,7 +70,6 @@ function setupObserver() {
   });
 }
 
-// Cleanup function before reload
 function cleanup() {
   console.log('[4hu脚本] 清理状态...');
   if (observer) {
@@ -114,155 +79,79 @@ function cleanup() {
   window.Hu4Script.isInitialized = false;
 }
 
-/**
- * Get current domain's hide elements settings from storage
- */
+// ========== 存储 ==========
 async function loadDomainHideSettings() {
-  if (typeof chrome === 'undefined' || !chrome.storage) {
-    // Fallback to default if not in extension context
-    updateHideElements(DEFAULT_HIDE_SELECTORS);
-    return;
-  }
+  const domain = DOMUtils.getCurrentDomain();
+  const settings = await StorageUtils.getDomainSettings('hideElementsSettings', domain);
 
-  try {
-    const hostname = window.location.hostname;
-    const result = await chrome.storage.local.get(['hideElementsSettings']);
-    const allSettings = result.hideElementsSettings || {};
-
-    if (allSettings[hostname] && allSettings[hostname].enabled) {
-      const selectors = allSettings[hostname].selectors || DEFAULT_HIDE_SELECTORS;
-      updateHideElements(selectors);
-      console.log('[4hu脚本] 已加载域名隐藏设置:', hostname, selectors);
-    } else {
-      // Use default selectors if no custom settings
-      updateHideElements(DEFAULT_HIDE_SELECTORS);
-    }
-  } catch (error) {
-    console.log('[4hu脚本] 加载设置失败，使用默认设置:', error);
+  if (settings?.enabled) {
+    updateHideElements(settings.selectors || DEFAULT_HIDE_SELECTORS);
+    console.log('[4hu脚本] 已加载域名隐藏设置:', domain, settings.selectors);
+  } else {
     updateHideElements(DEFAULT_HIDE_SELECTORS);
   }
 }
 
-// Initialize function
+// ========== 初始化 ==========
+async function registerBlockedDomains() {
+  const result = await MessagingUtils.registerBlockedDomains('4hu.tv', BLOCKED_DOMAINS);
+  if (result?.success) console.log('[4hu脚本] 已向 background 注册 blockedDomains');
+}
+
 function init() {
-  // 防止重复初始化
   if (window.Hu4Script.isInitialized) {
     console.log('[4hu脚本] 已经初始化，跳过重复初始化');
     return;
   }
   window.Hu4Script.isInitialized = true;
 
-  // Load domain-specific hide settings and apply
   loadDomainHideSettings();
-
-  // 向 background.js 注册 blockedDomains
   registerBlockedDomains();
 
-  // Run on page load
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-      autoClickTiaozhuan();
-    });
+    document.addEventListener('DOMContentLoaded', autoClickTiaozhuan);
   } else {
     autoClickTiaozhuan();
   }
 
-  // Setup observer
   setupObserver();
 }
 
-/**
- * 向 background.js 注册当前域名的 blockedDomains 配置
- */
-async function registerBlockedDomains() {
-  if (typeof chrome === 'undefined' || !chrome.runtime) {
-    console.log('[4hu脚本] 非扩展环境，跳过注册 blockedDomains');
-    return;
-  }
-
-  try {
-    const response = await chrome.runtime.sendMessage({
-      type: 'REGISTER_BLOCKED_DOMAINS',
-      domain: '4hu.tv',
-      blockedDomains: BLOCKED_DOMAINS
-    });
-    if (response && response.success) {
-      console.log('[4hu脚本] 已向 background 注册 blockedDomains');
-    }
-  } catch (error) {
-    console.error('[4hu脚本] 注册 blockedDomains 失败:', error);
-  }
-}
-
-// 导出配置供外部使用
+// ========== 导出配置 ==========
 window.Hu4ScriptConfig = {
   DEFAULT_HIDE_SELECTORS,
   BLOCKED_DOMAINS
 };
 
-// ========== Chrome Extension Message Handler ==========
-// 使用全局标志防止重复注册消息监听器
-if (typeof chrome !== 'undefined' && chrome.runtime) {
-  const MESSAGE_HANDLER_ID = 'hu4_message_handler_v1';
+// ========== 消息处理 ==========
+MessagingUtils.createMessageHandler('hu4_message_handler', {
+  'TOGGLE_EXTENSION': (message) => {
+    console.log('[4hu脚本] 扩展状态:', message.enabled ? '启用' : '禁用');
+    return { success: true };
+  },
 
-  if (!window[MESSAGE_HANDLER_ID]) {
-    window[MESSAGE_HANDLER_ID] = true;
-    console.log('[4hu脚本] 注册消息监听器');
+  'UPDATE_KEYWORDS': (message) => {
+    console.log('[4hu脚本] 关键词更新:', message.keywords);
+    return { success: true, message: '关键词已更新' };
+  },
 
-    chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    // Handle extension toggle
-    if (message.type === 'TOGGLE_EXTENSION') {
-      const { enabled } = message;
-      console.log('[4hu脚本] 扩展状态:', enabled ? '启用' : '禁用');
-      sendResponse({ success: true });
-      return true;
+  'GET_DEFAULT_HIDE_SELECTORS': () => ({ success: true, selectors: DEFAULT_HIDE_SELECTORS }),
+  'GET_CURRENT_HIDE_SELECTORS': () => ({ success: true, selectors: currentSelectors }),
+
+  'UPDATE_HIDE_ELEMENTS': (message) => {
+    const { enabled, selectors } = message;
+    if (enabled && selectors?.length > 0) {
+      updateHideElements(selectors);
+      console.log('[4hu脚本] 隐藏元素已更新:', selectors);
+    } else {
+      DOMUtils.removeStyle(STYLE_TAG_ID);
+      console.log('[4hu脚本] 隐藏元素已禁用');
     }
-
-    // Handle keywords update
-    if (message.type === 'UPDATE_KEYWORDS') {
-      const { keywords } = message;
-      console.log('[4hu脚本] 关键词更新:', keywords);
-      sendResponse({ success: true, message: '关键词已更新' });
-      return true;
-    }
-
-    // Handle get default hide selectors
-    if (message.type === 'GET_DEFAULT_HIDE_SELECTORS') {
-      sendResponse({ success: true, selectors: DEFAULT_HIDE_SELECTORS });
-      return true;
-    }
-
-    // Handle get current hide selectors
-    if (message.type === 'GET_CURRENT_HIDE_SELECTORS') {
-      sendResponse({ success: true, selectors: currentSelectors });
-      return true;
-    }
-
-    // Handle update hide elements
-    if (message.type === 'UPDATE_HIDE_ELEMENTS') {
-      const { enabled, selectors } = message;
-      if (enabled && selectors && selectors.length > 0) {
-        updateHideElements(selectors);
-        console.log('[4hu脚本] 隐藏元素已更新:', selectors);
-      } else {
-        // Disable hiding by removing style tag
-        const existingStyle = document.getElementById(STYLE_TAG_ID);
-        if (existingStyle) {
-          existingStyle.remove();
-        }
-        console.log('[4hu脚本] 隐藏元素已禁用');
-      }
-      sendResponse({ success: true });
-      return true;
-    }
-
-    // Return false to indicate message not handled (let other scripts handle it)
-    return false;
-  });
+    return { success: true };
   }
-}
+});
 
-// Start the script
+// ========== 启动 ==========
 if (document.readyState === 'loading') {
   window.addEventListener('DOMContentLoaded', init);
 } else {

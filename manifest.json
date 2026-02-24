@@ -33,8 +33,67 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content.js"],
+      "js": [
+        "content/utils/logger.js",
+        "content/utils/storage.js",
+        "content/utils/dom.js",
+        "content/utils/messaging.js",
+        "content/common/redirect-links.js",
+        "content/common/text-to-link.js",
+        "content/common/lang-to-zh.js",
+        "content/common/link-blank.js",
+        "content/common/add-title.js",
+        "content.js"
+      ],
       "css": ["styles.css"]
+    },
+    {
+      "matches": ["*://*.bilibili.com/*"],
+      "js": ["content/bili.js"]
+    },
+    {
+      "matches": ["*://*.douyin.com/*"],
+      "js": ["content/douyin.js"]
+    },
+    {
+      "matches": ["*://*.4hu.tv/*"],
+      "js": ["content/4hu.js"]
+    },
+    {
+      "matches": ["*://*.weread.qq.com/*"],
+      "js": ["content/weread.js"]
+    },
+    {
+      "matches": ["*://*.quark.cn/*"],
+      "js": ["content/quark.js"]
+    },
+    {
+      "matches": ["*://*.18comic.vip/*"],
+      "js": ["content/comic18.js"]
+    },
+    {
+      "matches": ["*://*.aliyundrive.com/*"],
+      "js": ["content/aliyun.js"]
+    },
+    {
+      "matches": ["*://*.baidu.com/*"],
+      "js": ["content/baiduPan.js"]
+    },
+    {
+      "matches": ["*://*.zhipin.com/*"],
+      "js": ["content/boss.js"]
+    },
+    {
+      "matches": ["*://*.xiaohongshu.com/*"],
+      "js": ["content/xiaohongshu.js"]
+    },
+    {
+      "matches": ["*://*.wyaqpx.com/*"],
+      "js": ["content/dianGong.js"]
+    },
+    {
+      "matches": ["*://*.ymmfa.com/*"],
+      "js": ["content/gongkong.js"]
     }
   ],
   "background": {
@@ -43,7 +102,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["inject.js", "content/*.js"],
+      "resources": ["inject.js", "content/*.js", "content/common/*.js"],
       "matches": ["<all_urls>"]
     }
   ]
