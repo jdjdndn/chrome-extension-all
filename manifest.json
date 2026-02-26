@@ -9,7 +9,10 @@
     "activeTab",
     "scripting",
     "declarativeNetRequest",
-    "webRequest"
+    "cookies",
+    "browsingData",
+    "bookmarks",
+    "history"
   ],
   "host_permissions": ["*://*/*"],
   "declarative_net_request": {
@@ -105,5 +108,6 @@
       "resources": ["inject.js", "content/*.js", "content/common/*.js"],
       "matches": ["<all_urls>"]
     }
-  ]
+  ],
+  "devtools_page": "devtools/devtools.html"
 }

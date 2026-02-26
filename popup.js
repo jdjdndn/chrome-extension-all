@@ -129,19 +129,35 @@ debugModeCheckbox.addEventListener('change', () => {
 
 // Load blocked domains
 async function loadBlockedDomains() {
-  const result = await chrome.runtime.sendMessage({ type: 'GET_BLOCKED_DOMAINS' });
-  if (result) {
-    renderBlockedDomains(result.blockedDomains || []);
-    renderBlockedResponseDomains(result.blockedResponseDomains || []);
+  try {
+    const result = await chrome.runtime.sendMessage({ type: 'GET_BLOCKED_DOMAINS' });
+    console.log('[Blocked Domains] Response:', result);
+    if (result) {
+      renderBlockedDomains(result.blockedDomains || []);
+      renderBlockedResponseDomains(result.blockedResponseDomains || []);
 
-    // Debug log
-    console.log('Loaded blocked domains:', result.blockedDomains);
-    console.log('Current domain:', result.currentDomain);
+      // Debug log
+      console.log('[Blocked Domains] Loaded:', result.blockedDomains);
+      console.log('[Blocked Domains] Current domain:', result.currentDomain);
+    } else {
+      console.error('[Blocked Domains] No result from background');
+      renderBlockedDomains([]);
+      renderBlockedResponseDomains([]);
+    }
+  } catch (error) {
+    console.error('[Blocked Domains] Error loading:', error);
+    renderBlockedDomains([]);
+    renderBlockedResponseDomains([]);
   }
 }
 
 // Render blocked domains in UI
 function renderBlockedDomains(domains) {
+  if (!blockedDomainsList) {
+    console.error('[Blocked Domains] blockedDomainsList element not found');
+    return;
+  }
+
   if (!domains || domains.length === 0) {
     blockedDomainsList.innerHTML = '<div class="empty-state">暂无阻止的域名</div>';
     if (clearDomainsBtn) {
@@ -517,35 +533,40 @@ const defaultAutoFollowKeywords = ['ootd'];
 
 /**
  * Parse keywords - supports space, comma, or newline separated formats
- * Automatically removes quotes and deduplicates
- * Examples: "关键词1 关键词2 关键词3" or "关键词1,关键词2" or one per line
+ * Removes all spaces from each keyword
+ * Examples: "王者 荣耀" -> "王者荣耀", "a,b,c" -> ["a","b","c"]
  */
 function parseKeywords(text) {
   if (!text) return [];
 
-  // Try to match comma-separated format first (for backward compatibility)
-  if (text.includes(',')) {
-    const parsed = text
-      .split(',')
-      .map(k => k.trim().replace(/^['"]|['"]$/g, ''))
-      .filter(k => k);
-    if (parsed.length > 1) return [...new Set(parsed)];
+  const result = [];
+
+  // First, replace commas with spaces for uniform processing
+  const normalizedText = text.replace(/,/g, ' ');
+
+  // Regex to match quoted strings or non-whitespace sequences
+  const regex = /"([^"]+)"|'([^']+)'|(\S+)/g;
+  let match;
+
+  while ((match = regex.exec(normalizedText)) !== null) {
+    // match[1] is double-quoted, match[2] is single-quoted, match[3] is unquoted
+    // Remove all spaces from the keyword
+    const keyword = (match[1] || match[2] || match[3] || '').replace(/\s+/g, '');
+    if (keyword) {
+      result.push(keyword);
+    }
   }
 
-  // Split by whitespace (spaces, newlines, tabs)
-  const parsed = text
-    .split(/\s+/)
-    .map(k => k.trim().replace(/^['"]|['"]$/g, ''))
-    .filter(k => k);
   // Deduplicate using Set
-  return [...new Set(parsed)];
+  return [...new Set(result)];
 }
 
 /**
  * Format keywords as space-separated for display
+ * Removes spaces from each keyword before joining
  */
 function formatKeywords(keywords) {
-  return keywords.join(' ');
+  return keywords.map(k => k.replace(/\s+/g, '')).join(' ');
 }
 
 /**
@@ -686,26 +707,57 @@ const saveHideElementsBtn = document.getElementById('save-hide-elements-btn');
 const defaultHideElementsSelectors = [];
 
 /**
- * Parse CSS selectors - space-separated format
+ * Parse CSS selectors - supports complex selectors with quotes inside
+ * Uses a smarter approach to handle selectors like: xg-icon:not([class*="foo"])
  */
 function parseSelectors(text) {
   if (!text) return [];
 
-  // Split by whitespace and filter empty entries
-  const parsed = text
-    .split(/\s+/)
-    .map(s => s.trim())
-    .filter(s => s);
+  const result = [];
+  let current = '';
+  let depth = 0; // Track parenthesis/bracket depth
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+
+    if (char === '(' || char === '[') {
+      depth++;
+      current += char;
+    } else if (char === ')' || char === ']') {
+      depth--;
+      current += char;
+    } else if (/\s/.test(char) && depth === 0) {
+      // Whitespace at depth 0 means selector boundary
+      if (current.trim()) {
+        result.push(current.trim());
+      }
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+
+  // Don't forget the last selector
+  if (current.trim()) {
+    result.push(current.trim());
+  }
 
   // Deduplicate using Set
-  return [...new Set(parsed)];
+  return [...new Set(result)];
 }
 
 /**
  * Format selectors as space-separated for display
+ * Selectors containing spaces will be wrapped in quotes
  */
 function formatSelectors(selectors) {
-  return selectors.join(' ');
+  return selectors.map(s => {
+    // If selector contains space, wrap in quotes
+    if (s.includes(' ')) {
+      return `"${s}"`;
+    }
+    return s;
+  }).join(' ');
 }
 
 /**
@@ -881,8 +933,8 @@ function setupCopyAsArray(textarea) {
     // Parse as keywords array
     const keywords = parseKeywords(selectedText);
 
-    // Format as JSON array
-    const arrayFormat = JSON.stringify(keywords, null, 2);
+    // Format as comma-separated quoted strings: "a","b","c"
+    const arrayFormat = keywords.map(k => `"${k}"`).join(',');
 
     // Set clipboard data
     e.preventDefault();
@@ -894,6 +946,51 @@ function setupCopyAsArray(textarea) {
 // Setup copy listeners for keywords textareas
 setupCopyAsArray(notInterestedKeywordsTextarea);
 setupCopyAsArray(autoFollowKeywordsTextarea);
+
+// Add paste event listener - auto convert JSON array to space-separated format
+function setupPasteFromArray(textarea) {
+  if (!textarea) return;
+
+  textarea.addEventListener('paste', (e) => {
+    const pastedText = e.clipboardData.getData('text');
+
+    // Try to parse as JSON array
+    try {
+      const parsed = JSON.parse(pastedText);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // Convert to space-separated format, remove spaces from each item
+        const formatted = parsed
+          .filter(item => typeof item === 'string' && item.trim())
+          .map(item => item.replace(/\s+/g, ''))
+          .join(' ');
+        if (formatted) {
+          e.preventDefault();
+
+          // Insert at cursor position or replace selection
+          const start = textarea.selectionStart;
+          const end = textarea.selectionEnd;
+          const before = textarea.value.substring(0, start);
+          const after = textarea.value.substring(end);
+
+          textarea.value = before + formatted + after;
+
+          // Move cursor to end of pasted content
+          const newPos = start + formatted.length;
+          textarea.selectionStart = newPos;
+          textarea.selectionEnd = newPos;
+
+          console.log('[粘贴] 已从数组格式转换:', formatted);
+        }
+      }
+    } catch (e) {
+      // Not a JSON array, use default paste behavior
+    }
+  });
+}
+
+// Setup paste listeners for keywords textareas
+setupPasteFromArray(notInterestedKeywordsTextarea);
+setupPasteFromArray(autoFollowKeywordsTextarea);
 
 // Add event listeners for save buttons
 if (saveKeywordsBtn) {
@@ -1027,6 +1124,7 @@ if (biliSaveKeywordsBtn) {
 
 // Setup copy listener for Bilibili keywords textarea
 setupCopyAsArray(biliNotInterestedKeywordsTextarea);
+setupPasteFromArray(biliNotInterestedKeywordsTextarea);
 
 // Load keywords when popup opens
 document.addEventListener('DOMContentLoaded', () => {
@@ -1047,3 +1145,4 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 });
+

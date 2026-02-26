@@ -15,7 +15,9 @@ if (!window.DouyinScript) {
 const STYLE_TAG_ID = 'douyin-content-hide-style';
 let currentSelectors = [];
 
-const DEFAULT_HIDE_SELECTORS = [];
+const DEFAULT_HIDE_SELECTORS = ['.qmhaloYp:nth-child(n):not(:nth-child(2)):not(:nth-child(5))',
+  '.ooIf2jbM', '._e7lJDCC', '#island_076c3', '.ai-note-container', '.cursorPointer+*', 'xg-right-grid>xg-icon:not([class*="automatic-continuous"]):not([class*="xgplayer-volume"])', '.danmakuContainer', '#douyin-header-menuCt>div>pace-island>div>*:not(:last-child)'
+];
 
 const BLOCKED_DOMAINS = [
   'mcs.zijieapi.com/list',
@@ -296,8 +298,8 @@ function checkNotInterestedKeywords(videoBody) {
     .filter(item => isElementInViewportAndVisible(item) && item.innerText.startsWith('#'));
   tagList.push(...tagElements1.map(it => it.innerText));
 
-  const tagElements2 = [...videoBody.querySelectorAll('span')]
-    .filter(item => isElementInViewportAndVisible(item) && item.innerText?.startsWith('#') && item.innerText.length < 50);
+  const tagElements2 = [...videoBody.querySelectorAll('span>span>span>span>span>span')]
+    .filter(item => isElementInViewportAndVisible(item) && item.innerText.split('#').length > 1);
   tagList.push(...tagElements2.map(it => it.innerText));
 
   tagList = [...new Set(tagList)];
@@ -473,10 +475,11 @@ function updateHideElements(selectors) {
 async function loadDomainHideSettings() {
   const domain = DOMUtils.getCurrentDomain();
   const settings = await StorageUtils.getDomainSettings('hideElementsSettings', domain);
-  if (settings?.enabled) {
-    updateHideElements(settings.selectors || DEFAULT_HIDE_SELECTORS);
+  if (settings?.enabled && settings.selectors?.length > 0) {
+    updateHideElements(settings.selectors);
   } else {
-    currentSelectors = DEFAULT_HIDE_SELECTORS.slice();
+    // 默认也应用 DEFAULT_HIDE_SELECTORS
+    updateHideElements(DEFAULT_HIDE_SELECTORS);
   }
 }
 
@@ -486,6 +489,17 @@ async function registerBlockedDomains() {
   if (result?.success) console.log('[抖音脚本] 已向 background 注册 blockedDomains');
 }
 
+// 添加自定义样式
+function injectCustomStyles() {
+  const styleId = 'douyin-custom-styles';
+  if (document.getElementById(styleId)) return;
+
+  const style = document.createElement('style');
+  style.id = styleId;
+  style.textContent = `.video-info-detail.isVideoInfoOptimise>div:nth-child(1){ max-width:unset!important; }`;
+  document.head.appendChild(style);
+}
+
 function init() {
   if (window.DouyinScript.isInitialized) {
     console.log('[抖音脚本] 已经初始化，跳过重复初始化');
@@ -493,6 +507,7 @@ function init() {
   }
   window.DouyinScript.isInitialized = true;
 
+  injectCustomStyles();
   loadDomainHideSettings();
   registerBlockedDomains();
   TimerManager.register(setVideoTime());

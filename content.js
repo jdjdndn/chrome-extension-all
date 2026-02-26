@@ -4,6 +4,21 @@
 
 'use strict';
 
+// ========== Inject Page Context Script ==========
+// Inject the script into the page context to intercept XHR/Fetch at page level
+(function() {
+  // Check if already injected to avoid duplicate injection
+  if (window._injectScriptInjected) return;
+  window._injectScriptInjected = true;
+
+  const script = document.createElement('script');
+  script.src = chrome.runtime.getURL('inject.js');
+  script.onload = function() {
+    this.remove();
+  };
+  (document.head || document.documentElement).appendChild(script);
+})();
+
 // ========== Domain-specific Default Hide Selectors ==========
 const DOMAIN_DEFAULT_HIDE_SELECTORS = {
   '4hu.tv': ['.kkm-content'],
@@ -169,13 +184,81 @@ MessagingUtils.createMessageHandler('content_main_handler', {
   }
 });
 
+// ========== Mock Rules ==========
+// Simple structure: URL -> mock response (deleted after use)
+let mockRules = {};
+
+// Clear mock rules on page load (they should only last for one request within a session)
+async function initMockRules() {
+  try {
+    // Clear any stale mock rules from storage
+    mockRules = {};
+    await chrome.storage.local.set({ mockRules });
+  } catch (e) {
+    console.error('[Mock] Failed to clear mock rules:', e);
+  }
+}
+
+// Get and consume mock response for URL (deletes after use)
+function getMockResponse(url) {
+  try {
+    const urlObj = new URL(url);
+    const urlPath = urlObj.origin + urlObj.pathname;
+
+    // Check exact match
+    if (mockRules.hasOwnProperty(urlPath)) {
+      const mockData = mockRules[urlPath];
+      // Delete after use (one-time mock)
+      delete mockRules[urlPath];
+      chrome.storage.local.set({ mockRules }).catch(() => {});
+      if (settings.debugMode) {
+        console.log('[Mock] Mock used and removed:', urlPath);
+      }
+      return mockData;
+    }
+
+    return null;
+  } catch (e) {
+    return null;
+  }
+}
+
+// Initial load - clear stale mock rules
+initMockRules();
+
+// Listen for storage changes to update mock rules
+StorageUtils.onChanged((changes, areaName) => {
+  if (areaName === 'local' && changes.mockRules) {
+    mockRules = changes.mockRules.newValue || {};
+  }
+});
+
 // ========== Fetch Interception ==========
 if (!window._originalFetch) {
   window._originalFetch = window.fetch;
   window.fetch = async function (url, options = {}) {
     try {
+      const urlString = typeof url === 'string' ? url : url.url;
+
+      // Check for mock response first
+      const mockData = getMockResponse(urlString);
+      if (mockData !== null) {
+        if (settings.debugMode) {
+          console.log('[Mock] Intercepting fetch:', urlString);
+        }
+        const responseBody = typeof mockData === 'string' ? mockData : JSON.stringify(mockData);
+        return new Response(responseBody, {
+          status: 200,
+          statusText: 'OK',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Mock-Intercepted': 'true'
+          }
+        });
+      }
+
       const currentDomain = new URL(window.location.href).hostname;
-      const requestDomain = new URL(url).hostname;
+      const requestDomain = new URL(urlString).hostname;
 
       const result = await MessagingUtils.checkDomainBlocked(currentDomain, requestDomain);
 
@@ -191,9 +274,77 @@ if (!window._originalFetch) {
         throttledPrintUrls();
       }
 
-      return window._originalFetch(url, options);
+      return await window._originalFetch(url, options);
     } catch (error) {
       return window._originalFetch(url, options);
     }
   };
+}
+
+// ========== XMLHttpRequest Interception ==========
+if (!window._originalXHR) {
+  window._originalXHR = window.XMLHttpRequest;
+
+  window.XMLHttpRequest = function() {
+    const xhr = new window._originalXHR();
+    let _url = '';
+    let _method = 'GET';
+
+    const originalOpen = xhr.open;
+    const originalSend = xhr.send;
+
+    xhr.open = function(method, url, ...args) {
+      _url = url;
+      _method = method;
+      return originalOpen.call(this, method, url, ...args);
+    };
+
+    xhr.send = function(body) {
+      // Check for mock response
+      const mockData = getMockResponse(_url);
+      if (mockData !== null) {
+        if (settings.debugMode) {
+          console.log('[Mock] Intercepting XHR:', _url);
+        }
+
+        const responseBody = typeof mockData === 'string' ? mockData : JSON.stringify(mockData);
+
+        // Simulate async response
+        setTimeout(() => {
+          Object.defineProperty(xhr, 'status', { value: 200, writable: false });
+          Object.defineProperty(xhr, 'readyState', { value: 4, writable: false });
+          Object.defineProperty(xhr, 'responseText', { value: responseBody, writable: false });
+          Object.defineProperty(xhr, 'response', { value: responseBody, writable: false });
+
+          xhr.getResponseHeader = function(header) {
+            if (header.toLowerCase() === 'content-type') {
+              return 'application/json';
+            }
+            if (header.toLowerCase() === 'x-mock-intercepted') {
+              return 'true';
+            }
+            return null;
+          };
+
+          if (xhr.onreadystatechange) xhr.onreadystatechange();
+          if (xhr.onload) xhr.onload();
+          xhr.dispatchEvent(new Event('load'));
+          xhr.dispatchEvent(new Event('readystatechange'));
+        }, 10);
+
+        return;
+      }
+
+      return originalSend.call(this, body);
+    };
+
+    return xhr;
+  };
+
+  // Copy static properties
+  window.XMLHttpRequest.UNSENT = 0;
+  window.XMLHttpRequest.OPENED = 1;
+  window.XMLHttpRequest.HEADERS_RECEIVED = 2;
+  window.XMLHttpRequest.LOADING = 3;
+  window.XMLHttpRequest.DONE = 4;
 }

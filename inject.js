@@ -47,6 +47,47 @@ function getGlobalVar(name) {
   }
 }
 
+// ========== XHR Interception in Page Context ==========
+// This intercepts XHR requests made by the page itself (not content script)
+if (!window._injectOriginalXHR) {
+  window._injectOriginalXHR = window.XMLHttpRequest;
+
+  window.XMLHttpRequest = function() {
+    const xhr = new window._injectOriginalXHR();
+    const originalOpen = xhr.open;
+    const originalSend = xhr.send;
+
+    xhr.open = function(method, url, ...args) {
+      this._url = url;
+      this._method = method;
+      return originalOpen.call(this, method, url, ...args);
+    };
+
+    xhr.send = function(body) {
+      return originalSend.call(this, body);
+    };
+
+    return xhr;
+  };
+
+  // Copy static properties
+  window.XMLHttpRequest.UNSENT = 0;
+  window.XMLHttpRequest.OPENED = 1;
+  window.XMLHttpRequest.HEADERS_RECEIVED = 2;
+  window.XMLHttpRequest.LOADING = 3;
+  window.XMLHttpRequest.DONE = 4;
+}
+
+// ========== Fetch Interception in Page Context ==========
+// This intercepts fetch requests made by the page itself
+if (!window._injectOriginalFetch) {
+  window._injectOriginalFetch = window.fetch;
+
+  window.fetch = async function(url, options = {}) {
+    return await window._injectOriginalFetch(url, options);
+  };
+}
+
 // Create a bridge between the extension and page context
 window.ExtensionBridge = {
   // Send message to content script

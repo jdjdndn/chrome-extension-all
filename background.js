@@ -86,6 +86,9 @@ let extensionState = {
   }, // 新增：域名到注入脚本映射 {域名: [文件名数组]}
 };
 
+// Mock rules storage: { urlPattern: { response: any, enabled: boolean, statusCode: number } }
+let mockRules = {};
+
 // Define getters and setters that bind to current active tab's domain
 Object.defineProperties(extensionState, {
   blockedDomains: {
@@ -125,10 +128,10 @@ Object.defineProperties(extensionState, {
 // Persist domain blocked data to storage
 async function persistDomainBlockedData() {
   try {
-    const settings = await chrome.storage.sync.get(SETTINE);
-    const currentSettings = settings.settings || {};
+    const result = await chrome.storage.sync.get(SETTINE);
+    const currentSettings = result[SETTINE] || result.settings || {};
     await chrome.storage.sync.set({
-      settings: {
+      [SETTINE]: {
         ...currentSettings,
         domainBlockedData: _domainBlockedData
       }
@@ -218,7 +221,7 @@ function initialize() {
 async function loadSettings() {
   try {
     const result = await chrome.storage.sync.get(SETTINE);
-    const settings = result.settings || { debugMode: true };
+    const settings = result[SETTINE] || result.settings || { debugMode: true };
     extensionState.isDebugMode = settings.debugMode || true;
 
     // Load domain-specific blocked data
@@ -236,10 +239,15 @@ async function loadSettings() {
 
     extensionState.domainScriptMap = settings.domainScriptMap || extensionState.domainScriptMap || {};
 
+    // Clear mock rules on startup (they should only last for one request)
+    mockRules = {};
+    await chrome.storage.local.set({ mockRules });
+
     if (extensionState.isDebugMode) {
       console.log('Settings loaded:', settings);
       console.log('Domain blocked data:', _domainBlockedData);
       console.log('Domain script map:', extensionState.domainScriptMap);
+      console.log('Mock rules loaded:', Object.keys(mockRules).length, 'rules');
     }
 
     // Update declarative net request rules
@@ -518,7 +526,8 @@ async function handleMessage(message, sender, sendResponse) {
     console.log('Background received message:', message);
   }
 
-  switch (message.type) {
+  try {
+    switch (message.type) {
     case 'GET_EXTENSION_INFO':
       const currentDomainForInfo = await getCurrentTabDomain();
       sendResponse({
@@ -616,10 +625,16 @@ async function handleMessage(message, sender, sendResponse) {
 
     case 'GET_BLOCKED_DOMAINS':
       const currentDomainForResponse = await getCurrentTabDomain();
+      console.log('[Background] GET_BLOCKED_DOMAINS - currentDomain:', currentDomainForResponse);
+      console.log('[Background] _domainBlockedData:', JSON.stringify(_domainBlockedData));
+      const blockedDomains = getBlockedDomainsForDomain(currentDomainForResponse);
+      const blockedResponseDomains = getBlockedResponseDomainsForDomain(currentDomainForResponse);
+      console.log('[Background] blockedDomains:', blockedDomains);
+      console.log('[Background] blockedResponseDomains:', blockedResponseDomains);
       sendResponse({
         currentDomain: currentDomainForResponse,
-        blockedDomains: getBlockedDomainsForDomain(currentDomainForResponse),
-        blockedResponseDomains: getBlockedResponseDomainsForDomain(currentDomainForResponse),
+        blockedDomains: blockedDomains,
+        blockedResponseDomains: blockedResponseDomains,
         domainScriptMap: extensionState.domainScriptMap,
         allDomainBlockedData: _domainBlockedData
       });
@@ -691,9 +706,155 @@ async function handleMessage(message, sender, sendResponse) {
       }
       break;
 
+    case 'REGISTER_MOCK':
+      // Register a mock rule (simple URL -> response mapping)
+      if (message.url && message.response !== undefined) {
+        mockRules[message.url] = message.response;
+        console.log('[Mock] Registered mock for:', message.url);
+        chrome.storage.local.set({ mockRules }).catch(() => {});
+        sendResponse({ success: true });
+      } else {
+        sendResponse({ success: false, error: 'Missing url or response' });
+      }
+      break;
+
+    case 'UNREGISTER_MOCK':
+      // Remove a mock rule
+      if (message.url) {
+        delete mockRules[message.url];
+        console.log('[Mock] Unregistered mock for:', message.url);
+        chrome.storage.local.set({ mockRules }).catch(() => {});
+        sendResponse({ success: true });
+      } else {
+        sendResponse({ success: false, error: 'Missing url' });
+      }
+      break;
+
+    case 'GET_MOCK_RULES':
+      sendResponse({ success: true, rules: mockRules });
+      break;
+
+    case 'CLEAR_MOCK_RULES':
+      mockRules = {};
+      chrome.storage.local.set({ mockRules }).catch(() => {});
+      sendResponse({ success: true });
+      break;
+
+    case 'CHECK_MOCK':
+      // Check if a URL has a mock rule
+      const mockEntry = mockRules[message.url];
+      if (mockEntry && mockEntry.enabled) {
+        sendResponse({
+          hasMock: true,
+          response: mockEntry.response,
+          statusCode: mockEntry.statusCode,
+          contentType: mockEntry.contentType
+        });
+      } else {
+        sendResponse({ hasMock: false });
+      }
+      break;
+
+    case 'GET_MEMORY_INFO':
+      // 获取当前标签页的性能和内存信息
+      try {
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tabs[0]) {
+          // 在页面中执行脚本获取内存信息
+          const results = await chrome.scripting.executeScript({
+            target: { tabId: tabs[0].id },
+            func: () => {
+              const info = {};
+
+              // JS堆内存信息
+              if (performance.memory) {
+                info.jsHeapSizeLimit = performance.memory.jsHeapSizeLimit;
+                info.totalJSHeapSize = performance.memory.totalJSHeapSize;
+                info.usedJSHeapSize = performance.memory.usedJSHeapSize;
+              }
+
+              // 导航计时
+              if (performance.getEntriesByType) {
+                const navigation = performance.getEntriesByType('navigation')[0];
+                if (navigation) {
+                  info.domContentLoaded = navigation.domContentLoadedEventEnd;
+                  info.loadComplete = navigation.loadEventEnd;
+                  info.domInteractive = navigation.domInteractive;
+                  info.transferSize = navigation.transferSize;
+                  info.encodedBodySize = navigation.encodedBodySize;
+                  info.decodedBodySize = navigation.decodedBodySize;
+                }
+
+                // 资源信息
+                const resources = performance.getEntriesByType('resource');
+                info.resourceCount = resources.length;
+                info.resourceSize = resources.reduce((sum, r) => sum + (r.transferSize || 0), 0);
+              }
+
+              return info;
+            }
+          });
+
+          if (results && results[0]) {
+            sendResponse({ success: true, data: results[0].result });
+          } else {
+            sendResponse({ success: false, error: 'No result from script' });
+          }
+        } else {
+          sendResponse({ success: false, error: 'No active tab' });
+        }
+      } catch (error) {
+        console.error('[Background] Error getting memory info:', error);
+        sendResponse({ success: false, error: error.message });
+      }
+      break;
+
+    case 'CLEANUP_COOKIES':
+      // 清理当前页面的cookies
+      try {
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tabs[0] && tabs[0].url) {
+          const url = new URL(tabs[0].url);
+          const cookies = await chrome.cookies.getAll({ domain: url.hostname });
+          let count = 0;
+          for (const cookie of cookies) {
+            await chrome.cookies.remove({
+              url: `${url.protocol}//${cookie.domain}${cookie.path}`,
+              name: cookie.name
+            });
+            count++;
+          }
+          sendResponse({ success: true, count });
+        } else {
+          sendResponse({ success: false, error: 'No active tab' });
+        }
+      } catch (error) {
+        console.error('[Background] Error cleaning cookies:', error);
+        sendResponse({ success: false, error: error.message });
+      }
+      break;
+
+    case 'CLEAR_BROWSING_DATA':
+      // Clear browsing data - handled in background script
+      console.log('[Background] 收到清除数据请求:', message);
+      try {
+        // chrome.browsingData.remove requires {since: number} as first parameter
+        await chrome.browsingData.remove({ since: message.data.since }, message.data.dataTypes);
+        console.log('[清除数据] 已清除:', message.data.dataTypes);
+        sendResponse({ success: true });
+      } catch (error) {
+        console.error('[清除数据] 清除失败:', error);
+        sendResponse({ success: false, error: error.message });
+      }
+      break;
+
     default:
       console.warn('Unknown message type:', message.type);
       sendResponse({ error: 'Unknown message type' });
+  }
+  } catch (error) {
+    console.error('[Background] Error handling message:', error);
+    sendResponse({ error: error.message, success: false });
   }
 }
 
