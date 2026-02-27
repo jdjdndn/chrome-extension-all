@@ -103,6 +103,9 @@
     "service_worker": "background.js",
     "type": "module"
   },
+  "chrome_url_overrides": {
+    "newtab": "newtab.html"
+  },
   "web_accessible_resources": [
     {
       "resources": ["inject.js", "content/*.js", "content/common/*.js"],

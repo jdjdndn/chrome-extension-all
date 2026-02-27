@@ -1088,7 +1088,7 @@
       /* Network panel table header */
       .network-table-header {
         display: grid;
-        grid-template-columns: 24px 44px 1fr 50px 40px 45px 50px;
+        grid-template-columns: 24px 30px 44px 1fr 50px 40px 45px 50px;
         padding: 0 4px;
         background: #f0f0f0;
         border-bottom: 1px solid #bbb;
@@ -1166,7 +1166,7 @@
       /* Network panel row style */
       .mock-item {
         display: grid;
-        grid-template-columns: 24px 44px 1fr 50px 40px 45px 50px;
+        grid-template-columns: 24px 30px 44px 1fr 50px 40px 45px 50px;
         padding: 0 4px;
         border-bottom: 1px solid #d0d0d0;
         cursor: pointer;
@@ -1190,25 +1190,47 @@
       }
 
       .mock-item.active {
-        background: #094771;
+        background: #007acc;
+        color: #fff;
+      }
+
+      .mock-item.active .url,
+      .mock-item.active .type-label,
+      .mock-item.active .col-size,
+      .mock-item.active .col-time {
+        color: #fff;
       }
 
       .mock-item.mocked {
-        background: rgba(78, 201, 176, 0.1);
+        background: rgba(0, 122, 204, 0.15);
+        border-left: 3px solid #007acc;
       }
 
       .mock-item.mocked:hover {
-        background: rgba(78, 201, 176, 0.15);
+        background: rgba(0, 122, 204, 0.2);
       }
 
       .mock-item.mocked.active {
-        background: rgba(78, 201, 176, 0.25);
+        background: #007acc;
+        border-left-color: #fff;
       }
 
       /* Column cells */
       .mock-item .col-icon {
         padding: 2px 4px;
         text-align: center;
+      }
+
+      .mock-item .col-mock-switch {
+        padding: 2px 4px;
+        text-align: center;
+      }
+
+      .mock-item .col-mock-switch input[type="checkbox"] {
+        width: 14px;
+        height: 14px;
+        cursor: pointer;
+        accent-color: #4ec9b0;
       }
 
       .mock-item .col-method {
@@ -1277,10 +1299,10 @@
         display: inline-block;
       }
 
-      .mock-item .status.success { background: #2d7d46; color: #333333; }
-      .mock-item .status.error { background: #c53030; color: #333333; }
-      .mock-item .status.pending { background: #e0a040; color: #333333; }
-      .mock-item .status.mocked { background: #4ec9b0; color: #ffffff; font-weight: 600; }
+      .mock-item .status.success { background: #2d7d46; color: #fff; }
+      .mock-item .status.error { background: #c53030; color: #fff; }
+      .mock-item .status.pending { background: #e0a040; color: #fff; }
+      .mock-item .status.mocked { background: #4ec9b0; color: #fff; font-weight: 600; }
 
       .mock-item .url {
         font-family: "Consolas", "Monaco", monospace;
@@ -1370,6 +1392,57 @@
         color: #333333;
         border-bottom-color: #007acc;
         background: rgba(0, 122, 204, 0.15);
+      }
+
+      /* Response sub-tabs */
+      .response-sub-tabs {
+        display: flex;
+        background: #f5f5f5;
+        border-bottom: 1px solid #d0d0d0;
+        flex-shrink: 0;
+        margin-top: 0;
+      }
+
+      .response-sub-tab {
+        padding: 6px 12px;
+        font-size: 10px;
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        color: #666666;
+        transition: all 0.2s ease;
+        background: transparent;
+      }
+
+      .response-sub-tab:hover {
+        color: #333333;
+        background: rgba(0, 0, 0, 0.05);
+      }
+
+      .response-sub-tab.active {
+        color: #333333;
+        border-bottom-color: #007acc;
+        background: rgba(0, 122, 204, 0.1);
+      }
+
+      .response-sub-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        min-height: 0;
+      }
+
+      .response-sub-pane {
+        display: none;
+        flex: 1;
+        overflow: hidden;
+        flex-direction: column;
+        min-height: 0;
+        max-height: 100%;
+      }
+
+      .response-sub-pane.active {
+        display: flex;
       }
 
       .mock-editor-content {
@@ -1672,8 +1745,8 @@
 
       /* Editor textarea improvements */
       .mock-response-editor textarea {
-        background: linear-gradient(180deg, #e8e8e8 0%, #151515 100%);
-        box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.12);
+        background: #ffffff;
+        border: 1px solid #d0d0d0;
       }
 
       /* Tab indicator animation */
@@ -1994,13 +2067,12 @@
 
       /* Improved response viewer */
       .mock-response-viewer {
-        background: linear-gradient(180deg, #e8e8e8 0%, #151515 100%);
+        background: #ffffff;
       }
 
       .mock-response-viewer .json-content {
         position: relative;
         border-left: 3px solid #007acc;
-        box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.12);
       }
 
       /* Collapsible JSON styles */
@@ -2589,11 +2661,11 @@
       }
 
       /* Method badge styles */
-      .mock-item .method.get { background: linear-gradient(135deg, #2d7d46 0%, #1e5a32 100%); }
-      .mock-item .method.post { background: linear-gradient(135deg, #0e639c 0%, #0a4d78 100%); }
-      .mock-item .method.put { background: linear-gradient(135deg, #b8860b 0%, #8b6508 100%); }
-      .mock-item .method.delete { background: linear-gradient(135deg, #c53030 0%, #9b2c2c 100%); }
-      .mock-item .method.patch { background: linear-gradient(135deg, #6b4c9a 0%, #553d7a 100%); }
+      .mock-item .method.get { background: #2d7d46; color: #fff; }
+      .mock-item .method.post { background: #0e639c; color: #fff; }
+      .mock-item .method.put { background: #b8860b; color: #fff; }
+      .mock-item .method.delete { background: #c53030; color: #fff; }
+      .mock-item .method.patch { background: #6b4c9a; color: #fff; }
 
       /* Mock badge animation */
       .mock-item .mock-badge {
@@ -4302,8 +4374,19 @@
         <div class="tab-header">
           <span class="header-icon">🔧</span>
           <span>接口 Mock</span>
-          <button class="mock-btn secondary" id="mock-clear-btn" style="margin-left: auto; padding: 4px 8px; font-size: 10px;">清空</button>
-          <button class="mock-btn secondary" id="mock-refresh-btn" style="padding: 4px 8px; font-size: 10px;">刷新</button>
+          <!-- Mock 总开关 -->
+          <div style="margin-left: auto; display: flex; align-items: center; gap: 8px;">
+            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11px; color: #333; background: #e8e8e8; padding: 4px 10px; border-radius: 4px; border: 1px solid #d0d0d0;">
+              <input type="checkbox" id="mock-global-switch" style="margin: 0; accent-color: #4ec9b0;">
+              <span id="mock-global-status">Mock 关闭</span>
+            </label>
+            <button class="mock-btn secondary" id="mock-clear-btn" style="padding: 4px 8px; font-size: 10px;">清空</button>
+            <button class="mock-btn secondary" id="mock-refresh-btn" style="padding: 4px 8px; font-size: 10px;">刷新</button>
+          </div>
+        </div>
+        <div class="mock-tip" style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 8px 12px; margin: 0 8px 8px 8px; font-size: 11px; color: #856404; display: flex; align-items: center; gap: 6px;">
+          <span>💡</span>
+          <span>此面板只能捕获打开<strong>之后</strong>发生的 XHR/Fetch 请求。请先打开此面板，然后在页面中操作触发接口请求。</span>
         </div>
         <div class="mock-container">
           <!-- Request List -->

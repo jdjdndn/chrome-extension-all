@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>新标签页</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      overflow: hidden;
+      height: 100%;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 900px;
+      width: 100%;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      padding: 40px;
+      margin-top: 40px;
+      overflow-y: auto;
+      max-height: calc(100vh - 200px);
+    }
+
+    /* 隐藏滚动条但保持滚动功能 */
+    .container::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .container::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .container::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 3px;
+    }
+
+    .container::-webkit-scrollbar-thumb:hover {
+      background: rgba(0, 0, 0, 0.3);
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .header h1 {
+      font-size: 32px;
+      color: #333;
+      margin-bottom: 10px;
+    }
+
+    .header p {
+      color: #666;
+      font-size: 14px;
+    }
+
+    .search-box {
+      margin-bottom: 40px;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 16px 24px;
+      font-size: 16px;
+      border: 2px solid #e0e0e0;
+      border-radius: 12px;
+      outline: none;
+      transition: all 0.3s ease;
+      background: #f8f9fa;
+    }
+
+    .search-input:focus {
+      border-color: #667eea;
+      background: #fff;
+      box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+    }
+
+    .quick-links {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 20px;
+      margin-bottom: 40px;
+    }
+
+    .quick-link {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 12px;
+      text-decoration: none;
+      color: #333;
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+
+    .quick-link:hover {
+      background: #667eea;
+      color: #fff;
+      transform: translateY(-4px);
+      box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+    }
+
+    .quick-link-icon {
+      width: 48px;
+      height: 48px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .quick-link:hover .quick-link-icon {
+      background: rgba(255, 255, 255, 0.2);
+      box-shadow: none;
+    }
+
+    .quick-link-title {
+      font-size: 13px;
+      font-weight: 500;
+      text-align: center;
+    }
+
+    .tools-section {
+      border-top: 1px solid #e0e0e0;
+      padding-top: 30px;
+    }
+
+    .tools-title {
+      font-size: 18px;
+      color: #333;
+      margin-bottom: 20px;
+      font-weight: 600;
+    }
+
+    .tools-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 15px;
+    }
+
+    .tool-item {
+      display: flex;
+      align-items: center;
+      padding: 15px;
+      background: #f8f9fa;
+      border-radius: 10px;
+      text-decoration: none;
+      color: #333;
+      transition: all 0.3s ease;
+    }
+
+    .tool-item:hover {
+      background: #667eea;
+      color: #fff;
+      transform: translateX(4px);
+    }
+
+    .tool-icon {
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      background: #fff;
+      border-radius: 8px;
+      margin-right: 12px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .tool-item:hover .tool-icon {
+      background: rgba(255, 255, 255, 0.2);
+      box-shadow: none;
+    }
+
+    .tool-info {
+      flex: 1;
+    }
+
+    .tool-name {
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .tool-desc {
+      font-size: 12px;
+      color: #666;
+      margin-top: 2px;
+    }
+
+    .tool-item:hover .tool-desc {
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .time-display {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      font-size: 24px;
+      font-weight: 300;
+      color: rgba(255, 255, 255, 0.9);
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    .date-display {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.7);
+      margin-top: 5px;
+    }
+
+    .add-link-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: #f0f0f0;
+      border: 2px dashed #ccc;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .add-link-btn:hover {
+      border-color: #667eea;
+      background: rgba(102, 126, 234, 0.1);
+    }
+
+    .add-link-btn-icon {
+      font-size: 32px;
+      color: #999;
+    }
+
+    .add-link-btn:hover .add-link-btn-icon {
+      color: #667eea;
+    }
+
+    .add-link-btn-text {
+      font-size: 13px;
+      color: #666;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="time-display" id="time">00:00</div>
+  <div class="date-display" id="date">星期一</div>
+
+  <div class="container">
+    <div class="header">
+      <h1>👋 欢迎使用</h1>
+      <p>快速访问您的常用网站和工具</p>
+    </div>
+
+    <div class="search-box">
+      <input type="text" class="search-input" id="searchInput" placeholder="搜索或输入网址..." autofocus>
+    </div>
+
+    <div class="quick-links" id="quickLinks">
+      <!-- 默认快捷方式 -->
+      <a class="quick-link" href="https://www.google.com">
+        <div class="quick-link-icon">🔍</div>
+        <span class="quick-link-title">Google</span>
+      </a>
+      <a class="quick-link" href="https://www.baidu.com">
+        <div class="quick-link-icon">🔎</div>
+        <span class="quick-link-title">百度</span>
+      </a>
+      <a class="quick-link" href="https://github.com">
+        <div class="quick-link-icon">🐱</div>
+        <span class="quick-link-title">GitHub</span>
+      </a>
+      <a class="quick-link" href="https://www.bilibili.com">
+        <div class="quick-link-icon">📺</div>
+        <span class="quick-link-title">B站</span>
+      </a>
+      <a class="quick-link" href="https://www.zhihu.com">
+        <div class="quick-link-icon">🧠</div>
+        <span class="quick-link-title">知乎</span>
+      </a>
+      <a class="quick-link" href="https://juejin.cn">
+        <div class="quick-link-icon">💎</div>
+        <span class="quick-link-title">掘金</span>
+      </a>
+
+      <div class="add-link-btn" id="addLinkBtn">
+        <span class="add-link-btn-icon">+</span>
+        <span class="add-link-btn-text">添加</span>
+      </div>
+    </div>
+
+    <div class="tools-section">
+      <div class="tools-title">🛠️ 实用工具</div>
+      <div class="tools-grid">
+        <a href="https://www.google.com/search?q=chrome+extensions" target="_blank" class="tool-item">
+          <div class="tool-icon">⚙️</div>
+          <div class="tool-info">
+            <div class="tool-name">扩展管理</div>
+            <div class="tool-desc">管理浏览器扩展</div>
+          </div>
+        </a>
+        <a href="https://www.speedtest.net/" target="_blank" class="tool-item">
+          <div class="tool-icon">📊</div>
+          <div class="tool-info">
+            <div class="tool-name">网速测试</div>
+            <div class="tool-desc">测试网络速度</div>
+          </div>
+        </a>
+        <a href="https://wttr.in/?lang=zh" target="_blank" class="tool-item">
+          <div class="tool-icon">🌤️</div>
+          <div class="tool-info">
+            <div class="tool-name">天气查询</div>
+            <div class="tool-desc">查看当前天气</div>
+          </div>
+        </a>
+        <a href="https://ipinfo.io/" target="_blank" class="tool-item">
+          <div class="tool-icon">🌍</div>
+          <div class="tool-info">
+            <div class="tool-name">IP查询</div>
+            <div class="tool-desc">查看本机IP信息</div>
+          </div>
+        </a>
+        <a href="https://translate.google.com/?sl=auto&tl=zh-CN" target="_blank" class="tool-item">
+          <div class="tool-icon">🌐</div>
+          <div class="tool-info">
+            <div class="tool-name">谷歌翻译</div>
+            <div class="tool-desc">在线翻译工具</div>
+          </div>
+        </a>
+        <a href="https://json.cn/" target="_blank" class="tool-item">
+          <div class="tool-icon">📝</div>
+          <div class="tool-info">
+            <div class="tool-name">JSON格式化</div>
+            <div class="tool-desc">在线JSON工具</div>
+          </div>
+        </a>
+        <a href="https://regex101.com/" target="_blank" class="tool-item">
+          <div class="tool-icon">🔍</div>
+          <div class="tool-info">
+            <div class="tool-name">正则测试</div>
+            <div class="tool-desc">正则表达式测试</div>
+          </div>
+        </a>
+        <a href="https://caniuse.com/" target="_blank" class="tool-item">
+          <div class="tool-icon">📱</div>
+          <div class="tool-info">
+            <div class="tool-name">浏览器兼容</div>
+            <div class="tool-desc">查询特性支持</div>
+          </div>
+        </a>
+        <a href="https://tinypng.com/" target="_blank" class="tool-item">
+          <div class="tool-icon">🖼️</div>
+          <div class="tool-info">
+            <div class="tool-name">图片压缩</div>
+            <div class="tool-desc">在线压缩图片</div>
+          </div>
+        </a>
+        <a href="https://www.photopea.com/" target="_blank" class="tool-item">
+          <div class="tool-icon">🎨</div>
+          <div class="tool-info">
+            <div class="tool-name">在线PS</div>
+            <div class="tool-desc">在线图片编辑</div>
+          </div>
+        </a>
+        <a href="https://www.figma.com/" target="_blank" class="tool-item">
+          <div class="tool-icon">✏️</div>
+          <div class="tool-info">
+            <div class="tool-name">Figma</div>
+            <div class="tool-desc">在线设计工具</div>
+          </div>
+        </a>
+        <a href="https://codepen.io/pen/" target="_blank" class="tool-item">
+          <div class="tool-icon">💻</div>
+          <div class="tool-info">
+            <div class="tool-name">CodePen</div>
+            <div class="tool-desc">在线代码编辑</div>
+          </div>
+        </a>
+        <a href="https://convertio.co/zh/" target="_blank" class="tool-item">
+          <div class="tool-icon">🔄</div>
+          <div class="tool-info">
+            <div class="tool-name">文件转换</div>
+            <div class="tool-desc">在线文件格式转换</div>
+          </div>
+        </a>
+        <a href="https://www.remove.bg/" target="_blank" class="tool-item">
+          <div class="tool-icon">✂️</div>
+          <div class="tool-info">
+            <div class="tool-name">抠图工具</div>
+            <div class="tool-desc">在线去除背景</div>
+          </div>
+        </a>
+        <a href="https://extract.pics/" target="_blank" class="tool-item">
+          <div class="tool-icon">🖼️</div>
+          <div class="tool-info">
+            <div class="tool-name">图片提取</div>
+            <div class="tool-desc">从网站提取图片</div>
+          </div>
+        </a>
+        <a href="https://squoosh.app/" target="_blank" class="tool-item">
+          <div class="tool-icon">🎨</div>
+          <div class="tool-info">
+            <div class="tool-name">图片优化</div>
+            <div class="tool-desc">Google图片压缩工具</div>
+          </div>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script src="newtab.js"></script>
+</body>
+</html>

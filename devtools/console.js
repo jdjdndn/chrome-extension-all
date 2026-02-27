@@ -543,23 +543,34 @@ function setupAutoCleanup() {
 
   // 加载保存的设置
   chrome.storage.local.get(['autoCleanupEnabled', 'autoCleanupInterval'], (result) => {
-    if (result.autoCleanupEnabled !== undefined) {
-      autoCleanupEnabled.checked = result.autoCleanupEnabled;
-    }
-    if (result.autoCleanupInterval !== undefined) {
-      autoCleanupInterval.value = result.autoCleanupInterval;
-    }
+    try {
+      if (result.autoCleanupEnabled !== undefined) {
+        autoCleanupEnabled.checked = result.autoCleanupEnabled;
+      }
+      if (result.autoCleanupInterval !== undefined) {
+        autoCleanupInterval.value = result.autoCleanupInterval;
+      }
 
-    // 如果已启用，启动定时器
-    if (autoCleanupEnabled.checked) {
-      startAutoCleanup(parseInt(autoCleanupInterval.value));
+      // 如果已启用，启动定时器
+      if (autoCleanupEnabled.checked) {
+        startAutoCleanup(parseInt(autoCleanupInterval.value));
+      }
+    } catch (e) {
+      // Ignore errors during load
+      if (!isContextInvalidatedError(e)) {
+        console.error('[AutoCleanup] Failed to load settings:', e);
+      }
     }
   });
 
   // 切换自动清理
   autoCleanupEnabled.addEventListener('change', () => {
     const enabled = autoCleanupEnabled.checked;
-    chrome.storage.local.set({ autoCleanupEnabled: enabled });
+    chrome.storage.local.set({ autoCleanupEnabled: enabled }).catch(err => {
+      if (!isContextInvalidatedError(err)) {
+        console.error('[AutoCleanup] Failed to save enabled state:', err);
+      }
+    });
 
     if (enabled) {
       startAutoCleanup(parseInt(autoCleanupInterval.value));
@@ -571,7 +582,11 @@ function setupAutoCleanup() {
   // 修改清理间隔
   autoCleanupInterval.addEventListener('change', () => {
     const interval = parseInt(autoCleanupInterval.value);
-    chrome.storage.local.set({ autoCleanupInterval: interval });
+    chrome.storage.local.set({ autoCleanupInterval: interval }).catch(err => {
+      if (!isContextInvalidatedError(err)) {
+        console.error('[AutoCleanup] Failed to save interval:', err);
+      }
+    });
 
     if (autoCleanupEnabled.checked) {
       stopAutoCleanup();
@@ -1730,7 +1745,11 @@ function showNotification(message) {
 }
 
 // Initial load
-loadAllStorageData();
+loadAllStorageData().catch(err => {
+  if (!isContextInvalidatedError(err)) {
+    console.error('Failed to load storage data:', err);
+  }
+});
 
 // Listen for storage changes
 chrome.storage.onChanged.addListener((changes, areaName) => {
@@ -1751,19 +1770,6 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
       loadBlockedDomainsToExclude();
     }
   }
-
-  // Sync mock rules when they change
-  if (areaName === 'local' && changes.mockRules) {
-    mockRules = changes.mockRules.newValue || {};
-    renderMockList(mockFilterInput.value);
-    // If a request is selected, refresh the editor to show updated mock status
-    if (selectedRequestId) {
-      const req = mockRequests.find(r => r.id === selectedRequestId);
-      if (req) {
-        renderMockEditor(req);
-      }
-    }
-  }
 });
 
 // ============================================
@@ -1773,7 +1779,6 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 // Mock数据存储
 let mockRequests = [];
 let selectedRequestId = null;
-let mockRules = {}; // URL -> mock响应映射
 let currentInspectedDomain = ''; // 当前被检查页面的域名
 let currentTypeFilter = 'all'; // 当前类型过滤器
 let mockFilterSettings = {
@@ -1871,16 +1876,6 @@ function matchesTypeFilter(reqType, filter) {
   return type === filter;
 }
 
-// 从存储加载已存在的mock规则
-async function loadMockRules() {
-  try {
-    const result = await chrome.storage.local.get('mockRules');
-    mockRules = result.mockRules || {};
-  } catch (e) {
-    mockRules = {};
-  }
-}
-
 // 从存储加载mock过滤设置
 async function loadMockFilterSettings() {
   try {
@@ -1894,16 +1889,26 @@ async function loadMockFilterSettings() {
     }
     renderExcludePatterns();
   } catch (e) {
-    console.error('Failed to load mock filter settings:', e);
+    // Ignore context invalidated errors
+    if (!isContextInvalidatedError(e)) {
+      console.error('Failed to load mock filter settings:', e);
+    }
   }
 }
 
 // 保存mock过滤设置到存储
 async function saveMockFilterSettings() {
+  // Check context validity first
+  if (!isExtensionContextValid()) {
+    return;
+  }
   try {
     await chrome.storage.local.set({ mockFilterSettings });
   } catch (e) {
-    console.error('Failed to save mock filter settings:', e);
+    // Ignore context invalidated errors
+    if (!isContextInvalidatedError(e)) {
+      console.error('Failed to save mock filter settings:', e);
+    }
   }
 }
 
@@ -1977,11 +1982,12 @@ function isExtensionContextValid() {
 
 // 检查错误是否由于上下文失效导致
 function isContextInvalidatedError(error) {
-  return error && (
-    error.message?.includes('Extension context invalidated') ||
-    error.message?.includes('Extension not loaded') ||
-    error.name === 'Error'
-  );
+  if (!error) return false;
+  const message = error.message || error.toString();
+  return message.includes('Extension context invalidated') ||
+         message.includes('Extension not loaded') ||
+         message.includes('message port closed') ||
+         message.includes('Extension context invalid');
 }
 
 // 从后台加载被阻止的域名并添加到排除模式
@@ -2031,24 +2037,6 @@ async function loadBlockedDomainsToExclude() {
       console.error('Failed to load blocked domains:', e);
     }
   }
-}
-
-// 保存mock规则到存储
-async function saveMockRules() {
-  if (!isExtensionContextValid()) return;
-  try {
-    await chrome.storage.local.set({ mockRules });
-  } catch (e) {
-    if (!isContextInvalidatedError(e) && isExtensionContextValid()) {
-      console.error('Failed to save mock rules:', e);
-    }
-  }
-}
-
-// 检查URL是否有mock规则
-function hasMockRule(url) {
-  const urlPath = getUrlPath(url);
-  return mockRules.hasOwnProperty(urlPath);
 }
 
 // 获取URL路径（不包含查询字符串，用于匹配）
@@ -2154,6 +2142,25 @@ function renderMockList(filter = '', forceAnimate = false) {
   const filterByDomain = filterCurrentDomainCheckbox && filterCurrentDomainCheckbox.checked;
   const maxCount = mockFilterSettings.maxDisplayCount || 50;
 
+  // 先获取页面上下文中的 mock 规则，用于正确判断 mock 状态
+  const code = `
+    (function() {
+      if (!window.__mockData) return {};
+      const rules = {};
+      for (const key in window.__mockData) {
+        rules[key] = window.__mockData[key].enabled !== false;
+      }
+      return rules;
+    })()
+  `;
+
+  chrome.devtools.inspectedWindow.eval(code, (mockRules) => {
+    renderMockListWithRules(filter, forceAnimate, filterByDomain, maxCount, mockRules || {});
+  });
+}
+
+// 使用获取到的 mock 规则渲染列表
+function renderMockListWithRules(filter, forceAnimate, filterByDomain, maxCount, mockRules) {
   // Parse filter into show-only patterns (space-separated) - only show matching requests
   const showPatterns = filter.trim().split(/\s+/).filter(p => p.length > 0);
 
@@ -2197,8 +2204,42 @@ function renderMockList(filter = '', forceAnimate = false) {
     return true;
   });
 
+  // ========== URL 去重逻辑 ==========
+  // 同 URL 的请求只显示一个，优先显示已 mock 的数据
+  const urlGroupMap = new Map(); // key: method:url, value: array of requests
+
+  filtered.forEach(req => {
+    const key = `${req.method}:${req.url}`;
+    if (!urlGroupMap.has(key)) {
+      urlGroupMap.set(key, []);
+    }
+    urlGroupMap.get(key).push(req);
+  });
+
+  // 对每个 URL 组，选择要显示的 item
+  const displayRequests = [];
+  for (const [key, requests] of urlGroupMap) {
+    // 优先选择已 mock 的请求（检查页面上下文中的 mock 规则）
+    const hasMockRule = mockRules[key] === true;
+    const mockedRequest = requests.find(r => r.status === 'mocked' || hasMockRule);
+
+    if (mockedRequest) {
+      // 如果找到已 mock 的请求，标记为 mocked 状态
+      if (hasMockRule && mockedRequest.status !== 'mocked') {
+        mockedRequest.status = 'mocked';
+      }
+      displayRequests.push(mockedRequest);
+    } else {
+      // 没有 mock 的请求，选择最新的（数组第一个是最新的）
+      displayRequests.push(requests[0]);
+    }
+  }
+
+  // 按 timestamp 倒序排列（最新的在前）
+  displayRequests.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
   // Apply max display count limit
-  const displayRequests = filtered.slice(0, maxCount);
+  const finalDisplayRequests = displayRequests.slice(0, maxCount);
 
   // Find truly new requests (new in mockRequests, not just new to the view)
   const currentAllIds = new Set(mockRequests.map(r => r.id));
@@ -2207,7 +2248,7 @@ function renderMockList(filter = '', forceAnimate = false) {
   // Update known IDs
   knownRequestIds = currentAllIds;
 
-  if (displayRequests.length === 0) {
+  if (finalDisplayRequests.length === 0) {
     const domainHint = currentInspectedDomain ? `当前域名: ${currentInspectedDomain}` : '';
     const typeHint = currentTypeFilter !== 'all' ? `类型: ${currentTypeFilter.toUpperCase()}` : '';
     mockListContent.innerHTML = `
@@ -2230,6 +2271,7 @@ function renderMockList(filter = '', forceAnimate = false) {
   const tableHeader = `
     <div class="network-table-header">
       <div class="col col-icon"></div>
+      <div class="col col-mock-switch">Mock</div>
       <div class="col col-method">Method</div>
       <div class="col col-name">Name</div>
       <div class="col col-status">Status</div>
@@ -2240,8 +2282,11 @@ function renderMockList(filter = '', forceAnimate = false) {
   `;
 
   // Items wrapper for proper alternating colors
-  const itemsHtml = displayRequests.map(req => {
-    const isMocked = req.status === 'mocked';
+  const itemsHtml = finalDisplayRequests.map((req, index) => {
+    // 检查页面上下文中的 mock 规则来判断是否已 mock
+    const mockKey = `${req.method}:${req.url}`;
+    const hasMockRule = mockRules[mockKey] === true;
+    const isMocked = req.status === 'mocked' || hasMockRule;
     const isMockPending = req.status === 'mock-pending';
     const statusClass = isMocked ? 'mocked' :
       isMockPending ? 'pending' :
@@ -2256,11 +2301,17 @@ function renderMockList(filter = '', forceAnimate = false) {
     // Only animate if this is a truly new request
     const isNew = newRequestIds.includes(req.id);
 
+    // 生成唯一的开关 ID
+    const switchId = `switch_${req.id}`;
+
     return `
       <div class="mock-item ${selectedRequestId === req.id ? 'active' : ''} ${isMocked ? 'mocked' : ''} ${isNew ? 'new-item' : ''}"
            data-id="${req.id}">
         <div class="col-icon">
           <span class="type-icon ${typeIconClass}" title="${req.type || 'unknown'}">${typeLabel}</span>
+        </div>
+        <div class="col-mock-switch">
+          <input type="checkbox" id="${switchId}" class="url-mock-switch" data-id="${req.id}" data-url="${escapeHtml(req.url)}" data-method="${req.method}" title="Mock 此 URL">
         </div>
         <div class="col-method">
           <span class="method ${methodClass}">${req.method}</span>
@@ -2303,19 +2354,199 @@ function renderMockList(filter = '', forceAnimate = false) {
       deleteMockRequest(id);
     });
   });
+
+  // Add click handlers for mock switches
+  mockListContent.querySelectorAll('.url-mock-switch').forEach(sw => {
+    const url = sw.dataset.url;
+    const method = sw.dataset.method;
+
+    // 加载保存的开关状态
+    loadMockSwitchState(method, url, (enabled) => {
+      sw.checked = enabled === true;
+
+      // 添加点击事件
+      sw.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const newEnabled = sw.checked;
+
+        // 在页面上下文切换 mock 开关
+        const code = `
+          (function() {
+            if (!window.__mockData) window.__mockData = {};
+            const key = '${method}:${url}';
+            if (window.__mockData[key]) {
+              window.__mockData[key].enabled = ${newEnabled};
+              console.log('[Page] Mock 开关已切换:', key, 'enabled:', ${newEnabled});
+              return true;
+            } else {
+              console.log('[Page] 未找到 mock 规则:', key);
+              return false;
+            }
+          })()
+        `;
+
+        chrome.devtools.inspectedWindow.eval(code, (result) => {
+          if (result) {
+            // 保存开关状态到 storage
+            saveMockSwitchState(method, url, newEnabled);
+
+            // 联动逻辑：单个开关打开时，总开关也打开
+            if (newEnabled) {
+              ensureGlobalMockEnabled();
+            } else {
+              // 联动逻辑：所有单个开关都关闭时，总开关也关闭
+              checkAndUpdateGlobalSwitch();
+            }
+
+            showNotification(newEnabled ? 'Mock 已启用' : 'Mock 已禁用');
+          } else {
+            // 没有规则，取消开关
+            sw.checked = false;
+            showNotification('请先设置 Mock 数据');
+          }
+        });
+      });
+    });
+  });
+}
+
+// 保存 mock 开关状态
+function saveMockSwitchState(method, url, enabled) {
+  const key = `${method}:${url}`;
+  chrome.storage.session.get(['mockSwitchStates'], (result) => {
+    const states = result.mockSwitchStates || {};
+    states[key] = enabled;
+    chrome.storage.session.set({ mockSwitchStates: states });
+  });
+}
+
+// 加载 mock 开关状态
+function loadMockSwitchState(method, url, callback) {
+  const key = `${method}:${url}`;
+  chrome.storage.session.get(['mockSwitchStates'], (result) => {
+    const states = result.mockSwitchStates || {};
+    callback(states[key] === true);
+  });
+}
+
+// ========== Mock 开关联动逻辑 ==========
+
+// 更新总开关 UI 状态
+function updateMockGlobalStatus(enabled) {
+  const mockGlobalStatus = document.getElementById('mock-global-status');
+  if (mockGlobalStatus) {
+    mockGlobalStatus.textContent = enabled ? 'Mock 开启' : 'Mock 关闭';
+    mockGlobalStatus.style.color = enabled ? '#4ec9b0' : '#666';
+  }
+}
+
+// 同步总开关到页面上下文
+function syncMockGlobalSwitch(enabled) {
+  const code = `window.__mockEnabled = ${enabled};`;
+  chrome.devtools.inspectedWindow.eval(code);
+}
+
+// 确保总开关打开
+function ensureGlobalMockEnabled() {
+  const mockGlobalSwitch = document.getElementById('mock-global-switch');
+  if (mockGlobalSwitch && !mockGlobalSwitch.checked) {
+    mockGlobalSwitch.checked = true;
+    updateMockGlobalStatus(true);
+    syncMockGlobalSwitch(true);
+    chrome.storage.session.set({ mockGlobalEnabled: true });
+  }
+}
+
+// 检查并更新总开关（当所有单个开关都关闭时，关闭总开关）
+function checkAndUpdateGlobalSwitch() {
+  chrome.storage.session.get(['mockSwitchStates'], (result) => {
+    const states = result.mockSwitchStates || {};
+    const hasAnyEnabled = Object.values(states).some(enabled => enabled === true);
+
+    if (!hasAnyEnabled) {
+      // 所有开关都关闭，关闭总开关
+      const mockGlobalSwitch = document.getElementById('mock-global-switch');
+      if (mockGlobalSwitch && mockGlobalSwitch.checked) {
+        mockGlobalSwitch.checked = false;
+        updateMockGlobalStatus(false);
+        syncMockGlobalSwitch(false);
+        chrome.storage.session.set({ mockGlobalEnabled: false });
+      }
+    }
+  });
+}
+
+// 关闭所有单个开关
+function turnOffAllIndividualSwitches() {
+  // 关闭 UI 中的所有开关
+  const allSwitches = document.querySelectorAll('.url-mock-switch');
+  allSwitches.forEach(sw => {
+    if (sw.checked) {
+      sw.checked = false;
+      const url = sw.dataset.url;
+      const method = sw.dataset.method;
+
+      // 更新页面上下文
+      const code = `
+        (function() {
+          if (!window.__mockData) window.__mockData = {};
+          const key = '${method}:${url}';
+          if (window.__mockData[key]) {
+            window.__mockData[key].enabled = false;
+            return true;
+          }
+          return false;
+        })()
+      `;
+      chrome.devtools.inspectedWindow.eval(code);
+    }
+  });
+
+  // 清空 storage 中的所有开关状态
+  chrome.storage.session.get(['mockSwitchStates'], (result) => {
+    const states = result.mockSwitchStates || {};
+    for (const key in states) {
+      states[key] = false;
+    }
+    chrome.storage.session.set({ mockSwitchStates: states });
+  });
 }
 
 // Delete a single mock request
 function deleteMockRequest(id) {
   const index = mockRequests.findIndex(r => r.id === id);
   if (index >= 0) {
+    const req = mockRequests[index];
+
+    // 删除页面上下文中的 mock 数据
+    const mockKey = `${req.method}:${req.url}`;
+    const code = `
+      (function() {
+        if (window.__mockData && window.__mockData['${mockKey.replace(/'/g, "\\'")}']) {
+          delete window.__mockData['${mockKey.replace(/'/g, "\\'")}'];
+          console.log('[Page] Mock 规则已删除:', '${mockKey}');
+          return true;
+        }
+        return false;
+      })()
+    `;
+    chrome.devtools.inspectedWindow.eval(code);
+
+    // 删除 storage 中的开关状态
+    const storageKey = mockKey;
+    chrome.storage.session.get(['mockSwitchStates'], (result) => {
+      const states = result.mockSwitchStates || {};
+      delete states[storageKey];
+      chrome.storage.session.set({ mockSwitchStates: states });
+    });
+
     mockRequests.splice(index, 1);
     if (selectedRequestId === id) {
       selectedRequestId = null;
       renderEmptyEditor();
     }
     renderMockList(mockFilterInput.value);
-    showNotification('已删除请求');
+    showNotification('已删除请求和 Mock 规则');
   }
 }
 
@@ -2355,10 +2586,7 @@ function renderEmptyEditor() {
 
 // Render mock editor for a request
 function renderMockEditor(req) {
-  const urlPath = getUrlPath(req.url);
-  const hasMock = hasMockRule(req.url);
   const isMocked = req.status === 'mocked';
-  const mockData = mockRules[urlPath];
   const responseBody = req.responseBody || '';
 
   // Format for display and editing
@@ -2369,9 +2597,7 @@ function renderMockEditor(req) {
   } catch (e) { }
 
   // Mock textarea default value
-  const mockTextareaValue = mockData
-    ? (typeof mockData === 'string' ? mockData : JSON.stringify(mockData, null, 2))
-    : formattedBody;
+  const mockTextareaValue = formattedBody;
 
   // Status display
   const statusDisplay = isMocked ? 'MOCKED' : (req.status || 'Pending');
@@ -2394,31 +2620,76 @@ function renderMockEditor(req) {
       </div>
     </div>
     <div class="mock-editor-tabs">
-      <div class="mock-editor-tab active" data-tab="response">Response</div>
-      <div class="mock-editor-tab" data-tab="headers">Headers</div>
+      <div class="mock-editor-tab active" data-tab="headers">Headers</div>
+      <div class="mock-editor-tab" data-tab="payload">Payload</div>
+      <div class="mock-editor-tab" data-tab="preview">Preview</div>
+      <div class="mock-editor-tab" data-tab="response">Response</div>
       <div class="mock-editor-tab" data-tab="mock">Mock</div>
     </div>
     <div class="mock-editor-content">
-      <!-- Response Tab -->
-      <div class="mock-editor-pane active" id="pane-response">
+      <!-- Headers Tab -->
+      <div class="mock-editor-pane active" id="pane-headers">
+        <div class="mock-response-viewer">
+          <div style="background: #f0f0f0; padding: 8px; font-weight: 600; margin-bottom: 8px;">请求信息</div>
+          <table class="headers-table">
+            <tbody>
+              <tr>
+                <th>Method</th>
+                <td><span class="method ${req.method ? req.method.toLowerCase() : 'get'}">${escapeHtml(req.method || 'GET')}</span></td>
+              </tr>
+              <tr>
+                <th>URL</th>
+                <td><span style="word-break: break-all;">${escapeHtml(req.url)}</span></td>
+              </tr>
+              ${req.requestDomain ? `<tr><th>Domain</th><td>${escapeHtml(req.requestDomain)}</td></tr>` : ''}
+              ${req.type ? `<tr><th>Type</th><td>${escapeHtml(req.type)}</td></tr>` : ''}
+              ${req.time !== undefined ? `<tr><th>Time</th><td>${req.time ? req.time.toFixed(2) + 'ms' : '-'}</td></tr>` : ''}
+              ${req.timestamp ? `<tr><th>Timestamp</th><td>${new Date(req.timestamp).toLocaleString()}</td></tr>` : ''}
+            </tbody>
+          </table>
+          ${Object.keys(req.requestHeaders || {}).length > 0 ? `
+            <div style="background: #f0f0f0; padding: 8px; font-weight: 600; margin-top: 16px; margin-bottom: 8px;">请求头</div>
+            <table class="headers-table">
+              <tbody>
+                ${Object.entries(req.requestHeaders || {}).map(([key, value]) => `
+                  <tr><th>${escapeHtml(key)}</th><td>${escapeHtml(String(value))}</td></tr>
+                `).join('')}
+              </tbody>
+            </table>
+          ` : ''}
+          ${Object.keys(req.responseHeaders || {}).length > 0 ? `
+            <div style="background: #f0f0f0; padding: 8px; font-weight: 600; margin-top: 16px; margin-bottom: 8px;">响应头</div>
+            <table class="headers-table">
+              <tbody>
+                ${Object.entries(req.responseHeaders || {}).map(([key, value]) => `
+                  <tr><th>${escapeHtml(key)}</th><td>${escapeHtml(String(value))}</td></tr>
+                `).join('')}
+              </tbody>
+            </table>
+          ` : ''}
+        </div>
+      </div>
+      <!-- Payload Tab -->
+      <div class="mock-editor-pane" id="pane-payload">
+        <div class="mock-response-viewer">
+          ${req.requestBody ? `
+            <div style="background: #f0f0f0; padding: 8px; font-weight: 600; margin-bottom: 8px;">请求载荷</div>
+            ${renderJsonPreview(req.requestBody)}
+          ` : '<div class="json-preview-empty">无请求体</div>'}
+        </div>
+      </div>
+      <!-- Preview Tab -->
+      <div class="mock-editor-pane" id="pane-preview">
         <div class="mock-response-viewer">
           ${isMocked ? '<div style="color: #4ec9b0; margin-bottom: 8px; font-weight: 600;">✓ 此请求已被 Mock 拦截</div>' : ''}
           ${renderJsonPreview(responseBody)}
         </div>
       </div>
-      <!-- Headers Tab -->
-      <div class="mock-editor-pane" id="pane-headers">
-        <div class="mock-response-viewer">
-          <table class="headers-table">
-            <tbody>
-              ${Object.entries(req.responseHeaders || {}).map(([key, value]) => `
-                <tr>
-                  <th>${escapeHtml(key)}</th>
-                  <td>${escapeHtml(String(value))}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
+      <!-- Response Tab -->
+      <div class="mock-editor-pane" id="pane-response">
+        <div class="mock-response-viewer" style="height: 100%; display: flex; flex-direction: column;">
+          ${isMocked ? '<div style="color: #4ec9b0; margin-bottom: 8px; font-weight: 600;">✓ 此请求已被 Mock 拦截</div>' : ''}
+          ${renderJsonPreview(responseBody)}
         </div>
       </div>
       <!-- Mock Tab -->
@@ -2427,8 +2698,7 @@ function renderMockEditor(req) {
           ${renderEditableJsonPreview(mockTextareaValue, 'mock-response-textarea')}
         </div>
         <div class="mock-editor-actions">
-          <button class="mock-btn success" id="mock-and-request-btn">Mock一次</button>
-          ${hasMock ? '<button class="mock-btn danger" id="remove-mock-btn">移除 Mock</button>' : ''}
+          <span style="font-size: 11px; color: #4ec9b0;">💡 编辑后点击外部区域自动保存并启用 Mock</span>
         </div>
       </div>
     </div>
@@ -2454,33 +2724,39 @@ function renderMockEditor(req) {
     });
   });
 
-  // Add button handlers
-  document.getElementById('mock-and-request-btn').addEventListener('click', () => mockAndRequest(req));
+  // 编辑器失去焦点时自动保存 mock
+  const mockTextarea = document.getElementById('mock-response-textarea');
+  if (mockTextarea) {
+    // 记录初始值，用于检测是否有变化
+    let initialValue = mockTextarea.value;
+    let hasChanged = false;
 
-  const removeBtn = document.getElementById('remove-mock-btn');
-  if (removeBtn) {
-    removeBtn.addEventListener('click', () => removeMock(req));
+    mockTextarea.addEventListener('input', () => {
+      if (mockTextarea.value !== initialValue) {
+        hasChanged = true;
+      }
+    });
+
+    mockTextarea.addEventListener('blur', () => {
+      if (hasChanged) {
+        autoMockOnBlur(req);
+        initialValue = mockTextarea.value;
+        hasChanged = false;
+      }
+    });
   }
 }
 
-// Mock once - save current response data and trigger request
-async function mockAndRequest(req) {
-  if (!isExtensionContextValid()) {
-    showNotification('扩展上下文已失效，请刷新面板');
-    return;
-  }
-
+// 编辑器失去焦点时自动保存 mock
+function autoMockOnBlur(req) {
   const textarea = document.getElementById('mock-response-textarea');
   const value = textarea.value.trim();
 
   if (!value) {
-    showNotification('请输入 Mock 数据');
     return;
   }
 
-  const urlPath = getUrlPath(req.url);
-
-  // Try to parse as JSON, otherwise use as string
+  // 解析 mock 数据
   let mockData;
   try {
     mockData = JSON.parse(value);
@@ -2488,113 +2764,110 @@ async function mockAndRequest(req) {
     mockData = value;
   }
 
-  // Simple structure: URL -> mock response (will be deleted after use)
-  mockRules[urlPath] = mockData;
+  const mockKey = `${req.method || 'GET'}:${req.url}`;
+  console.log('[DevTools] ===================== MOCK 自动保存 =====================');
+  console.log('[DevTools] Mock 规则:', mockKey);
 
-  // Save to storage
-  try {
-    await chrome.storage.local.set({ mockRules });
-  } catch (e) {
-    if (!isContextInvalidatedError(e) && isExtensionContextValid()) {
-      console.error('Failed to save mock rules:', e);
-    }
-  }
-
-  showNotification('Mock已设置，正在请求...');
-
-  // Wait for storage to sync to content script
-  await new Promise(resolve => setTimeout(resolve, 50));
-
-  // Trigger a request - will be intercepted by content script
-  try {
-    const code = `
-      (async function() {
-        try {
-          const response = await fetch('${req.url.replace(/'/g, "\\'")}', {
-            method: '${req.method || 'GET'}',
-            credentials: 'include'
-          });
-          const text = await response.text();
-          return {
-            status: response.status,
-            statusText: response.statusText,
-            headers: Object.fromEntries(response.headers.entries()),
-            body: text
-          };
-        } catch (e) {
-          return { error: e.message };
-        }
-      })()
-    `;
-
-    chrome.devtools.inspectedWindow.eval(code, (result, isException) => {
-      if (isException) {
-        showNotification('请求失败: ' + (result.description || result));
-        return;
-      }
-
-      if (result && result.error) {
-        showNotification('请求失败: ' + result.error);
-        return;
-      }
-
-      // Add a NEW entry for mocked request (don't update existing)
-      const responseBody = typeof mockData === 'string' ? mockData : JSON.stringify(mockData, null, 2);
-      let requestHostname = '';
-      try {
-        requestHostname = new URL(req.url).hostname;
-      } catch (e) { }
-
-      const newMockedRequest = {
-        id: 'mock-' + Date.now().toString(),
-        url: req.url,
-        method: req.method || 'GET',
-        status: 'mocked',
-        type: 'fetch',
-        time: 0,
-        responseSize: responseBody.length,
-        responseHeaders: { 'x-mock-intercepted': 'true' },
-        responseBody: responseBody,
-        timestamp: Date.now(),
-        requestDomain: requestHostname
+  // 在页面上下文设置 mock 数据，并确保总开关打开
+  const code = `
+    (function() {
+      if (!window.__mockData) window.__mockData = {};
+      window.__mockData['${mockKey.replace(/'/g, "\\'")}'] = {
+        data: ${JSON.stringify(mockData).replace(/<\/script>/g, '<\\/script>')},
+        enabled: true
       };
+      // 确保总开关打开，否则拦截不会生效
+      window.__mockEnabled = true;
+      console.log('[Page] Mock 规则已设置并启用，总开关已打开，后续匹配的请求将返回 mock 数据');
+      return true;
+    })()
+  `;
 
-      mockRequests.unshift(newMockedRequest);
-      console.log('[Mock] Added new mocked request entry');
+  chrome.devtools.inspectedWindow.eval(code, (result, isException) => {
+    if (isException) {
+      console.error('[DevTools] 执行异常:', isException);
+    } else if (result) {
+      console.log('[DevTools] Mock 规则已自动保存');
 
-      showNotification('Mock请求完成');
+      // 保存开关状态
+      saveMockSwitchState(req.method || 'GET', req.url, true);
+
+      // 更新总开关 UI（确保总开关打开）
+      ensureGlobalMockEnabled();
+
+      // 更新列表中该请求的开关状态
+      const switchEl = document.querySelector(`.url-mock-switch[data-id="${req.id}"]`);
+      if (switchEl) {
+        switchEl.checked = true;
+      }
+
+      // 更新请求状态显示为 mocked
+      req.status = 'mocked';
       renderMockList(mockFilterInput.value);
 
-      // Select the new mocked request
-      selectedRequestId = newMockedRequest.id;
-      renderMockEditor(newMockedRequest);
-    });
-  } catch (e) {
-    showNotification('请求失败: ' + e.message);
-  }
+      showNotification('Mock 已自动保存');
+    }
+  });
 }
 
-// Remove mock for a request
-async function removeMock(req) {
-  if (!isExtensionContextValid()) {
-    showNotification('扩展上下文已失效，请刷新面板');
-    return;
-  }
+// 获取所有 mock 规则
+function getMockRules() {
+  const code = `
+    (function() {
+      if (!window.__mockData) return [];
+      return Object.keys(window.__mockData).map(key => {
+        const parts = key.split(':');
+        const method = parts[0];
+        const url = parts.slice(1).join(':');
+        const rule = window.__mockData[key];
+        return {
+          key,
+          method,
+          url,
+          enabled: rule.enabled !== false
+        };
+      });
+    })()
+  `;
 
-  const urlPath = getUrlPath(req.url);
-  delete mockRules[urlPath];
-
-  try {
-    await chrome.storage.local.set({ mockRules });
-  } catch (e) {
-    if (!isContextInvalidatedError(e) && isExtensionContextValid()) {
-      console.error('Failed to save mock rules:', e);
+  chrome.devtools.inspectedWindow.eval(code, (result, isException) => {
+    if (isException) {
+      console.error('[DevTools] 获取规则异常:', isException);
+      return [];
     }
-  }
+    return result || [];
+  });
+}
 
-  showNotification('Mock 已移除');
-  renderMockList(mockFilterInput.value);
-  renderMockEditor(req);
+// 切换 mock 开关
+function toggleMockRule(method, url, enabled) {
+  const mockKey = `${method}:${url}`;
+  const code = `
+    (function() {
+      if (!window.__mockData) return;
+      const key = '${mockKey.replace(/'/g, "\\'")}';
+      if (window.__mockData[key]) {
+        window.__mockData[key].enabled = ${enabled};
+        console.log('[Page] Mock 开关已切换:', key, 'enabled:', ${enabled});
+        return true;
+      }
+      return false;
+    })()
+  `;
+
+  chrome.devtools.inspectedWindow.eval(code, (result, isException) => {
+    if (isException) {
+      console.error('[DevTools] 切换开关异常:', isException);
+    } else {
+      console.log('[DevTools] Mock 开关已切换:', mockKey, 'enabled:', enabled);
+    }
+  });
+}
+
+// 刷新 mock 规则列表（如果需要显示）
+function refreshMockRulesList() {
+  // 这里可以添加更新 UI 的代码
+  console.log('[DevTools] 刷新 mock 规则列表');
 }
 
 // Network request handler (from devtools API)
@@ -2612,8 +2885,11 @@ function handleRequest(harEntry) {
   // Resource type is stored in _resourceType (undocumented but standard)
   const requestType = (harEntry._resourceType || '').toString().toLowerCase();
 
+  // console.log('[DevTools Network] Request captured:', method, url, 'type:', requestType);
+
   // Only capture XHR/Fetch requests
   if (requestType !== 'xhr' && requestType !== 'fetch') {
+    // console.log('[DevTools Network] Skipping non-XHR/Fetch request:', requestType);
     return;
   }
 
@@ -2622,8 +2898,11 @@ function handleRequest(harEntry) {
   try {
     requestHostname = new URL(url).hostname;
   } catch (e) {
+    // console.log('[DevTools Network] Invalid URL:', url);
     return;
   }
+
+  // console.log('[DevTools Network] Processing XHR/Fetch request:', method, url, 'hostname:', requestHostname);
 
   // Get response content via getContent() method
   harEntry.getContent((content, encoding) => {
@@ -2640,21 +2919,25 @@ function handleRequest(harEntry) {
       });
     }
 
+    // Convert request headers array [{name, value}] to object {name: value}
+    const requestHeadersObj = {};
+    if (Array.isArray(req.headers)) {
+      req.headers.forEach(h => {
+        if (h.name && h.value !== undefined) {
+          requestHeadersObj[h.name] = h.value;
+        }
+      });
+    }
+
+    // Get request body from HAR entry
+    const requestBody = req.postData ? req.postData.text : '';
+
     // Check if this request was mocked by checking response header
     const isMocked = headersObj['x-mock-intercepted'] === 'true';
 
-    // If this is a mocked request, skip - mockAndRequest will handle it
-    if (isMocked) {
-      console.log('[Network] Skipping mocked request (handled by mockAndRequest)');
-      return;
-    }
-
-    // Find existing request by URL path
-    const urlPath = getUrlPath(url);
-    const existingIndex = mockRequests.findIndex(r => getUrlPath(r.url) === urlPath && r.method === method);
-
+    // 创建请求记录（不去重，每次都新增）
     const reqData = {
-      id: harEntry._requestId || Date.now().toString(),
+      id: harEntry._requestId || (Date.now().toString() + '_' + Math.random().toString(36).substr(2, 9)),
       url: url,
       method: method,
       status: isMocked ? 'mocked' : (response.status || 200),
@@ -2663,26 +2946,26 @@ function handleRequest(harEntry) {
       responseSize: response.contentSize || (content ? content.length : 0),
       responseHeaders: headersObj,
       responseBody: content || '',
+      requestHeaders: requestHeadersObj,
+      requestBody: requestBody,
       timestamp: Date.now(),
       requestDomain: requestHostname
     };
 
-    // Update existing or add new
-    const isNewRequest = existingIndex < 0;
-    if (isNewRequest) {
-      mockRequests.unshift(reqData);
-    } else {
-      mockRequests[existingIndex] = reqData;
-    }
+    // 所有请求都新增到列表顶部（不去重）
+    // console.log('[DevTools Network] Adding request to list:', method, url, 'isMocked:', isMocked);
+    mockRequests.unshift(reqData);
+
+    // console.log('[DevTools Network] Total requests in list:', mockRequests.length);
 
     // Keep only last 100 requests
     if (mockRequests.length > 100) {
       mockRequests = mockRequests.slice(0, 100);
     }
 
-    // Only render if the request matches current filter (or updating existing visible request)
+    // 只有匹配当前过滤条件的请求才触发渲染
     const matchesFilter = matchesCurrentFilter(reqData);
-    if (matchesFilter || !isNewRequest) {
+    if (matchesFilter) {
       scheduleMockListRender();
     }
 
@@ -2707,11 +2990,55 @@ function scheduleMockListRender() {
 
 // Initialize network monitoring
 function initNetworkMonitoring() {
+  // console.log('[DevTools] Initializing network monitoring...');
+
   // Get current inspected tab info
   updateCurrentDomain();
 
   // Listen for network requests via devtools API
   chrome.devtools.network.onRequestFinished.addListener(handleRequest);
+  // console.log('[DevTools] Network request listener registered');
+
+  // ========== Mock 总开关初始化 ==========
+  const mockGlobalSwitch = document.getElementById('mock-global-switch');
+  const mockGlobalStatus = document.getElementById('mock-global-status');
+
+  if (mockGlobalSwitch) {
+    // 从 storage 加载开关状态
+    chrome.storage.session.get(['mockGlobalEnabled'], (result) => {
+      const enabled = result.mockGlobalEnabled === true;
+      mockGlobalSwitch.checked = enabled;
+      updateMockGlobalStatus(enabled);
+      syncMockGlobalSwitch(enabled);
+    });
+
+    // 总开关事件监听
+    mockGlobalSwitch.addEventListener('change', (e) => {
+      const enabled = e.target.checked;
+      updateMockGlobalStatus(enabled);
+      syncMockGlobalSwitch(enabled);
+      chrome.storage.session.set({ mockGlobalEnabled: enabled });
+
+      // 联动逻辑：总开关关闭时，关闭所有单个开关
+      if (!enabled) {
+        turnOffAllIndividualSwitches();
+      }
+
+      showNotification(enabled ? 'Mock 已启用' : 'Mock 已禁用');
+    });
+  }
+
+  // ========== 筛选参数持久化 ==========
+  // 加载保存的筛选参数
+  chrome.storage.session.get(['mockFilterValue', 'mockFilterDomain'], (result) => {
+    if (result.mockFilterValue !== undefined) {
+      mockFilterInput.value = result.mockFilterValue;
+    }
+    if (result.mockFilterDomain !== undefined && filterCurrentDomainCheckbox) {
+      filterCurrentDomainCheckbox.checked = result.mockFilterDomain;
+    }
+    renderMockList(mockFilterInput.value);
+  });
 
   // Listen for navigation to clear requests and update domain
   chrome.devtools.network.onNavigated.addListener((url) => {
@@ -2733,10 +3060,6 @@ function initNetworkMonitoring() {
     knownRequestIds = new Set(); // Reset known IDs
     renderMockList();
     renderEmptyEditor();
-
-    // Clear mock rules on navigation (they should only last for one request)
-    mockRules = {};
-    chrome.storage.local.set({ mockRules }).catch(() => { });
   });
 
   // Add domain filter checkbox listener
@@ -2769,17 +3092,42 @@ function updateDomainDisplay() {
 
 // Filter input handler
 mockFilterInput.addEventListener('input', (e) => {
-  renderMockList(e.target.value);
+  const value = e.target.value;
+  chrome.storage.session.set({ mockFilterValue: value });
+  renderMockList(value);
 });
 
 // Clear button handler
 mockClearBtn.addEventListener('click', () => {
+  // 清空页面上下文中的所有 mock 数据
+  const code = `
+    (function() {
+      if (window.__mockData) {
+        window.__mockData = {};
+        console.log('[Page] 所有 Mock 规则已清空');
+      }
+      return true;
+    })()
+  `;
+  chrome.devtools.inspectedWindow.eval(code);
+
+  // 清空 storage 中的所有开关状态
+  chrome.storage.session.set({ mockSwitchStates: {} });
+  chrome.storage.session.set({ mockGlobalEnabled: false });
+
+  // 更新总开关 UI
+  const mockGlobalSwitch = document.getElementById('mock-global-switch');
+  if (mockGlobalSwitch) {
+    mockGlobalSwitch.checked = false;
+    updateMockGlobalStatus(false);
+  }
+
   mockRequests = [];
   selectedRequestId = null;
   knownRequestIds = new Set(); // Reset known IDs
   renderMockList();
   renderEmptyEditor();
-  showNotification('已清空请求列表');
+  showNotification('已清空请求列表和所有 Mock 规则');
 });
 
 // Refresh button handler - reload the inspected page
@@ -2793,7 +3141,14 @@ if (maxDisplayCountInput) {
     const value = parseInt(e.target.value, 10);
     if (value >= 10 && value <= 500) {
       mockFilterSettings.maxDisplayCount = value;
-      saveMockFilterSettings();
+      if (isExtensionContextValid()) {
+        saveMockFilterSettings().catch(err => {
+          // Ignore context invalidated errors
+          if (!isContextInvalidatedError(err)) {
+            console.error('Failed to save mock filter settings:', err);
+          }
+        });
+      }
       renderMockList(mockFilterInput.value);
     }
   });
@@ -2967,8 +3322,12 @@ if (clearBrowsingDataBtn) {
 }
 
 // Initialize mock functionality
-loadMockRules();
-loadMockFilterSettings();
+loadMockFilterSettings().catch(err => {
+  // Ignore context invalidated errors during initialization
+  if (!isContextInvalidatedError(err)) {
+    console.error('Failed to load mock filter settings:', err);
+  }
+});
 initNetworkMonitoring();
 
 // ============================================

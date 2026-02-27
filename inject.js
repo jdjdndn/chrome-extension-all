@@ -1,209 +1,198 @@
-// Script injected directly into the page context
-// This script runs in the same context as the web page
+// 页面上下文注入脚本 - 拦截 fetch/XHR 并实现 mock
 
-// ========== 彩色日志工具 ==========
-// 生成随机颜色（避开白色/浅色）
-function getRandomColor() {
-  const hue = Math.floor(Math.random() * 360);
-  const saturation = 60 + Math.floor(Math.random() * 40);
-  const lightness = 30 + Math.floor(Math.random() * 30);
-  return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
-}
-function coloredLog(tag, message, ...args) {
-  const tagStyle = `color: ${getRandomColor()}; font-weight: bold;`;
-  const styledArgs = args.map((arg) => {
-    return [`%c${String(arg)}`, `color: ${getRandomColor()}`];
-  }).flat();
-  if (styledArgs.length > 0) console.log(`%c${tag} ${message}`, tagStyle, ...styledArgs);
-  else console.log(`%c${tag} ${message}`, tagStyle);
-}
-const originalConsole = { log: console.log.bind(console) };
-console.log = function(...args) {
-  const firstArg = args[0];
-  if (typeof firstArg === 'string') {
-    const tagMatch = firstArg.match(/^\[([^\]]+)\]/);
-    if (tagMatch) {
-      const tag = `[${tagMatch[1]}]`;
-      const message = firstArg.slice(tag.length).trim() || '';
-      coloredLog(tag, message, ...args.slice(1));
-      return;
+// ========== Mock 数据存储 ==========
+window.__mockData = {};
+
+// Mock 总开关（默认关闭）
+window.__mockEnabled = false;
+
+// 获取 mock 数据
+window.getMockData = function (method, url) {
+  // 检查总开关
+  if (window.__mockEnabled !== true) return null;
+  if (!window.__mockData) return null;
+
+  // 精确匹配
+  const key = `${method}:${url}`;
+  if (window.__mockData[key]) {
+    const rule = window.__mockData[key];
+    if (rule.enabled !== false) {
+      return rule.data;
     }
   }
-  originalConsole.log(...args);
+
+  // 尝试不带 query params
+  try {
+    const urlObj = new URL(url, window.location.href);
+    const urlWithoutQuery = urlObj.origin + urlObj.pathname;
+    const keyWithoutQuery = `${method}:${urlWithoutQuery}`;
+    if (window.__mockData[keyWithoutQuery]) {
+      const rule = window.__mockData[keyWithoutQuery];
+      if (rule.enabled !== false) {
+        return rule.data;
+      }
+    }
+  } catch (e) {}
+
+  return null;
 };
 
-console.log('[Extension] Extension injected script loaded');
+// 设置 mock 数据
+window.setMockData = function (method, url, data) {
+  if (!window.__mockData) window.__mockData = {};
+  const key = `${method}:${url}`;
+  window.__mockData[key] = { data, enabled: true };
+  console.log('[Inject] Mock 规则已设置:', key);
+};
 
-// Page-specific functionality can be added here
-// This script can access page variables and functions that are not available in content scripts
+// 切换 mock 总开关
+window.toggleMockGlobal = function (enabled) {
+  window.__mockEnabled = enabled;
+  console.log('[Inject] Mock 总开关:', enabled ? '已启用' : '已禁用');
+};
 
-// Helper function to safely access page variables
-function getGlobalVar(name) {
-  try {
-    return window[name];
-  } catch (e) {
-    console.error(`Error accessing global variable ${name}:`, e);
-    return null;
+// 获取 mock 总开关状态
+window.getMockGlobalEnabled = function () {
+  return window.__mockEnabled === true;
+};
+
+// 切换单个 mock 开关
+window.toggleMockRule = function (method, url, enabled) {
+  if (!window.__mockData) return;
+  const key = `${method}:${url}`;
+  if (window.__mockData[key]) {
+    window.__mockData[key].enabled = enabled;
+    console.log('[Inject] Mock 开关已切换:', key, 'enabled:', enabled);
   }
+};
+
+// 获取所有 mock 规则
+window.getAllMockRules = function () {
+  if (!window.__mockData) return [];
+  return Object.keys(window.__mockData).map(key => {
+    const parts = key.split(':');
+    const method = parts[0];
+    const url = parts.slice(1).join(':');
+    const rule = window.__mockData[key];
+    return {
+      key,
+      method,
+      url,
+      enabled: rule.enabled !== false,
+      data: rule.data
+    };
+  });
+};
+
+// ========== Fetch 拦截 ==========
+if (!window._injectOriginalFetch) {
+  window._injectOriginalFetch = window.fetch;
+  window.fetch = async function (url, options = {}) {
+    // 获取 URL 和 method
+    let urlString, method;
+
+    if (typeof url === 'string') {
+      urlString = url;
+      method = (options && options.method) ? options.method.toUpperCase() : 'GET';
+    } else if (url instanceof Request) {
+      // url 是 Request 对象
+      urlString = url.url;
+      method = url.method ? url.method.toUpperCase() : 'GET';
+    } else {
+      urlString = window.location.href;
+      method = (options && options.method) ? options.method.toUpperCase() : 'GET';
+    }
+
+    const mockData = window.getMockData(method, urlString);
+    if (mockData) {
+      console.log('[Inject Fetch] Mock 拦截:', method, urlString);
+      const mockBody = typeof mockData === 'string' ? mockData : JSON.stringify(mockData);
+
+      // 直接返回 mock 响应
+      return new Response(mockBody, {
+        status: 200,
+        statusText: 'OK',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-mock-intercepted': 'true'
+        }
+      });
+    }
+
+    return await window._injectOriginalFetch(url, options);
+  };
+  console.log('[Inject] Fetch 拦截已安装');
 }
 
-// ========== XHR Interception in Page Context ==========
-// This intercepts XHR requests made by the page itself (not content script)
+// ========== XHR 拦截 ==========
 if (!window._injectOriginalXHR) {
   window._injectOriginalXHR = window.XMLHttpRequest;
 
-  window.XMLHttpRequest = function() {
+  window.XMLHttpRequest = function () {
     const xhr = new window._injectOriginalXHR();
     const originalOpen = xhr.open;
     const originalSend = xhr.send;
+    let _url = '';
+    let _method = 'GET';
 
-    xhr.open = function(method, url, ...args) {
-      this._url = url;
-      this._method = method;
+    xhr.open = function (method, url, ...args) {
+      _url = url;
+      _method = method.toUpperCase();
       return originalOpen.call(this, method, url, ...args);
     };
 
-    xhr.send = function(body) {
+    xhr.send = function (body) {
+      const mockData = window.getMockData(_method, _url);
+      if (mockData) {
+        console.log('[Inject XHR] Mock 拦截:', _method, _url);
+        const responseBody = typeof mockData === 'string' ? mockData : JSON.stringify(mockData);
+
+        setTimeout(() => {
+          Object.defineProperty(xhr, 'status', { value: 200, writable: false });
+          Object.defineProperty(xhr, 'readyState', { value: 4, writable: false });
+          Object.defineProperty(xhr, 'responseText', { value: responseBody, writable: false });
+          Object.defineProperty(xhr, 'response', { value: responseBody, writable: false });
+
+          xhr.getResponseHeader = function (header) {
+            if (header.toLowerCase() === 'content-type') return 'application/json';
+            if (header.toLowerCase() === 'x-mock-intercepted') return 'true';
+            return null;
+          };
+
+          if (xhr.onreadystatechange) xhr.onreadystatechange();
+          if (xhr.onload) xhr.onload();
+          xhr.dispatchEvent(new Event('load'));
+        }, 10);
+
+        return;
+      }
+
       return originalSend.call(this, body);
     };
 
     return xhr;
   };
 
-  // Copy static properties
   window.XMLHttpRequest.UNSENT = 0;
   window.XMLHttpRequest.OPENED = 1;
   window.XMLHttpRequest.HEADERS_RECEIVED = 2;
   window.XMLHttpRequest.LOADING = 3;
   window.XMLHttpRequest.DONE = 4;
+  console.log('[Inject] XHR 拦截已安装');
 }
 
-// ========== Fetch Interception in Page Context ==========
-// This intercepts fetch requests made by the page itself
-if (!window._injectOriginalFetch) {
-  window._injectOriginalFetch = window.fetch;
-
-  window.fetch = async function(url, options = {}) {
-    return await window._injectOriginalFetch(url, options);
-  };
-}
-
-// Create a bridge between the extension and page context
-window.ExtensionBridge = {
-  // Send message to content script
-  sendToContent: function(message) {
-    window.postMessage({
-      source: 'extension-inject',
-      type: message.type,
-      data: message.data
-    }, '*');
-  },
-
-  // Listen for messages from content script
-  receiveFromContent: function(callback) {
-    window.addEventListener('message', function(event) {
-      if (event.source === window && event.data.source === 'extension-content') {
-        callback(event.data);
-      }
-    });
-  }
-};
-
-// Example: Wait for page to be fully loaded
-function waitForPageLoad(callback) {
-  if (document.readyState === 'complete') {
-    callback();
-  } else {
-    window.addEventListener('load', callback);
-  }
-}
-
-// Example: Create a custom element
-class ExtensionCustomElement extends HTMLElement {
-  constructor() {
-    super();
-    // Your custom element code here
-  }
-
-  connectedCallback() {
-    console.log('Custom element connected');
-    // Element has been added to the DOM
-  }
-
-  disconnectedCallback() {
-    console.log('Custom element disconnected');
-    // Element has been removed from the DOM
-  }
-}
-
-// Define the custom element (if not already defined)
-if (!customElements.get('extension-custom-element')) {
-  customElements.define('extension-custom-element', ExtensionCustomElement);
-}
-
-// Example: Inject custom UI into the page
-function injectCustomUI() {
-  // Check if we should inject
-  if (!document.body.classList.contains('extension-active')) {
-    return;
-  }
-
-  // Create floating action button
-  const fab = document.createElement('button');
-  fab.className = 'extension-button extension-fab';
-  fab.innerHTML = 'EXT';
-  fab.style.cssText = `
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    z-index: 2147483646;
-  `;
-
-  fab.addEventListener('click', function() {
-    window.ExtensionBridge.sendToContent({
-      type: 'FAB_CLICKED'
-    });
-  });
-
-  document.body.appendChild(fab);
-
-  // Add CSS for the floating button
-  const style = document.createElement('style');
-  style.textContent = `
-    .extension-fab {
-      border-radius: 50%;
-      width: 56px;
-      height: 56px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: bold;
+// 监听 DevTools 发送的消息
+window.addEventListener('message', (event) => {
+  if (event.data.source === 'devtools-mock') {
+    const { type, method, url, data } = event.data;
+    if (type === 'setMock') {
+      window.setMockData(method, url, data);
+    } else if (type === 'toggleGlobal') {
+      window.toggleMockGlobal(data);
+    } else if (type === 'toggleRule') {
+      window.toggleMockRule(method, url, data);
     }
-  `;
-  document.head.appendChild(style);
-}
-
-// Initialize when page loads
-waitForPageLoad(() => {
-  console.log('Page fully loaded, initializing extension UI');
-
-  // Inject custom UI
-  injectCustomUI();
-
-  // Listen for messages from content script
-  ExtensionBridge.receiveFromContent((message) => {
-    console.log('Received message from content:', message);
-    // Handle messages from content script
-  });
-
-  // Notify content script that we're ready
-  ExtensionBridge.sendToContent({
-    type: 'INJECT_SCRIPT_LOADED'
-  });
+  }
 });
 
-// Clean up when page is unloaded
-window.addEventListener('beforeunload', () => {
-  // Remove injected elements
-  document.querySelectorAll('.extension-fab').forEach(el => el.remove());
-});
+console.log('[Inject] 注入脚本已加载');
