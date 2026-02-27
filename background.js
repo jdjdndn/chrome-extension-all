@@ -1032,3 +1032,89 @@ self.addEventListener('activate', () => {
 
 // Initialize when service worker starts
 initialize();
+
+// ========== 添加到新标签页功能 ==========
+
+// 创建右键菜单
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.contextMenus.create({
+    id: 'addToNewtab',
+    title: '添加到新标签页',
+    contexts: ['page', 'link']
+  });
+});
+
+// 处理右键菜单点击
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId === 'addToNewtab') {
+    // 获取要添加的 URL
+    let url = info.linkUrl || tab.url;
+
+    // 获取页面标题
+    let title = tab.title;
+
+    // 获取 favicon
+    let favicon = tab.favIconUrl || '';
+
+    // 保存到 storage
+    saveToNewtab(url, title, favicon, tab.id);
+  }
+});
+
+// 保存到新标签页
+function saveToNewtab(url, title, favicon, tabId) {
+  chrome.storage.local.get(['quickLinks'], (result) => {
+    const links = result.quickLinks || [];
+
+    // 检查是否已存在
+    const exists = links.some(link => link.url === url);
+    if (exists) {
+      // 通知用户已存在
+      chrome.notifications.create({
+        type: 'basic',
+        iconUrl: 'icon.png',
+        title: '已存在',
+        message: '该网站已在新标签页中'
+      });
+      return;
+    }
+
+    // 获取域名作为图标
+    let icon = getDomainIcon(url);
+
+    // 添加新链接
+    links.unshift({
+      title: title || new URL(url).hostname,
+      url: url,
+      icon: icon,
+      favicon: favicon
+    });
+
+    // 保存（最多保留 20 个）
+    const trimmedLinks = links.slice(0, 20);
+    chrome.storage.local.set({ quickLinks: trimmedLinks }, () => {
+      // 通知用户
+      chrome.notifications.create({
+        type: 'basic',
+        iconUrl: favicon || 'icon.png',
+        title: '已添加到新标签页',
+        message: title || new URL(url).hostname
+      });
+    });
+  });
+}
+
+// 获取域名对应的图标
+function getDomainIcon(url) {
+  const icons = ['🌐', '🔗', '📌', '⭐', '🚀', '💡', '🎯', '📱', '💻', '🎨', '📺', '🎵', '🛒', '📰', '🎮'];
+  try {
+    const domain = new URL(url).hostname;
+    let hash = 0;
+    for (let i = 0; i < domain.length; i++) {
+      hash = domain.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return icons[Math.abs(hash) % icons.length];
+  } catch (e) {
+    return '🌐';
+  }
+}

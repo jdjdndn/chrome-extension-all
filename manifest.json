@@ -12,7 +12,9 @@
     "cookies",
     "browsingData",
     "bookmarks",
-    "history"
+    "history",
+    "notifications",
+    "contextMenus"
   ],
   "host_permissions": ["*://*/*"],
   "declarative_net_request": {
@@ -97,6 +99,11 @@
     {
       "matches": ["*://*.ymmfa.com/*"],
       "js": ["content/gongkong.js"]
+    },
+    {
+      "matches": ["*://*.youtube.com/*"],
+      "js": ["content/base/SiteScript.js", "content/youtube.js"],
+      "run_at": "document_start"
     }
   ],
   "background": {

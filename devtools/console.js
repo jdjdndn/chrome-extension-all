@@ -86,6 +86,9 @@ document.querySelectorAll('.sidebar-tab').forEach(tab => {
       if (tabId === 'history') {
         loadHistory();
       }
+      if (tabId === 'resources') {
+        initResourcesTab();
+      }
     }
   });
 });
@@ -109,6 +112,12 @@ document.querySelectorAll('.info-sub-tab').forEach(tab => {
     // 如果切换到内存标签页，加载内存数据
     if (subtabId === 'memory') {
       loadMemoryInfo();
+    }
+
+    // 如果切换到元素标签页，加载元素信息
+    if (subtabId === 'element') {
+      refreshElementInfo();
+      loadHiddenElementsFromStorage();
     }
   });
 });
@@ -395,6 +404,415 @@ if (refreshMemoryBtn) {
   refreshMemoryBtn.addEventListener('click', () => {
     loadMemoryInfo();
   });
+}
+
+// ========== 元素操作功能 ==========
+const refreshElementBtn = document.getElementById('refresh-element-btn');
+const elementSelectorInput = document.getElementById('element-selector');
+const elementTagEl = document.getElementById('element-tag');
+const elementIdEl = document.getElementById('element-id');
+const elementClassEl = document.getElementById('element-class');
+const copySelectorBtn = document.getElementById('copy-selector-btn');
+const hideElementBtn = document.getElementById('hide-element-btn');
+const showElementBtn = document.getElementById('show-element-btn');
+const deleteElementBtn = document.getElementById('delete-element-btn');
+const elementHiddenList = document.getElementById('element-hidden-list');
+const elementHiddenItems = document.getElementById('element-hidden-items');
+
+// 存储已隐藏的元素选择器
+const hiddenElements = new Map();
+
+// 生成 CSS 选择器
+function generateSelector(element) {
+  const code = `
+    (function(element) {
+      if (!element) return null;
+
+      // 如果有 ID，优先使用 ID
+      if (element.id) {
+        return '#' + element.id;
+      }
+
+      // 构建选择器
+      let selector = element.tagName.toLowerCase();
+
+      // 添加类名（最多3个）
+      if (element.classList && element.classList.length > 0) {
+        const classes = Array.from(element.classList).slice(0, 3);
+        selector += '.' + classes.join('.');
+      }
+
+      // 添加 nth-child 确保唯一性
+      if (element.parentNode) {
+        const siblings = Array.from(element.parentNode.children);
+        const index = siblings.indexOf(element) + 1;
+        selector += ':nth-child(' + index + ')';
+      }
+
+      return selector;
+    })($0)
+  `;
+
+  return new Promise((resolve) => {
+    chrome.devtools.inspectedWindow.eval(code, (result, error) => {
+      if (error) {
+        console.error('获取选择器失败:', error);
+        resolve(null);
+      } else {
+        resolve(result);
+      }
+    });
+  });
+}
+
+// 获取元素信息
+function getElementInfo() {
+  const code = `
+    (function(element) {
+      if (!element) return null;
+
+      return {
+        tagName: element.tagName.toLowerCase(),
+        id: element.id || '',
+        className: element.className || '',
+        classList: element.classList ? Array.from(element.classList) : []
+      };
+    })($0)
+  `;
+
+  return new Promise((resolve) => {
+    chrome.devtools.inspectedWindow.eval(code, (result, error) => {
+      if (error) {
+        console.error('获取元素信息失败:', error);
+        resolve(null);
+      } else {
+        resolve(result);
+      }
+    });
+  });
+}
+
+// 刷新元素信息
+async function refreshElementInfo() {
+  const selector = await generateSelector();
+  const info = await getElementInfo();
+
+  if (selector) {
+    elementSelectorInput.value = selector;
+  } else {
+    elementSelectorInput.value = '未选中元素';
+  }
+
+  if (info) {
+    elementTagEl.textContent = info.tagName || '-';
+    elementIdEl.textContent = info.id || '-';
+    elementClassEl.textContent = info.classList.length > 0 ? info.classList.slice(0, 3).join(', ') + (info.classList.length > 3 ? '...' : '') : '-';
+  } else {
+    elementTagEl.textContent = '-';
+    elementIdEl.textContent = '-';
+    elementClassEl.textContent = '-';
+  }
+
+  updateHiddenList();
+}
+
+// 获取当前域名
+async function getCurrentDomain() {
+  return new Promise((resolve) => {
+    chrome.devtools.inspectedWindow.eval('window.location.hostname', (result) => {
+      resolve(result);
+    });
+  });
+}
+
+// 同步隐藏元素设置到 popup 存储
+async function syncHideElementsToStorage(domain, selectors, enabled) {
+  const result = await chrome.storage.local.get(['hideElementsSettings']);
+  const allSettings = result.hideElementsSettings || {};
+  allSettings[domain] = { enabled, selectors };
+  await chrome.storage.local.set({ hideElementsSettings: allSettings });
+
+  // 通知 content script
+  const tabId = chrome.devtools.inspectedWindow.tabId;
+  if (tabId) {
+    chrome.tabs.sendMessage(tabId, {
+      type: 'UPDATE_HIDE_ELEMENTS',
+      enabled,
+      selectors
+    }).catch(() => {
+      console.log('[DevTools] Content script 未就绪，忽略消息');
+    });
+  }
+}
+
+// 添加隐藏样式（与 content script 使用相同的 style ID 和格式）
+async function addHideStyle(selector) {
+  const code = `
+    (function(selector) {
+      let styleEl = document.getElementById('extension-hide-elements-style');
+      if (!styleEl) {
+        styleEl = document.createElement('style');
+        styleEl.id = 'extension-hide-elements-style';
+        document.head.appendChild(styleEl);
+      }
+
+      // 使用与 content script 相同的格式
+      const rule = selector + ' { display: none !important; }';
+      const currentStyles = styleEl.textContent || '';
+      if (!currentStyles.includes(rule)) {
+        styleEl.textContent = currentStyles + (currentStyles.endsWith('\\n') ? '' : '\\n') + rule;
+        return true;
+      }
+      return false;
+    })(${JSON.stringify(selector)})
+  `;
+
+  const added = await new Promise((resolve) => {
+    chrome.devtools.inspectedWindow.eval(code, (result, error) => {
+      if (error) {
+        console.error('添加隐藏样式失败:', error);
+        resolve(false);
+      } else {
+        resolve(result);
+      }
+    });
+  });
+
+  if (added) {
+    // 同步到 popup 存储
+    const domain = await getCurrentDomain();
+    if (domain) {
+      const result = await chrome.storage.local.get(['hideElementsSettings']);
+      const allSettings = result.hideElementsSettings || {};
+      const domainSettings = allSettings[domain] || { enabled: false, selectors: [] };
+
+      if (!domainSettings.selectors.includes(selector)) {
+        domainSettings.selectors.push(selector);
+        domainSettings.enabled = true;
+        await syncHideElementsToStorage(domain, domainSettings.selectors, true);
+      }
+    }
+  }
+
+  return added;
+}
+
+// 移除隐藏样式（与 content script 使用相同的 style ID 和格式）
+async function removeHideStyle(selector) {
+  const code = `
+    (function(selector) {
+      const styleEl = document.getElementById('extension-hide-elements-style');
+      if (!styleEl) return false;
+
+      // 使用与 content script 相同的格式
+      const rule = selector + ' { display: none !important; }';
+      let currentStyles = styleEl.textContent || '';
+      if (currentStyles.includes(rule)) {
+        currentStyles = currentStyles.replace(rule, '').replace(/^\\n+|\\n+$/g, '');
+        styleEl.textContent = currentStyles;
+        return true;
+      }
+      return false;
+    })(${JSON.stringify(selector)})
+  `;
+
+  const removed = await new Promise((resolve) => {
+    chrome.devtools.inspectedWindow.eval(code, (result, error) => {
+      if (error) {
+        console.error('移除隐藏样式失败:', error);
+        resolve(false);
+      } else {
+        resolve(result);
+      }
+    });
+  });
+
+  if (removed) {
+    // 同步到 popup 存储
+    const domain = await getCurrentDomain();
+    if (domain) {
+      const result = await chrome.storage.local.get(['hideElementsSettings']);
+      const allSettings = result.hideElementsSettings || {};
+      const domainSettings = allSettings[domain] || { enabled: false, selectors: [] };
+
+      const index = domainSettings.selectors.indexOf(selector);
+      if (index > -1) {
+        domainSettings.selectors.splice(index, 1);
+        // 如果没有选择器了，保持开启但清空列表（用户可以继续添加）
+        await syncHideElementsToStorage(domain, domainSettings.selectors, domainSettings.enabled);
+      }
+    }
+  }
+
+  return removed;
+}
+
+// 删除元素
+function deleteElement(selector) {
+  const code = `
+    (function(selector) {
+      const element = document.querySelector(selector);
+      if (element) {
+        element.remove();
+        return true;
+      }
+      return false;
+    })(${JSON.stringify(selector)})
+  `;
+
+  return new Promise((resolve) => {
+    chrome.devtools.inspectedWindow.eval(code, (result, error) => {
+      if (error) {
+        console.error('删除元素失败:', error);
+        resolve(false);
+      } else {
+        resolve(result);
+      }
+    });
+  });
+}
+
+// 更新已隐藏列表
+function updateHiddenList() {
+  if (hiddenElements.size === 0) {
+    elementHiddenList.style.display = 'none';
+    return;
+  }
+
+  elementHiddenList.style.display = 'block';
+  elementHiddenItems.innerHTML = '';
+
+  hiddenElements.forEach((name, selector) => {
+    const item = document.createElement('div');
+    item.className = 'element-hidden-item';
+    item.innerHTML = `
+      <span>${name}</span>
+      <span class="remove-btn" data-selector="${selector}">×</span>
+    `;
+    item.querySelector('.remove-btn').addEventListener('click', async () => {
+      if (await removeHideStyle(selector)) {
+        hiddenElements.delete(selector);
+        updateHiddenList();
+        showNotification('元素已显示');
+      }
+    });
+    elementHiddenItems.appendChild(item);
+  });
+}
+
+// 刷新按钮
+if (refreshElementBtn) {
+  refreshElementBtn.addEventListener('click', refreshElementInfo);
+}
+
+// 复制选择器按钮
+if (copySelectorBtn) {
+  copySelectorBtn.addEventListener('click', async () => {
+    const selector = elementSelectorInput.value;
+    if (selector && selector !== '未选中元素') {
+      await copyToClipboard(selector);
+      showNotification('选择器已复制');
+    }
+  });
+}
+
+// 隐藏元素按钮
+if (hideElementBtn) {
+  hideElementBtn.addEventListener('click', async () => {
+    const selector = elementSelectorInput.value;
+    if (!selector || selector === '未选中元素') {
+      showNotification('请先选中元素');
+      return;
+    }
+
+    if (await addHideStyle(selector)) {
+      // 生成一个简短名称
+      const name = selector.split('>').pop().split(':').pop().substring(0, 20);
+      hiddenElements.set(selector, name || selector);
+      updateHiddenList();
+      showNotification('元素已隐藏');
+    } else {
+      showNotification('元素已隐藏');
+    }
+  });
+}
+
+// 显示元素按钮
+if (showElementBtn) {
+  showElementBtn.addEventListener('click', async () => {
+    const selector = elementSelectorInput.value;
+    if (!selector || selector === '未选中元素') {
+      showNotification('请先选中元素');
+      return;
+    }
+
+    if (await removeHideStyle(selector)) {
+      hiddenElements.delete(selector);
+      updateHiddenList();
+      showNotification('元素已显示');
+    } else {
+      showNotification('元素未隐藏');
+    }
+  });
+}
+
+// 删除元素按钮
+if (deleteElementBtn) {
+  deleteElementBtn.addEventListener('click', async () => {
+    const selector = elementSelectorInput.value;
+    if (!selector || selector === '未选中元素') {
+      showNotification('请先选中元素');
+      return;
+    }
+
+    if (confirm('确定要删除此元素吗？')) {
+      if (await deleteElement(selector)) {
+        showNotification('元素已删除');
+        refreshElementInfo();
+      } else {
+        showNotification('删除失败');
+      }
+    }
+  });
+}
+
+// 从 popup 存储加载隐藏元素并应用到页面
+async function loadHiddenElementsFromStorage() {
+  const domain = await getCurrentDomain();
+  if (!domain) return;
+
+  const result = await chrome.storage.local.get(['hideElementsSettings']);
+  const allSettings = result.hideElementsSettings || {};
+  const domainSettings = allSettings[domain] || { enabled: false, selectors: [] };
+
+  // 更新本地 hiddenElements Map
+  hiddenElements.clear();
+  domainSettings.selectors.forEach(selector => {
+    const name = selector.split('>').pop().split(':').pop().substring(0, 20);
+    hiddenElements.set(selector, name || selector);
+  });
+
+  // 如果已启用，确保样式已应用到页面（使用与 content script 相同的格式）
+  if (domainSettings.enabled && domainSettings.selectors.length > 0) {
+    const code = `
+      (function(selectors) {
+        let styleEl = document.getElementById('extension-hide-elements-style');
+        if (!styleEl) {
+          styleEl = document.createElement('style');
+          styleEl.id = 'extension-hide-elements-style';
+          document.head.appendChild(styleEl);
+        }
+
+        // 使用与 content script 相同的格式
+        let css = selectors.map(s => s + ' { display: none !important; }').join('\\n');
+        styleEl.textContent = css;
+        return true;
+      })(${JSON.stringify(domainSettings.selectors)})
+    `;
+    chrome.devtools.inspectedWindow.eval(code);
+  }
+
+  updateHiddenList();
 }
 
 // ========== 内存清理功能 ==========
@@ -1786,6 +2204,10 @@ let mockFilterSettings = {
   excludePatterns: []   // 要排除的URL模式
 };
 
+// ========== 资源嗅探相关变量 ==========
+let capturedResources = [];
+let currentResourceFilter = 'all';
+
 // Mock DOM元素
 const mockListContent = document.getElementById('mock-list-content');
 const mockEditor = document.getElementById('mock-editor');
@@ -2987,6 +3409,387 @@ function scheduleMockListRender() {
     mockListRenderTimer = null;
   }, 100); // Batch renders within 100ms
 }
+
+// ========== 资源嗅探功能 ==========
+
+// 扫描页面资源
+function scanPageResources() {
+  console.log('[DevTools] 开始扫描资源...');
+  capturedResources = [];
+  const resourcesContainer = document.getElementById('resources-container');
+
+  if (!resourcesContainer) {
+    console.error('[DevTools] resources-container 元素不存在');
+    return;
+  }
+
+  resourcesContainer.innerHTML = '<div class="resources-empty-state"><div class="icon">🔍</div><div class="text">正在扫描资源...</div></div>';
+
+  // 在页面上下文执行扫描
+  const scanCode = `
+    (function() {
+      const resources = [];
+      const url = window.location.href;
+
+      // 1. 扫描图片
+      document.querySelectorAll('img[src]').forEach(img => {
+        const src = img.src;
+        if (src && !src.startsWith('data:') && !src.includes('chrome-extension://') && !src.startsWith('chrome://')) {
+          const width = img.naturalWidth || img.width || 0;
+          const height = img.naturalHeight || img.height || 0;
+          resources.push({
+            type: 'image',
+            url: src,
+            name: src.split('/').pop().split('?')[0] || 'image',
+            size: (width > 0 && height > 0) ? width + 'x' + height : ''
+          });
+        }
+      });
+
+      // 2. 扫描所有图片（包括在 picture、figure 中的）
+      document.querySelectorAll('source[srcset], source[src]').forEach(source => {
+        const src = source.srcset || source.src;
+        if (src && src.startsWith('http') && !src.includes('chrome-extension://') && !src.startsWith('chrome://')) {
+          resources.push({
+            type: 'image',
+            url: src.split(' ')[0],
+            name: src.split('/').pop().split('?')[0] || 'source',
+            size: ''
+          });
+        }
+      });
+
+      // 3. 扫描 video 元素
+      document.querySelectorAll('video').forEach(video => {
+        const src = video.src || video.currentSrc;
+        const sources = video.querySelectorAll('source[src]');
+
+        if (src && !src.includes('chrome-extension://') && !src.startsWith('chrome://')) {
+          resources.push({
+            type: 'video',
+            url: src,
+            name: src.split('/').pop().split('?')[0] || 'video',
+            size: (video.videoWidth > 0 && video.videoHeight > 0) ? video.videoWidth + 'x' + video.videoHeight : ''
+          });
+        }
+
+        sources.forEach(source => {
+          if (source.src && !source.src.includes('chrome-extension://') && !source.src.startsWith('chrome://')) {
+            resources.push({
+              type: 'video',
+              url: source.src,
+              name: source.src.split('/').pop().split('?')[0] || 'video',
+              size: ''
+            });
+          }
+        });
+      });
+
+      // 4. 扫描 audio 元素
+      document.querySelectorAll('audio').forEach(audio => {
+        const src = audio.src || audio.currentSrc;
+        const sources = audio.querySelectorAll('source[src]');
+
+        if (src && !src.includes('chrome-extension://') && !src.startsWith('chrome://')) {
+          resources.push({
+            type: 'audio',
+            url: src,
+            name: src.split('/').pop().split('?')[0] || 'audio'
+          });
+        }
+
+        sources.forEach(source => {
+          if (source.src && !source.src.includes('chrome-extension://') && !source.src.startsWith('chrome://')) {
+            resources.push({
+              type: 'audio',
+              url: source.src,
+              name: source.src.split('/').pop().split('?')[0] || 'audio'
+            });
+          }
+        });
+      });
+
+      // 5. 扫描 iframe
+      document.querySelectorAll('iframe[src]').forEach(iframe => {
+        const src = iframe.src;
+        if (src && !src.includes('chrome-extension://') && !src.startsWith('chrome://')) {
+          resources.push({
+            type: 'other',
+            url: src,
+            name: 'iframe: ' + (iframe.title || src.split('/').pop())
+          });
+        }
+      });
+
+      // 6. 扫描背景图片（从 style 属性）
+      document.querySelectorAll('*').forEach(el => {
+        const style = el.style.backgroundImage;
+        if (style && style !== 'none') {
+          const match = style.match(/url\\(['"]?([^'"]+)['"]?\\)/);
+          if (match && match[2]) {
+            let src = match[2];
+            // 处理相对路径
+            if (!src.startsWith('http') && !src.startsWith('//')) {
+              try {
+                src = new URL(src, window.location.href).href;
+              } catch(e) {}
+            }
+            if (src.startsWith('http') && !src.includes('chrome-extension://') && !src.startsWith('chrome://')) {
+              resources.push({
+                type: 'image',
+                url: src,
+                name: src.split('/').pop().split('?')[0] || 'background'
+              });
+            }
+          }
+        }
+      });
+
+      // 7. 扫描 link 标签（stylesheet, icon等）
+      document.querySelectorAll('link[href]').forEach(link => {
+        if (link.href && !link.href.includes('chrome-extension://') && !link.href.startsWith('chrome://')) {
+          const rel = link.rel || 'link';
+          resources.push({
+            type: 'other',
+            url: link.href,
+            name: rel + ': ' + link.href.split('/').pop()
+          });
+        }
+      });
+
+      // 8. 扫描 object 和 embed
+      document.querySelectorAll('object[data], embed[src]').forEach(el => {
+        const src = el.data || el.src;
+        if (src && !src.includes('chrome-extension://') && !src.startsWith('chrome://')) {
+          resources.push({
+            type: 'other',
+            url: src,
+            name: el.tagName.toLowerCase()
+          });
+        }
+      });
+
+      // 去重
+      const seen = new Set();
+      const unique = resources.filter(r => {
+        if (seen.has(r.url)) return false;
+        seen.add(r.url);
+        return true;
+      });
+
+      console.log('[Page Scan] 找到资源:', unique.length);
+      return unique;
+    })()
+  `;
+
+  chrome.devtools.inspectedWindow.eval(scanCode, (result) => {
+    console.log('[DevTools] 扫描结果:', result);
+    if (result && Array.isArray(result)) {
+      capturedResources = result.map((r, i) => ({
+        id: 'res_' + Date.now() + '_' + i,
+        ...r
+      }));
+      console.log('[DevTools] 捕获资源数量:', capturedResources.length);
+      renderResources();
+    } else {
+      resourcesContainer.innerHTML = '<div class="resources-empty-state"><div class="icon">⚠️</div><div class="text">扫描失败</div></div>';
+    }
+  });
+}
+
+// 渲染资源列表
+function renderResources() {
+  const resourcesContainer = document.getElementById('resources-container');
+
+  if (!capturedResources || capturedResources.length === 0) {
+    resourcesContainer.innerHTML = '<div class="resources-empty-state"><div class="icon">📦</div><div class="text">未发现资源</div><div class="hint">当前页面没有可嗅探的资源</div></div>';
+    return;
+  }
+
+  // 根据类型过滤
+  let filtered = capturedResources;
+  if (currentResourceFilter !== 'all') {
+    filtered = capturedResources.filter(r => r.type === currentResourceFilter);
+  }
+
+  if (filtered.length === 0) {
+    resourcesContainer.innerHTML = '<div class="resources-empty-state"><div class="icon">📦</div><div class="text">该类型暂无资源</div></div>';
+    return;
+  }
+
+  // 渲染网格
+  const grid = document.createElement('div');
+  grid.className = 'resources-grid';
+
+  filtered.forEach(resource => {
+    const item = createResourceItem(resource);
+    grid.appendChild(item);
+  });
+
+  resourcesContainer.innerHTML = '';
+  resourcesContainer.appendChild(grid);
+}
+
+// 创建资源项
+function createResourceItem(resource) {
+  const item = document.createElement('div');
+  item.className = 'resource-item';
+  item.dataset.id = resource.id;
+
+  const typeIcon = {
+    image: '🖼️',
+    video: '🎬',
+    audio: '🎵',
+    document: '📄',
+    other: '📎'
+  }[resource.type] || '📎';
+
+  // 检查是否可以预览（排除本地资源）
+  const canPreview = !resource.url.startsWith('chrome://') &&
+                      !resource.url.startsWith('chrome-extension://') &&
+                      !resource.url.startsWith('edge://') &&
+                      !resource.url.startsWith('about:');
+
+  // 预览区域
+  let previewContent = '';
+  if (resource.type === 'image' && canPreview) {
+    previewContent = `<img src="${resource.url}" loading="lazy" onerror="this.parentElement.innerHTML='<span class=\\'preview-placeholder\\'>❌</span>'">`;
+  } else if (resource.type === 'video' && canPreview) {
+    previewContent = `<span class="preview-placeholder">${typeIcon}</span>`;
+  } else if (resource.type === 'audio' && canPreview) {
+    previewContent = `<span class="preview-placeholder">${typeIcon}</span>`;
+  } else {
+    previewContent = `<span class="preview-placeholder">${typeIcon}</span>`;
+  }
+
+  item.innerHTML = `
+    <div class="resource-preview">${previewContent}</div>
+    <div class="resource-info">
+      <span class="resource-type-badge ${resource.type}">${resource.type}</span>
+      <div class="resource-name" title="${resource.name}">${resource.name}</div>
+      <div class="resource-url" title="${resource.url}">${resource.url}</div>
+      ${resource.size ? `<div class="resource-url">${resource.size}</div>` : ''}
+    </div>
+    <div class="resource-actions">
+      <button class="resource-action-btn copy" data-id="${resource.id}" data-url="${encodeURIComponent(resource.url)}">复制链接</button>
+      <button class="resource-action-btn download" data-id="${resource.id}" data-url="${encodeURIComponent(resource.url)}" data-type="${resource.type}">下载</button>
+    </div>
+  `;
+
+  // 点击选中
+  item.addEventListener('click', (e) => {
+    if (!e.target.classList.contains('resource-action-btn')) {
+      document.querySelectorAll('.resource-item').forEach(i => i.classList.remove('selected'));
+      item.classList.add('selected');
+    }
+  });
+
+  return item;
+}
+
+// 复制到剪贴板
+function copyToClipboard(text) {
+  navigator.clipboard.writeText(text).then(() => {
+    showNotification('已复制到剪贴板');
+  }).catch(() => {
+    // 降级方案
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+    showNotification('已复制到剪贴板');
+  });
+}
+
+// 下载资源
+async function downloadResource(url, type) {
+  try {
+    // 对于图片和简单文件，直接下载
+    if (type === 'image' || type === 'other') {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = url.split('/').pop().split('?')[0] || 'download';
+      a.target = '_blank';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      showNotification('已触发下载');
+    } else if (type === 'video') {
+      // 视频：尝试通过 fetch 获取并下载
+      showNotification('正在下载视频...');
+      try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = 'video_' + Date.now() + '.mp4';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+        showNotification('视频下载完成');
+      } catch (e) {
+        // 视频下载失败，在新标签页打开
+        chrome.tabs.create({ url: url });
+        showNotification('已在新标签页打开');
+      }
+    } else {
+      // 其他类型：在新标签页打开
+      chrome.tabs.create({ url: url });
+      showNotification('已在新标签页打开');
+    }
+  } catch (error) {
+    console.error('下载失败:', error);
+    // 失败时在新标签页打开
+    chrome.tabs.create({ url: url });
+    showNotification('已在新标签页打开');
+  }
+}
+
+// 初始化资源标签页事件
+function initResourcesTab() {
+  const scanBtn = document.getElementById('resources-scan-btn');
+  const clearBtn = document.getElementById('resources-clear-btn');
+  const typeFilter = document.getElementById('resource-type-filter');
+
+  if (scanBtn) {
+    scanBtn.addEventListener('click', scanPageResources);
+  }
+
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      capturedResources = [];
+      const resourcesContainer = document.getElementById('resources-container');
+      resourcesContainer.innerHTML = '<div class="resources-empty-state"><div class="icon">📦</div><div class="text">点击"扫描"按钮嗅探页面资源</div><div class="hint">支持图片、视频、音频、文档等资源</div></div>';
+    });
+  }
+
+  if (typeFilter) {
+    typeFilter.addEventListener('change', (e) => {
+      currentResourceFilter = e.target.value;
+      renderResources();
+    });
+  }
+
+  // 事件委托处理复制和下载按钮
+  const resourcesContainer = document.getElementById('resources-container');
+  resourcesContainer.addEventListener('click', (e) => {
+    if (e.target.classList.contains('copy')) {
+      const url = decodeURIComponent(e.target.dataset.url);
+      copyToClipboard(url);
+    } else if (e.target.classList.contains('download')) {
+      const url = decodeURIComponent(e.target.dataset.url);
+      const type = e.target.dataset.type;
+      downloadResource(url, type);
+    }
+  });
+}
+
 
 // Initialize network monitoring
 function initNetworkMonitoring() {

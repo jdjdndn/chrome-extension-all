@@ -464,6 +464,164 @@
         font-weight: 500;
       }
 
+      /* Element Info Styles */
+      .element-info-section {
+        padding: 12px;
+      }
+
+      .element-selector-box {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 12px;
+        padding: 8px;
+        background: #f8f9fa;
+        border-radius: 6px;
+      }
+
+      .element-selector-label {
+        font-size: 11px;
+        color: #666;
+        white-space: nowrap;
+      }
+
+      .element-selector-input {
+        flex: 1;
+        padding: 6px 8px;
+        font-size: 11px;
+        border: 1px solid #d0d0d0;
+        border-radius: 4px;
+        background: #fff;
+        color: #333;
+        font-family: 'Consolas', 'Monaco', monospace;
+      }
+
+      .copy-selector-btn {
+        padding: 6px 12px;
+        font-size: 10px;
+        background: #4ec9b0;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+
+      .copy-selector-btn:hover {
+        background: #3db89d;
+      }
+
+      .element-info-box {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 12px;
+        padding: 8px;
+        background: #f8f9fa;
+        border-radius: 6px;
+      }
+
+      .element-info-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+      }
+
+      .element-info-label {
+        color: #666;
+        font-weight: 500;
+      }
+
+      .element-info-value {
+        color: #333;
+        font-family: 'Consolas', 'Monaco', monospace;
+        max-width: 200px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .element-actions {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+
+      .element-action-btn {
+        flex: 1;
+        padding: 8px 12px;
+        font-size: 11px;
+        background: #fff;
+        border: 1px solid #d0d0d0;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+
+      .element-action-btn:hover {
+        background: #667eea;
+        color: white;
+        border-color: #667eea;
+      }
+
+      .element-action-btn.hide-btn:hover {
+        background: #f59e0b;
+        border-color: #f59e0b;
+      }
+
+      .element-action-btn.show-btn:hover {
+        background: #10b981;
+        border-color: #10b981;
+      }
+
+      .element-action-btn.delete-btn:hover {
+        background: #ef4444;
+        border-color: #ef4444;
+      }
+
+      .element-hidden-list {
+        margin-top: 12px;
+        padding: 8px;
+        background: #fff3cd;
+        border-radius: 6px;
+        border: 1px solid #ffc107;
+      }
+
+      .element-hidden-header {
+        font-size: 11px;
+        font-weight: 600;
+        color: #856404;
+        margin-bottom: 6px;
+      }
+
+      .element-hidden-items {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+      }
+
+      .element-hidden-item {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 8px;
+        background: white;
+        border-radius: 4px;
+        font-size: 10px;
+        font-family: 'Consolas', 'Monaco', monospace;
+      }
+
+      .element-hidden-item .remove-btn {
+        color: #dc2626;
+        cursor: pointer;
+        font-weight: bold;
+      }
+
+      .element-hidden-item .remove-btn:hover {
+        color: #b91c1c;
+      }
+
       .auto-cleanup-section {
         display: flex;
         align-items: center;
@@ -2978,6 +3136,193 @@
         background: linear-gradient(180deg, #5a5a5a 0%, #999 100%);
       }
 
+      /* ========== Resources Tab Styles ========== */
+      .resources-container {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px;
+      }
+
+      .resources-empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 60px 20px;
+        color: #999;
+      }
+
+      .resources-empty-state .icon {
+        font-size: 48px;
+        margin-bottom: 16px;
+      }
+
+      .resources-empty-state .text {
+        font-size: 14px;
+        margin-bottom: 8px;
+      }
+
+      .resources-empty-state .hint {
+        font-size: 12px;
+        color: #888;
+      }
+
+      .resources-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 12px;
+      }
+
+      .resource-item {
+        display: flex;
+        flex-direction: column;
+        padding: 12px;
+        background: #f8f9fa;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        transition: all 0.2s ease;
+      }
+
+      .resource-item:hover {
+        background: #fff;
+        border-color: #667eea;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+      }
+
+      .resource-item.selected {
+        background: #e8f0fe;
+        border-color: #4285f4;
+      }
+
+      .resource-preview {
+        width: 100%;
+        height: 120px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #fff;
+        border-radius: 6px;
+        margin-bottom: 10px;
+        overflow: hidden;
+      }
+
+      .resource-preview img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+      }
+
+      .resource-preview video {
+        max-width: 100%;
+        max-height: 100%;
+      }
+
+      .resource-preview .preview-placeholder {
+        font-size: 32px;
+        color: #ccc;
+      }
+
+      .resource-info {
+        flex: 1;
+        min-height: 0;
+      }
+
+      .resource-type {
+        font-size: 10px;
+        color: #667eea;
+        text-transform: uppercase;
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+
+      .resource-name {
+        font-size: 11px;
+        color: #333;
+        word-break: break-all;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        margin-bottom: 4px;
+      }
+
+      .resource-url {
+        font-size: 10px;
+        color: #888;
+        word-break: break-all;
+        display: -webkit-box;
+        -webkit-line-clamp: 1;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+
+      .resource-actions {
+        display: flex;
+        gap: 6px;
+        margin-top: 8px;
+      }
+
+      .resource-action-btn {
+        flex: 1;
+        padding: 6px 8px;
+        font-size: 10px;
+        background: #fff;
+        border: 1px solid #d0d0d0;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-align: center;
+      }
+
+      .resource-action-btn:hover {
+        background: #667eea;
+        color: #fff;
+        border-color: #667eea;
+      }
+
+      .resource-action-btn.copy {
+        background: #f0f0f0;
+      }
+
+      .resource-action-btn.copy:hover {
+        background: #4caf50;
+        border-color: #4caf50;
+      }
+
+      .resource-type-badge {
+        display: inline-block;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 9px;
+        font-weight: 600;
+        text-transform: uppercase;
+      }
+
+      .resource-type-badge.image {
+        background: #e3f2fd;
+        color: #1976d2;
+      }
+
+      .resource-type-badge.video {
+        background: #fce4ec;
+        color: #c2185b;
+      }
+
+      .resource-type-badge.audio {
+        background: #f3e5f5;
+        color: #7b1fa2;
+      }
+
+      .resource-type-badge.document {
+        background: #fff3e0;
+        color: #e65100;
+      }
+
+      .resource-type-badge.other {
+        background: #f5f5f5;
+        color: #616161;
+      }
+
       /* ========== Bookmarks Tab Styles ========== */
       .bookmarks-container {
         flex: 1;
@@ -3482,7 +3827,8 @@
       }
 
       /* Context Menu */
-      .bookmark-context-menu {
+      .bookmark-context-menu,
+      .element-context-menu {
         position: fixed;
         background: #f0f0f0;
         border: 1px solid #bbb;
@@ -3494,7 +3840,8 @@
         display: none;
       }
 
-      .bookmark-context-menu.active {
+      .bookmark-context-menu.active,
+      .element-context-menu.active {
         display: block;
       }
 
@@ -4226,6 +4573,10 @@
         <span class="tab-icon">🔧</span>
         <span class="tab-label">Mock</span>
       </a>
+      <a class="sidebar-tab" data-tab="resources">
+        <span class="tab-icon">📦</span>
+        <span class="tab-label">资源</span>
+      </a>
       <a class="sidebar-tab" data-tab="bookmarks">
         <span class="tab-icon">🔖</span>
         <span class="tab-label">书签</span>
@@ -4243,6 +4594,7 @@
         <div class="info-sub-tabs">
           <button class="info-sub-tab active" data-subtab="storage">存储</button>
           <button class="info-sub-tab" data-subtab="memory">内存</button>
+          <button class="info-sub-tab" data-subtab="element">元素</button>
           <button class="info-sub-tab" data-subtab="clear-data">清除数据</button>
         </div>
         <!-- Storage Sub-tab -->
@@ -4367,6 +4719,44 @@
             </div>
           </div>
         </div>
+        <!-- Element Sub-tab -->
+        <div class="info-sub-content" id="info-element">
+          <div class="tab-header">
+            <span class="header-icon">🎯</span>
+            <span>当前选中元素</span>
+            <button class="refresh-element-btn" id="refresh-element-btn" title="刷新选中元素">🔄</button>
+          </div>
+          <div class="element-info-section">
+            <div class="element-selector-box">
+              <div class="element-selector-label">CSS 选择器</div>
+              <input type="text" id="element-selector" class="element-selector-input" readonly placeholder="在 Elements 面板选中元素后点击刷新">
+              <button class="copy-selector-btn" id="copy-selector-btn">📋 复制</button>
+            </div>
+            <div class="element-info-box">
+              <div class="element-info-item">
+                <span class="element-info-label">标签名</span>
+                <span class="element-info-value" id="element-tag">-</span>
+              </div>
+              <div class="element-info-item">
+                <span class="element-info-label">ID</span>
+                <span class="element-info-value" id="element-id">-</span>
+              </div>
+              <div class="element-info-item">
+                <span class="element-info-label">类名</span>
+                <span class="element-info-value" id="element-class">-</span>
+              </div>
+            </div>
+            <div class="element-actions">
+              <button class="element-action-btn hide-btn" id="hide-element-btn">👁️ 隐藏元素</button>
+              <button class="element-action-btn show-btn" id="show-element-btn">👁️‍🗨️ 显示元素</button>
+              <button class="element-action-btn delete-btn" id="delete-element-btn">🗑️ 删除元素</button>
+            </div>
+            <div class="element-hidden-list" id="element-hidden-list" style="display: none;">
+              <div class="element-hidden-header">已隐藏元素</div>
+              <div class="element-hidden-items" id="element-hidden-items"></div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Mock Tab Content -->
@@ -4453,6 +4843,33 @@
               <div class="icon">📝</div>
               <div class="text">选择一个请求查看详情</div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Resources Tab Content -->
+      <div class="tab-content" id="tab-resources">
+        <div class="tab-header">
+          <span class="header-icon">📦</span>
+          <span>页面资源嗅探</span>
+          <div style="margin-left: auto; display: flex; gap: 8px; align-items: center;">
+            <select id="resource-type-filter" class="view-mode-select" style="padding: 4px 8px; font-size: 11px; border: 1px solid #d0d0d0; border-radius: 4px; background: #fff;">
+              <option value="all">全部</option>
+              <option value="image">图片</option>
+              <option value="video">视频</option>
+              <option value="audio">音频</option>
+              <option value="document">文档</option>
+              <option value="other">其他</option>
+            </select>
+            <button class="mock-btn secondary" id="resources-scan-btn" style="padding: 4px 8px; font-size: 10px;">🔍 扫描</button>
+            <button class="mock-btn secondary" id="resources-clear-btn" style="padding: 4px 8px; font-size: 10px;">清空</button>
+          </div>
+        </div>
+        <div class="resources-container" id="resources-container">
+          <div class="resources-empty-state">
+            <div class="icon">📦</div>
+            <div class="text">点击"扫描"按钮嗅探页面资源</div>
+            <div class="hint">支持图片、视频、音频、文档等资源</div>
           </div>
         </div>
       </div>
@@ -4570,6 +4987,14 @@
       <div class="context-menu-item" data-action="new-bookmark">🔖 新建书签</div>
       <div class="context-menu-divider"></div>
       <div class="context-menu-item danger" data-action="delete">🗑️ 删除</div>
+    </div>
+
+    <!-- Element Context Menu -->
+    <div class="element-context-menu" id="element-context-menu">
+      <div class="context-menu-item" data-action="hide-element">👁️ 隐藏元素</div>
+      <div class="context-menu-item" data-action="show-element">👁️‍🗨️ 显示元素</div>
+      <div class="context-menu-divider"></div>
+      <div class="context-menu-item" data-action="copy-selector">📋 复制选择器</div>
     </div>
 
     <script src="console.js"></script>

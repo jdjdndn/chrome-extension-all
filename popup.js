@@ -817,6 +817,7 @@ async function loadHideElementsSettings() {
     // Merge default selectors with stored selectors (remove duplicates)
     const mergedSelectors = [...new Set([...defaultSelectors, ...(settings.selectors || [])])];
     settings.selectors = mergedSelectors;
+    console.log('[隐藏元素] 从存储加载:', domain, settings);
   } else {
     // Use default selectors, but don't auto-enable
     settings = {

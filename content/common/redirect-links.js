@@ -21,12 +21,83 @@ if (window.RedirectLinksLoaded) {
   let lastExecutionTime = 0;
   const DELAY = 500;
 
+  // 从 URL 中提取真实目标链接
+  function extractTargetUrl(href) {
+    if (!href) return null;
+
+    try {
+      const urlObj = new URL(href);
+      const searchParams = urlObj.searchParams;
+
+      // 常见的参数名
+      const targetParams = ['target', 'url', 'to', 'u', 'link', 'href', 'q', 'redirect', 'goto', 'jump', 'next'];
+
+      for (const param of targetParams) {
+        const value = searchParams.get(param);
+        if (value) {
+          try {
+            // URL 解码（可能需要解码多次）
+            let decoded = value;
+            for (let i = 0; i < 3; i++) {
+              const prev = decoded;
+              decoded = decodeURIComponent(decoded);
+              if (prev === decoded) break;
+            }
+
+            // 如果解码后的值是有效的 URL，直接返回
+            if (decoded.startsWith('http://') || decoded.startsWith('https://')) {
+              return decoded;
+            }
+
+            // 处理类似 https%3A//chrome.google.com 这种格式
+            // 方法：找第二个 // 及后面的内容
+            const slashIndex = decoded.indexOf('//');
+            if (slashIndex >= 0) {
+              // 检查是否有第二个 //
+              const secondSlashIndex = decoded.indexOf('//', slashIndex + 2);
+              if (secondSlashIndex > 0) {
+                // 有第二个 //，说明格式类似 "xxx://https://yyy" 或 "https%3A//yyy"
+                // 提取从第二个 // 开始的内容（浏览器会自动处理协议）
+                return decoded.substring(secondSlashIndex);
+              } else {
+                // 只有一个 //，直接返回（浏览器会自动处理协议）
+                return decoded.substring(slashIndex);
+              }
+            }
+
+            // 处理纯域名格式
+            if (decoded.includes('.') && !decoded.includes('/')) {
+              return 'https://' + decoded;
+            }
+          } catch (e) {
+            // 解码失败，继续尝试其他方法
+          }
+        }
+      }
+
+      // 尝试从 hash 中提取
+      const hash = urlObj.hash;
+      if (hash) {
+        const hashMatch = hash.match(/[/?&](url|target|link|u)=([^&]+)/);
+        if (hashMatch) {
+          try {
+            return decodeURIComponent(hashMatch[2]);
+          } catch (e) {}
+        }
+      }
+
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   function processLinks() {
     if (lastExecutionTime + DELAY > Date.now()) return;
     lastExecutionTime = Date.now();
 
     const links = document.querySelectorAll(`a[href]:not([${YC_ATTR}])`);
-    // 注意：这里不能排除已有 target 的元素，因为需要提取重定向链接的真实 URL
+    let replacedCount = 0;
 
     links.forEach(link => {
       link.setAttribute(YC_ATTR, 'true');
@@ -43,20 +114,18 @@ if (window.RedirectLinksLoaded) {
         link.target = '_blank';
       }
 
-      // 尝试提取真实链接
-      try {
-        const linkUrl = decodeURIComponent(link.search);
-        const urlMatch = linkUrl.match(/url=([^&]*)/);
-        if (urlMatch && urlMatch[1]) {
-          const realUrl = decodeURIComponent(urlMatch[1]);
-          if (realUrl.startsWith('http')) {
-            link.href = realUrl;
-          }
-        }
-      } catch (e) {
-        // 忽略解析错误
+      // 尝试提取真实链接并替换
+      const realUrl = extractTargetUrl(link.href);
+      if (realUrl && realUrl !== link.href) {
+        link.href = realUrl;
+        replacedCount++;
+        console.log('[通用脚本] 替换重定向链接:', link.href.substring(0, 60) + '...', '->', realUrl.substring(0, 60) + '...');
       }
     });
+
+    if (replacedCount > 0) {
+      console.log(`[通用脚本] 已替换 ${replacedCount} 个重定向链接`);
+    }
   }
 
   // 使用 MutationObserver 监听 DOM 变化
