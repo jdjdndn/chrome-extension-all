@@ -126,6 +126,7 @@ function updateHideElements(enabled, selectors) {
 
 /**
  * Initialize hide elements from storage
+ * 分功能控制：默认选择器始终自动应用，用户自定义选择器根据设置决定
  */
 async function initHideElements() {
   const domain = DOMUtils.getCurrentDomain();
@@ -135,15 +136,23 @@ async function initHideElements() {
   }
 
   const defaultSelectors = getDomainDefaultHideSelectors();
-  const settings = await StorageUtils.getDomainSettings('hideElementsSettings', domain);
+  const domainSettings = await StorageUtils.getDomainSettings('hideElementsSettings', domain);
 
-  if (settings && settings.enabled) {
-    const mergedSelectors = [...new Set([...defaultSelectors, ...(settings.selectors || [])])];
-    updateHideElements(settings.enabled, mergedSelectors);
-    console.log(`[隐藏元素] 已加载 ${domain} 的设置:`, { enabled: settings.enabled, selectors: mergedSelectors });
-  } else if (defaultSelectors.length > 0) {
+  // 默认选择器始终自动应用（分功能控制）
+  if (defaultSelectors.length > 0) {
+    applyHideElementsStyle(defaultSelectors);
+    console.log(`[隐藏元素] ${domain} 已自动应用默认选择器:`, defaultSelectors);
+  }
+
+  // 用户自定义选择器根据设置决定是否启用
+  if (domainSettings && domainSettings.enabled && domainSettings.selectors && domainSettings.selectors.length > 0) {
+    const mergedSelectors = [...new Set([...defaultSelectors, ...domainSettings.selectors])];
+    applyHideElementsStyle(mergedSelectors);
+    hideElementsState.enabled = true;
+    hideElementsState.selectors = mergedSelectors;
+    console.log(`[隐藏元素] 已加载 ${domain} 的用户设置:`, { enabled: domainSettings.enabled, selectors: domainSettings.selectors });
+  } else {
     hideElementsState.selectors = defaultSelectors;
-    console.log(`[隐藏元素] ${domain} 有默认选择器:`, defaultSelectors);
   }
 }
 
@@ -188,7 +197,107 @@ MessagingUtils.createMessageHandler('content_main_handler', {
     settings.enabled = message.enabled;
     settings.debugMode = message.debugMode || false;
     return { success: true };
+  },
+
+  // ========== 元素拾取器消息处理 ==========
+  'START_ELEMENT_PICKER': () => {
+    // 注入元素拾取器脚本
+    injectElementPickerScript();
+    return { success: true };
+  },
+
+  'STOP_ELEMENT_PICKER': () => {
+    // 发送停止命令到注入脚本
+    const event = new CustomEvent('element-picker-command', {
+      detail: { action: 'STOP' },
+      bubbles: true
+    });
+    document.dispatchEvent(event);
+    return { success: true };
   }
+});
+
+// ========== 元素拾取器脚本注入 ==========
+function injectElementPickerScript() {
+  // 检查注入脚本是否有效（不仅仅是标志位）
+  // 扩展重新加载后，旧的注入脚本会失效
+  if (window._elementPickerInjected && window.ElementPickerInject) {
+    // 验证注入脚本是否仍然有效
+    try {
+      // 尝试访问注入脚本的方法，如果失效会抛出错误
+      const isValid = typeof window.ElementPickerInject.start === 'function';
+      if (isValid) {
+        const event = new CustomEvent('element-picker-command', {
+          detail: { action: 'START' },
+          bubbles: true
+        });
+        document.dispatchEvent(event);
+        return;
+      }
+    } catch (e) {
+      window._elementPickerInjected = false;
+      window.ElementPickerInject = null;
+    }
+  }
+
+  // 需要注入脚本
+  const script = document.createElement('script');
+  script.src = chrome.runtime.getURL('content/element-picker-inject.js');
+  script.onload = function() {
+    this.remove();
+    window._elementPickerInjected = true;
+
+    // 发送启动命令
+    setTimeout(() => {
+      const event = new CustomEvent('element-picker-command', {
+        detail: { action: 'START' },
+        bubbles: true
+      });
+      document.dispatchEvent(event);
+    }, 100);
+  };
+  (document.head || document.documentElement).appendChild(script);
+}
+
+// 监听来自元素拾取器注入脚本的消息
+document.addEventListener('element-picker-message', (event) => {
+  const message = event.detail;
+
+  // 如果是元素选择变化消息
+  if (message.type === 'ELEMENT_SELECTION_CHANGED') {
+    // 转发给 devtools
+    chrome.runtime.sendMessage({
+      type: 'ELEMENT_SELECTION_CHANGED',
+      elements: message.elements || []
+    }).catch(() => {});
+
+    // 如果有元素，保存最新选中的元素到临时存储
+    if (message.elements && message.elements.length > 0) {
+      const latestElement = message.elements[message.elements.length - 1];
+      chrome.storage.local.set({
+        pendingPickedElement: {
+          selector: latestElement.selector,
+          matchCount: latestElement.matchCount || 1,
+          tagName: latestElement.tagName,
+          id: latestElement.id,
+          className: latestElement.className,
+          timestamp: Date.now()
+        }
+      });
+
+      // 尝试发送给 popup（如果还在打开状态）
+      chrome.runtime.sendMessage({
+        type: 'ELEMENT_PICKED',
+        data: latestElement
+      }).catch(() => {});
+    }
+  }
+
+  // 转发所有消息到 background，供 DevTools 轮询获取
+  MessagingUtils.sendToBackground({
+    type: 'PICKER_MESSAGE_RELAY',
+    data: message
+  }).catch(() => {});
 });
 
 // ========== Fetch Interception ==========
