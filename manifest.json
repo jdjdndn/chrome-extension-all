@@ -42,7 +42,13 @@
         "content/utils/logger.js",
         "content/utils/storage.js",
         "content/utils/dom.js",
-        "content/utils/messaging.js",
+        "content/utils/messaging.js"
+      ],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": [
         "content/common/redirect-links.js",
         "content/common/text-to-link.js",
         "content/common/lang-to-zh.js",

@@ -4,16 +4,21 @@
  * 依赖: content/utils/logger.js, storage.js, dom.js, messaging.js
  */
 
-'use strict';
+(function () {
+  'use strict';
 
-// ========== 全局命名空间 ==========
-if (!window.DouyinScript) {
-  window.DouyinScript = { isInitialized: false };
-}
+  // ========== 防止重复加载 ==========
+  if (window.DouyinScript && window.DouyinScript.isInitialized) {
+    console.log('[抖音脚本] 已加载，跳过重复初始化');
+    return;
+  }
+  if (!window.DouyinScript) {
+    window.DouyinScript = { isInitialized: false };
+  }
 
-// ========== 配置 ==========
-const STYLE_TAG_ID = 'douyin-content-hide-style';
-let currentSelectors = [];
+  // ========== 配置 ==========
+  const STYLE_TAG_ID = 'douyin-content-hide-style';
+  let currentSelectors = [];
 
 const DEFAULT_HIDE_SELECTORS = ['.qmhaloYp:nth-child(n):not(:nth-child(2)):not(:nth-child(5))',
   '.ooIf2jbM', '._e7lJDCC', '#island_076c3', '.ai-note-container', '.cursorPointer+*', 'xg-right-grid>xg-icon:not([class*="automatic-continuous"]):not([class*="xgplayer-volume"])', '.danmakuContainer', '#douyin-header-menuCt>div>pace-island>div>*:not(:last-child)'
@@ -129,6 +134,7 @@ const VideoChangeChecker = {
       const currentVideoBody = findOne('.playerContainer');
       const currentId = currentVideoBody ? getVideoUUID(currentVideoBody) : null;
 
+      // 视频已切换、是直播、是广告时，取消检测
       if (currentId !== expectedVideoId || VideoStateManager.isLiveHandled(currentVideoBody) || VideoStateManager.isSkipAd(currentVideoBody)) {
         this.cancel(expectedVideoId);
         return;
@@ -244,6 +250,10 @@ function skipToNextVideo(reason) {
   console.log(`[自动下滑] 原因: ${reason}`);
   triggerKeyboardEvent("skip_video", "keydown", { keyCode: 40, key: "ArrowDown", code: "ArrowDown" });
   if (currentId) VideoChangeChecker.start(currentId, reason);
+}
+
+function isElementInViewportAndVisible(element) {
+  return DOMUtils.isElementInViewport(element, { checkVisibility: true, checkDimensions: true });
 }
 
 function detectAdSvg() {
@@ -513,6 +523,69 @@ function init() {
   loopFunc(processCurrentVideo);
   TimerManager.start();
 
+  // 首次立即处理当前视频（等待 DOM 就绪）
+  const startFirstVideo = () => {
+    // 检查视频容器（普通视频）或直播播放器
+    const videoBody = document.querySelector('.playerContainer');
+    const livePlayer = document.querySelector('.douyin-player');
+
+    if (videoBody || livePlayer) {
+      console.log('[抖音脚本] 检测到视频/直播容器，开始处理');
+      processCurrentVideo();
+    } else {
+      // 使用 MutationObserver 等待容器出现
+      console.log('[抖音脚本] 等待视频/直播容器出现...');
+      let timeoutId = null;
+      const observer = new MutationObserver((mutations, obs) => {
+        const hasVideo = document.querySelector('.playerContainer');
+        const hasLive = document.querySelector('.douyin-player');
+        if (hasVideo || hasLive) {
+          console.log('[抖音脚本] 视频/直播容器已出现，开始处理');
+          obs.disconnect();
+          if (timeoutId) clearTimeout(timeoutId);
+          processCurrentVideo();
+        }
+      });
+      observer.observe(document.body || document.documentElement, {
+        childList: true,
+        subtree: true
+      });
+      // 10秒后超时停止观察（定时器会持续处理，这里只是停止观察）
+      timeoutId = setTimeout(() => {
+        observer.disconnect();
+        console.log('[抖音脚本] 等待容器超时，依赖定时器继续处理');
+      }, 10000);
+    }
+  };
+
+  // 确保 DOM 就绪后执行
+  if (document.body) {
+    startFirstVideo();
+  } else {
+    document.addEventListener('DOMContentLoaded', startFirstVideo);
+  }
+
+  // 监听用户上滑操作，取消自动下滑检测
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowUp' || e.keyCode === 38) {
+      console.log('[用户操作] 检测到上滑，取消所有自动下滑检测');
+      VideoChangeChecker.cancelAll();
+    }
+  });
+
+  // 触摸上滑检测（移动端）
+  let touchStartY = 0;
+  document.addEventListener('touchstart', (e) => {
+    touchStartY = e.touches[0].clientY;
+  }, { passive: true });
+  document.addEventListener('touchend', (e) => {
+    const touchEndY = e.changedTouches[0].clientY;
+    if (touchEndY - touchStartY > 50) {  // 上滑距离超过 50px
+      console.log('[用户操作] 检测到触摸上滑，取消所有自动下滑检测');
+      VideoChangeChecker.cancelAll();
+    }
+  }, { passive: true });
+
   visibilityChangeHandler = () => {
     if (document.hidden) {
       TimerManager.clearAll();
@@ -588,3 +661,5 @@ MessagingUtils.createMessageHandler('douyin_message_handler', {
     return { success: true };
   }
 });
+
+})();

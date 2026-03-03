@@ -51,10 +51,62 @@ function pushToDevTools(tabId, message) {
   return false;
 }
 const SETTINE = 'cy_settings';
-// 初始化函数（保留用于存储加载时合并配置）
+
+// 脚本内部默认配置（各站点脚本可通过 REGISTER_BLOCKED_DOMAINS 注册）
+const _defaultBlockedDomains = {
+  // 示例：'douyin.com': ['mcs.zijieapi.com/list']
+};
+
+// 域名阻止数据（中间变量，合并存储数据和默认配置）
+let _domainBlockedData = {
+  blockedDomains: {},      // { domain: [blockedUrlPatterns] }
+  blockedResponseDomains: {} // { domain: [blockedResponseUrlPatterns] }
+};
+
+// 设置加载状态
+let _settingsLoaded = false;
+let _settingsLoadPromise = null;
+
+// 合并并去重数组
+function mergeAndDedupe(arr1, arr2) {
+  return [...new Set([...(arr1 || []), ...(arr2 || [])])];
+}
+
+// 合并域名阻止数据
+function mergeDomainBlockedData(storedData, defaultData) {
+  const result = {
+    blockedDomains: { ...defaultData.blockedDomains },
+    blockedResponseDomains: { ...defaultData.blockedResponseDomains }
+  };
+
+  // 合并存储的数据
+  if (storedData) {
+    // 合并 blockedDomains
+    for (const [domain, domains] of Object.entries(storedData.blockedDomains || {})) {
+      result.blockedDomains[domain] = mergeAndDedupe(
+        result.blockedDomains[domain],
+        domains
+      );
+    }
+    // 合并 blockedResponseDomains
+    for (const [domain, domains] of Object.entries(storedData.blockedResponseDomains || {})) {
+      result.blockedResponseDomains[domain] = mergeAndDedupe(
+        result.blockedResponseDomains[domain],
+        domains
+      );
+    }
+  }
+
+  return result;
+}
+
+// 初始化函数
 function initDomainBlockedData() {
-  // 配置已直接定义在 _domainBlockedData 中
-  // 此函数保留用于未来可能的扩展
+  // 初始化为默认配置
+  _domainBlockedData = {
+    blockedDomains: { ..._defaultBlockedDomains },
+    blockedResponseDomains: {}
+  };
 }
 
 // 执行初始化
@@ -189,19 +241,29 @@ function getAllBlockedResponseDomains() {
 }
 
 // Initialize extension
-function initialize() {
+async function initialize() {
   if (extensionState.initialized) return;
 
   console.log('Initializing extension...');
   extensionState.initialized = true;
 
-  // Load settings
-  loadSettings();
+  // Load settings (await to ensure data is ready)
+  _settingsLoadPromise = loadSettings();
+  await _settingsLoadPromise;
+  _settingsLoaded = true;
 
   // Listen for extension events
   setupEventListeners();
 
   console.log('Extension initialized successfully');
+}
+
+// Ensure settings are loaded before accessing
+async function ensureSettingsLoaded() {
+  if (_settingsLoaded) return;
+  if (_settingsLoadPromise) {
+    await _settingsLoadPromise;
+  }
 }
 
 // Load settings from storage
@@ -211,18 +273,23 @@ async function loadSettings() {
     const settings = result[SETTINE] || result.settings || { debugMode: true };
     extensionState.isDebugMode = settings.debugMode || true;
 
-    // Load domain-specific blocked data
-    if (settings.domainBlockedData) {
-      _domainBlockedData.blockedDomains = settings.domainBlockedData.blockedDomains || {};
-      _domainBlockedData.blockedResponseDomains = settings.domainBlockedData.blockedResponseDomains || {};
-    } else {
-      // Migrate old data format to new format
-      const oldBlockedDomains = settings.blockedDomains || [];
-      const oldBlockedResponseDomains = settings.blockedResponseDomains || [];
-      // Store old data in a default key (can be migrated to specific domains as needed)
-      _domainBlockedData.blockedDomains = { '*': oldBlockedDomains };
-      _domainBlockedData.blockedResponseDomains = { '*': oldBlockedResponseDomains };
+    // 合并存储数据和默认配置
+    const storedDomainData = settings.domainBlockedData || {
+      blockedDomains: {},
+      blockedResponseDomains: {}
+    };
+
+    // 如果有旧格式数据，先转换
+    if (!settings.domainBlockedData && (settings.blockedDomains || settings.blockedResponseDomains)) {
+      storedDomainData.blockedDomains = { '*': settings.blockedDomains || [] };
+      storedDomainData.blockedResponseDomains = { '*': settings.blockedResponseDomains || [] };
     }
+
+    // 合并并去重
+    _domainBlockedData = mergeDomainBlockedData(storedDomainData, {
+      blockedDomains: _defaultBlockedDomains,
+      blockedResponseDomains: {}
+    });
 
     extensionState.domainScriptMap = settings.domainScriptMap || extensionState.domainScriptMap || {};
 
@@ -642,10 +709,13 @@ async function handleMessage(message, sender, sendResponse) {
       break;
 
     case 'REGISTER_BLOCKED_DOMAINS':
-      // 注册 content script 的 blockedDomains 配置
+      // 注册 content script 的 blockedDomains 配置（合并去重）
       if (message.domain && message.blockedDomains) {
-        _domainBlockedData.blockedDomains[message.domain] = message.blockedDomains;
-        console.log(`[Extension] Registered blockedDomains for ${message.domain}:`, message.blockedDomains);
+        _domainBlockedData.blockedDomains[message.domain] = mergeAndDedupe(
+          _domainBlockedData.blockedDomains[message.domain],
+          message.blockedDomains
+        );
+        console.log(`[Extension] Registered blockedDomains for ${message.domain}:`, _domainBlockedData.blockedDomains[message.domain]);
         // 持久化到 storage
         await persistDomainBlockedData();
         // 更新网络规则
