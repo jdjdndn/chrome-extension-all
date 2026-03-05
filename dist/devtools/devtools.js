@@ -1,6 +1,16 @@
 // DevTools panels registration
 'use strict';
 
+// Create EventBus Monitor panel
+chrome.devtools.panels.create(
+  'EventBus Monitor',
+  null, // Use default icon
+  'eventbus-devtools.html',
+  function (panel) {
+    console.log('EventBus Monitor panel created');
+  }
+);
+
 // Create Console panel
 chrome.devtools.panels.create(
   'Tool-info',

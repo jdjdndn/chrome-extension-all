@@ -23,6 +23,7 @@
 const DEFAULT_HIDE_SELECTORS = ['.qmhaloYp:nth-child(n):not(:nth-child(2)):not(:nth-child(5))',
   '.ooIf2jbM', '._e7lJDCC', '#island_076c3', '.ai-note-container', '.cursorPointer+*', 'xg-right-grid>xg-icon:not([class*="automatic-continuous"]):not([class*="xgplayer-volume"])', '.danmakuContainer', '#douyin-header-menuCt>div>pace-island>div>*:not(:last-child)'
 ];
+console.log('[抖音脚本] DEFAULT_HIDE_SELECTORS 已定义，数量:', DEFAULT_HIDE_SELECTORS.length);
 
 const BLOCKED_DOMAINS = [
   'mcs.zijieapi.com/list',
@@ -62,7 +63,7 @@ const THROTTLE_CONFIG = {
 let processedVideos = new Set();
 let lastActionTime = {};
 let videoHistory = [];
-const VIDEO_HISTORY_SIZE = 5;
+const VIDEO_HISTORY_SIZE = 30; // 保留最近30个视频的历史，支持更长时间的手动返回
 let currentVideoId = null;
 let visibilityChangeHandler = null;
 let beforeUnloadHandler = null;
@@ -221,7 +222,15 @@ function debounceById(fn, delay = 400) {
 }
 
 const triggerKeyboardEvent = debounceById(function (eventType, eventData) {
-  document.dispatchEvent(new KeyboardEvent(eventType, eventData));
+  // 添加 bubbles 和 cancelable 确保事件能冒泡和被正常处理
+  const event = new KeyboardEvent(eventType, {
+    bubbles: true,
+    cancelable: true,
+    ...eventData
+  });
+  // 优先尝试派发到焦点元素，再冒泡到 document
+  const target = document.activeElement || document.body;
+  target.dispatchEvent(event);
 }, 400);
 
 function isManualNavigation(videoId) {
@@ -243,12 +252,124 @@ function clearProcessedVideo(videoId) {
 }
 
 // ========== 核心功能 ==========
+
+// 点击下一个视频按钮（优先按钮，备选键盘）
+function clickNextButton() {
+  // 首选：播放器切换按钮
+  const nextBtn = findOne('div.xgplayer-playswitch-next');
+  if (nextBtn && isElementInViewportAndVisible(nextBtn)) {
+    console.log('[导航] 点击 xgplayer-playswitch-next 按钮');
+    // 尝试多种触发方式
+    nextBtn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    nextBtn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+    nextBtn.click();
+    return true;
+  }
+  // 备选1：data-e2e 按钮
+  const nextBtn2 = findOne('[data-e2e="video-switch-next-arrow"]');
+  if (nextBtn2 && isElementInViewportAndVisible(nextBtn2)) {
+    console.log('[导航] 点击 data-e2e 下一个按钮');
+    nextBtn2.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    nextBtn2.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+    nextBtn2.click();
+    return true;
+  }
+  // 备选2：键盘下箭头
+  console.log('[导航] 使用键盘下箭头');
+  triggerKeyboardEvent("skip_video", "keydown", { keyCode: 40, key: "ArrowDown", code: "ArrowDown" });
+  return false;
+}
+
+// 点击上一个视频按钮
+function clickPrevButton() {
+  // 首选：播放器切换按钮
+  const prevBtn = findOne('div.xgplayer-playswitch-prev');
+  if (prevBtn && isElementInViewportAndVisible(prevBtn)) {
+    console.log('[导航] 点击 xgplayer-playswitch-prev 按钮');
+    prevBtn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    prevBtn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+    prevBtn.click();
+    return true;
+  }
+  // 备选1：data-e2e 按钮
+  const prevBtn2 = findOne('[data-e2e="video-switch-prev-arrow"]');
+  if (prevBtn2 && isElementInViewportAndVisible(prevBtn2)) {
+    console.log('[导航] 点击 data-e2e 上一个按钮');
+    prevBtn2.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    prevBtn2.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+    prevBtn2.click();
+    return true;
+  }
+  // 备选2：键盘上箭头
+  console.log('[导航] 使用键盘上箭头');
+  triggerKeyboardEvent("prev_video", "keydown", { keyCode: 38, key: "ArrowUp", code: "ArrowUp" });
+  return false;
+}
+
+// 点击评论按钮
+function clickCommentButton() {
+  // 方法1: 通过收藏按钮定位 (div[data-e2e*=video-player-collect] 上一个兄弟的第一个儿子)
+  const collectBtn = findOne('div[data-e2e*="video-player-collect"]');
+  if (collectBtn) {
+    const parent = collectBtn.parentElement;
+    if (parent) {
+      const prevSibling = collectBtn.previousElementSibling;
+      if (prevSibling && prevSibling.firstElementChild) {
+        const commentBtn = prevSibling.firstElementChild;
+        if (isElementInViewportAndVisible(commentBtn)) {
+          console.log('[评论区] 通过收藏按钮定位，点击评论按钮');
+          commentBtn.click();
+          return checkCommentOpened();
+        }
+      }
+    }
+  }
+
+  // 方法2: svg选择器 (必须精确匹配1个)
+  const selectors = [
+    'div[class]>div:not([class]):not(style):not([data-])>svg',
+    'div:not([class]):not(style):not([data-])>svg'
+  ];
+
+  for (const selector of selectors) {
+    const svgs = [...document.querySelectorAll(selector)]
+      .filter(svg => isElementInViewportAndVisible(svg));
+
+    if (svgs.length === 1) {
+      console.log(`[评论区] 选择器 "${selector}" 精确匹配1个，点击`);
+      svgs[0].click();
+      return checkCommentOpened();
+    }
+  }
+
+  // 方法3: 键盘x
+  console.log('[评论区] 使用键盘x');
+  triggerKeyboardEvent("autoOpenComment", "keydown", { keyCode: 88, key: "x", code: "KeyX" });
+  return false;
+}
+
+function checkCommentOpened() {
+  setTimeout(() => {
+    const panel = findOne('#videoSideCard') || findOne('[class*="comment"]');
+    if (panel && panel.offsetWidth > 0) {
+      console.log('[评论区] 已成功打开');
+    } else {
+      console.log('[评论区] 点击未成功，尝试键盘x');
+      triggerKeyboardEvent("autoOpenComment", "keydown", { keyCode: 88, key: "x", code: "KeyX" });
+    }
+  }, 300);
+  return true;
+}
+
 function skipToNextVideo(reason) {
   if (!canExecuteAction('skip_video', THROTTLE_CONFIG.SKIP_VIDEO)) return;
   const currentVideoBody = findOne('.playerContainer');
   const currentId = currentVideoBody ? getVideoUUID(currentVideoBody) : null;
   console.log(`[自动下滑] 原因: ${reason}`);
-  triggerKeyboardEvent("skip_video", "keydown", { keyCode: 40, key: "ArrowDown", code: "ArrowDown" });
+
+  // 优先点击按钮，备选键盘
+  clickNextButton();
+
   if (currentId) VideoChangeChecker.start(currentId, reason);
 }
 
@@ -336,20 +457,33 @@ function handleNotInterested(videoBody) {
   }
 }
 
-function isVideoing(video) {
-  const text = video.innerText;
+function isLiveStream(video) {
+  if (!video) return false;
+  const text = video.innerText || '';
   return text.includes('点击或按\n进入直播间') || text.includes('上滑继续看视频');
 }
 
-function autoSkip(videoBody) {
-  if (videoBody) return;
-  const video = findOne('.douyin-player');
-  if (!video || VideoStateManager.isLiveHandled(video)) return;
-  if (isVideoing(video)) {
+function detectAndSkipLive() {
+  const videoBody = findOne('.playerContainer');
+  if (videoBody) return false; // 有普通视频容器，不是直播
+
+  const livePlayer = findOne('.douyin-player');
+  if (!livePlayer) return false;
+
+  if (VideoStateManager.isLiveHandled(livePlayer)) return true; // 已处理过
+
+  if (isLiveStream(livePlayer)) {
     console.log('[直播检测] 检测到直播，准备跳过');
-    VideoStateManager.setLiveHandled(video, true);
-    skipToNextVideo('检测到直播');
+    VideoStateManager.setLiveHandled(livePlayer, true);
+
+    // 确保执行下滑
+    setTimeout(() => {
+      clickNextButton();
+    }, 100);
+
+    return true;
   }
+  return false;
 }
 
 function autoStar() {
@@ -387,51 +521,14 @@ function autoOpenComment(videoBody) {
     return;
   }
 
-  // 方法1: 通过 SVG 路径签名查找评论按钮
-  const signature = "M-4.644999980926514,4.482999801635742";
-  const visiblePaths = DOMUtils.findAllInViewport('path', { checkVisibility: true, checkDimensions: true });
-
-  for (const path of visiblePaths) {
-    const d = path.getAttribute('d') || '';
-    if (d.includes(signature)) {
-      const button = path.closest('button') || path.closest('div[role="button"]');
-      if (button && isElementInViewportAndVisible(button)) {
-        button.click();
-        console.log('[评论区] 通过SVG签名找到并点击评论按钮');
-        return;
-      }
-    }
-  }
-
-  // 方法2: 查找包含"评论"文字的按钮
-  const possibleSelectors = [
-    'xg-icon[class*="comment"]',
-    '[class*="right-grid"] xg-icon',
-    'button[aria-label*="评论"]',
-    'button[aria-label*="Comment"]'
-  ];
-
-  for (const sel of possibleSelectors) {
-    try {
-      const elements = DOMUtils.findAllInViewport(sel, { checkVisibility: true, checkDimensions: true });
-      for (const el of elements) {
-        const ariaLabel = el.getAttribute('aria-label') || el.getAttribute('title') || '';
-        if (ariaLabel.includes('评论') || ariaLabel.includes('Comment')) {
-          el.click();
-          console.log('[评论区] 通过选择器找到并点击:', sel);
-          return;
-        }
-      }
-    } catch (e) {}
-  }
-
-  // 方法3: 查找右侧栏所有图标按钮（通常第3个是评论）
-  const rightBarButtons = DOMUtils.findAllInViewport('.xg-right-grid xg-icon, [class*="right"] xg-icon', { checkVisibility: true, checkDimensions: true });
-  if (rightBarButtons.length >= 3) {
-    rightBarButtons[2].click();
-    console.log('[评论区] 通过右侧栏位置找到并点击（第3个按钮）');
+  // 方法1: 点击评论按钮（使用新选择器）
+  if (clickCommentButton()) {
     return;
   }
+
+  // 方法2: 触发键盘事件 'x' 打开评论区
+  triggerKeyboardEvent("autoOpenComment", "keydown", { keyCode: 88, key: "x", code: "KeyX" });
+  console.log('[评论区] 触发键盘事件 x');
 }
 
 // ========== 评论区时间跳转 ==========
@@ -487,36 +584,101 @@ function setVideoTime() {
 
 // ========== 主处理循环 ==========
 function processCurrentVideo() {
+  // ========== 第一步：直播检测（优先级最高） ==========
+  if (detectAndSkipLive()) {
+    return; // 检测到直播并已触发跳过
+  }
+
   const videoBody = findOne('.playerContainer');
-
-  // 直播检测：只有在没有普通视频容器时才检查直播
-  autoSkip(videoBody);
-
   if (!videoBody) return;
 
   const videoId = getVideoUUID(videoBody);
   if (currentVideoId === videoId) return;
 
+  // 判断是否是手动返回（在更新历史之前检查）
+  const isGoingBack = isManualNavigation(videoId);
+
+  // 视频切换处理
   if (currentVideoId !== null && currentVideoId !== videoId) {
-    console.log(`[抖音脚本] 视频切换`);
-    updateVideoHistory(videoId);
-    if (isManualNavigation(videoId)) {
+    console.log(`[抖音脚本] 视频切换: ${currentVideoId.substring(0, 8)} -> ${videoId.substring(0, 8)}`);
+
+    // 检测手动上滑返回
+    if (isGoingBack) {
       console.log(`[手动导航] 检测到手动上滑返回，暂停自动处理`);
       VideoChangeChecker.cancelAll();
       currentVideoId = videoId;
+      updateVideoHistory(videoId);
       return;
     }
-    clearProcessedVideo(currentVideoId);
+
+    updateVideoHistory(videoId);
+    // 只清理超出历史范围的视频记录（保留最近 VIDEO_HISTORY_SIZE 个视频的标记）
+    cleanupOldVideoRecords();
   } else {
     updateVideoHistory(videoId);
   }
   currentVideoId = videoId;
 
+  // ========== 第二步：先检测视频类型 ==========
+  const aiSkipKey = `skip_ai_${videoId}`;
+  const notInterestedKey = `not_interested_${videoId}`;
+
+  // 检测广告
   skipAD(videoBody);
-  skipAi(videoBody);
-  handleNotInterested(videoBody);
+
+  // 检测AI内容
+  const isAI = detectAIContent(videoBody);
+  if (isAI) {
+    processedVideos.add(aiSkipKey);
+    // 如果已经在 processedVideos 中，说明之前看过并跳过过，继续跳过
+    console.log('[AI检测] 检测到AI相关内容，跳过');
+    skipToNextVideo('AI生成内容');
+    return;
+  }
+
+  // 检测不感兴趣关键词
+  const matchedKeyword = checkNotInterestedKeywords(videoBody);
+  if (matchedKeyword) {
+    processedVideos.add(notInterestedKey);
+    console.log(`[不感兴趣] 匹配到关键词: "${matchedKeyword}"，跳过`);
+    skipToNextVideo(`不感兴趣: ${matchedKeyword}`);
+    return;
+  }
+
+  // ========== 第三步：检查历史标记（用于已滑过的视频） ==========
+  if (processedVideos.has(aiSkipKey)) {
+    console.log(`[视频追踪] 已标记为AI视频，跳过: ${videoId.substring(0, 8)}`);
+    skipToNextVideo('AI视频(已标记)');
+    return;
+  }
+
+  if (processedVideos.has(notInterestedKey)) {
+    console.log(`[视频追踪] 已标记为不感兴趣，跳过: ${videoId.substring(0, 8)}`);
+    skipToNextVideo('不感兴趣(已标记)');
+    return;
+  }
+
+  // ========== 第四步：其他自动操作 ==========
   autoStar();
   autoOpenComment(videoBody);
+}
+
+// 清理超出历史范围的视频记录
+function cleanupOldVideoRecords() {
+  // 获取当前历史中的视频ID
+  const activeVideoIds = new Set(videoHistory);
+
+  // 找出需要清理的记录（不在历史中的视频）
+  const keysToDelete = [...processedVideos].filter(key => {
+    // 提取视频ID: "skip_ai_xxx" 或 "not_interested_xxx"
+    const videoId = key.split('_').slice(-1)[0];
+    return !activeVideoIds.has(videoId);
+  });
+
+  if (keysToDelete.length > 0) {
+    keysToDelete.forEach(key => processedVideos.delete(key));
+    console.log(`[清理] 移除了 ${keysToDelete.length} 条过期视频记录`);
+  }
 }
 
 function loopFunc(fn) {
@@ -569,11 +731,13 @@ function injectCustomStyles() {
 }
 
 function init() {
+  console.log('[抖音脚本] init 函数被调用');
   if (window.DouyinScript.isInitialized) {
     console.log('[抖音脚本] 已经初始化，跳过重复初始化');
     return;
   }
   window.DouyinScript.isInitialized = true;
+  console.log('[抖音脚本] 脚本初始化完成');
 
   injectCustomStyles();
   // 异步加载设置，错误时使用默认值
@@ -661,6 +825,11 @@ function init() {
 
   document.addEventListener('visibilitychange', visibilityChangeHandler);
   window.addEventListener('beforeunload', beforeUnloadHandler);
+
+  // 标记 content script 已就绪
+  if (window.ContentBridge) {
+    ContentBridge.markReady();
+  }
 }
 
 // ========== 启动 ==========
@@ -708,8 +877,20 @@ MessagingUtils.createMessageHandler('douyin_message_handler', {
     return { success: true };
   },
 
-  'GET_DEFAULT_HIDE_SELECTORS': () => ({ success: true, selectors: DEFAULT_HIDE_SELECTORS }),
-  'GET_CURRENT_HIDE_SELECTORS': () => ({ success: true, selectors: currentSelectors }),
+  'GET_DEFAULT_HIDE_SELECTORS': () => {
+    console.log('[抖音脚本] === GET_DEFAULT_HIDE_SELECTORS 消息接收 ===');
+    console.log('[抖音脚本] DEFAULT_HIDE_SELECTORS 类型:', typeof DEFAULT_HIDE_SELECTORS);
+    console.log('[抖音脚本] DEFAULT_HIDE_SELECTORS 值:', DEFAULT_HIDE_SELECTORS);
+    console.log('[抖音脚本] DEFAULT_HIDE_SELECTORS 长度:', DEFAULT_HIDE_SELECTORS ? DEFAULT_HIDE_SELECTORS.length : 'N/A');
+    const result = { success: true, selectors: DEFAULT_HIDE_SELECTORS || [] };
+    console.log('[抖音脚本] 返回结果:', result);
+    return result;
+  },
+  'GET_CURRENT_HIDE_SELECTORS': () => {
+    console.log('[抖音脚本] === GET_CURRENT_HIDE_SELECTORS 消息接收 ===');
+    console.log('[抖音脚本] currentSelectors:', currentSelectors);
+    return { success: true, selectors: currentSelectors || [] };
+  },
 
   'UPDATE_HIDE_ELEMENTS': (message) => {
     const { enabled, selectors } = message;

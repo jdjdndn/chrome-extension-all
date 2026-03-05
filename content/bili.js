@@ -399,6 +399,11 @@ if (window.BiliScriptLoaded) {
     updatePageConfig();
 
     console.log('[Bilibili脚本] 初始化完成，本地服务:', localServerAvailable ? '已连接' : '未连接');
+
+    // 标记 content script 已就绪
+    if (window.ContentBridge) {
+      ContentBridge.markReady();
+    }
   }
 
   if (document.readyState === 'loading') {

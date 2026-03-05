@@ -4,6 +4,12 @@
 
 'use strict';
 
+// 防止重复注入
+if (window._contentScriptLoaded) {
+  console.log('[Extension] Content script already loaded, skipping');
+} else {
+  window._contentScriptLoaded = true;
+
 // ========== Inject Page Context Script ==========
 // Inject the script into the page context to intercept XHR/Fetch at page level
 function injectPageScript() {
@@ -350,3 +356,5 @@ if (!window._originalFetch) {
     }
   };
 }
+
+} // end of _contentScriptLoaded check

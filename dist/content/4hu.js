@@ -151,6 +151,11 @@ function init() {
   }
 
   setupObserver();
+
+  // 标记 content script 已就绪
+  if (window.ContentBridge) {
+    ContentBridge.markReady();
+  }
 }
 
 // ========== 导出配置 ==========

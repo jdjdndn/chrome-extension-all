@@ -1,5 +1,64 @@
 // Popup script runs in the context of the popup window
 
+// ========== EventBus 通信层 ==========
+
+/**
+ * 等待 EventBus 就绪
+ */
+async function waitForEventBus() {
+  const maxWait = 5000;
+  const checkInterval = 100;
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < maxWait) {
+    if (window.EventBus && EventBus.getState && EventBus.getState().isReady) {
+      return true;
+    }
+    await new Promise(resolve => setTimeout(resolve, checkInterval));
+  }
+  console.warn('[Popup] EventBus 未就绪，继续尝试');
+  return false;
+}
+
+/**
+ * 发送消息到 content script（使用 EventBus）
+ */
+async function sendMessageToContentScript(message) {
+  await waitForEventBus();
+
+  // 将旧的消息格式转换为 EventBus 格式
+  const messageType = message.type;
+  const messageData = message.data || message;
+
+  try {
+    const response = await EventBus.request(messageType, messageData, {
+      target: 'content',
+      timeout: 5000
+    });
+    return response;
+  } catch (error) {
+    console.warn('[Popup] 发送消息失败:', error.message);
+    // 降级方案：尝试直接使用 chrome.tabs.sendMessage
+    try {
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tabs[0]?.id) {
+        return await chrome.tabs.sendMessage(tabs[0].id, message);
+      }
+    } catch (e) {
+      console.warn('[Popup] 降级方案也失败:', e.message);
+    }
+    return null;
+  }
+}
+
+/**
+ * 广播消息到所有组件
+ */
+async function broadcastMessage(message) {
+  await waitForEventBus();
+  await EventBus.publish(message.type, message.data || message);
+}
+
 // Default settings
 const defaultSettings = {
   enabled: false,
@@ -67,15 +126,14 @@ async function toggleExtension() {
   const newSettings = await saveSettings({ enabled: newEnabled });
   updateStatus(newSettings.enabled);
 
-  // Notify content scripts
-  const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (tabs[0]?.id) {
-    chrome.tabs.sendMessage(tabs[0].id, {
-      type: 'TOGGLE_EXTENSION',
+  // Notify content scripts (使用 EventBus)
+  try {
+    await waitForEventBus();
+    await EventBus.publish('TOGGLE_EXTENSION', {
       enabled: newSettings.enabled
-    }).catch(() => {
-      // Content script may not be loaded
     });
+  } catch (error) {
+    console.warn('[Popup] 通知失败:', error);
   }
 }
 
@@ -822,24 +880,28 @@ const DEFAULT_SELECTORS_BY_DOMAIN = {
 async function getDefaultHideSelectors() {
   // 先尝试从 content script 获取
   try {
-    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tabs[0]?.id) {
-      const response = await chrome.tabs.sendMessage(tabs[0].id, {
-        type: 'GET_DEFAULT_HIDE_SELECTORS'
-      }).catch(() => null);
-      if (response && response.success && response.selectors) {
-        console.log('[隐藏元素] 从 content script 获取默认选择器:', response.selectors);
-        return response.selectors;
-      }
+    console.log('[隐藏元素] 尝试从 content script 获取默认选择器');
+    const response = await sendMessageToContentScript({
+      type: 'GET_DEFAULT_HIDE_SELECTORS'
+    });
+
+    console.log('[隐藏元素] 收到响应:', response);
+
+    if (response && response.success && response.selectors && response.selectors.length > 0) {
+      console.log('[隐藏元素] ✓ 从 content script 获取默认选择器:', response.selectors.length, '个');
+      return response.selectors;
+    } else {
+      console.log('[隐藏元素] 收到响应但选择器为空');
     }
   } catch (error) {
-    console.log('[隐藏元素] 无法从 content script 获取默认选择器:', error);
+    console.log('[隐藏元素] 获取失败:', error.message);
   }
 
-  // 备用方案：从硬编码数据获取
+  // 失败时使用硬编码数据
+  console.log('[隐藏元素] 使用硬编码默认选择器');
   const domain = await getCurrentDomain();
   if (domain && DEFAULT_SELECTORS_BY_DOMAIN[domain]) {
-    console.log('[隐藏元素] 使用硬编码默认选择器:', domain, DEFAULT_SELECTORS_BY_DOMAIN[domain].length, '个');
+    console.log('[隐藏元素] 硬编码数据:', domain, DEFAULT_SELECTORS_BY_DOMAIN[domain].length, '个');
     return DEFAULT_SELECTORS_BY_DOMAIN[domain];
   }
 

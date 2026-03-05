@@ -1,6 +1,13 @@
 // Background service worker (Manifest V3)
 // Runs in the background and handles extension lifecycle events
 
+// ========== EventBus 加载 ==========
+// 在 service worker 中使用 importScripts 加载 event-bus.js
+// 这比 ES6 import 更可靠，因为 event-bus.js 是 IIFE 格式
+if (typeof self !== 'undefined' && typeof self.importScripts === 'function') {
+  self.importScripts('event-bus.js');
+}
+
 // ========== Port 连接管理 ==========
 const devtoolsPorts = new Map(); // tabId -> port
 
@@ -262,6 +269,30 @@ async function initialize() {
   console.log('Initializing extension...');
   extensionState.initialized = true;
 
+  // 初始化 EventBus V5
+  if (typeof EventBus !== 'undefined') {
+    await EventBus.init();
+    console.log('[Background] EventBus V5 已初始化');
+
+    // 配置 EventBus
+    EventBus.configure({
+      DEBUG_MODE: extensionState.isDebugMode || false,
+      ENABLE_TRACKING: true,
+      ENABLE_STATISTICS: true,
+      ENABLE_PERFORMANCE_MONITORING: true,
+      ENABLE_CIRCUIT_BREAKER: true,
+      ENABLE_SMART_ERRORS: true,
+      ENABLE_MEMORY_PROFILING: false, // Service Worker 不支持内存分析
+      ENABLE_MESSAGE_TEMPLATES: true
+    });
+
+    // 注册核心处理器
+    registerEventBusHandlers();
+
+    // 注册消息模板
+    registerMessageTemplates();
+  }
+
   // Load settings (await to ensure data is ready)
   _settingsLoadPromise = loadSettings();
   await _settingsLoadPromise;
@@ -277,6 +308,132 @@ async function initialize() {
   }, 500);
 
   console.log('Extension initialized successfully');
+}
+
+// 注册 EventBus 处理器
+function registerEventBusHandlers() {
+  // 测试回显
+  EventBus.on('TEST_ECHO', (data) => {
+    console.log('[Background] 收到 TEST_ECHO:', data);
+    return { success: true, echo: data };
+  });
+
+  // 获取状态
+  EventBus.on('GET_STATE', () => {
+    return {
+      success: true,
+      state: extensionState,
+      eventbus: EventBus.getState()
+    };
+  });
+
+  // 获取性能指标
+  EventBus.on('GET_PERFORMANCE', () => {
+    return {
+      success: true,
+      metrics: EventBus.getPerformanceMetrics(),
+      stats: EventBus.getStats()
+    };
+  });
+
+  // 获取健康状态
+  EventBus.on('GET_HEALTH', () => {
+    return {
+      success: true,
+      health: EventBus.getHealthAnalysis()
+    };
+  });
+
+  // 获取快照
+  EventBus.on('GET_SNAPSHOT', () => {
+    return {
+      success: true,
+      snapshot: EventBus.getSnapshot()
+    };
+  });
+
+  // 检查域名是否被阻止
+  EventBus.on('CHECK_DOMAIN_BLOCKED', (data) => {
+    const { currentDomain, requestDomain } = data;
+    if (currentDomain && requestDomain) {
+      const blockedList = getBlockedDomainsForDomain(currentDomain);
+      const isBlocked = blockedList.some(blockedDomain => {
+        return requestDomain === blockedDomain ||
+               requestDomain.endsWith('.' + blockedDomain);
+      });
+      return {
+        blocked: isBlocked,
+        blockedReason: isBlocked ? 'Domain in blocklist' : null
+      };
+    }
+    return { blocked: false };
+  });
+
+  // 注册阻止域名
+  EventBus.on('REGISTER_BLOCKED_DOMAINS', async (data) => {
+    const { domain, blockedDomains } = data;
+    if (domain && blockedDomains) {
+      _domainBlockedData.blockedDomains[domain] = mergeAndDedupe(
+        _domainBlockedData.blockedDomains[domain],
+        blockedDomains
+      );
+      console.log(`[Background] 注册阻止域名 ${domain}:`, _domainBlockedData.blockedDomains[domain]);
+      await persistDomainBlockedData();
+      await updateNetworkRules();
+      return { success: true };
+    }
+    return { success: false, error: 'Missing domain or blockedDomains' };
+  });
+
+  // 获取隐藏选择器
+  EventBus.on('GET_DEFAULT_HIDE_SELECTORS', () => {
+    return { success: true, selectors: [] };
+  });
+
+  EventBus.on('GET_CURRENT_HIDE_SELECTORS', () => {
+    return { success: true, selectors: [] };
+  });
+
+  // 更新隐藏元素
+  EventBus.on('UPDATE_HIDE_ELEMENTS', () => {
+    return { success: true };
+  });
+
+  // 更新关键词
+  EventBus.on('UPDATE_KEYWORDS', () => {
+    return { success: true };
+  });
+
+  // 切换扩展
+  EventBus.on('TOGGLE_EXTENSION', (data) => {
+    console.log('[Background] TOGGLE_EXTENSION:', data.enabled);
+    return { success: true };
+  });
+
+  console.log('[Background] EventBus 处理器已注册');
+}
+
+// 注册消息模板
+function registerMessageTemplates() {
+  // 设置变更消息模板
+  EventBus.defineTemplate('SETTINGS_CHANGE', {
+    schema: { required: ['key', 'value'] },
+    defaults: { timestamp: Date.now() }
+  });
+
+  // 标签页消息模板
+  EventBus.defineTemplate('TAB_ACTION', {
+    schema: { required: ['action', 'tabId'] },
+    validate: (data) => {
+      const validActions = ['create', 'update', 'remove', 'activate'];
+      if (!validActions.includes(data.action)) {
+        return ['Invalid action'];
+      }
+      return null;
+    }
+  });
+
+  console.log('[Background] 消息模板已注册');
 }
 
 // Ensure settings are loaded before accessing
@@ -378,6 +535,14 @@ function setupEventListeners() {
 
   // Listen for messages from other extension components
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    // 如果是 EventBus 消息，让 EventBus 处理器处理
+    if (message && message.__eventbus__) {
+      // EventBus 已经在 Transport.onMessage 中注册了监听器
+      // 这里只需要返回 false，让其他监听器有机会处理
+      return false;
+    }
+
+    // 非 EventBus 消息，使用原有的 handleMessage
     handleMessage(message, sender, sendResponse);
     return true; // Keep message channel open for async responses
   });
@@ -621,6 +786,11 @@ function getScriptsForDomain(domain) {
 // Inject scripts for matching domain
 async function injectScriptsForTab(tabId, tabUrl) {
   try {
+    // 检查 URL 是否允许注入（跳过特殊页面）
+    if (!tabUrl || !tabUrl.startsWith('http://') && !tabUrl.startsWith('https://')) {
+      return;
+    }
+
     const currentDomain = new URL(tabUrl).hostname;
     const scriptsToInject = getScriptsForDomain(currentDomain);
     console.log('Scripts to inject for domain:', currentDomain, scriptsToInject);
@@ -692,6 +862,12 @@ async function injectScriptsToExistingTabs() {
 // 完整注入所有脚本（模拟 manifest.json 的 content_scripts 行为）
 async function injectAllScriptsForTab(tabId, tabUrl) {
   try {
+    // 检查 URL 是否允许注入（跳过特殊页面）
+    if (!tabUrl || !tabUrl.startsWith('http://') && !tabUrl.startsWith('https://')) {
+      console.log(`[Background] 跳过非 HTTP(S) 页面: ${tabUrl}`);
+      return;
+    }
+
     // 首先检查脚本是否已经注入过（检查 window.ExtensionAPI 是否存在）
     const checkResult = await chrome.scripting.executeScript({
       target: { tabId },
@@ -877,6 +1053,24 @@ async function handleMessage(message, sender, sendResponse) {
         currentDomain: currentDomain2,
         domains: getBlockedDomainsForDomain(currentDomain2)
       });
+      break;
+
+    case 'CHECK_DOMAIN_BLOCKED':
+      // 检查请求域名是否被阻止
+      if (message.currentDomain && message.requestDomain) {
+        const blockedList = getBlockedDomainsForDomain(message.currentDomain);
+        const isBlocked = blockedList.some(blockedDomain => {
+          return message.requestDomain === blockedDomain ||
+                 message.requestDomain.endsWith('.' + blockedDomain);
+        });
+        sendResponse({
+          blocked: isBlocked,
+          blockedReason: isBlocked ? 'Domain in blocklist' : null,
+          blockedDomains: blockedList
+        });
+      } else {
+        sendResponse({ blocked: false, error: 'Missing domains' });
+      }
       break;
 
     case 'GET_BLOCKED_DOMAINS':

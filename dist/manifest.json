@@ -39,10 +39,11 @@
     {
       "matches": ["<all_urls>"],
       "js": [
+        "event-bus-v5.js",
         "content/utils/logger.js",
+        "content/eventbus-integration.js",
         "content/utils/storage.js",
-        "content/utils/dom.js",
-        "content/utils/messaging.js"
+        "content/utils/dom.js"
       ],
       "run_at": "document_start"
     },
@@ -63,48 +64,108 @@
       "js": ["content/bili.js"]
     },
     {
+      "matches": ["*://*.bilibili.com/*"],
+      "js": ["content/eventbus-integration.js"],
+      "run_at": "document_end"
+    },
+    {
       "matches": ["*://*.douyin.com/*"],
       "js": ["content/utils/localServer.js", "content/douyin.js"]
+    },
+    {
+      "matches": ["*://*.douyin.com/*"],
+      "js": ["content/eventbus-integration.js", "content/eventbus-integration-douyin.js"],
+      "run_at": "document_end"
     },
     {
       "matches": ["*://*.4hu.tv/*"],
       "js": ["content/4hu.js"]
     },
     {
+      "matches": ["*://*.4hu.tv/*"],
+      "js": ["content/eventbus-integration.js"],
+      "run_at": "document_end"
+    },
+    {
       "matches": ["*://*.weread.qq.com/*"],
       "js": ["content/weread.js"]
+    },
+    {
+      "matches": ["*://*.weread.qq.com/*"],
+      "js": ["content/eventbus-integration.js"],
+      "run_at": "document_end"
     },
     {
       "matches": ["*://*.quark.cn/*"],
       "js": ["content/quark.js"]
     },
     {
+      "matches": ["*://*.quark.cn/*"],
+      "js": ["content/eventbus-integration.js"],
+      "run_at": "document_end"
+    },
+    {
       "matches": ["*://*.18comic.vip/*"],
       "js": ["content/comic18.js"]
+    },
+    {
+      "matches": ["*://*.18comic.vip/*"],
+      "js": ["content/eventbus-integration.js"],
+      "run_at": "document_end"
     },
     {
       "matches": ["*://*.aliyundrive.com/*"],
       "js": ["content/aliyun.js"]
     },
     {
+      "matches": ["*://*.aliyundrive.com/*"],
+      "js": ["content/eventbus-integration.js"],
+      "run_at": "document_end"
+    },
+    {
       "matches": ["*://*.baidu.com/*"],
       "js": ["content/baiduPan.js"]
+    },
+    {
+      "matches": ["*://*.baidu.com/*"],
+      "js": ["content/eventbus-integration.js"],
+      "run_at": "document_end"
     },
     {
       "matches": ["*://*.zhipin.com/*"],
       "js": ["content/boss.js"]
     },
     {
+      "matches": ["*://*.zhipin.com/*"],
+      "js": ["content/eventbus-integration.js"],
+      "run_at": "document_end"
+    },
+    {
       "matches": ["*://*.xiaohongshu.com/*"],
       "js": ["content/xiaohongshu.js"]
+    },
+    {
+      "matches": ["*://*.xiaohongshu.com/*"],
+      "js": ["content/eventbus-integration.js"],
+      "run_at": "document_end"
     },
     {
       "matches": ["*://*.wyaqpx.com/*"],
       "js": ["content/dianGong.js"]
     },
     {
+      "matches": ["*://*.wyaqpx.com/*"],
+      "js": ["content/eventbus-integration.js"],
+      "run_at": "document_end"
+    },
+    {
       "matches": ["*://*.ymmfa.com/*"],
       "js": ["content/gongkong.js"]
+    },
+    {
+      "matches": ["*://*.ymmfa.com/*"],
+      "js": ["content/eventbus-integration.js"],
+      "run_at": "document_end"
     },
     {
       "matches": ["*://*.youtube.com/*"],
@@ -113,8 +174,7 @@
     }
   ],
   "background": {
-    "service_worker": "background.js",
-    "type": "module"
+    "service_worker": "background.js"
   },
   "chrome_url_overrides": {
     "newtab": "newtab.html"
