@@ -759,7 +759,68 @@ async function getCurrentDomain() {
  * Get default hide selectors from content script
  * @returns {Promise<string[]>} Default selectors or empty array
  */
+// 各网站默认隐藏选择器（备用数据，当 content script 未加载时使用）
+const DEFAULT_SELECTORS_BY_DOMAIN = {
+  'douyin.com': [
+    '.qmhaloYp:nth-child(n):not(:nth-child(2)):not(:nth-child(5))',
+    '.ooIf2jbM',
+    '._e7lJDCC',
+    '#island_076c3',
+    '.ai-note-container',
+    '.cursorPointer+*',
+    'xg-right-grid>xg-icon:not([class*="automatic-continuous"]):not([class*="xgplayer-volume"])',
+    '.danmakuContainer',
+    '#douyin-header-menuCt>div>pace-island>div>*:not(:last-child)'
+  ],
+  'www.douyin.com': [
+    '.qmhaloYp:nth-child(n):not(:nth-child(2)):not(:nth-child(5))',
+    '.ooIf2jbM',
+    '._e7lJDCC',
+    '#island_076c3',
+    '.ai-note-container',
+    '.cursorPointer+*',
+    'xg-right-grid>xg-icon:not([class*="automatic-continuous"]):not([class*="xgplayer-volume"])',
+    '.danmakuContainer',
+    '#douyin-header-menuCt>div>pace-island>div>*:not(:last-child)'
+  ],
+  'bilibili.com': [
+    '.left-entry>.v-popover-wrap:nth-child(n+2)',
+    '.floor-single-card:has(.living)',
+    '.bili-feed-card:has(.bili-live-card)',
+    '.floor-single-card:has(.floor-title)',
+    '.bili-feed-card:not(:has(a))',
+    '.feed-card:not(:has(a))'
+  ],
+  'www.bilibili.com': [
+    '.left-entry>.v-popover-wrap:nth-child(n+2)',
+    '.floor-single-card:has(.living)',
+    '.bili-feed-card:has(.bili-live-card)',
+    '.floor-single-card:has(.floor-title)',
+    '.bili-feed-card:not(:has(a))',
+    '.feed-card:not(:has(a))'
+  ],
+  'pornhub.com': [
+    '.cnhmmcccai',
+    '.alpha',
+    '#dbdcdkcbbd',
+    '#countryRedirectMessage',
+    '.video-wrapper>.hd.clear.original',
+    '#welcome'
+  ],
+  'www.pornhub.com': [
+    '.cnhmmcccai',
+    '.alpha',
+    '#dbdcdkcbbd',
+    '#countryRedirectMessage',
+    '.video-wrapper>.hd.clear.original',
+    '#welcome'
+  ],
+  '4hu.tv': ['.kkm-content'],
+  'www.4hu.tv': ['.kkm-content']
+};
+
 async function getDefaultHideSelectors() {
+  // 先尝试从 content script 获取
   try {
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
     if (tabs[0]?.id) {
@@ -767,13 +828,22 @@ async function getDefaultHideSelectors() {
         type: 'GET_DEFAULT_HIDE_SELECTORS'
       }).catch(() => null);
       if (response && response.success && response.selectors) {
-        console.log('[隐藏元素] 获取到默认选择器:', response.selectors);
+        console.log('[隐藏元素] 从 content script 获取默认选择器:', response.selectors);
         return response.selectors;
       }
     }
   } catch (error) {
-    console.log('[隐藏元素] 无法获取默认选择器:', error);
+    console.log('[隐藏元素] 无法从 content script 获取默认选择器:', error);
   }
+
+  // 备用方案：从硬编码数据获取
+  const domain = await getCurrentDomain();
+  if (domain && DEFAULT_SELECTORS_BY_DOMAIN[domain]) {
+    console.log('[隐藏元素] 使用硬编码默认选择器:', domain, DEFAULT_SELECTORS_BY_DOMAIN[domain].length, '个');
+    return DEFAULT_SELECTORS_BY_DOMAIN[domain];
+  }
+
+  console.log('[隐藏元素] 无默认选择器');
   return [];
 }
 
@@ -850,8 +920,9 @@ async function loadHideElementsSettings() {
     hideElementsEnabledCheckbox.checked = settings.enabled;
   }
 
-  // 更新列表显示
-  await renderHideSelectorsList();
+  // 调用 loadSelectorsEditor 来正确加载编辑器和列表
+  // （编辑器只显示用户选择器，列表显示所有合并后的选择器）
+  await loadSelectorsEditor();
 
   // Show manager only if enabled or has selectors to display
   const shouldShowManager = settings.enabled || (settings.selectors && settings.selectors.length > 0);
@@ -863,9 +934,9 @@ async function loadHideElementsSettings() {
 
 /**
  * Save hide elements settings (domain-specific)
- * @param {string[]} selectors - 选择器数组（可选，不传则从存储读取）
+ * @param {string[]} userSelectors - 用户选择器数组（可选，不传则从编辑器读取）
  */
-async function saveHideElementsSettings(selectors = null) {
+async function saveHideElementsSettings(userSelectors = null) {
   const enabled = hideElementsEnabledCheckbox ? hideElementsEnabledCheckbox.checked : false;
   const domain = await getCurrentDomain();
 
@@ -874,48 +945,76 @@ async function saveHideElementsSettings(selectors = null) {
     return;
   }
 
-  // Get default selectors to merge with user input
+  // 获取默认选择器
   const defaultSelectors = await getDefaultHideSelectors();
 
-  // 如果没有传入 selectors，从存储中读取当前的
-  if (selectors === null) {
-    const result = await chrome.storage.local.get(['hideElementsSettings']);
-    const allSettings = result.hideElementsSettings || {};
-    const domainSettings = allSettings[domain] || {};
-    selectors = domainSettings.selectors || defaultSelectors;
+  // 获取本地服务器选择器
+  let localServerSelectors = [];
+  try {
+    const normalizedDomain = domain.startsWith('www.') ? domain.slice(4) : domain;
+    const response = await fetch(`http://localhost:3000/api/data/selectors/${normalizedDomain}`, {
+      signal: AbortSignal.timeout(1000)
+    });
+    const data = await response.json();
+    if (data.success && data.data) {
+      if (Array.isArray(data.data)) {
+        localServerSelectors = data.data;
+      } else if (typeof data.data === 'string' && data.data.trim()) {
+        localServerSelectors = data.data.split(',').map(s => s.trim()).filter(s => s);
+      }
+    }
+  } catch (e) {
+    // 忽略本地服务器错误
   }
 
-  // Merge default selectors with user input (remove duplicates)
-  const mergedSelectors = [...new Set([...defaultSelectors, ...selectors])];
+  // 如果没有传入 userSelectors，从编辑器读取（只包含用户添加的）
+  if (userSelectors === null) {
+    userSelectors = parseSelectorsFromEditor();
+  }
 
-  // Get all existing settings
+  // 用户选择器去重
+  userSelectors = [...new Set(userSelectors)];
+
+  // 合并所有选择器（默认 + 本地服务器 + 用户），用于发送给 content script
+  const mergedSelectors = [...new Set([...defaultSelectors, ...localServerSelectors, ...userSelectors])];
+
+  // 获取所有现有设置
   const result = await chrome.storage.local.get(['hideElementsSettings']);
   const allSettings = result.hideElementsSettings || {};
 
-  // Update settings for current domain
-  allSettings[domain] = { enabled, selectors: mergedSelectors };
+  // 只保存用户选择器到存储（不包含默认和本地服务器的）
+  allSettings[domain] = { enabled, selectors: userSelectors };
 
   // 保存到 Chrome 存储
   await chrome.storage.local.set({
     hideElementsSettings: allSettings
   });
 
-  // 同步到本地服务器（保存到不带 www. 的域名格式）
+  // 同步用户选择器到本地服务器
   try {
     const normalizedDomain = domain.startsWith('www.') ? domain.slice(4) : domain;
     await fetch(`http://localhost:3000/api/data/selectors/${normalizedDomain}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(mergedSelectors)
+      body: JSON.stringify(userSelectors)
     });
-    console.log('已同步到本地服务器:', normalizedDomain);
+    console.log('已同步用户选择器到本地服务器:', normalizedDomain);
   } catch (e) {
     console.log('同步到本地服务器失败:', e.message);
   }
 
-  console.log('隐藏元素设置已保存:', { enabled, selectors: mergedSelectors });
+  console.log('隐藏元素设置已保存:', {
+    enabled,
+    default: defaultSelectors.length,
+    localServer: localServerSelectors.length,
+    user: userSelectors.length,
+    total: mergedSelectors.length
+  });
 
-  // Notify content script to update hide elements
+  // 更新列表显示和编辑器
+  await loadSelectorsEditor();
+
+  // Notify content script to update hide elements (发送合并后的选择器)
   try {
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
     if (tabs[0]?.id) {
@@ -928,6 +1027,144 @@ async function saveHideElementsSettings(selectors = null) {
   } catch (error) {
     console.error('Failed to notify content script:', error);
   }
+}
+
+/**
+ * 渲染隐藏选择器列表
+ */
+async function renderHideSelectorsList() {
+  const domain = await getCurrentDomain();
+  if (!domain) return;
+
+  // 获取默认选择器
+  const defaultSelectors = await getDefaultHideSelectors();
+
+  // 从存储获取用户选择器
+  const result = await chrome.storage.local.get(['hideElementsSettings']);
+  const allSettings = result.hideElementsSettings || {};
+  const domainSettings = allSettings[domain] || {};
+  const userSelectors = domainSettings.selectors || [];
+
+  // 从本地服务器获取选择器
+  let localServerSelectors = [];
+  try {
+    const normalizedDomain = domain.startsWith('www.') ? domain.slice(4) : domain;
+    const response = await fetch(`http://localhost:3000/api/data/selectors/${normalizedDomain}`, {
+      signal: AbortSignal.timeout(1000)
+    });
+    const data = await response.json();
+    if (data.success && data.data) {
+      if (Array.isArray(data.data)) {
+        localServerSelectors = data.data;
+      } else if (typeof data.data === 'string' && data.data.trim()) {
+        localServerSelectors = data.data.split(',').map(s => s.trim()).filter(s => s);
+      }
+    }
+  } catch (e) {
+    // 忽略本地服务器错误
+  }
+
+  // 合并所有选择器并去重
+  const allSelectors = [...new Set([...defaultSelectors, ...localServerSelectors, ...userSelectors])];
+
+  // 获取编辑器容器
+  const editor = document.getElementById('hide-elements-editor');
+  if (!editor) return;
+
+  // 清空现有内容
+  editor.innerHTML = '';
+
+  // 渲染选择器列表
+  allSelectors.forEach(selector => {
+    const item = document.createElement('div');
+    item.className = 'selector-item';
+
+    // 判断选择器来源
+    let source = '用户添加';
+    if (defaultSelectors.includes(selector)) {
+      source = '默认';
+      item.classList.add('default-selector');
+    } else if (localServerSelectors.includes(selector)) {
+      source = '本地服务器';
+      item.classList.add('local-server-selector');
+    }
+
+    item.innerHTML = `
+      <span class="selector-text">${escapeHtml(selector)}</span>
+      <span class="selector-source">${source}</span>
+      <button class="selector-delete" data-selector="${escapeHtml(selector)}" title="删除">×</button>
+    `;
+
+    editor.appendChild(item);
+  });
+
+  // 添加删除事件监听
+  editor.querySelectorAll('.selector-delete').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const selectorToDelete = btn.getAttribute('data-selector');
+      await deleteSelector(selectorToDelete);
+    });
+  });
+
+  console.log('[隐藏元素] 已渲染选择器列表:', allSelectors.length, '个');
+}
+
+/**
+ * 删除选择器
+ */
+async function deleteSelector(selector) {
+  const domain = await getCurrentDomain();
+  if (!domain) return;
+
+  // 获取当前设置
+  const result = await chrome.storage.local.get(['hideElementsSettings']);
+  const allSettings = result.hideElementsSettings || {};
+  const domainSettings = allSettings[domain] || {};
+  const currentSelectors = domainSettings.selectors || [];
+
+  // 获取默认选择器和本地服务器选择器
+  const defaultSelectors = await getDefaultHideSelectors();
+  let localServerSelectors = [];
+  try {
+    const normalizedDomain = domain.startsWith('www.') ? domain.slice(4) : domain;
+    const response = await fetch(`http://localhost:3000/api/data/selectors/${normalizedDomain}`, {
+      signal: AbortSignal.timeout(1000)
+    });
+    const data = await response.json();
+    if (data.success && data.data) {
+      if (Array.isArray(data.data)) {
+        localServerSelectors = data.data;
+      } else if (typeof data.data === 'string' && data.data.trim()) {
+        localServerSelectors = data.data.split(',').map(s => s.trim()).filter(s => s);
+      }
+    }
+  } catch (e) {
+    // 忽略
+  }
+
+  // 只能删除用户添加的选择器，不能删除默认和本地服务器的
+  if (defaultSelectors.includes(selector) || localServerSelectors.includes(selector)) {
+    console.log('[隐藏元素] 不能删除默认或本地服务器选择器:', selector);
+    return;
+  }
+
+  // 从用户选择器中删除
+  const newSelectors = currentSelectors.filter(s => s !== selector);
+
+  // 保存
+  await saveHideElementsSettings(newSelectors);
+
+  // 重新渲染列表
+  await renderHideSelectorsList();
+}
+
+/**
+ * 转义 HTML
+ */
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }
 
 // Add event listeners for hide elements
@@ -1362,30 +1599,42 @@ async function loadSelectorsEditor() {
     console.log('[隐藏选择器] 本地服务器加载失败:', e.message);
   }
 
-  // 从 Chrome 存储加载
+  // 从 Chrome 存储加载（仅用户添加的选择器）
   const result = await chrome.storage.local.get(['hideElementsSettings']);
   const allSettings = result.hideElementsSettings || {};
   const domainSettings = allSettings[domain] || { selectors: [] };
+  const userSelectors = domainSettings.selectors || [];
 
-  // 合并所有来源（去重）
-  const allSelectors = [...new Set([...defaultSelectors, ...domainSettings.selectors, ...localServerSelectors])];
-
-  // 更新编辑器
+  // 编辑器只显示用户添加的选择器（不包含默认和本地服务器的）
+  // 这样用户编辑时不会意外修改默认或本地服务器的选择器
   if (selectorsEditor) {
-    selectorsEditor.value = allSelectors.join('\n');
+    selectorsEditor.value = userSelectors.join('\n');
   }
 
-  // 更新计数
-  updateSelectorsCount();
+  // 更新计数显示总选择器数（默认+本地服务器+用户）
+  const totalSelectors = [...new Set([...defaultSelectors, ...localServerSelectors, ...userSelectors])];
+  updateSelectorsCount(totalSelectors.length, defaultSelectors.length, localServerSelectors.length, userSelectors.length);
+
+  // 同时渲染列表（显示所有合并后的选择器）
+  await renderHideSelectorsList();
 }
 
 /**
  * 更新选择器计数
+ * @param {number} total - 总选择器数（默认+本地服务器+用户）
+ * @param {number} defaultCount - 默认选择器数
+ * @param {number} localServerCount - 本地服务器选择器数
+ * @param {number} userCount - 用户选择器数
  */
-function updateSelectorsCount() {
-  if (selectorsCount && selectorsEditor) {
-    const selectors = parseSelectorsFromEditor();
-    selectorsCount.textContent = `(${selectors.length}个)`;
+function updateSelectorsCount(total = null, defaultCount = null, localServerCount = null, userCount = null) {
+  if (selectorsCount) {
+    if (total !== null && defaultCount !== null && localServerCount !== null && userCount !== null) {
+      selectorsCount.textContent = `(${total}个 - 默认${defaultCount}+服务器${localServerCount}+用户${userCount})`;
+    } else if (selectorsEditor) {
+      // Fallback: parse from editor (only user selectors)
+      const selectors = parseSelectorsFromEditor();
+      selectorsCount.textContent = `(${selectors.length}个用户选择器)`;
+    }
   }
 }
 
@@ -1411,43 +1660,67 @@ async function saveSelectors() {
   const domain = await getCurrentDomain();
   if (!domain) return;
 
-  const selectors = parseSelectorsFromEditor();
+  // 用户选择器（从编辑器读取）
+  const userSelectors = parseSelectorsFromEditor();
 
-  // 保存到 Chrome 存储
+  // 获取默认选择器和本地服务器选择器
+  const defaultSelectors = await getDefaultHideSelectors();
+  let localServerSelectors = [];
+  try {
+    const normalizedDomain = domain.startsWith('www.') ? domain.slice(4) : domain;
+    const response = await fetch(`http://localhost:3000/api/data/selectors/${normalizedDomain}`, {
+      signal: AbortSignal.timeout(1000)
+    });
+    const data = await response.json();
+    if (data.success && data.data) {
+      if (Array.isArray(data.data)) {
+        localServerSelectors = data.data;
+      } else if (typeof data.data === 'string' && data.data.trim()) {
+        localServerSelectors = data.data.split(',').map(s => s.trim()).filter(s => s);
+      }
+    }
+  } catch (e) {
+    // 忽略本地服务器错误
+  }
+
+  // 合并所有选择器（用于发送给 content script）
+  const mergedSelectors = [...new Set([...defaultSelectors, ...localServerSelectors, ...userSelectors])];
+
+  // 保存用户选择器到 Chrome 存储
   const result = await chrome.storage.local.get(['hideElementsSettings']);
   const allSettings = result.hideElementsSettings || {};
-  allSettings[domain] = { enabled: selectors.length > 0, selectors };
+  allSettings[domain] = { enabled: userSelectors.length > 0 || defaultSelectors.length > 0 || localServerSelectors.length > 0, selectors: userSelectors };
   await chrome.storage.local.set({ hideElementsSettings: allSettings });
 
-  // 同步到本地服务器（保存到不带 www. 的域名格式）
+  // 同步用户选择器到本地服务器
   try {
     const normalizedDomain = domain.startsWith('www.') ? domain.slice(4) : domain;
     await fetch(`http://localhost:3000/api/data/selectors/${normalizedDomain}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(selectors)
+      body: JSON.stringify(userSelectors)
     });
     console.log('[隐藏选择器] 已同步到本地服务器:', normalizedDomain);
   } catch (e) {
     console.log('[隐藏选择器] 同步到本地服务器失败:', e.message);
   }
 
-  // 通知 content script
+  // 通知 content script（发送合并后的选择器）
   try {
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
     if (tabs[0]?.id) {
       chrome.tabs.sendMessage(tabs[0].id, {
         type: 'UPDATE_HIDE_ELEMENTS',
-        enabled: selectors.length > 0,
-        selectors
+        enabled: mergedSelectors.length > 0,
+        selectors: mergedSelectors
       }).catch(() => {});
     }
   } catch (error) {
     console.error('[隐藏选择器] 通知 content script 失败:', error);
   }
 
-  // 更新计数
-  updateSelectorsCount();
+  // 更新计数和列表
+  await loadSelectorsEditor();
 
   // 显示保存成功提示
   const btn = document.getElementById('save-selectors-btn');
@@ -1461,7 +1734,12 @@ async function saveSelectors() {
     }, 1500);
   }
 
-  console.log('[隐藏选择器] 已保存:', selectors.length, '个选择器');
+  console.log('[隐藏选择器] 已保存:', {
+    default: defaultSelectors.length,
+    localServer: localServerSelectors.length,
+    user: userSelectors.length,
+    total: mergedSelectors.length
+  });
 }
 
 // 事件监听
@@ -1470,8 +1748,34 @@ if (saveSelectorsBtn) {
 }
 
 if (selectorsEditor) {
-  // 实时更新计数
-  selectorsEditor.addEventListener('input', updateSelectorsCount);
+  // 实时更新计数（需要重新获取默认和本地服务器选择器来计算总数）
+  selectorsEditor.addEventListener('input', async () => {
+    const domain = await getCurrentDomain();
+    if (!domain) return;
+
+    const defaultSelectors = await getDefaultHideSelectors();
+    let localServerSelectors = [];
+    try {
+      const normalizedDomain = domain.startsWith('www.') ? domain.slice(4) : domain;
+      const response = await fetch(`http://localhost:3000/api/data/selectors/${normalizedDomain}`, {
+        signal: AbortSignal.timeout(500)
+      });
+      const data = await response.json();
+      if (data.success && data.data) {
+        if (Array.isArray(data.data)) {
+          localServerSelectors = data.data;
+        } else if (typeof data.data === 'string' && data.data.trim()) {
+          localServerSelectors = data.data.split(',').map(s => s.trim()).filter(s => s);
+        }
+      }
+    } catch (e) {
+      // 忽略本地服务器错误
+    }
+
+    const userSelectors = parseSelectorsFromEditor();
+    const totalSelectors = [...new Set([...defaultSelectors, ...localServerSelectors, ...userSelectors])];
+    updateSelectorsCount(totalSelectors.length, defaultSelectors.length, localServerSelectors.length, userSelectors.length);
+  });
 }
 
 // 加载编辑器

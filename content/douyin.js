@@ -297,12 +297,17 @@ function checkNotInterestedKeywords(videoBody) {
   if (!videoBody) return null;
   let tagList = [];
 
-  const tagElements1 = [...videoBody.querySelectorAll('span>a>span')]
-    .filter(item => isElementInViewportAndVisible(item) && item.innerText.startsWith('#'));
+  // 获取所有候选元素并过滤可视区域内的
+  const allTagElements1 = [...videoBody.querySelectorAll('span>a>span')]
+    .filter(item => isElementInViewportAndVisible(item));
+
+  const tagElements1 = allTagElements1.filter(item => item.innerText && item.innerText.startsWith('#'));
   tagList.push(...tagElements1.map(it => it.innerText));
 
-  const tagElements2 = [...videoBody.querySelectorAll('span>span>span>span>span>span')]
-    .filter(item => isElementInViewportAndVisible(item) && item.innerText.split('#').length > 1);
+  const allTagElements2 = [...videoBody.querySelectorAll('span>span>span>span>span>span')]
+    .filter(item => isElementInViewportAndVisible(item));
+
+  const tagElements2 = allTagElements2.filter(item => item.innerText && item.innerText.split('#').length > 1);
   tagList.push(...tagElements2.map(it => it.innerText));
 
   tagList = [...new Set(tagList)];
@@ -352,8 +357,10 @@ function autoStar() {
     return findPath('<path fill-rule="evenodd" clip-rule="evenodd" d="M16 26.7319C22.6274 26.7319 28 21.3594 28 14.7319C28 8.10452 22.6274 2.73193 16 2.73193C9.37258 2.73193 4 8.10452 4 14.7319C4 21.3594 9.37258 26.7319 16 26.7319Z" fill="#FE2C55"></path>');
   }
 
+  // 只获取可视区内的标签元素
   const tagElements = [...document.querySelectorAll('span>a>span')]
-    .filter(item => isElementInViewportAndVisible(item) && item.innerText.startsWith('#'));
+    .filter(item => isElementInViewportAndVisible(item))
+    .filter(item => item.innerText && item.innerText.startsWith('#'));
   const tagList = tagElements.map(it => it.innerText);
 
   if (hasNoStar()) {
@@ -370,10 +377,60 @@ function autoStar() {
 }
 
 function autoOpenComment(videoBody) {
-  if (!videoBody?.parentElement) return;
-  const isCommentOpen = videoBody.parentElement.offsetWidth > videoBody.offsetWidth;
-  if (!isCommentOpen && canExecuteAction('open_comment', THROTTLE_CONFIG.OPEN_COMMENT)) {
-    triggerKeyboardEvent("autoOpenComment", "keydown", { keyCode: 88, key: "x", code: "KeyX" });
+  // 检查评论区是否已打开
+  const commentPanel = findOne('#videoSideCard') || findOne('[class*="comment"]');
+  if (commentPanel && commentPanel.offsetWidth > 0) {
+    return; // 已打开
+  }
+
+  if (!canExecuteAction('open_comment', THROTTLE_CONFIG.OPEN_COMMENT)) {
+    return;
+  }
+
+  // 方法1: 通过 SVG 路径签名查找评论按钮
+  const signature = "M-4.644999980926514,4.482999801635742";
+  const visiblePaths = DOMUtils.findAllInViewport('path', { checkVisibility: true, checkDimensions: true });
+
+  for (const path of visiblePaths) {
+    const d = path.getAttribute('d') || '';
+    if (d.includes(signature)) {
+      const button = path.closest('button') || path.closest('div[role="button"]');
+      if (button && isElementInViewportAndVisible(button)) {
+        button.click();
+        console.log('[评论区] 通过SVG签名找到并点击评论按钮');
+        return;
+      }
+    }
+  }
+
+  // 方法2: 查找包含"评论"文字的按钮
+  const possibleSelectors = [
+    'xg-icon[class*="comment"]',
+    '[class*="right-grid"] xg-icon',
+    'button[aria-label*="评论"]',
+    'button[aria-label*="Comment"]'
+  ];
+
+  for (const sel of possibleSelectors) {
+    try {
+      const elements = DOMUtils.findAllInViewport(sel, { checkVisibility: true, checkDimensions: true });
+      for (const el of elements) {
+        const ariaLabel = el.getAttribute('aria-label') || el.getAttribute('title') || '';
+        if (ariaLabel.includes('评论') || ariaLabel.includes('Comment')) {
+          el.click();
+          console.log('[评论区] 通过选择器找到并点击:', sel);
+          return;
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 方法3: 查找右侧栏所有图标按钮（通常第3个是评论）
+  const rightBarButtons = DOMUtils.findAllInViewport('.xg-right-grid xg-icon, [class*="right"] xg-icon', { checkVisibility: true, checkDimensions: true });
+  if (rightBarButtons.length >= 3) {
+    rightBarButtons[2].click();
+    console.log('[评论区] 通过右侧栏位置找到并点击（第3个按钮）');
+    return;
   }
 }
 
@@ -431,7 +488,10 @@ function setVideoTime() {
 // ========== 主处理循环 ==========
 function processCurrentVideo() {
   const videoBody = findOne('.playerContainer');
+
+  // 直播检测：只有在没有普通视频容器时才检查直播
   autoSkip(videoBody);
+
   if (!videoBody) return;
 
   const videoId = getVideoUUID(videoBody);

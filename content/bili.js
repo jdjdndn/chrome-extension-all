@@ -237,27 +237,22 @@ if (window.BiliScriptLoaded) {
     console.log('[Bilibili脚本] DEFAULT_HIDE_SELECTORS 数量:', DEFAULT_HIDE_SELECTORS.length);
 
     // 尝试从本地服务获取选择器
+    let serverSelectors = [];
     if (localServerAvailable) {
-      const serverSelectors = await loadSelectorsFromServer();
+      serverSelectors = await loadSelectorsFromServer();
       if (serverSelectors && Array.isArray(serverSelectors) && serverSelectors.length > 0) {
-        // 合并本地服务选择器和默认选择器
-        const mergedSelectors = [...new Set([...DEFAULT_HIDE_SELECTORS, ...serverSelectors])];
-        updateHideElements(mergedSelectors);
-        console.log('[Bilibili脚本] 从本地服务加载选择器，合并后:', mergedSelectors.length, '个');
-        return;
+        console.log('[Bilibili脚本] 从本地服务加载选择器:', serverSelectors.length, '个');
+      } else {
+        serverSelectors = [];
       }
     }
 
-    // 使用代码中的默认选择器
-    if (settings?.enabled && settings.selectors?.length > 0) {
-      // 合并用户选择器和默认选择器
-      const mergedSelectors = [...new Set([...DEFAULT_HIDE_SELECTORS, ...(settings.selectors || [])])];
-      updateHideElements(mergedSelectors);
-      console.log('[Bilibili脚本] 已加载域名隐藏设置，合并后:', mergedSelectors.length, '个选择器');
-    } else {
-      console.log('[Bilibili脚本] 使用默认选择器:', DEFAULT_HIDE_SELECTORS.length, '个');
-      updateHideElements(DEFAULT_HIDE_SELECTORS);
-    }
+    // 合并：默认 + 本地服务器 + 用户添加
+    const userSelectors = settings?.selectors || [];
+    const mergedSelectors = [...new Set([...DEFAULT_HIDE_SELECTORS, ...serverSelectors, ...userSelectors])];
+
+    updateHideElements(mergedSelectors);
+    console.log('[Bilibili脚本] 合并后选择器:', mergedSelectors.length, '个 (默认:', DEFAULT_HIDE_SELECTORS.length, ', 服务器:', serverSelectors.length, ', 用户:', userSelectors.length, ')');
   }
 
   // ========== 初始化 ==========

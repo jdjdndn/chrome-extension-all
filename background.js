@@ -112,6 +112,21 @@ function initDomainBlockedData() {
 // 执行初始化
 initDomainBlockedData();
 
+// Get current tab's domain (async helper)
+async function getCurrentTabDomain() {
+  try {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tabs[0] && tabs[0].url) {
+      const url = new URL(tabs[0].url);
+      return url.hostname;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error getting current tab domain:', error);
+    return null;
+  }
+}
+
 // Extension state
 let extensionState = {
   initialized: false,
@@ -255,6 +270,12 @@ async function initialize() {
   // Listen for extension events
   setupEventListeners();
 
+  // 处理浏览器启动时已存在的标签页
+  // 延迟执行，确保 service worker 完全就绪
+  setTimeout(() => {
+    injectScriptsToExistingTabs();
+  }, 500);
+
   console.log('Extension initialized successfully');
 }
 
@@ -316,20 +337,42 @@ async function loadSettings() {
 // Set up event listeners
 function setupEventListeners() {
   // Listen for extension installation
-  chrome.runtime.onInstalled.addListener((details) => {
+  chrome.runtime.onInstalled.addListener(async (details) => {
     console.log('Extension installed:', details);
 
     if (details.reason === 'install') {
       // Show welcome page on first install
       chrome.tabs.create({ url: 'welcome.html' });
     }
+
+    // 处理已存在的标签页（安装、更新时都要处理）
+    if (details.reason === 'install' || details.reason === 'update') {
+      await injectScriptsToExistingTabs();
+    }
   });
 
 
   // Listen for tab updates
-  chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+    // 在页面加载完成时注入脚本
     if (changeInfo.status === 'complete') {
       handleTabUpdate(tabId, tab);
+    }
+  });
+
+  // Listen for tab removal to clean up injection records
+  chrome.tabs.onRemoved.addListener(async (tabId) => {
+    try {
+      const result = await chrome.storage.local.get('injectedTabs');
+      const injectedTabs = result.injectedTabs || {};
+      const tabKey = String(tabId);
+      if (injectedTabs[tabKey]) {
+        delete injectedTabs[tabKey];
+        await chrome.storage.local.set({ injectedTabs });
+        console.log(`[Background] 标签页 ${tabId} 已关闭，清理注入记录`);
+      }
+    } catch (error) {
+      console.error('[Background] 清理注入记录失败:', error);
     }
   });
 
@@ -347,7 +390,7 @@ function setupEventListeners() {
 
 
 // Handle tab updates
-function handleTabUpdate(tabId, tab) {
+async function handleTabUpdate(tabId, tab) {
   if (extensionState.isDebugMode) {
     console.log('Tab updated:', tabId, tab.title);
   }
@@ -355,8 +398,37 @@ function handleTabUpdate(tabId, tab) {
 
   // Only apply to specific URLs if needed
   if (tab.url && tab.status === 'complete' && tab.url.startsWith('http')) {
-    // content.js is already injected via manifest.json, just inject domain-specific scripts
-    injectScriptsForTab(tabId, tab.url);
+    // 检查是否已经注入过
+    const result = await chrome.storage.local.get('injectedTabs');
+    const injectedTabs = result.injectedTabs || {};
+    const tabKey = String(tabId);
+
+    // 如果已记录为手动注入过，跳过
+    if (injectedTabs[tabKey]) {
+      console.log(`[Background] 标签页 ${tabId} 已手动注入过，跳过`);
+      return;
+    }
+
+    // 检查是否 manifest.json 已自动注入（通过检查 ExtensionAPI）
+    try {
+      const checkResult = await chrome.scripting.executeScript({
+        target: { tabId },
+        func: () => typeof window.ExtensionAPI !== 'undefined'
+      });
+
+      if (checkResult && checkResult[0]?.result) {
+        console.log(`[Background] 标签页 ${tabId} 已通过 manifest.json 自动注入`);
+        return;
+      }
+
+      // manifest.json 没有自动注入，需要手动注入（已存在的标签页）
+      console.log(`[Background] 标签页 ${tabId} 需要手动注入`);
+      await injectAllScriptsForTab(tabId, tab.url);
+      injectedTabs[tabKey] = Date.now();
+      await chrome.storage.local.set({ injectedTabs });
+    } catch (error) {
+      console.error('[Background] 检查/注入失败:', error);
+    }
   }
 }
 
@@ -571,6 +643,136 @@ async function injectScriptsForTab(tabId, tabUrl) {
     }
   } catch (error) {
     console.error('Error injecting scripts:', error);
+  }
+}
+
+// 向已存在的标签页注入脚本（扩展安装/更新或浏览器启动时调用）
+async function injectScriptsToExistingTabs() {
+  try {
+    const tabs = await chrome.tabs.query({});
+    console.log('[Background] 检查已存在的标签页，共', tabs.length, '个');
+
+    // 清理旧的注入记录（超过1小时的记录）
+    const result = await chrome.storage.local.get('injectedTabs');
+    const injectedTabs = result.injectedTabs || {};
+    const now = Date.now();
+
+    for (const [tabId, timestamp] of Object.entries(injectedTabs)) {
+      if (now - timestamp > 3600000) { // 1小时
+        delete injectedTabs[tabId];
+      }
+    }
+    await chrome.storage.local.set({ injectedTabs });
+
+    for (const tab of tabs) {
+      // 只处理 http/https 页面
+      if (tab.url && tab.url.startsWith('http')) {
+        const tabKey = String(tab.id);
+        // 检查是否已经注入过
+        if (!injectedTabs[tabKey]) {
+          try {
+            await injectAllScriptsForTab(tab.id, tab.url);
+            // 记录已注入
+            injectedTabs[tabKey] = now;
+            await chrome.storage.local.set({ injectedTabs });
+          } catch (error) {
+            // 某些页面可能无法注入（如 chrome:// 页面）
+            console.log(`[Background] 无法注入标签页 ${tab.id}:`, error.message);
+          }
+        } else {
+          console.log(`[Background] 标签页 ${tab.id} 已注入过，跳过`);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('[Background] 注入已存在标签页失败:', error);
+  }
+}
+
+// 完整注入所有脚本（模拟 manifest.json 的 content_scripts 行为）
+async function injectAllScriptsForTab(tabId, tabUrl) {
+  try {
+    // 首先检查脚本是否已经注入过（检查 window.ExtensionAPI 是否存在）
+    const checkResult = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        return typeof window.ExtensionAPI !== 'undefined';
+      }
+    });
+
+    const alreadyInjected = checkResult && checkResult[0]?.result;
+
+    if (alreadyInjected) {
+      console.log(`[Background] 标签页 ${tabId} 脚本已存在，跳过注入`);
+      return;
+    }
+
+    const url = new URL(tabUrl);
+    const hostname = url.hostname;
+
+    // 基础工具脚本（所有页面都需要）
+    const baseScripts = [
+      'content/utils/logger.js',
+      'content/utils/storage.js',
+      'content/utils/dom.js',
+      'content/utils/messaging.js'
+    ];
+
+    // 通用脚本（所有页面都需要）
+    const commonScripts = [
+      'content/common/redirect-links.js',
+      'content/common/text-to-link.js',
+      'content/common/lang-to-zh.js',
+      'content/common/link-blank.js',
+      'content/common/add-title.js',
+      'content.js'
+    ];
+
+    // 域名特定脚本映射（与 manifest.json 中的 content_scripts 保持一致）
+    const domainScripts = {
+      'bilibili.com': ['content/bili.js'],
+      'douyin.com': ['content/utils/localServer.js', 'content/douyin.js'],
+      '4hu.tv': ['content/4hu.js'],
+      'weread.qq.com': ['content/weread.js'],
+      'quark.cn': ['content/quark.js'],
+      '18comic.vip': ['content/comic18.js'],
+      'aliyundrive.com': ['content/aliyun.js'],
+      'baidu.com': ['content/baiduPan.js'],
+      'zhipin.com': ['content/boss.js'],
+      'xiaohongshu.com': ['content/xiaohongshu.js'],
+      'wyaqpx.com': ['content/dianGong.js'],
+      'ymmfa.com': ['content/gongkong.js'],
+      'youtube.com': ['content/base/SiteScript.js', 'content/youtube.js']
+    };
+
+    // 收集需要注入的脚本
+    const scriptsToInject = [...baseScripts, ...commonScripts];
+
+    // 添加域名特定脚本
+    for (const [domain, scripts] of Object.entries(domainScripts)) {
+      if (hostname === domain || hostname.endsWith('.' + domain)) {
+        scriptsToInject.push(...scripts);
+        console.log(`[Background] 为 ${hostname} 添加域名脚本:`, scripts);
+        break;
+      }
+    }
+
+    // 依次注入所有脚本
+    for (const scriptFile of scriptsToInject) {
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId },
+          files: [scriptFile]
+        });
+        console.log(`[Background] 已注入脚本: ${scriptFile} 到标签页 ${tabId}`);
+      } catch (error) {
+        console.error(`[Background] 注入脚本失败 ${scriptFile}:`, error);
+      }
+    }
+
+    console.log(`[Background] 标签页 ${tabId} (${hostname}) 脚本注入完成`);
+  } catch (error) {
+    console.error('[Background] 注入脚本时出错:', error);
   }
 }
 

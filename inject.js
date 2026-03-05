@@ -124,7 +124,17 @@ if (!window._injectOriginalFetch) {
       });
     }
 
-    return await window._injectOriginalFetch(url, options);
+    return await window._injectOriginalFetch(url, options).catch(err => {
+      // 对于网络错误（如被阻止的请求），静默处理不抛出
+      if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
+        return new Response('{"error": "request_blocked"}', {
+          status: 200,
+          statusText: 'OK',
+          headers: { 'Content-Type': 'application/json', 'x-blocked': 'true' }
+        });
+      }
+      throw err;
+    });
   };
   console.log('[Inject] Fetch 拦截已安装');
 }

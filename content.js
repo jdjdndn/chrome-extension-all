@@ -138,22 +138,39 @@ async function initHideElements() {
   const defaultSelectors = getDomainDefaultHideSelectors();
   const domainSettings = await StorageUtils.getDomainSettings('hideElementsSettings', domain);
 
-  // 默认选择器始终自动应用（分功能控制）
-  if (defaultSelectors.length > 0) {
-    applyHideElementsStyle(defaultSelectors);
-    console.log(`[隐藏元素] ${domain} 已自动应用默认选择器:`, defaultSelectors);
+  // 尝试从本地服务器加载选择器
+  let serverSelectors = [];
+  try {
+    const normalizedDomain = domain.startsWith('www.') ? domain.slice(4) : domain;
+    const response = await fetch(`http://localhost:3000/api/data/selectors/${normalizedDomain}`, {
+      signal: AbortSignal.timeout(1000)
+    });
+    const data = await response.json();
+    if (data.success && data.data) {
+      if (Array.isArray(data.data)) {
+        serverSelectors = data.data;
+      } else if (typeof data.data === 'string' && data.data.trim()) {
+        serverSelectors = data.data.split(',').map(s => s.trim()).filter(s => s);
+      }
+      if (serverSelectors.length > 0) {
+        console.log(`[隐藏元素] ${domain} 从本地服务器加载选择器:`, serverSelectors.length, '个');
+      }
+    }
+  } catch (e) {
+    // 忽略本地服务器错误
   }
 
-  // 用户自定义选择器根据设置决定是否启用
-  if (domainSettings && domainSettings.enabled && domainSettings.selectors && domainSettings.selectors.length > 0) {
-    const mergedSelectors = [...new Set([...defaultSelectors, ...domainSettings.selectors])];
-    applyHideElementsStyle(mergedSelectors);
-    hideElementsState.enabled = true;
-    hideElementsState.selectors = mergedSelectors;
-    console.log(`[隐藏元素] 已加载 ${domain} 的用户设置:`, { enabled: domainSettings.enabled, selectors: domainSettings.selectors });
-  } else {
-    hideElementsState.selectors = defaultSelectors;
-  }
+  // 获取用户自定义选择器
+  const userSelectors = domainSettings?.selectors || [];
+
+  // 合并：默认 + 本地服务器 + 用户添加
+  const mergedSelectors = [...new Set([...defaultSelectors, ...serverSelectors, ...userSelectors])];
+
+  // 应用合并后的选择器
+  applyHideElementsStyle(mergedSelectors);
+  hideElementsState.selectors = mergedSelectors;
+
+  console.log(`[隐藏元素] ${domain} 合并后选择器:`, mergedSelectors.length, '个 (默认:', defaultSelectors.length, ', 服务器:', serverSelectors.length, ', 用户:', userSelectors.length, ')');
 }
 
 // Initialize hide elements

@@ -63,18 +63,38 @@ function cleanup() {
 // ========== 存储 ==========
 async function loadDomainHideSettings() {
   const domain = DOMUtils.getCurrentDomain();
-  const settings = await StorageUtils.getDomainSettings('hideElementsSettings', domain);
 
-  if (settings?.enabled && settings.selectors?.length > 0) {
-    // 合并默认选择器和用户选择器
-    const mergedSelectors = [...new Set([...DEFAULT_HIDE_SELECTORS, ...(settings.selectors || [])])];
-    updateHideElements(mergedSelectors);
-    console.log('[Pornhub脚本] 已加载隐藏设置，合并后:', mergedSelectors.length, '个选择器');
-  } else {
-    // 使用默认选择器
-    updateHideElements(DEFAULT_HIDE_SELECTORS);
-    console.log('[Pornhub脚本] 使用默认选择器:', DEFAULT_HIDE_SELECTORS.length, '个');
+  // 尝试从本地服务器加载选择器
+  let serverSelectors = [];
+  try {
+    const normalizedDomain = domain.startsWith('www.') ? domain.slice(4) : domain;
+    const response = await fetch(`http://localhost:3000/api/data/selectors/${normalizedDomain}`, {
+      signal: AbortSignal.timeout(1000)
+    });
+    const data = await response.json();
+    if (data.success && data.data) {
+      if (Array.isArray(data.data)) {
+        serverSelectors = data.data;
+      } else if (typeof data.data === 'string' && data.data.trim()) {
+        serverSelectors = data.data.split(',').map(s => s.trim()).filter(s => s);
+      }
+      if (serverSelectors.length > 0) {
+        console.log('[Pornhub脚本] 从本地服务器加载选择器:', serverSelectors.length, '个');
+      }
+    }
+  } catch (e) {
+    // 忽略本地服务器错误
   }
+
+  // 从存储获取用户选择器
+  const settings = await StorageUtils.getDomainSettings('hideElementsSettings', domain);
+  const userSelectors = settings?.selectors || [];
+
+  // 合并：默认 + 本地服务器 + 用户添加
+  const mergedSelectors = [...new Set([...DEFAULT_HIDE_SELECTORS, ...serverSelectors, ...userSelectors])];
+
+  updateHideElements(mergedSelectors);
+  console.log('[Pornhub脚本] 合并后选择器:', mergedSelectors.length, '个 (默认:', DEFAULT_HIDE_SELECTORS.length, ', 服务器:', serverSelectors.length, ', 用户:', userSelectors.length, ')');
 }
 
 // ========== 初始化 ==========
