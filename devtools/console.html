@@ -469,6 +469,114 @@
         padding: 12px;
       }
 
+      /* 元素拾取工具栏 */
+      .element-pick-toolbar {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+
+      .pick-element-btn {
+        flex: 1;
+        padding: 10px;
+        background: #667eea;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 500;
+        transition: background 0.2s;
+      }
+
+      .pick-element-btn:hover {
+        background: #5a67d8;
+      }
+
+      .pick-element-btn.active {
+        background: #48bb78;
+      }
+
+      .pick-element-btn.active:hover {
+        background: #38a169;
+      }
+
+      .cancel-pick-btn {
+        padding: 10px 16px;
+        background: #ef4444;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 12px;
+        transition: background 0.2s;
+      }
+
+      .cancel-pick-btn:hover {
+        background: #dc2626;
+      }
+
+      /* 层级导航 */
+      .element-level-nav {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 12px;
+        padding: 8px;
+        background: #f0f0f0;
+        border-radius: 6px;
+      }
+
+      .level-hint {
+        font-size: 11px;
+        color: #666;
+        white-space: nowrap;
+      }
+
+      .level-btn {
+        padding: 6px 12px;
+        background: white;
+        border: 1px solid #d0d0d0;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 11px;
+        transition: all 0.2s;
+      }
+
+      .level-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .level-btn:not(:disabled):hover {
+        background: #667eea;
+        color: white;
+        border-color: #667eea;
+      }
+
+      .level-btn.clear-btn {
+        background: #fee2e2;
+        border-color: #fecaca;
+        color: #dc2626;
+      }
+
+      .level-btn.clear-btn:hover {
+        background: #dc2626;
+        border-color: #dc2626;
+        color: white;
+      }
+
+      .level-info {
+        flex: 1;
+        text-align: center;
+        font-size: 11px;
+        color: #333;
+        font-family: 'Consolas', 'Monaco', monospace;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
       .element-selector-box {
         display: flex;
         align-items: center;
@@ -765,6 +873,27 @@
 
       .batch-copy-btn:hover {
         background: #d0d0d0;
+      }
+
+      .batch-quick-actions {
+        display: flex;
+        gap: 4px;
+        align-items: center;
+      }
+
+      .batch-quick-btn {
+        padding: 2px 6px;
+        font-size: 10px;
+        background: transparent;
+        border: 1px solid #d0d0d0;
+        border-radius: 3px;
+        cursor: pointer;
+        opacity: 0.7;
+      }
+
+      .batch-quick-btn:hover {
+        background: #e0e0e0;
+        opacity: 1;
       }
 
       .batch-selected-list {
@@ -5067,42 +5196,7 @@
         </div>
         <!-- Element Sub-tab -->
         <div class="info-sub-content" id="info-element">
-          <div class="tab-header">
-            <span class="header-icon">🎯</span>
-            <span>当前选中元素</span>
-            <button class="refresh-element-btn" id="refresh-element-btn" title="刷新选中元素">🔄</button>
-          </div>
           <div class="element-info-section">
-            <div class="element-selector-box">
-              <div class="element-selector-label">CSS 选择器</div>
-              <input type="text" id="element-selector" class="element-selector-input" readonly placeholder="在 Elements 面板选中元素后点击刷新">
-              <span class="selector-match-badge" id="selector-match-badge"></span>
-              <button class="copy-selector-btn" id="copy-selector-btn">📋 复制</button>
-            </div>
-            <div class="element-info-box">
-              <div class="element-info-item">
-                <span class="element-info-label">标签名</span>
-                <span class="element-info-value" id="element-tag">-</span>
-              </div>
-              <div class="element-info-item">
-                <span class="element-info-label">ID</span>
-                <span class="element-info-value" id="element-id">-</span>
-              </div>
-              <div class="element-info-item">
-                <span class="element-info-label">类名</span>
-                <span class="element-info-value" id="element-class">-</span>
-              </div>
-            </div>
-            <div class="element-actions">
-              <button class="element-action-btn hide-btn" id="hide-element-btn">👁️ 隐藏元素</button>
-              <button class="element-action-btn show-btn" id="show-element-btn">👁️‍🗨️ 显示元素</button>
-              <button class="element-action-btn delete-btn" id="delete-element-btn">🗑️ 删除元素</button>
-            </div>
-            <div class="element-hidden-list" id="element-hidden-list" style="display: none;">
-              <div class="element-hidden-header">已隐藏元素</div>
-              <div class="element-hidden-items" id="element-hidden-items"></div>
-            </div>
-
             <!-- 批量选择区域 -->
             <div class="batch-picker-section">
               <div class="batch-picker-header">
@@ -5118,7 +5212,12 @@
               <div class="batch-selected-info" id="batch-selected-info" style="display: none;">
                 <div class="batch-selected-header">
                   <span>已选择 <span id="batch-selected-count">0</span> 个元素:</span>
-                  <button class="batch-copy-btn" id="copy-merged-selector-btn" title="复制合并后的选择器">📋 复制</button>
+                  <div class="batch-quick-actions">
+                    <button class="batch-quick-btn" id="select-all-btn" title="全选 (Ctrl+A)">☑️</button>
+                    <button class="batch-quick-btn" id="deselect-all-btn" title="取消全选">⬜</button>
+                    <button class="batch-quick-btn" id="invert-selection-btn" title="反选">🔄</button>
+                    <button class="batch-copy-btn" id="copy-merged-selector-btn" title="复制合并后的选择器">📋</button>
+                  </div>
                 </div>
                 <div class="batch-selected-list" id="batch-selected-list"></div>
               </div>
@@ -5375,6 +5474,9 @@
       <div class="context-menu-item" data-action="copy-selector">📋 复制选择器</div>
     </div>
 
+    <!-- EventBus V4.6 和 StorageBridge -->
+    <script src="../event-bus-v4.6.js"></script>
+    <script src="../content/utils/storage-bridge.js"></script>
     <script src="console.js"></script>
   </body>
 </html>

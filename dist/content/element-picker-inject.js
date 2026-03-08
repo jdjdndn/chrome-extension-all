@@ -44,9 +44,24 @@
       this.selectedElements = []; // 已选中的元素信息 { pickerUid, xpath, selector, tagName }
       this.highlightOverlay = null;
       this.sizeTooltip = null;
+      this.breadcrumbEl = null; // 元素路径面包屑
+      // statsEl 已移除 - 批量选择统计信息现在只在 DevTools 面板中显示
+      this.levelIndicator = null; // 智能选择层级指示器
       this.currentHoveredElement = null;
       this.multiSelectMode = false; // 多选模式（Ctrl/Cmd 按下时）
+      this.smartSelectLevel = 0; // 当前智能选择层级
       this._uidCounter = 0; // 唯一 ID 计数器
+      this.singleSelectMode = false; // 单选模式（只选择一个元素）
+
+      // ========== 新增：短期优化功能 ==========
+      this.selectionHistory = []; // 选择历史（用于撤销）
+      this.historyIndex = -1; // 当前历史位置
+      this.maxHistorySize = 50; // 最大历史记录数
+      this.isBoxSelecting = false; // 是否正在框选
+      this.boxSelectStart = null; // 框选起点
+      this.boxSelectOverlay = null; // 框选覆盖层
+      this.previewOverlay = null; // 选择器预览覆盖层容器
+      this.previewElements = []; // 当前预览的元素
 
       // 绑定方法以保持 this 上下文
       this.onHover = this.onHover.bind(this);
@@ -57,6 +72,10 @@
       this.onKeyUp = this.onKeyUp.bind(this);
       this.onScroll = this.onScroll.bind(this);
       this.onResize = this.onResize.bind(this);
+      this.onDoubleClick = this.onDoubleClick.bind(this); // 双击批量选择相同元素
+      this.onMouseDown = this.onMouseDown.bind(this); // 框选开始
+      this.onMouseMove = this.onMouseMove.bind(this); // 框选中
+      this.onMouseUp = this.onMouseUp.bind(this); // 框选结束
 
       this.createHighlightOverlay();
 
@@ -135,6 +154,7 @@
         background: rgba(0, 122, 204, 0.15);
         border-radius: 3px;
         display: none;
+        transition: all 0.1s ease-out;
       `;
       document.body.appendChild(this.highlightOverlay);
 
@@ -155,6 +175,74 @@
         display: none;
       `;
       document.body.appendChild(this.sizeTooltip);
+
+      // 元素路径面包屑
+      this.breadcrumbEl = document.createElement('div');
+      this.breadcrumbEl.id = 'element-picker-breadcrumb';
+      this.breadcrumbEl.style.cssText = `
+        position: fixed;
+        pointer-events: none;
+        z-index: 2147483647;
+        background: rgba(0, 0, 0, 0.85);
+        color: #9ca3af;
+        padding: 4px 8px;
+        border-radius: 3px;
+        font-size: 10px;
+        font-family: 'Consolas', 'Monaco', monospace;
+        white-space: nowrap;
+        max-width: 80%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: none;
+      `;
+      document.body.appendChild(this.breadcrumbEl);
+
+      // 注意：批量选择统计浮层(statsEl)已移除
+      // 选择器信息现在只在 DevTools 面板中显示，不再遮挡页面
+
+      // 智能选择层级指示器
+      this.levelIndicator = document.createElement('div');
+      this.levelIndicator.id = 'element-picker-level-indicator';
+      this.levelIndicator.style.cssText = `
+        position: fixed;
+        pointer-events: none;
+        z-index: 2147483647;
+        background: rgba(59, 130, 246, 0.9);
+        color: white;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 10px;
+        font-family: 'Consolas', 'Monaco', monospace;
+        display: none;
+      `;
+      document.body.appendChild(this.levelIndicator);
+
+      // ========== 框选覆盖层 ==========
+      this.boxSelectOverlay = document.createElement('div');
+      this.boxSelectOverlay.id = 'element-picker-box-select';
+      this.boxSelectOverlay.style.cssText = `
+        position: fixed;
+        pointer-events: none;
+        z-index: 2147483646;
+        border: 2px dashed #f59e0b;
+        background: rgba(245, 158, 11, 0.1);
+        display: none;
+      `;
+      document.body.appendChild(this.boxSelectOverlay);
+
+      // ========== 预览覆盖层容器 ==========
+      this.previewOverlay = document.createElement('div');
+      this.previewOverlay.id = 'element-picker-preview-container';
+      this.previewOverlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 2147483645;
+      `;
+      document.body.appendChild(this.previewOverlay);
     }
 
     /**
@@ -206,9 +294,6 @@
       // 隐藏高亮层
       this.hideHighlight();
 
-      // 清除选中高亮
-      this.clearSelectedHighlights();
-
       // 通知 content script 选择模式已停止（即使之前不是活动状态也发送，确保同步）
       this.sendMessage({ type: 'ELEMENT_PICKER_STOPPED' });
 
@@ -232,9 +317,13 @@
       document.addEventListener('mouseover', this.onHover, true);
       document.addEventListener('mouseout', this.onMouseOut, true);
       document.addEventListener('click', this.onClick, true);
+      document.addEventListener('dblclick', this.onDoubleClick, true);
       document.addEventListener('keydown', this.onKeyDown, true);
       document.addEventListener('keyup', this.onKeyUp, true);
       document.addEventListener('mouseleave', this.onMouseLeave, true);
+      document.addEventListener('mousedown', this.onMouseDown, true);
+      document.addEventListener('mousemove', this.onMouseMove, true);
+      document.addEventListener('mouseup', this.onMouseUp, true);
       window.addEventListener('scroll', this.onScroll, true);
       window.addEventListener('resize', this.onResize, true);
     }
@@ -246,9 +335,13 @@
       document.removeEventListener('mouseover', this.onHover, true);
       document.removeEventListener('mouseout', this.onMouseOut, true);
       document.removeEventListener('click', this.onClick, true);
+      document.removeEventListener('dblclick', this.onDoubleClick, true);
       document.removeEventListener('keydown', this.onKeyDown, true);
       document.removeEventListener('keyup', this.onKeyUp, true);
       document.removeEventListener('mouseleave', this.onMouseLeave, true);
+      document.removeEventListener('mousedown', this.onMouseDown, true);
+      document.removeEventListener('mousemove', this.onMouseMove, true);
+      document.removeEventListener('mouseup', this.onMouseUp, true);
       window.removeEventListener('scroll', this.onScroll, true);
       window.removeEventListener('resize', this.onResize, true);
     }
@@ -264,8 +357,10 @@
 
       // 忽略高亮层自身
       if (element === this.highlightOverlay || element === this.sizeTooltip) return;
+      if (element === this.breadcrumbEl || element === this.levelIndicator) return;
 
       this.currentHoveredElement = element;
+      this.smartSelectLevel = 0; // 重置智能选择层级
       this.showHighlight(element);
     }
 
@@ -300,6 +395,363 @@
       if (event.target === document || event.target === document.body) {
         this.hideHighlight();
         this.currentHoveredElement = null;
+      }
+    }
+
+    /**
+     * 鼠标按下 - 开始框选
+     */
+    onMouseDown(event) {
+      if (!this.isActive) return;
+      // 只响应左键 + Shift（框选模式）
+      if (event.button !== 0 || !event.shiftKey) return;
+      // 忽略高亮层自身
+      if (event.target === this.highlightOverlay || event.target === this.sizeTooltip) return;
+
+      this.isBoxSelecting = true;
+      this.boxSelectStart = { x: event.clientX, y: event.clientY };
+
+      // 初始化框选覆盖层
+      if (this.boxSelectOverlay) {
+        this.boxSelectOverlay.style.display = 'block';
+        this.boxSelectOverlay.style.left = `${event.clientX}px`;
+        this.boxSelectOverlay.style.top = `${event.clientY}px`;
+        this.boxSelectOverlay.style.width = '0';
+        this.boxSelectOverlay.style.height = '0';
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+    }
+
+    /**
+     * 鼠标移动 - 更新框选区域
+     */
+    onMouseMove(event) {
+      if (!this.isActive || !this.isBoxSelecting) return;
+
+      const startX = this.boxSelectStart.x;
+      const startY = this.boxSelectStart.y;
+      const currentX = event.clientX;
+      const currentY = event.clientY;
+
+      // 计算矩形区域
+      const left = Math.min(startX, currentX);
+      const top = Math.min(startY, currentY);
+      const width = Math.abs(currentX - startX);
+      const height = Math.abs(currentY - startY);
+
+      // 更新框选覆盖层
+      if (this.boxSelectOverlay) {
+        this.boxSelectOverlay.style.left = `${left}px`;
+        this.boxSelectOverlay.style.top = `${top}px`;
+        this.boxSelectOverlay.style.width = `${width}px`;
+        this.boxSelectOverlay.style.height = `${height}px`;
+      }
+
+      // 实时预览框选范围内的元素
+      this.previewBoxSelection(left, top, width, height);
+    }
+
+    /**
+     * 鼠标释放 - 完成框选
+     */
+    onMouseUp(event) {
+      if (!this.isBoxSelecting) return;
+
+      this.isBoxSelecting = false;
+
+      // 隐藏框选覆盖层
+      if (this.boxSelectOverlay) {
+        this.boxSelectOverlay.style.display = 'none';
+      }
+
+      // 清除预览
+      this.clearPreview();
+
+      const startX = this.boxSelectStart.x;
+      const startY = this.boxSelectStart.y;
+      const currentX = event.clientX;
+      const currentY = event.clientY;
+
+      // 如果框选区域太小（<5px），视为误操作，忽略
+      if (Math.abs(currentX - startX) < 5 && Math.abs(currentY - startY) < 5) {
+        return;
+      }
+
+      // 计算选择区域
+      const left = Math.min(startX, currentX);
+      const top = Math.min(startY, currentY);
+      const right = Math.max(startX, currentX);
+      const bottom = Math.max(startY, currentY);
+
+      // 获取框选范围内的元素
+      this.selectElementsInRect(left, top, right, bottom);
+    }
+
+    /**
+     * 预览框选范围内的元素
+     */
+    previewBoxSelection(left, top, width, height) {
+      this.clearPreview();
+
+      const right = left + width;
+      const bottom = top + height;
+
+      // 找出框选范围内的元素
+      const allElements = document.querySelectorAll('*');
+      const inRangeElements = [];
+
+      allElements.forEach(el => {
+        // 忽略高亮层和工具层
+        if (el === this.highlightOverlay || el === this.sizeTooltip ||
+            el === this.breadcrumbEl || el === this.levelIndicator ||
+            el === this.boxSelectOverlay || el === this.previewOverlay) return;
+
+        const rect = el.getBoundingClientRect();
+
+        // 检查元素是否与框选区域相交
+        if (rect.left < right && rect.right > left &&
+            rect.top < bottom && rect.bottom > top) {
+          inRangeElements.push(el);
+        }
+      });
+
+      // 过滤掉已被选中的元素
+      const newElements = inRangeElements.filter(el => {
+        const xpath = this.getXPath(el);
+        return !this.selectedElements.some(item => item.xpath === xpath);
+      });
+
+      // 显示预览高亮
+      this.previewElements = newElements;
+      this.showPreviewHighlights(newElements);
+    }
+
+    /**
+     * 显示预览高亮
+     */
+    showPreviewHighlights(elements) {
+      elements.forEach((el, index) => {
+        const previewEl = document.createElement('div');
+        previewEl.className = 'element-picker-preview-item';
+        previewEl.dataset.epPreviewIndex = index;
+        previewEl.style.cssText = `
+          position: fixed;
+          pointer-events: none;
+          z-index: 2147483644;
+          border: 1px dashed rgba(59, 130, 246, 0.8);
+          background: rgba(59, 130, 246, 0.1);
+          border-radius: 2px;
+        `;
+
+        const rect = el.getBoundingClientRect();
+        previewEl.style.left = `${rect.left}px`;
+        previewEl.style.top = `${rect.top}px`;
+        previewEl.style.width = `${rect.width}px`;
+        previewEl.style.height = `${rect.height}px`;
+
+        this.previewOverlay.appendChild(previewEl);
+      });
+
+      // 预览数量通过 DevTools 面板显示，不再在页面上显示浮层
+    }
+
+    /**
+     * 清除预览高亮
+     */
+    clearPreview() {
+      if (this.previewOverlay) {
+        this.previewOverlay.innerHTML = '';
+      }
+      this.previewElements = [];
+    }
+
+    /**
+     * 选择框选范围内的元素
+     */
+    selectElementsInRect(left, top, right, bottom) {
+      // 保存历史（用于撤销）
+      this.saveHistory();
+
+      const allElements = document.querySelectorAll('*');
+      let addedCount = 0;
+
+      allElements.forEach(el => {
+        // 忽略高亮层和工具层
+        if (el === this.highlightOverlay || el === this.sizeTooltip ||
+            el === this.breadcrumbEl || el === this.levelIndicator ||
+            el === this.boxSelectOverlay || el === this.previewOverlay) return;
+
+        const rect = el.getBoundingClientRect();
+
+        // 检查元素中心点是否在框选区域内
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+
+        if (centerX >= left && centerX <= right && centerY >= top && centerY <= bottom) {
+          // 智能选择：如果元素太小（<10px），可能只是内部元素，选择其父级
+          let targetEl = el;
+          if (rect.width < 10 && rect.height < 10 && el.parentElement) {
+            targetEl = this.smartSelectElement(el);
+          }
+
+          const xpath = this.getXPath(targetEl);
+          const exists = this.selectedElements.some(item => item.xpath === xpath);
+
+          if (!exists) {
+            const pickerUid = this.generatePickerUid();
+            const selector = this.generateSelector(targetEl);
+            const elementInfo = {
+              pickerUid,
+              xpath,
+              selector,
+              tagName: targetEl.tagName.toLowerCase(),
+              id: targetEl.id || '',
+              className: typeof targetEl.className === 'string' ? targetEl.className : ''
+            };
+            this.selectedElements.push(elementInfo);
+            this.addSelectedHighlight(targetEl, pickerUid);
+            addedCount++;
+          }
+        }
+      });
+
+      this.updateStats();
+      this.notifySelectionChanged();
+
+      // 显示提示
+      if (addedCount > 0) {
+        this.showToast(`已添加 ${addedCount} 个元素`);
+      }
+    }
+
+    /**
+     * 保存历史记录（用于撤销/重做）
+     */
+    saveHistory() {
+      // 删除当前位置之后的历史
+      this.selectionHistory = this.selectionHistory.slice(0, this.historyIndex + 1);
+
+      // 深拷贝当前选中状态
+      const snapshot = JSON.parse(JSON.stringify(this.selectedElements));
+      this.selectionHistory.push(snapshot);
+
+      // 限制历史记录数量
+      if (this.selectionHistory.length > this.maxHistorySize) {
+        this.selectionHistory.shift();
+      } else {
+        this.historyIndex++;
+      }
+    }
+
+    /**
+     * 撤销
+     */
+    undo() {
+      if (this.historyIndex <= 0) {
+        this.showToast('没有可撤销的操作', true);
+        return;
+      }
+
+      this.historyIndex--;
+      this.restoreFromHistory();
+    }
+
+    /**
+     * 重做
+     */
+    redo() {
+      if (this.historyIndex >= this.selectionHistory.length - 1) {
+        this.showToast('没有可重做的操作', true);
+        return;
+      }
+
+      this.historyIndex++;
+      this.restoreFromHistory();
+    }
+
+    /**
+     * 从历史记录恢复选中状态
+     */
+    restoreFromHistory() {
+      // 清除当前选中
+      this.clearSelectedHighlights();
+      this.selectedElements = [];
+
+      // 恢复历史状态
+      const snapshot = this.selectionHistory[this.historyIndex];
+      if (!snapshot) return;
+
+      snapshot.forEach(item => {
+        const element = this.getElementByXPath(item.xpath);
+        if (element) {
+          this.selectedElements.push({ ...item });
+          this.addSelectedHighlight(element, item.pickerUid);
+        }
+      });
+
+      this.updateStats();
+      this.notifySelectionChanged();
+      this.showToast(`已恢复 (${this.historyIndex + 1}/${this.selectionHistory.length})`);
+    }
+
+    /**
+     * 显示轻提示
+     */
+    showToast(message, isError = false) {
+      // 创建或复用 toast 元素
+      let toast = document.getElementById('element-picker-toast');
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'element-picker-toast';
+        toast.style.cssText = `
+          position: fixed;
+          bottom: 60px;
+          left: 50%;
+          transform: translateX(-50%);
+          background: ${isError ? '#ef4444' : '#10b981'};
+          color: white;
+          padding: 6px 12px;
+          border-radius: 4px;
+          font-size: 12px;
+          font-family: 'Consolas', 'Monaco', monospace;
+          z-index: 2147483647;
+          pointer-events: none;
+          opacity: 0;
+          transition: opacity 0.2s;
+        `;
+        document.body.appendChild(toast);
+      }
+
+      toast.textContent = message;
+      toast.style.background = isError ? '#ef4444' : '#10b981';
+      toast.style.opacity = '1';
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+      }, 1500);
+    }
+
+    /**
+     * 预览选择器匹配结果
+     * @param {string} selector - 要预览的选择器
+     */
+    previewSelector(selector) {
+      this.clearPreview();
+
+      if (!selector) return 0;
+
+      try {
+        const elements = document.querySelectorAll(selector);
+        this.previewElements = Array.from(elements);
+
+        // 显示预览高亮
+        this.showPreviewHighlights(this.previewElements);
+
+        return elements.length;
+      } catch (e) {
+        return 0;
       }
     }
 
@@ -346,6 +798,12 @@
       // 智能选择：自动向上查找有效父级
       const smartElement = this.smartSelectElement(element);
 
+      // 单选模式处理
+      if (this.singleSelectMode) {
+        this.selectSingleElement(smartElement);
+        return;
+      }
+
       // 防抖：检查是否是重复点击（500ms 内同一元素）
       const now = Date.now();
       const xpath = this.getXPath(smartElement);
@@ -362,9 +820,12 @@
         item => item.xpath === xpath
       );
 
+      // 保存历史（用于撤销）
+      this.saveHistory();
+
       if (existingIndex > -1) {
         // 已选中，取消选中
-        const removedItem = this.selectedElements.splice(existingIndex, 1)[0];
+        this.selectedElements.splice(existingIndex, 1);
         this.removeSelectedHighlight(smartElement);
       } else {
         // 未选中，添加选中
@@ -377,9 +838,6 @@
         try {
           const found = document.querySelectorAll(selector);
           matchCount = found.length;
-          if (found.length > 1) {
-          } else if (found.length === 0) {
-          }
         } catch (e) {
           matchCount = 0;
         }
@@ -398,23 +856,71 @@
       }
 
       // 通知选中状态变化
-      const messageData = {
-        type: 'ELEMENT_SELECTION_CHANGED',
-        elements: this.selectedElements.map(item => ({
-          pickerUid: item.pickerUid,
-          selector: item.selector,
-          matchCount: item.matchCount || 1,
-          tagName: item.tagName,
-          id: item.id,
-          className: item.className
-        }))
+      this.updateStats();
+      this.notifySelectionChanged();
+    }
+
+    /**
+     * 单选模式：选择单个元素
+     * @param {Element} element - 要选择的元素
+     */
+    selectSingleElement(element) {
+      if (!element || !element.tagName) return;
+
+      const xpath = this.getXPath(element);
+      const selector = this.generateSelector(element);
+
+      // 验证选择器并获取匹配数量
+      let matchCount = 1;
+      try {
+        const found = document.querySelectorAll(selector);
+        matchCount = found.length;
+      } catch (e) {
+        matchCount = 0;
+      }
+
+      // 获取元素路径信息
+      const path = [];
+      let current = element;
+      while (current && current !== document.documentElement) {
+        path.push({
+          tagName: current.tagName.toLowerCase(),
+          id: current.id || '',
+          className: typeof current.className === 'string' ? current.className : ''
+        });
+        current = current.parentElement;
+      }
+
+      // 检查是否有父级/子级
+      const hasParent = element.parentElement && element.parentElement !== document.documentElement;
+      const hasChild = element.firstElementChild !== null;
+
+      const elementInfo = {
+        xpath,
+        selector,
+        matchCount,
+        tagName: element.tagName.toLowerCase(),
+        id: element.id || '',
+        className: typeof element.className === 'string' ? element.className : '',
+        path,
+        hasParent,
+        hasChild
       };
 
+      // 发送单选消息
+      this.sendMessage({
+        type: 'SINGLE_ELEMENT_SELECTED',
+        element: elementInfo
+      });
 
-      if (messageData.elements.length > 0) {
+      // 显示选中提示
+      this.showToast(`已选择: ${elementInfo.tagName}${elementInfo.id ? '#' + elementInfo.id : ''}`);
 
-      }
-      this.sendMessage(messageData);
+      // 高亮显示选中的元素（短暂显示）
+      this.showHighlight(element);
+      setTimeout(() => {
+        this.hideHighlight();
+      }, 1000);
     }
 
     /**
@@ -488,6 +994,58 @@
       // Esc 退出选择模式
       if (event.key === 'Escape') {
         this.stop();
+        return;
+      }
+
+      // 撤销: Ctrl+Z
+      if (event.key === 'z' && (event.ctrlKey || event.metaKey) && !event.shiftKey) {
+        event.preventDefault();
+        this.undo();
+        return;
+      }
+
+      // 重做: Ctrl+Y 或 Ctrl+Shift+Z
+      if ((event.key === 'y' && (event.ctrlKey || event.metaKey)) ||
+          (event.key === 'z' && (event.ctrlKey || event.metaKey) && event.shiftKey)) {
+        event.preventDefault();
+        this.redo();
+        return;
+      }
+
+      // 上下键调整智能选择层级
+      if (event.key === 'ArrowUp' && this.currentHoveredElement) {
+        event.preventDefault();
+        this.adjustSmartSelectLevel(1);
+      }
+
+      if (event.key === 'ArrowDown' && this.currentHoveredElement) {
+        event.preventDefault();
+        this.adjustSmartSelectLevel(-1);
+      }
+
+      // 数字键 1-9 快速选择同类型元素
+      if (event.key >= '1' && event.key <= '9' && event.shiftKey) {
+        event.preventDefault();
+        this.selectSimilarElements(parseInt(event.key));
+      }
+
+      // A 键全选当前高亮元素的同级元素
+      if (event.key === 'a' && event.ctrlKey) {
+        event.preventDefault();
+        this.selectAllSiblings();
+      }
+
+      // Delete 键清除所有选中
+      if (event.key === 'Delete') {
+        event.preventDefault();
+        this.clearSelection();
+        this.showToast('已清除所有选中');
+      }
+
+      // ? 键显示帮助
+      if (event.key === '?') {
+        event.preventDefault();
+        this.showHelp();
       }
     }
 
@@ -501,6 +1059,214 @@
       if (!event.ctrlKey && !event.metaKey) {
         this.multiSelectMode = false;
       }
+    }
+
+    /**
+     * 调整智能选择层级
+     * @param {number} delta - 层级变化（正数向上，负数向下）
+     */
+    adjustSmartSelectLevel(delta) {
+      if (!this.currentHoveredElement) return;
+
+      const maxLevel = 10;
+      this.smartSelectLevel = Math.max(0, Math.min(maxLevel, this.smartSelectLevel + delta));
+
+      // 根据层级向上选择父元素
+      let targetElement = this.currentHoveredElement;
+      for (let i = 0; i < this.smartSelectLevel && targetElement.parentElement; i++) {
+        if (targetElement.parentElement === document.body) break;
+        targetElement = targetElement.parentElement;
+      }
+
+      // 显示层级指示器
+      this.showLevelIndicator(this.smartSelectLevel);
+      this.showHighlight(targetElement);
+    }
+
+    /**
+     * 显示智能选择层级指示器
+     */
+    showLevelIndicator(level) {
+      if (!this.levelIndicator) return;
+
+      if (level > 0) {
+        this.levelIndicator.textContent = `↑${level}`;
+        this.levelIndicator.style.display = 'block';
+
+        // 定位到高亮框右上角
+        if (this.highlightOverlay && this.highlightOverlay.style.display !== 'none') {
+          const rect = this.highlightOverlay.getBoundingClientRect();
+          this.levelIndicator.style.left = `${rect.right + 5}px`;
+          this.levelIndicator.style.top = `${rect.top}px`;
+        }
+      } else {
+        this.levelIndicator.style.display = 'none';
+      }
+    }
+
+    /**
+     * 双击批量选择相同元素
+     */
+    onDoubleClick(event) {
+      if (!this.isActive) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+
+      const element = event.target;
+
+      // 忽略高亮层自身
+      if (element === this.highlightOverlay || element === this.sizeTooltip) return;
+      if (element === this.breadcrumbEl) return;
+
+      // 选择所有相同标签名的同级元素
+      this.selectSimilarElements(0);
+    }
+
+    /**
+     * 选择相似元素
+     * @param {number} mode - 0: 同级同标签, 1-9: 限制数量
+     */
+    selectSimilarElements(mode) {
+      if (!this.currentHoveredElement) return;
+
+      const element = this.smartSelectLevel > 0
+        ? this.getAncestorAtLevel(this.currentHoveredElement, this.smartSelectLevel)
+        : this.currentHoveredElement;
+
+      if (!element) return;
+
+      const parent = element.parentElement;
+      if (!parent) return;
+
+      const tag = element.tagName;
+      const classes = element.className && typeof element.className === 'string'
+        ? element.className.trim().split(' ').filter(c => c && !/^(css-|styled-|sc-|js-|_)/.test(c))
+        : [];
+
+      // 找到同级相似元素
+      let siblings = Array.from(parent.children).filter(child => {
+        if (child === element) return true;
+        if (child.tagName !== tag) return false;
+
+        // 如果有共同的 class，优先选择有相同 class 的
+        if (classes.length > 0) {
+          const childClasses = child.className && typeof child.className === 'string'
+            ? child.className.trim().split(' ')
+            : [];
+          const hasCommonClass = classes.some(c => childClasses.includes(c));
+          if (!hasCommonClass) return false;
+        }
+
+        return true;
+      });
+
+      // 限制数量
+      if (mode > 0 && mode < siblings.length) {
+        const elementIndex = siblings.indexOf(element);
+        const half = Math.floor(mode / 2);
+        const start = Math.max(0, elementIndex - half);
+        siblings = siblings.slice(start, start + mode);
+      }
+
+      // 批量添加选中
+      siblings.forEach(el => {
+        const xpath = this.getXPath(el);
+        const exists = this.selectedElements.some(item => item.xpath === xpath);
+
+        if (!exists) {
+          const pickerUid = this.generatePickerUid();
+          const selector = this.generateSelector(el);
+          const elementInfo = {
+            pickerUid,
+            xpath,
+            selector,
+            tagName: el.tagName.toLowerCase(),
+            id: el.id || '',
+            className: typeof el.className === 'string' ? el.className : ''
+          };
+          this.selectedElements.push(elementInfo);
+          this.addSelectedHighlight(el, pickerUid);
+        }
+      });
+
+      this.updateStats();
+      this.notifySelectionChanged();
+    }
+
+    /**
+     * 全选当前高亮元素的同级元素
+     */
+    selectAllSiblings() {
+      if (!this.currentHoveredElement) return;
+
+      const element = this.smartSelectLevel > 0
+        ? this.getAncestorAtLevel(this.currentHoveredElement, this.smartSelectLevel)
+        : this.currentHoveredElement;
+
+      if (!element || !element.parentElement) return;
+
+      const parent = element.parentElement;
+      const tag = element.tagName;
+
+      // 选择所有同标签的同级元素
+      Array.from(parent.children)
+        .filter(child => child.tagName === tag)
+        .forEach(child => {
+          const xpath = this.getXPath(child);
+          const exists = this.selectedElements.some(item => item.xpath === xpath);
+
+          if (!exists) {
+            const pickerUid = this.generatePickerUid();
+            const selector = this.generateSelector(child);
+            const elementInfo = {
+              pickerUid,
+              xpath,
+              selector,
+              tagName: child.tagName.toLowerCase(),
+              id: child.id || '',
+              className: typeof child.className === 'string' ? child.className : ''
+            };
+            this.selectedElements.push(elementInfo);
+            this.addSelectedHighlight(child, pickerUid);
+          }
+        });
+
+      this.updateStats();
+      this.notifySelectionChanged();
+    }
+
+    /**
+     * 获取指定层级的祖先元素
+     */
+    getAncestorAtLevel(element, level) {
+      let current = element;
+      for (let i = 0; i < level && current.parentElement; i++) {
+        if (current.parentElement === document.body) break;
+        current = current.parentElement;
+      }
+      return current;
+    }
+
+    /**
+     * 通知选中状态变化
+     */
+    notifySelectionChanged() {
+      const messageData = {
+        type: 'ELEMENT_SELECTION_CHANGED',
+        elements: this.selectedElements.map((item, index) => ({
+          pickerUid: item.pickerUid,
+          selector: item.selector,
+          matchCount: item.matchCount || 1,
+          tagName: item.tagName,
+          id: item.id,
+          className: item.className,
+          index: index + 1
+        }))
+      };
+      console.log('[ElementPicker] 发送选中变化消息, 元素数量:', messageData.elements.length);
+      this.sendMessage(messageData);
     }
 
     /**
@@ -537,6 +1303,9 @@
         const height = Math.round(rect.height);
         const tagName = element.tagName.toLowerCase();
         const idStr = element.id ? `#${element.id}` : '';
+        const classStr = element.className && typeof element.className === 'string'
+          ? element.className.trim().split(' ').slice(0, 2).map(c => `.${c}`).join('')
+          : '';
 
         // 使用 textContent 避免 TrustedHTML 错误
         const strongEl = document.createElement('strong');
@@ -544,6 +1313,19 @@
         this.sizeTooltip.textContent = '';
         this.sizeTooltip.appendChild(strongEl);
         this.sizeTooltip.appendChild(document.createTextNode(` ${width} × ${height}`));
+
+        // 显示匹配数量
+        const selector = this.generateSelector(element);
+        try {
+          const matches = document.querySelectorAll(selector);
+          if (matches.length > 1) {
+            const matchInfo = document.createElement('span');
+            matchInfo.style.cssText = 'color: #fbbf24; margin-left: 8px;';
+            matchInfo.textContent = `(${matches.length} 匹配)`;
+            this.sizeTooltip.appendChild(matchInfo);
+          }
+        } catch (e) {}
+
         this.sizeTooltip.style.display = 'block';
 
         // 定位尺寸提示（在高亮框上方或下方）
@@ -565,6 +1347,62 @@
         this.sizeTooltip.style.top = `${tooltipTop}px`;
         this.sizeTooltip.style.left = `${tooltipLeft}px`;
       }
+
+      // 更新面包屑（元素路径）
+      this.showBreadcrumb(element, rect);
+    }
+
+    /**
+     * 显示元素路径面包屑
+     */
+    showBreadcrumb(element, rect) {
+      if (!this.breadcrumbEl) return;
+
+      const path = [];
+      let current = element;
+      const maxDepth = 5;
+
+      while (current && current.nodeType === Node.ELEMENT_NODE && path.length < maxDepth) {
+        const tag = current.tagName.toLowerCase();
+        let part = `<span class="tag">${tag}</span>`;
+
+        if (current.id && !current.id.includes(' ')) {
+          part += `<span class="id">#${current.id}</span>`;
+        } else if (current.className && typeof current.className === 'string') {
+          const classes = current.className.trim().split(' ').filter(c =>
+            c && !/^(css-|styled-|sc-|js-|_|data-)/.test(c)
+          ).slice(0, 2);
+          if (classes.length > 0) {
+            part += classes.map(c => `<span class="class">.${c}</span>`).join('');
+          }
+        }
+
+        path.unshift(part);
+
+        if (current === document.body) break;
+        current = current.parentElement;
+      }
+
+      this.breadcrumbEl.innerHTML = path.join('<span class="sep">›</span>');
+      this.breadcrumbEl.style.display = 'block';
+
+      // 定位面包屑
+      const breadcrumbHeight = 24;
+      let breadcrumbTop = rect.bottom + 4;
+      let breadcrumbLeft = rect.left;
+
+      // 确保不超出视口
+      if (breadcrumbTop + breadcrumbHeight > window.innerHeight) {
+        breadcrumbTop = rect.top - breadcrumbHeight - 4;
+      }
+
+      const breadcrumbWidth = this.breadcrumbEl.offsetWidth || 200;
+      if (breadcrumbLeft + breadcrumbWidth > window.innerWidth) {
+        breadcrumbLeft = window.innerWidth - breadcrumbWidth - 10;
+      }
+
+      this.breadcrumbEl.style.top = `${breadcrumbTop}px`;
+      this.breadcrumbEl.style.left = `${breadcrumbLeft}px`;
     }
 
     /**
@@ -577,28 +1415,148 @@
       if (this.sizeTooltip) {
         this.sizeTooltip.style.display = 'none';
       }
+      if (this.breadcrumbEl) {
+        this.breadcrumbEl.style.display = 'none';
+      }
+      if (this.levelIndicator) {
+        this.levelIndicator.style.display = 'none';
+      }
     }
 
     /**
      * 添加选中高亮样式
      */
     addSelectedHighlight(element, pickerUid) {
+      // 确保元素有定位，以便编号标签能正确显示
+      const computedStyle = window.getComputedStyle(element);
+      if (computedStyle.position === 'static') {
+        element.dataset.epOriginalPosition = 'static';
+        element.style.position = 'relative';
+      }
 
       element.setAttribute('data-ep-selected', 'true');
       element.setAttribute('data-ep-uid', pickerUid);
+
+      // 添加索引号
+      const index = this.selectedElements.length;
+      element.setAttribute('data-ep-index', index);
+
       // 强制重绘
       void element.offsetHeight;
+
+      // 更新统计浮层
+      this.updateStats();
+    }
+
+    /**
+     * 更新批量选择统计（通过消息发送到 DevTools）
+     */
+    updateStats() {
+      // 统计信息现在通过 notifySelectionChanged 发送到 DevTools
+      // 不再在页面上显示浮层
+      this.notifySelectionChanged();
+    }
+
+    /**
+     * 在页面上显示简短提示
+     */
+    showPageToast(message, color = '#10b981') {
+      // 移除旧的 toast
+      const oldToast = document.getElementById('element-picker-toast');
+      if (oldToast) oldToast.remove();
+
+      // 创建新 toast
+      const toast = document.createElement('div');
+      toast.id = 'element-picker-toast';
+      toast.style.cssText = `
+        position: fixed;
+        bottom: 80px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: ${color};
+        color: white;
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-family: 'Consolas', 'Monaco', monospace;
+        white-space: pre-line;
+        z-index: 2147483647;
+        pointer-events: none;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        animation: ep-toast-in 0.3s ease-out;
+        max-width: 300px;
+        text-align: center;
+      `;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+
+      // 添加动画样式
+      if (!document.getElementById('element-picker-toast-styles')) {
+        const style = document.createElement('style');
+        style.id = 'element-picker-toast-styles';
+        style.textContent = `
+          @keyframes ep-toast-in {
+            from {
+              opacity: 0;
+              transform: translateX(-50%) translateY(20px);
+            }
+            to {
+              opacity: 1;
+              transform: translateX(-50%) translateY(0);
+            }
+          }
+          @keyframes ep-toast-out {
+            from {
+              opacity: 1;
+              transform: translateX(-50%) translateY(0);
+            }
+            to {
+              opacity: 0;
+              transform: translateX(-50%) translateY(-20px);
+            }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+
+      // 2秒后自动消失
+      setTimeout(() => {
+        toast.style.animation = 'ep-toast-out 0.3s ease-out forwards';
+        setTimeout(() => toast.remove(), 300);
+      }, 2000);
     }
 
     /**
      * 移除选中高亮样式（通过唯一 ID）
      */
     removeSelectedHighlight(element) {
+      // 恢复原始 position
+      if (element.dataset.epOriginalPosition === 'static') {
+        element.style.position = '';
+        delete element.dataset.epOriginalPosition;
+      }
 
       element.removeAttribute('data-ep-selected');
       element.removeAttribute('data-ep-uid');
+      element.removeAttribute('data-ep-index');
       // 强制重绘
       void element.offsetHeight;
+
+      // 更新所有元素的索引
+      this.updateAllIndices();
+      this.updateStats();
+    }
+
+    /**
+     * 更新所有选中元素的索引
+     */
+    updateAllIndices() {
+      this.selectedElements.forEach((item, index) => {
+        const element = this.getElementByXPath(item.xpath);
+        if (element) {
+          element.setAttribute('data-ep-index', index + 1);
+        }
+      });
     }
 
     /**
@@ -610,8 +1568,15 @@
       // 通过唯一 ID 属性查找元素
       const element = document.querySelector(`[data-ep-uid="${pickerUid}"]`);
       if (element) {
+        // 恢复原始 position
+        if (element.dataset.epOriginalPosition === 'static') {
+          element.style.position = '';
+          delete element.dataset.epOriginalPosition;
+        }
+
         element.removeAttribute('data-ep-selected');
         element.removeAttribute('data-ep-uid');
+        element.removeAttribute('data-ep-index');
 
         return true;
       }
@@ -624,9 +1589,17 @@
     clearSelectedHighlights() {
       // 通过属性选择器找到所有标记的元素
       document.querySelectorAll('[data-ep-uid]').forEach(el => {
+        // 恢复原始 position
+        if (el.dataset.epOriginalPosition === 'static') {
+          el.style.position = '';
+          delete el.dataset.epOriginalPosition;
+        }
         el.removeAttribute('data-ep-selected');
         el.removeAttribute('data-ep-uid');
+        el.removeAttribute('data-ep-index');
       });
+
+      // 统计信息已通过 DevTools 面板显示
     }
 
     /**
@@ -648,7 +1621,7 @@
 
     /**
      * 生成 CSS 选择器
-     * 确保返回的选择器精确匹配目标元素
+     * 使用多策略 BFS 算法，确保返回最短且精确的选择器
      */
     generateSelector(element) {
       if (!element || !element.tagName) return '';
@@ -662,31 +1635,73 @@
         if (!node.className || typeof node.className !== 'string') return [];
         return node.className.trim().split(' ').filter(c => {
           if (!c || /^[0-9]/.test(c)) return false;
-          if (/^(css-|styled-|sc-|js-|_|__|Mui|jss|css_|_)/.test(c) || c.length > 30) return false;
+          // 过滤动态生成的 class
+          if (/^(css-|styled-|sc-|js-|_|__|Mui|jss|css_|_|ng-|React|react|vue-|v-)/.test(c)) return false;
+          if (c.length > 40) return false;
           return /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(c);
         });
       };
 
-      const getValidAttributes = (node) => {
+      // 高优先级测试属性（这些属性通常唯一标识元素）
+      const TEST_ATTRS = ['data-testid', 'data-test', 'data-cy', 'data-test-id', 'data-qa', 'data-automation-id'];
+
+      // 稳定属性（可用于选择器）
+      const STABLE_ATTRS = [
+        'type', 'role', 'aria-role', 'data-type', 'data-role', 'data-kind',
+        'data-variant', 'data-size', 'data-id', 'name', 'placeholder',
+        'lang', 'dir', 'target', 'rel', 'colspan', 'rowspan', 'scope',
+        'disabled', 'readonly', 'required', 'checked', 'multiple', 'selected'
+      ];
+
+      // 特殊元素属性（对特定元素很有用）
+      const ELEMENT_SPECIFIC_ATTRS = {
+        'a': ['href'],
+        'img': ['src', 'alt'],
+        'input': ['type', 'name', 'placeholder'],
+        'button': ['type'],
+        'form': ['action', 'method'],
+        'select': ['name', 'multiple'],
+        'textarea': ['name', 'placeholder'],
+        'video': ['src', 'poster'],
+        'audio': ['src'],
+        'iframe': ['src'],
+        'meta': ['name', 'property', 'content'],
+        'link': ['rel', 'href']
+      };
+
+      const getValidAttributes = (node, forMerge = false) => {
         if (!node.attributes) return [];
-        // 排除：脚本添加的属性、样式属性、内容属性（每个元素都不同的）
-        const skipAttrs = [
-          // 脚本添加的属性
-          'data-ep-selected', 'data-ep-uid',
-          // 基础属性
-          'class', 'id', 'style',
-          // 内容属性（每个元素不同）
-          'title', 'alt', 'aria-label', 'aria-describedby', 'aria-labelledby',
-          'placeholder', 'value', 'name', 'href', 'src', 'data-tooltip',
-          // 状态/交互属性（不稳定）
-          'tabindex', 'role', 'disabled', 'type'
-        ];
+        const skipAttrs = new Set([
+          'data-ep-selected', 'data-ep-uid', 'class', 'id', 'style',
+          'aria-label', 'aria-describedby', 'aria-labelledby', 'title',
+          'data-tooltip', 'onclick', 'onchange', 'onsubmit'
+        ]);
         const attrs = [];
         for (const attr of node.attributes) {
-          if (skipAttrs.includes(attr.name) || !attr.value || attr.value.length > 50 || /^\d+$/.test(attr.value)) continue;
+          if (skipAttrs.has(attr.name)) continue;
+          if (!attr.value || attr.value.length > 80) continue;
+          if (/^\d+$/.test(attr.value)) continue;
+          if (forMerge && !STABLE_ATTRS.includes(attr.name) && !TEST_ATTRS.includes(attr.name)) continue;
           attrs.push({ name: attr.name, value: attr.value });
         }
+        // 按优先级排序：测试属性 > 稳定属性 > 其他
+        attrs.sort((a, b) => {
+          const aIsTest = TEST_ATTRS.includes(a.name) ? 0 : 1;
+          const bIsTest = TEST_ATTRS.includes(b.name) ? 0 : 1;
+          if (aIsTest !== bIsTest) return aIsTest - bIsTest;
+          const aIsStable = STABLE_ATTRS.includes(a.name) ? 0 : 1;
+          const bIsStable = STABLE_ATTRS.includes(b.name) ? 0 : 1;
+          return aIsStable - bIsStable;
+        });
         return attrs;
+      };
+
+      // 获取元素在所有兄弟中的索引（用于 nth-child）
+      const getNthChild = (node) => {
+        const parent = node.parentElement;
+        if (!parent) return 0;
+        const siblings = Array.from(parent.children);
+        return siblings.length > 1 ? siblings.indexOf(node) + 1 : 0;
       };
 
       // 获取元素在同类兄弟中的索引（用于 nth-of-type）
@@ -708,99 +1723,207 @@
         return found.length === 1 && found[0] === target;
       };
 
-      // === 策略1: ID ===
-      if (hasValidId(element)) {
-        const sel = '#' + CSS.escape(element.id);
-        if (isExactMatch(sel, element)) return sel;
-      }
+      // 返回匹配数量和是否包含目标
+      const testSelectorResult = (sel, target) => {
+        try {
+          const found = document.querySelectorAll(sel);
+          return { count: found.length, contains: Array.from(found).includes(target) };
+        } catch { return { count: Infinity, contains: false }; }
+      };
 
-      // === 策略2: 单class ===
-      const classes = getValidClasses(element);
       const tag = element.tagName.toLowerCase();
-      for (const cls of classes) {
-        const sel = '.' + CSS.escape(cls);
-        if (isExactMatch(sel, element)) return sel;
-        const tagCls = tag + '.' + CSS.escape(cls);
-        if (isExactMatch(tagCls, element)) return tagCls;
-      }
-
-      // === 策略3: 属性选择器 ===
+      const classes = getValidClasses(element);
       const attrs = getValidAttributes(element);
-      for (const attr of attrs) {
-        const sel = '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]';
-        if (isExactMatch(sel, element)) return sel;
-        const tagAttr = tag + '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]';
-        if (isExactMatch(tagAttr, element)) return tagAttr;
+      const nthChild = getNthChild(element);
+      const nthOfType = getNthOfType(element);
+
+      // === BFS 候选选择器队列 ===
+      const candidates = [];
+
+      // === Level 1: 最简单的选择器 ===
+
+      // 1.1 测试属性（最高优先级）
+      for (const testAttr of TEST_ATTRS) {
+        const attr = attrs.find(a => a.name === testAttr);
+        if (attr) {
+          candidates.push('[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]');
+          candidates.push(tag + '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]');
+        }
       }
 
-      // === 策略4: 组合 (class + attr) ===
+      // 1.2 ID（如果存在且有效）
+      if (hasValidId(element)) {
+        candidates.push('#' + CSS.escape(element.id));
+      }
+
+      // 1.3 role 属性
+      const roleAttr = attrs.find(a => a.name === 'role');
+      if (roleAttr) {
+        candidates.push(tag + '[role="' + CSS.escape(roleAttr.value) + '"]');
+      }
+
+      // 1.4 单个 class
+      for (const cls of classes) {
+        candidates.push('.' + CSS.escape(cls));
+        candidates.push(tag + '.' + CSS.escape(cls));
+      }
+
+      // 1.5 元素特定属性
+      const elementAttrs = ELEMENT_SPECIFIC_ATTRS[tag] || [];
+      for (const attrName of elementAttrs) {
+        const attr = attrs.find(a => a.name === attrName);
+        if (attr) {
+          candidates.push(tag + '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]');
+        }
+      }
+
+      // 1.6 其他属性
+      for (const attr of attrs.slice(0, 3)) {
+        if (!TEST_ATTRS.includes(attr.name) && attr.name !== 'role') {
+          candidates.push('[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]');
+          candidates.push(tag + '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]');
+        }
+      }
+
+      // 测试 Level 1
+      for (const sel of candidates) {
+        if (isExactMatch(sel, element)) return sel;
+      }
+
+      // === Level 2: 双 class 组合 ===
+      if (classes.length >= 2) {
+        // 尝试前两个 class 组合
+        candidates.push(tag + '.' + classes.slice(0, 2).map(c => CSS.escape(c)).join('.'));
+        candidates.push('.' + classes.slice(0, 2).map(c => CSS.escape(c)).join('.'));
+
+        // 测试
+        for (let i = candidates.length - 2; i < candidates.length; i++) {
+          if (isExactMatch(candidates[i], element)) return candidates[i];
+        }
+      }
+
+      // === Level 3: class + 属性组合 ===
       if (classes.length > 0 && attrs.length > 0) {
-        for (const cls of classes) {
-          for (const attr of attrs) {
+        for (const cls of classes.slice(0, 2)) {
+          for (const attr of attrs.slice(0, 2)) {
             const sel = tag + '.' + CSS.escape(cls) + '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]';
+            candidates.push(sel);
             if (isExactMatch(sel, element)) return sel;
           }
         }
       }
 
-      // === 策略5: 多class组合 ===
-      if (classes.length >= 2) {
-        const sel = tag + '.' + classes.map(c => CSS.escape(c)).join('.');
+      // === Level 4: 多 class 组合（3个） ===
+      if (classes.length >= 3) {
+        const sel = tag + '.' + classes.slice(0, 3).map(c => CSS.escape(c)).join('.');
         if (isExactMatch(sel, element)) return sel;
       }
 
-      // === 策略6: 构建完整路径 ===
-      // 收集从元素到 html 的所有节点
-      const path = [];
-      let cur = element;
-
-      while (cur) {
-        if (hasValidId(cur)) {
-          path.unshift('#' + CSS.escape(cur.id));
-          break;
-        }
-
-        const t = cur.tagName.toLowerCase();
-        const c = getValidClasses(cur);
-        const nth = getNthOfType(cur);
-        const curAttrs = cur === element ? attrs : getValidAttributes(cur);
-
-        // 优先使用 class，其次 nth-of-type
-        if (c.length > 0) {
-          path.unshift(t + '.' + CSS.escape(c[0]));
-        } else if (curAttrs.length > 0) {
-          path.unshift(t + '[' + CSS.escape(curAttrs[0].name) + '="' + CSS.escape(curAttrs[0].value) + '"]');
-        } else if (nth > 0) {
-          path.unshift(t + ':nth-of-type(' + nth + ')');
-        } else {
-          path.unshift(t);
-        }
-
-        if (cur === document.documentElement) break;
-        cur = cur.parentElement;
+      // === Level 5: 带 nth-of-type / nth-child ===
+      if (nthOfType > 0) {
+        const sel = tag + ':nth-of-type(' + nthOfType + ')';
+        candidates.push(sel);
+        if (isExactMatch(sel, element)) return sel;
       }
 
-      // 验证并逐步扩展直到精确匹配
-      let selector = path.join(' > ');
-      while (!isExactMatch(selector, element)) {
-        // 如果路径已经完整但仍不精确，添加更多层级
-        if (path[0] === 'html') {
-          // 尝试在最后一层添加属性
-          const lastPart = path[path.length - 1];
-          if (attrs.length > 0 && !lastPart.includes('[')) {
-            path[path.length - 1] = lastPart + '[' + CSS.escape(attrs[0].name) + '="' + CSS.escape(attrs[0].value) + '"]';
-          } else if (classes.length > 0 && !lastPart.includes('.')) {
-            path[path.length - 1] = lastPart + '.' + CSS.escape(classes[0]);
-          } else {
+      if (nthChild > 0) {
+        const sel = tag + ':nth-child(' + nthChild + ')';
+        candidates.push(sel);
+        if (isExactMatch(sel, element)) return sel;
+      }
+
+      // class + nth-of-type
+      if (classes.length > 0 && nthOfType > 0) {
+        const sel = tag + '.' + CSS.escape(classes[0]) + ':nth-of-type(' + nthOfType + ')';
+        if (isExactMatch(sel, element)) return sel;
+      }
+
+      // === Level 6: 构建路径（从元素到有 ID 的祖先或 body） ===
+      const buildPath = (startNode, maxDepth = 6) => {
+        const path = [];
+        let cur = startNode;
+        let depth = 0;
+
+        while (cur && depth < maxDepth) {
+          const t = cur.tagName.toLowerCase();
+
+          // 遇到有 ID 的祖先就停止
+          if (hasValidId(cur) && cur !== element) {
+            path.unshift('#' + CSS.escape(cur.id));
             break;
           }
+
+          const c = getValidClasses(cur);
+          const curNth = getNthOfType(cur);
+          const curAttrs = cur === element ? attrs : getValidAttributes(cur);
+
+          // 构建当前节点的选择器部分
+          let part = t;
+          if (c.length > 0) {
+            part += '.' + CSS.escape(c[0]);
+          } else if (curAttrs.length > 0) {
+            // 优先使用测试属性
+            const testAttr = curAttrs.find(a => TEST_ATTRS.includes(a.name));
+            if (testAttr) {
+              part += '[' + CSS.escape(testAttr.name) + '="' + CSS.escape(testAttr.value) + '"]';
+            } else {
+              part += '[' + CSS.escape(curAttrs[0].name) + '="' + CSS.escape(curAttrs[0].value) + '"]';
+            }
+          } else if (curNth > 0 && cur !== element) {
+            part += ':nth-of-type(' + curNth + ')';
+          }
+
+          path.unshift(part);
+
+          if (cur === document.documentElement) break;
+          cur = cur.parentElement;
+          depth++;
         }
-        selector = path.join(' > ');
-        if (isExactMatch(selector, element)) break;
-        break; // 防止无限循环
+
+        return path;
+      };
+
+      // 尝试不同深度的路径
+      for (let depth = 2; depth <= 5; depth++) {
+        const path = buildPath(element, depth);
+        if (path.length < 2) continue;
+
+        const selector = path.join(' > ');
+        if (isExactMatch(selector, element)) return selector;
+
+        // 如果匹配多个，尝试添加更多细节到最后一层
+        const result = testSelectorResult(selector, element);
+        if (result.contains && result.count > 1 && result.count <= 5) {
+          // 尝试在最后一层添加更多 class
+          const lastPart = path[path.length - 1];
+          if (classes.length > 1 && !lastPart.includes(':nth')) {
+            const enhancedPath = [...path];
+            enhancedPath[enhancedPath.length - 1] = tag + '.' + classes.slice(0, 2).map(c => CSS.escape(c)).join('.');
+            const enhancedSel = enhancedPath.join(' > ');
+            if (isExactMatch(enhancedSel, element)) return enhancedSel;
+          }
+
+          // 尝试添加属性
+          if (attrs.length > 0 && !lastPart.includes('[')) {
+            const enhancedPath = [...path];
+            enhancedPath[enhancedPath.length - 1] = lastPart + '[' + CSS.escape(attrs[0].name) + '="' + CSS.escape(attrs[0].value) + '"]';
+            const enhancedSel = enhancedPath.join(' > ');
+            if (isExactMatch(enhancedSel, element)) return enhancedSel;
+          }
+
+          // 尝试添加 nth-of-type
+          if (nthOfType > 0 && !lastPart.includes(':nth')) {
+            const enhancedPath = [...path];
+            enhancedPath[enhancedPath.length - 1] = lastPart + ':nth-of-type(' + nthOfType + ')';
+            const enhancedSel = enhancedPath.join(' > ');
+            if (isExactMatch(enhancedSel, element)) return enhancedSel;
+          }
+        }
       }
 
-      return selector;
+      // === 最后回退：完整路径 ===
+      const fullPath = buildPath(element, 10);
+      return fullPath.join(' > ');
     }
 
     /**
@@ -865,20 +1988,47 @@
         });
       };
 
-      const getValidAttributes = (node) => {
+      // 确定性属性白名单（用于合并）
+      const STABLE_ATTRS = new Set([
+        'type', 'role', 'data-type', 'data-role', 'data-kind',
+        'data-variant', 'data-size', 'data-testid', 'data-test', 'data-id',
+        'lang', 'dir', 'target', 'rel', 'colspan', 'rowspan', 'scope',
+        'disabled', 'readonly', 'required', 'checked', 'multiple'
+      ]);
+
+      const getValidAttributes = (node, forMerge = false) => {
         if (!node.attributes) return [];
-        const skipAttrs = [
+        const skipAttrs = new Set([
           'data-ep-selected', 'data-ep-uid', 'data-element-picker-uid',
           'class', 'id', 'style', 'title', 'alt', 'aria-label', 'aria-describedby', 'aria-labelledby',
           'placeholder', 'value', 'name', 'href', 'src', 'data-tooltip',
-          'tabindex', 'role', 'disabled', 'type', 'onclick', 'onchange', 'onsubmit'
-        ];
+          'onclick', 'onchange', 'onsubmit', 'onfocus', 'onblur', 'onhover'
+        ]);
         const attrs = [];
         for (const attr of node.attributes) {
-          if (skipAttrs.includes(attr.name) || !attr.value || attr.value.length > 50 || /^\d+$/.test(attr.value)) continue;
+          // 如果是用于合并，只允许确定性属性
+          if (forMerge && !STABLE_ATTRS.has(attr.name)) continue;
+          if (skipAttrs.has(attr.name) || !attr.value || attr.value.length > 50 || /^\d+$/.test(attr.value)) continue;
           attrs.push({ name: attr.name, value: attr.value });
         }
         return attrs;
+      };
+
+      // 获取元素的伪类信息（用于智能合并）
+      const getPseudoInfo = (node) => {
+        const parent = node.parentElement;
+        if (!parent) return { nthOfType: 0, isFirst: false, isLast: false, isOnly: false };
+
+        const siblings = Array.from(parent.children).filter(c => c.tagName === node.tagName);
+        const index = siblings.indexOf(node);
+        const count = siblings.length;
+
+        return {
+          nthOfType: count > 1 ? index + 1 : 0,
+          isFirst: index === 0 && count > 1,
+          isLast: index === count - 1 && count > 1,
+          isOnly: count === 1
+        };
       };
 
       const getPath = (node) => {
@@ -889,10 +2039,18 @@
           const id = current.id && !current.id.includes(' ') && !/^\d/.test(current.id) ? '#' + CSS.escape(current.id) : '';
           const classes = getValidClasses(current);
           const cls = classes.length > 0 ? '.' + CSS.escape(classes[0]) : '';
+          const pseudo = getPseudoInfo(current);
 
-          path.unshift(tag + id + cls);
+          let selector = tag + id + cls;
+          // 添加伪类信息（用于后续合并）
+          if (pseudo.isFirst) selector += ':first-child';
+          else if (pseudo.isLast) selector += ':last-child';
+          else if (pseudo.isOnly) selector += ':only-child';
+          else if (pseudo.nthOfType > 0) selector += `:nth-child(${pseudo.nthOfType})`;
+
+          path.unshift(selector);
           current = current.parentElement;
-          if (path.length >= 5) break; // 限制路径深度
+          if (path.length >= 6) break; // 限制路径深度
         }
         return path;
       };
@@ -901,8 +2059,10 @@
         tag: element.tagName.toLowerCase(),
         id: element.id || '',
         classes: getValidClasses(element),
-        attributes: getValidAttributes(element),
-        path: getPath(element)
+        attributes: getValidAttributes(element, false), // 单元素选择器可以用更多属性
+        stableAttributes: getValidAttributes(element, true), // 合并时只允许确定性属性
+        path: getPath(element),
+        pseudoInfo: getPseudoInfo(element)
       };
     }
 
@@ -914,6 +2074,7 @@
         tag: null,
         classes: [],
         attributes: [],
+        stableAttributes: [], // 确定性属性（用于合并）
         commonPathPrefix: []
       };
 
@@ -935,13 +2096,30 @@
         }
       }
 
-      // 找出共同的路径前缀
+      // 找出共同的确定性属性
+      const allStableAttrs = featuresList.map(f =>
+        new Map((f.stableAttributes || []).map(a => [a.name, a.value]))
+      );
+      if (allStableAttrs.length > 0 && allStableAttrs[0].size > 0) {
+        for (const [name, value] of allStableAttrs[0]) {
+          if (allStableAttrs.every(map => map.get(name) === value)) {
+            common.stableAttributes.push({ name, value });
+          }
+        }
+      }
+
+      // 找出共同的路径前缀（移除伪类后比较）
       if (featuresList.length > 0) {
         const firstPath = featuresList[0].path;
         for (let i = 0; i < firstPath.length; i++) {
-          const segment = firstPath[i];
-          const allMatch = featuresList.every(f => f.path[i] === segment);
+          // 移除伪类后比较
+          const segment = firstPath[i].replace(/:[a-z-]+\([^)]*\)|:[a-z-]+/gi, '');
+          const allMatch = featuresList.every(f => {
+            const fSegment = (f.path[i] || '').replace(/:[a-z-]+\([^)]*\)|:[a-z-]+/gi, '');
+            return fSegment === segment;
+          });
           if (allMatch) {
+            // 使用不带伪类的基础选择器
             common.commonPathPrefix.push(segment);
           } else {
             break;
@@ -954,6 +2132,7 @@
 
     /**
      * 生成合并候选选择器（按长度排序：短 → 长）
+     * 支持多种合并策略：:is()、:not()、伪类合并、路径分析
      */
     _generateMergedCandidates(elements, common) {
       const candidates = [];
@@ -970,15 +2149,15 @@
         candidates.push(tag + '.' + common.classes.map(c => CSS.escape(c)).join('.'));
       }
 
-      // === 策略3: 共同属性 ===
-      for (const attr of common.attributes) {
+      // === 策略3: 共同确定性属性（仅使用稳定属性）===
+      for (const attr of common.stableAttributes || []) {
         candidates.push('[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]');
         candidates.push(tag + '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]');
       }
 
-      // === 策略4: class + 属性组合 ===
+      // === 策略4: class + 确定性属性组合 ===
       for (const cls of common.classes.slice(0, 2)) {
-        for (const attr of common.attributes.slice(0, 2)) {
+        for (const attr of (common.stableAttributes || []).slice(0, 2)) {
           candidates.push(tag + '.' + CSS.escape(cls) + '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]');
         }
       }
@@ -995,7 +2174,6 @@
       }
 
       // === 策略6: 父级共同特征 + tag ===
-      // 尝试找父级的共同特征
       const parents = elements.map(el => el.parentElement).filter(p => p);
       if (parents.length === elements.length) {
         const parentCommon = this._findCommonFeatures(parents.map(p => this._extractElementFeatures(p)));
@@ -1005,15 +2183,229 @@
           candidates.push(parentSel + ' > ' + tag);
         }
 
-        if (parentCommon.attributes.length > 0) {
-          const attr = parentCommon.attributes[0];
+        if ((parentCommon.stableAttributes || []).length > 0) {
+          const attr = parentCommon.stableAttributes[0];
           const parentSel = (parentCommon.tag || tag) + '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]';
           candidates.push(parentSel + ' > ' + tag);
         }
       }
 
+      // === 策略7: :is() 伪类合并 ===
+      const isMerged = this._tryIsMerge(elements, common);
+      if (isMerged) candidates.push(isMerged);
+
+      // === 策略8: :not() 排除法 ===
+      const notMerged = this._tryNotMerge(elements, common);
+      if (notMerged) candidates.push(notMerged);
+
+      // === 策略9: 伪类合并（first-child, last-child, nth-child 等）===
+      const pseudoMerged = this._tryPseudoMerge(elements, common);
+      if (pseudoMerged) candidates.push(pseudoMerged);
+
+      // === 策略10: 路径差异合并 ===
+      const pathMerged = this._tryPathMerge(elements, common);
+      if (pathMerged) candidates.push(pathMerged);
+
       // 按长度排序（贪心：优先测试短选择器）
       return candidates.sort((a, b) => a.length - b.length);
+    }
+
+    /**
+     * 尝试使用 :is() 伪类合并
+     */
+    _tryIsMerge(elements, common) {
+      if (elements.length < 2 || elements.length > 10) return null;
+
+      const tag = common.tag;
+      const tagSet = new Set(elements.map(el => el.tagName.toLowerCase()));
+      if (tagSet.size > 1) return null; // 标签不同，不适合 :is()
+
+      // 收集各元素的独特特征
+      const features = elements.map(el => {
+        const info = this._extractElementFeatures(el);
+        const parts = [];
+
+        // 优先使用 ID
+        if (info.id) return '#' + CSS.escape(info.id);
+
+        // 使用类名
+        if (info.classes.length > 0) {
+          parts.push('.' + CSS.escape(info.classes[0]));
+        }
+
+        // 使用确定性属性
+        if (info.stableAttributes && info.stableAttributes.length > 0) {
+          const attr = info.stableAttributes[0];
+          parts.push('[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]');
+        }
+
+        // 使用伪类信息
+        if (info.pseudoInfo) {
+          if (info.pseudoInfo.isFirst) parts.push(':first-child');
+          else if (info.pseudoInfo.isLast) parts.push(':last-child');
+          else if (info.pseudoInfo.isOnly) parts.push(':only-child');
+          else if (info.pseudoInfo.nthOfType > 0) parts.push(`:nth-child(${info.pseudoInfo.nthOfType})`);
+        }
+
+        return parts.length > 0 ? parts.join('') : null;
+      }).filter(f => f);
+
+      if (features.length === elements.length && features.length >= 2) {
+        const uniqueFeatures = [...new Set(features)];
+        if (uniqueFeatures.length >= 2 && uniqueFeatures.length <= 10) {
+          return `${tag}:is(${uniqueFeatures.join(', ')})`;
+        }
+      }
+
+      return null;
+    }
+
+    /**
+     * 尝试使用 :not() 排除法合并
+     * 适用于：同一父元素下选中大部分子元素，用 :not() 排除未选中的
+     */
+    _tryNotMerge(elements, common) {
+      if (elements.length < 3) return null;
+
+      // 检查是否有共同的父元素
+      const parents = elements.map(el => el.parentElement);
+      const parentSet = new Set(parents);
+      if (parentSet.size !== 1) return null;
+
+      const parent = parents[0];
+      const allChildren = Array.from(parent.children).filter(child => {
+        const style = window.getComputedStyle(child);
+        return style.display !== 'none';
+      });
+
+      // 如果选中的元素占大部分，考虑用 :not() 排除未选中的
+      const elementSet = new Set(elements);
+      const notSelected = allChildren.filter(child => !elementSet.has(child));
+
+      // 如果未选中的数量 <= 3 且少于选中的数量
+      if (notSelected.length > 0 && notSelected.length <= 3 && notSelected.length < elements.length) {
+        const tag = common.tag || elements[0].tagName.toLowerCase();
+
+        // 找出未选中元素的索引
+        const notIndices = notSelected.map(child => {
+          const index = allChildren.indexOf(child) + 1;
+          return index;
+        }).sort((a, b) => a - b);
+
+        const notParts = notIndices.map(i => `:not(:nth-child(${i}))`);
+        return `${tag}:nth-child(n)${notParts.join('')}`;
+      }
+
+      return null;
+    }
+
+    /**
+     * 尝试使用伪类合并（连续的 nth-child）
+     */
+    _tryPseudoMerge(elements, common) {
+      if (elements.length < 2) return null;
+
+      // 检查是否是同一父元素下的兄弟元素
+      const parents = elements.map(el => el.parentElement);
+      const parentSet = new Set(parents);
+      if (parentSet.size !== 1) return null;
+
+      const parent = parents[0];
+      const allChildren = Array.from(parent.children);
+      const tag = common.tag || elements[0].tagName.toLowerCase();
+
+      // 获取选中元素的索引
+      const indices = elements.map(el => allChildren.indexOf(el) + 1).sort((a, b) => a - b);
+
+      // 检查是否连续
+      let isConsecutive = true;
+      for (let i = 1; i < indices.length; i++) {
+        if (indices[i] !== indices[i - 1] + 1) {
+          isConsecutive = false;
+          break;
+        }
+      }
+
+      if (isConsecutive && indices.length >= 2) {
+        const start = indices[0];
+        const end = indices[indices.length - 1];
+
+        // 使用范围选择器
+        if (start === end) {
+          return `${tag}:nth-child(${start})`;
+        } else if (start === 1 && end === allChildren.length) {
+          return tag; // 所有子元素
+        } else if (start === 1) {
+          return `${tag}:nth-child(-n+${end})`;
+        } else if (end === allChildren.length) {
+          return `${tag}:nth-child(n+${start})`;
+        } else {
+          return `${tag}:nth-child(n+${start}):nth-child(-n+${end})`;
+        }
+      }
+
+      // 检查是否是 first-child 和 last-child
+      const hasFirst = indices.includes(1);
+      const hasLast = indices.includes(allChildren.length);
+
+      if (hasFirst && hasLast && indices.length === 2) {
+        return `${tag}:is(:first-child, :last-child)`;
+      }
+
+      // 检查是否是奇偶位置
+      const allOdd = indices.every(i => i % 2 === 1);
+      const allEven = indices.every(i => i % 2 === 0);
+
+      if (allOdd && indices.length > 2) return `${tag}:nth-child(odd)`;
+      if (allEven && indices.length > 2) return `${tag}:nth-child(even)`;
+
+      return null;
+    }
+
+    /**
+     * 尝试路径差异合并
+     * 分析各元素路径的差异，提取共同部分，用 :is() 合并差异部分
+     */
+    _tryPathMerge(elements, common) {
+      if (elements.length < 2) return null;
+
+      const features = elements.map(el => this._extractElementFeatures(el));
+      const paths = features.map(f => f.path);
+
+      // 检查路径长度是否相同
+      const pathLengths = new Set(paths.map(p => p.length));
+      if (pathLengths.size !== 1) return null;
+
+      const len = paths[0].length;
+      const mergedPath = [];
+
+      for (let i = 0; i < len; i++) {
+        const parts = paths.map(p => p[i]);
+        const uniqueParts = [...new Set(parts)];
+
+        if (uniqueParts.length === 1) {
+          // 相同部分，直接使用
+          mergedPath.push(uniqueParts[0]);
+        } else if (uniqueParts.length <= 5) {
+          // 差异部分，尝试用 :is() 合并
+          // 移除伪类后检查是否相同
+          const baseParts = uniqueParts.map(p => p.replace(/:[a-z-]+\([^)]*\)|:[a-z-]+/gi, ''));
+          const uniqueBase = [...new Set(baseParts)];
+
+          if (uniqueBase.length === 1) {
+            // 基础选择器相同，只是伪类不同
+            mergedPath.push(`${uniqueBase[0]}:is(${uniqueParts.join(', ')})`);
+          } else {
+            // 基础选择器也不同，用 :is() 直接合并
+            mergedPath.push(`:is(${uniqueParts.join(', ')})`);
+          }
+        } else {
+          // 差异太大，不适合合并
+          return null;
+        }
+      }
+
+      return mergedPath.join(' > ');
     }
 
     /**
@@ -1064,6 +2456,103 @@
       this.selectedElements = [];
       // 移除事件监听器
       document.removeEventListener('element-picker-command', this._commandHandler);
+    }
+
+    /**
+     * 显示帮助信息
+     */
+    showHelp() {
+      // 创建或更新帮助浮层
+      let helpEl = document.getElementById('element-picker-help');
+      if (helpEl) {
+        helpEl.remove();
+        return;
+      }
+
+      helpEl = document.createElement('div');
+      helpEl.id = 'element-picker-help';
+      helpEl.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.95);
+        color: #e5e7eb;
+        padding: 16px 20px;
+        border-radius: 8px;
+        font-size: 12px;
+        font-family: 'Consolas', 'Monaco', monospace;
+        z-index: 2147483647;
+        min-width: 320px;
+        max-width: 400px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        border: 1px solid #374151;
+      `;
+
+      helpEl.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid #374151; padding-bottom: 8px;">
+          <span style="color: #60a5fa; font-weight: bold; font-size: 14px;">⌨️ 快捷键帮助</span>
+          <span style="cursor: pointer; color: #9ca3af;" onclick="this.parentElement.parentElement.remove()">✕</span>
+        </div>
+        <div style="display: grid; gap: 6px;">
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: #9ca3af;">点击</span>
+            <span style="color: #10b981;">选择/取消选择元素</span>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: #9ca3af;">双击</span>
+            <span style="color: #10b981;">批量选择同级相似元素</span>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: #9ca3af;">Shift + 拖拽</span>
+            <span style="color: #10b981;">框选区域内元素</span>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: #9ca3af;">↑ / ↓</span>
+            <span style="color: #10b981;">调整选择层级</span>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: #9ca3af;">Ctrl + A</span>
+            <span style="color: #10b981;">全选同级元素</span>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: #9ca3af;">Ctrl + Z</span>
+            <span style="color: #10b981;">撤销</span>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: #9ca3af;">Ctrl + Y</span>
+            <span style="color: #10b981;">重做</span>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: #9ca3af;">Delete</span>
+            <span style="color: #10b981;">清除所有选中</span>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: #9ca3af;">Esc</span>
+            <span style="color: #10b981;">退出选择模式</span>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: #9ca3af;">Shift + 1-9</span>
+            <span style="color: #10b981;">选择 N 个相似元素</span>
+          </div>
+        </div>
+        <div style="margin-top: 12px; padding-top: 8px; border-top: 1px solid #374151; color: #6b7280; font-size: 10px; text-align: center;">
+          按 ? 或点击外部关闭此帮助
+        </div>
+      `;
+
+      document.body.appendChild(helpEl);
+
+      // 点击外部关闭
+      const closeHelp = (e) => {
+        if (!helpEl.contains(e.target)) {
+          helpEl.remove();
+          document.removeEventListener('click', closeHelp, true);
+        }
+      };
+      setTimeout(() => {
+        document.addEventListener('click', closeHelp, true);
+      }, 100);
     }
 
     /**
@@ -1169,9 +2658,106 @@
   const style = document.createElement('style');
   style.id = 'element-picker-styles';
   style.textContent = `
+    /* 选中元素高亮 - 添加动画效果增强可见性 */
     [data-ep-selected="true"] {
       outline: 2px solid #10b981 !important;
       outline-offset: 1px !important;
+      animation: ep-pulse 2s ease-in-out infinite;
+    }
+
+    /* 选中元素编号标签 */
+    [data-ep-selected="true"]::before {
+      content: attr(data-ep-index);
+      position: absolute;
+      top: -18px;
+      left: -2px;
+      background: #10b981;
+      color: white;
+      font-size: 10px;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-weight: bold;
+      padding: 1px 5px;
+      border-radius: 3px;
+      z-index: 2147483646;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    /* 脉冲动画 - 增强选中元素的可见性 */
+    @keyframes ep-pulse {
+      0%, 100% { outline-color: #10b981; }
+      50% { outline-color: #34d399; }
+    }
+
+    /* 悬停高亮层样式优化 */
+    #element-picker-highlight-overlay {
+      transition: all 0.1s ease-out;
+    }
+
+    /* 悬停时的元素路径面包屑 */
+    #element-picker-breadcrumb {
+      position: fixed;
+      pointer-events: none;
+      z-index: 2147483647;
+      background: rgba(0, 0, 0, 0.85);
+      color: #9ca3af;
+      padding: 4px 8px;
+      border-radius: 3px;
+      font-size: 10px;
+      font-family: 'Consolas', 'Monaco', monospace;
+      white-space: nowrap;
+      max-width: 80%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #element-picker-breadcrumb .tag {
+      color: #60a5fa;
+    }
+
+    #element-picker-breadcrumb .id {
+      color: #fbbf24;
+    }
+
+    #element-picker-breadcrumb .class {
+      color: #34d399;
+    }
+
+    #element-picker-breadcrumb .sep {
+      color: #6b7280;
+      margin: 0 2px;
+    }
+
+    /* 批量选择统计信息现在只在 DevTools 面板中显示 */
+
+    /* 智能选择层级指示器 */
+    #element-picker-level-indicator {
+      position: fixed;
+      pointer-events: none;
+      z-index: 2147483647;
+      background: rgba(59, 130, 246, 0.9);
+      color: white;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 10px;
+      font-family: 'Consolas', 'Monaco', monospace;
+    }
+
+    /* 框选覆盖层增强样式 */
+    #element-picker-box-select {
+      border-width: 2px !important;
+      box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.3);
+    }
+
+    /* 预览元素样式 */
+    .element-picker-preview-item {
+      transition: all 0.1s ease-out;
+    }
+
+    /* Toast 提示动画 */
+    @keyframes ep-toast-in {
+      from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+      to { opacity: 1; transform: translateX(-50%) translateY(0); }
     }
   `;
   document.head.appendChild(style);

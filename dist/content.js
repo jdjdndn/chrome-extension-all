@@ -1,14 +1,36 @@
 // Content script runs in the context of the web page
 // Can access and modify the DOM
 // 依赖: content/utils/logger.js, storage.js, dom.js, messaging.js
+// 核心: content/core/store.js, content/core/services.js, content/core/pipeline.js
 
 'use strict';
 
 // 防止重复注入
 if (window._contentScriptLoaded) {
   console.log('[Extension] Content script already loaded, skipping');
-} else {
-  window._contentScriptLoaded = true;
+  throw new Error('Content script already loaded');
+}
+window._contentScriptLoaded = true;
+
+// ========== 架构初始化 ==========
+// 初始化 Store（如果可用）
+let storeReady = false;
+if (typeof AppStore !== 'undefined') {
+  AppStore.init({
+    storageArea: 'local',
+    storageKey: 'contentState',
+    initialState: {
+      enabled: false,
+      debugMode: false,
+      hideElements: { enabled: false, selectors: [] }
+    }
+  }).then(() => {
+    storeReady = true;
+    console.log('[Content] Store 初始化完成');
+  }).catch(e => {
+    console.warn('[Content] Store 初始化失败:', e);
+  });
+}
 
 // ========== Inject Page Context Script ==========
 // Inject the script into the page context to intercept XHR/Fetch at page level
@@ -285,42 +307,41 @@ function injectElementPickerScript() {
 // 监听来自元素拾取器注入脚本的消息
 document.addEventListener('element-picker-message', (event) => {
   const message = event.detail;
+  console.log('[Content] 收到元素拾取器消息:', message.type);
 
-  // 如果是元素选择变化消息
-  if (message.type === 'ELEMENT_SELECTION_CHANGED') {
-    // 转发给 devtools
-    chrome.runtime.sendMessage({
-      type: 'ELEMENT_SELECTION_CHANGED',
-      elements: message.elements || []
-    }).catch(() => {});
-
-    // 如果有元素，保存最新选中的元素到临时存储
-    if (message.elements && message.elements.length > 0) {
-      const latestElement = message.elements[message.elements.length - 1];
-      chrome.storage.local.set({
-        pendingPickedElement: {
-          selector: latestElement.selector,
-          matchCount: latestElement.matchCount || 1,
-          tagName: latestElement.tagName,
-          id: latestElement.id,
-          className: latestElement.className,
-          timestamp: Date.now()
-        }
-      });
-
-      // 尝试发送给 popup（如果还在打开状态）
-      chrome.runtime.sendMessage({
-        type: 'ELEMENT_PICKED',
-        data: latestElement
-      }).catch(() => {});
-    }
-  }
-
-  // 转发所有消息到 background，供 DevTools 轮询获取
-  MessagingUtils.sendToBackground({
+  // 直接转发到 background，由 background 处理
+  chrome.runtime.sendMessage({
     type: 'PICKER_MESSAGE_RELAY',
     data: message
-  }).catch(() => {});
+  }).then((response) => {
+    console.log('[Content] PICKER_MESSAGE_RELAY 成功:', response);
+  }).catch((e) => {
+    console.warn('[Content] PICKER_MESSAGE_RELAY 失败:', e);
+  });
+
+  // 如果是元素选择变化消息，也保存到临时存储
+  if (message.type === 'ELEMENT_SELECTION_CHANGED' && message.elements?.length > 0) {
+    console.log('[Content] 元素选择变化, 数量:', message.elements.length);
+
+    // 保存最新选中的元素到临时存储
+    const latestElement = message.elements[message.elements.length - 1];
+    chrome.storage.local.set({
+      pendingPickedElement: {
+        selector: latestElement.selector,
+        matchCount: latestElement.matchCount || 1,
+        tagName: latestElement.tagName,
+        id: latestElement.id,
+        className: latestElement.className,
+        timestamp: Date.now()
+      }
+    });
+
+    // 尝试发送给 popup（如果还在打开状态）
+    chrome.runtime.sendMessage({
+      type: 'ELEMENT_PICKED',
+      data: latestElement
+    }).catch(() => {});
+  }
 });
 
 // ========== Fetch Interception ==========
@@ -356,5 +377,3 @@ if (!window._originalFetch) {
     }
   };
 }
-
-} // end of _contentScriptLoaded check

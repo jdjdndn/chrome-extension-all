@@ -1,200 +1,205 @@
 /**
- * EventBus DevTools 面板脚本
- *
- * 与后台脚本通信，显示实时监控数据
+ * EventBus DevTools Panel
+ * 用于在 DevTools 中监控 EventBus 活动
  */
 
 (function () {
   'use strict';
 
-  // ========== 状态管理 ==========
+  // 状态
   const state = {
-    connected: false,
-    currentTab: 'dashboard',
     messages: [],
-    recording: null,
-    stats: {
-      sent: 0,
-      received: 0,
-      failed: 0,
-      latency: 0,
-      subscriptions: 0,
-      uptime: 0
-    },
-    performance: [],
-    health: null,
-    charts: {
-      throughput: [],
-      latency: [],
-      memory: []
-    }
+    recordings: [],
+    isRecording: false,
+    connectionStatus: 'disconnected'
   };
 
-  // ========== 端口连接 ==========
-  let port = null;
+  // DOM 元素缓存
+  const elements = {};
 
-  function connect() {
-    try {
-      port = chrome.runtime.connect({
-        name: 'eventbus-monitor'
+  // 初始化
+  function init() {
+    cacheElements();
+    bindEvents();
+    connectToBackground();
+    updateStats();
+  }
+
+  // 缓存 DOM 元素
+  function cacheElements() {
+    elements.connectionStatus = document.getElementById('connectionStatus');
+    elements.statSent = document.getElementById('statSent');
+    elements.statReceived = document.getElementById('statReceived');
+    elements.statFailed = document.getElementById('statFailed');
+    elements.statLatency = document.getElementById('statLatency');
+    elements.statSubscriptions = document.getElementById('statSubscriptions');
+    elements.statUptime = document.getElementById('statUptime');
+    elements.messageItems = document.getElementById('messageItems');
+    elements.messageCount = document.getElementById('messageCount');
+    elements.messageDetail = document.getElementById('messageDetail');
+    elements.messageSearch = document.getElementById('messageSearch');
+    elements.recordingItems = document.getElementById('recordingItems');
+    elements.recordingCount = document.getElementById('recordingCount');
+    elements.healthStatus = document.getElementById('healthStatus');
+    elements.issuesList = document.getElementById('issuesList');
+    elements.throughputChart = document.getElementById('throughputChart');
+    elements.latencyChart = document.getElementById('latencyChart');
+
+    // 录制按钮
+    elements.startRecording = document.getElementById('startRecording');
+    elements.stopRecording = document.getElementById('stopRecording');
+    elements.replayRecording = document.getElementById('replayRecording');
+    elements.exportRecording = document.getElementById('exportRecording');
+    elements.clearRecording = document.getElementById('clearRecording');
+  }
+
+  // 绑定事件
+  function bindEvents() {
+    // 标签页切换
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        tab.classList.add('active');
+        const contentId = tab.dataset.tab;
+        document.getElementById(contentId).classList.add('active');
       });
+    });
+
+    // 消息搜索
+    if (elements.messageSearch) {
+      elements.messageSearch.addEventListener('input', filterMessages);
+    }
+
+    // 清空消息
+    document.getElementById('clearMessages')?.addEventListener('click', () => {
+      state.messages = [];
+      renderMessages();
+    });
+
+    // 导出消息
+    document.getElementById('exportMessages')?.addEventListener('click', exportMessages);
+
+    // 录制控制
+    elements.startRecording?.addEventListener('click', startRecording);
+    elements.stopRecording?.addEventListener('click', stopRecording);
+    elements.replayRecording?.addEventListener('click', replayRecording);
+    elements.exportRecording?.addEventListener('click', exportRecording);
+    elements.clearRecording?.addEventListener('click', clearRecording);
+  }
+
+  // 连接到 background
+  function connectToBackground() {
+    try {
+      const port = chrome.runtime.connect({ name: 'devtools-panel' });
 
       port.onMessage.addListener(handleMessage);
-      port.onDisconnect.addListener(handleDisconnect);
+
+      port.onDisconnect.addListener(() => {
+        updateConnectionStatus('disconnected');
+        disableContentScriptMonitoring();
+        setTimeout(connectToBackground, 2000);
+      });
+
+      // 注册当前 tab
+      const tabId = chrome.devtools.inspectedWindow.tabId;
+      port.postMessage({
+        type: 'REGISTER_DEVTOOLS',
+        tabId: tabId
+      });
 
       updateConnectionStatus('connected');
-      requestState();
     } catch (error) {
-      console.error('连接失败:', error);
       updateConnectionStatus('disconnected');
-      // 重试连接
-      setTimeout(connect, 3000);
+      console.error('[DevTools] 连接失败:', error);
     }
   }
 
-  function handleDisconnect() {
-    updateConnectionStatus('disconnected');
-    port = null;
-    // 重试连接
-    setTimeout(connect, 3000);
-  }
-
-  function handleMessage(message) {
-    const { type, data } = message;
-
-    switch (type) {
-      case 'state':
-        updateState(data);
-        break;
-      case 'notification':
-        handleNotification(data);
-        break;
-      case 'chart':
-        updateChart(data.type, data.data);
-        break;
-      case 'recordingStopped':
-        updateRecording(data);
-        break;
-      case 'recording':
-        updateRecordingData(data);
-        break;
-      case 'memoryReport':
-        updateMemoryReport(data);
-        break;
-    }
-  }
-
-  function send(type, data) {
-    if (port && state.connected) {
+  // 启用 content script 的监控
+  async function enableContentScriptMonitoring(tabId) {
+    // 先尝试直接发送消息
+    try {
+      await chrome.tabs.sendMessage(tabId, { type: 'ENABLE_EVENTBUS_MONITOR' });
+      console.log('[DevTools] EventBus 监控已启用 (via message)');
+    } catch (err) {
+      // 如果消息发送失败，尝试注入脚本
+      console.warn('[DevTools] 消息发送失败，尝试注入:', err.message);
       try {
-        port.postMessage({ type, data });
-      } catch (error) {
-        console.error('发送失败:', error);
+        await chrome.scripting.executeScript({
+          target: { tabId: tabId },
+          func: () => {
+            if (window.EventBus && EventBus.enableDevToolsMonitor) {
+              EventBus.enableDevToolsMonitor();
+              console.log('[DevTools] EventBus 监控已启用 (via script)');
+            } else {
+              console.warn('[DevTools] EventBus 不可用');
+            }
+          }
+        });
+      } catch (scriptErr) {
+        console.warn('[DevTools] 启用监控失败:', scriptErr);
       }
     }
   }
 
-  // ========== UI 更新 ==========
+  // 禁用 content script 的监控
+  function disableContentScriptMonitoring() {
+    const tabId = chrome.devtools.inspectedWindow.tabId;
+    chrome.scripting.executeScript({
+      target: { tabId: tabId },
+      func: () => {
+        if (window.EventBus && EventBus.disableDevToolsMonitor) {
+          EventBus.disableDevToolsMonitor();
+        }
+      }
+    }).catch(() => {});
+  }
 
-  function updateConnectionStatus(status) {
-    state.connected = status === 'connected';
-    const badge = document.getElementById('connectionStatus');
-
-    if (status === 'connected') {
-      badge.className = 'status-badge connected';
-      badge.innerHTML = '● 已连接';
-    } else if (status === 'disconnected') {
-      badge.className = 'status-badge disconnected';
-      badge.innerHTML = '○ 未连接';
-    } else {
-      badge.className = 'status-badge';
-      badge.innerHTML = '● 连接中...';
+  // 处理来自 background 的消息
+  function handleMessage(message) {
+    if (message.type === 'PICKER_MESSAGE_PUSH') {
+      addMessage(message.data);
+    } else if (message.type === 'EVENTBUS_STATS') {
+      updateStatsFromData(message.data);
     }
   }
 
-  function updateState(data) {
-    if (data.config) {
-      // 配置更新
-    }
-    if (data.stats) {
-      state.stats = {
-        sent: data.stats.sent || 0,
-        received: data.stats.received || 0,
-        failed: data.stats.failed || 0,
-        latency: data.stats.avgLatency || 0,
-        subscriptions: data.subscriptions || 0,
-        uptime: data.uptime || 0
-      };
-      updateStats();
-    }
-    if (data.isRecording !== undefined) {
-      updateRecordingStatus(data.isRecording);
-    }
-  }
-
-  function updateStats() {
-    document.getElementById('statSent').textContent = formatNumber(state.stats.sent);
-    document.getElementById('statReceived').textContent = formatNumber(state.stats.received);
-    document.getElementById('statFailed').textContent = formatNumber(state.stats.failed);
-    document.getElementById('statLatency').textContent = formatLatency(state.stats.latency);
-    document.getElementById('statSubscriptions').textContent = formatNumber(state.stats.subscriptions);
-    document.getElementById('statUptime').textContent = formatUptime(state.stats.uptime);
-  }
-
-  function handleNotification(data) {
-    const { category, event } = data;
-
-    switch (category) {
-      case 'message':
-        addMessage(data);
-        break;
-      case 'error':
-        showError(data);
-        break;
-      case 'subscription':
-        handleSubscriptionEvent(event);
-        break;
-      case 'plugin':
-        handlePluginEvent(event);
-        break;
-      case 'recorder':
-        handleRecorderEvent(event);
-        break;
-      case 'memory':
-        updateMemorySample(data.sample);
-        break;
-    }
-  }
-
+  // 添加消息
   function addMessage(data) {
-    const message = {
-      id: data.id || generateId(),
-      type: data.type || data.message?.type,
-      timestamp: data.timestamp || Date.now(),
-      from: data.from,
-      latency: data.latency,
-      error: data.error,
-      data: data.data || data.message?.data
+    const msg = {
+      ...data,
+      id: Date.now() + Math.random(),
+      timestamp: Date.now()
     };
 
-    state.messages.unshift(message);
+    state.messages.unshift(msg);
 
     // 限制消息数量
-    if (state.messages.length > 1000) {
-      state.messages.pop();
+    if (state.messages.length > 500) {
+      state.messages = state.messages.slice(0, 500);
     }
 
-    if (state.currentTab === 'messages') {
-      renderMessages();
+    // 如果正在录制，添加到录制列表
+    if (state.isRecording) {
+      state.recordings.push(msg);
+      renderRecordings();
     }
+
+    renderMessages();
+    updateStats();
   }
 
+  // 渲染消息列表
   function renderMessages() {
-    const container = document.getElementById('messageItems');
-    const filtered = filterMessages();
+    if (!elements.messageItems) return;
+
+    const searchTerm = elements.messageSearch?.value?.toLowerCase() || '';
+    const filtered = searchTerm
+      ? state.messages.filter(m => m.type?.toLowerCase().includes(searchTerm))
+      : state.messages;
 
     if (filtered.length === 0) {
-      container.innerHTML = `
+      elements.messageItems.innerHTML = `
         <div class="empty-state">
           <div class="empty-state-icon">📨</div>
           <div>暂无消息</div>
@@ -203,518 +208,214 @@
       return;
     }
 
-    container.innerHTML = filtered.map(msg => `
+    elements.messageItems.innerHTML = filtered.slice(0, 100).map(msg => `
       <div class="message-item" data-id="${msg.id}">
-        <div class="message-icon ${getMessageIconClass(msg)}">
-          ${getMessageIcon(msg)}
-        </div>
+        <div class="message-icon ${msg.type || 'request'}">${(msg.type || 'REQ')[0]}</div>
         <div class="message-content">
-          <div class="message-type">${escapeHtml(msg.type)}</div>
-          <div class="message-meta">
-            ${formatTime(msg.timestamp)}
-            ${msg.latency ? ` · ${formatLatency(msg.latency)}` : ''}
-            ${msg.from ? ` · 来自 ${msg.from}` : ''}
-          </div>
+          <div class="message-type">${msg.type || 'Unknown'}</div>
+          <div class="message-meta">${formatTime(msg.timestamp)}</div>
         </div>
       </div>
     `).join('');
 
-    document.getElementById('messageCount').textContent = `${filtered.length} 条`;
+    elements.messageCount.textContent = `${filtered.length} 条`;
 
-    // 添加点击事件
-    container.querySelectorAll('.message-item').forEach(item => {
-      item.addEventListener('click', () => {
-        const id = item.dataset.id;
-        showMessageDetail(id);
-      });
+    // 绑定点击事件
+    elements.messageItems.querySelectorAll('.message-item').forEach(item => {
+      item.addEventListener('click', () => showMessageDetail(item.dataset.id));
     });
   }
 
+  // 显示消息详情
   function showMessageDetail(id) {
-    const message = state.messages.find(m => m.id === id);
-    if (!message) return;
+    const msg = state.messages.find(m => m.id == id);
+    if (!msg || !elements.messageDetail) return;
 
-    const detail = document.getElementById('messageDetail');
-    detail.style.display = 'block';
-    detail.textContent = JSON.stringify(message, null, 2);
+    elements.messageDetail.style.display = 'block';
+    elements.messageDetail.textContent = JSON.stringify(msg, null, 2);
 
     // 高亮选中项
-    document.querySelectorAll('.message-item').forEach(item => {
+    elements.messageItems.querySelectorAll('.message-item').forEach(item => {
       item.classList.toggle('selected', item.dataset.id === id);
     });
   }
 
+  // 过滤消息
   function filterMessages() {
-    const search = document.getElementById('messageSearch')?.value?.toLowerCase() || '';
-    return state.messages.filter(msg => {
-      if (!search) return true;
-      return msg.type?.toLowerCase().includes(search);
-    });
+    renderMessages();
   }
 
-  function getMessageIcon(msg) {
-    if (msg.error) return '✕';
-    if (msg.type?.includes('request') || msg.type?.includes('REQUEST')) return '→';
-    if (msg.type?.includes('response') || msg.type?.includes('RESPONSE')) return '←';
-    return '●';
-  }
-
-  function getMessageIconClass(msg) {
-    if (msg.error) return 'error';
-    if (msg.type?.includes('request') || msg.type?.includes('REQUEST')) return 'request';
-    return 'publish';
-  }
-
-  function updateChart(type, data) {
-    switch (type) {
-      case 'messages':
-        state.charts.throughput = data;
-        renderThroughputChart();
-        break;
-      case 'latency':
-        state.charts.latency = data.latencies || [];
-        renderLatencyChart();
-        break;
-      case 'memory':
-        state.charts.memory = data.samples || [];
-        renderMemoryChart();
-        break;
-    }
-  }
-
-  function renderThroughputChart() {
-    const container = document.getElementById('throughputChart');
-    if (!container) return;
-
-    const { sent, received, failed } = state.charts.throughput;
-    const max = Math.max(sent, received, failed, 1);
-
-    container.innerHTML = `
-      <div style="display: flex; gap: 20px; height: 100%; align-items: flex-end;">
-        <div style="flex: 1; display: flex; flex-direction: column; justify-content: flex-end;">
-          <div style="text-align: center; margin-bottom: 4px; font-size: 10px;">已发送</div>
-          <div style="height: ${(sent / max) * 100}%; background: #4ec9b0; border-radius: 4px 4px 0 0; min-height: 20px; display: flex; align-items: center; justify-content: center; font-size: 11px;">${sent}</div>
-        </div>
-        <div style="flex: 1; display: flex; flex-direction: column; justify-content: flex-end;">
-          <div style="text-align: center; margin-bottom: 4px; font-size: 10px;">已接收</div>
-          <div style="height: ${(received / max) * 100}%; background: #007acc; border-radius: 4px 4px 0 0; min-height: 20px; display: flex; align-items: center; justify-content: center; font-size: 11px;">${received}</div>
-        </div>
-        <div style="flex: 1; display: flex; flex-direction: column; justify-content: flex-end;">
-          <div style="text-align: center; margin-bottom: 4px; font-size: 10px;">失败</div>
-          <div style="height: ${(failed / max) * 100}%; background: #f48771; border-radius: 4px 4px 0 0; min-height: 20px; display: flex; align-items: center; justify-content: center; font-size: 11px;">${failed}</div>
-        </div>
-      </div>
-    `;
-  }
-
-  function renderLatencyChart() {
-    const container = document.getElementById('latencyChart');
-    if (!container || !state.charts.latency.length) return;
-
-    const latencies = state.charts.latency.slice(-50);
-    const max = Math.max(...latencies.map(l => l.y), 1);
-
-    container.innerHTML = latencies.map((point, i) => {
-      const height = (point.y / max) * 100;
-      const left = (i / latencies.length) * 100;
-      return `<div class="chart-bar" style="height: ${height}%; left: ${left}%; width: ${100 / latencies.length}%;" title="${point.y.toFixed(2)}ms"></div>`;
-    }).join('');
-  }
-
-  function renderMemoryChart() {
-    const container = document.getElementById('memoryChart');
-    if (!container || !state.charts.memory.length) return;
-
-    const samples = state.charts.memory.slice(-50);
-    const max = Math.max(...samples.map(s => s.y || s.usedJSHeapSize || 0), 1);
-
-    container.innerHTML = samples.map((sample, i) => {
-      const value = sample.y || sample.usedJSHeapSize || 0;
-      const height = (value / max) * 100;
-      const left = (i / samples.length) * 100;
-      const mb = (value / 1024 / 1024).toFixed(1);
-      return `<div class="chart-bar" style="height: ${height}%; left: ${left}%; width: ${100 / samples.length}%;" title="${mb} MB"></div>`;
-    }).join('');
-  }
-
-  function updateRecording(data) {
-    state.recording = data;
-    renderRecording();
-  }
-
-  function updateRecordingData(data) {
-    if (data && data.messages) {
-      state.recording = data;
-      renderRecording();
-    }
-  }
-
-  function renderRecording() {
-    const container = document.getElementById('recordingItems');
-    const messages = state.recording?.messages || [];
-
-    if (messages.length === 0) {
-      container.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-state-icon">⏺️</div>
-          <div>点击"开始录制"开始记录消息</div>
-        </div>
-      `;
-    } else {
-      container.innerHTML = messages.map((msg, i) => `
-        <div class="message-item">
-          <div class="message-icon publish">${i + 1}</div>
-          <div class="message-content">
-            <div class="message-type">${escapeHtml(msg.type || msg.requestType)}</div>
-            <div class="message-meta">
-              ${msg.__offset ? `偏移: ${msg.__offset}ms` : formatTime(msg.timestamp)}
-            </div>
-          </div>
-        </div>
-      `).join('');
-    }
-
-    document.getElementById('recordingCount').textContent = `${messages.length} 条`;
-
-    // 更新按钮状态
-    document.getElementById('replayRecording').disabled = messages.length === 0;
-    document.getElementById('exportRecording').disabled = messages.length === 0;
-  }
-
-  function updateRecordingStatus(isRecording) {
-    const startBtn = document.getElementById('startRecording');
-    const stopBtn = document.getElementById('stopRecording');
-
-    startBtn.disabled = isRecording;
-    stopBtn.disabled = !isRecording;
-  }
-
-  function updateMemorySample(sample) {
-    if (sample) {
-      state.charts.memory.push({
-        x: sample.timestamp,
-        y: sample.usedJSHeapSize
-      });
-
-      // 限制样本数量
-      if (state.charts.memory.length > 100) {
-        state.charts.memory.shift();
-      }
-
-      if (state.currentTab === 'performance') {
-        renderMemoryChart();
-      }
-    }
-  }
-
-  function updateMemoryReport(report) {
-    const container = document.getElementById('performanceItems');
-
-    if (!report || report.error) {
-      container.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-state-icon">📊</div>
-          <div>暂无性能数据</div>
-        </div>
-      `;
-      return;
-    }
-
-    container.innerHTML = `
-      <div style="padding: 12px;">
-        <div style="margin-bottom: 12px;">
-          <div style="font-size: 10px; color: #858585; margin-bottom: 4px;">内存使用</div>
-          <div style="font-size: 18px; font-weight: 600; color: #4ec9b0;">
-            ${(report.memory?.current / 1024 / 1024).toFixed(2)} MB
-          </div>
-        </div>
-
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 11px;">
-          <div>
-            <span style="color: #858585;">峰值:</span>
-            ${(report.memory?.peak / 1024 / 1024).toFixed(2)} MB
-          </div>
-          <div>
-            <span style="color: #858585;">平均:</span>
-            ${(report.memory?.average / 1024 / 1024).toFixed(2)} MB
-          </div>
-          <div>
-            <span style="color: #858585;">趋势:</span>
-            <span style="color: ${report.memory?.trend > 0 ? '#f48771' : '#4ec9b0'};">
-              ${report.memory?.trend > 0 ? '+' : ''}${(report.memory?.trend / 1024).toFixed(2)} KB
-            </span>
-          </div>
-          <div>
-            <span style="color: #858585;">样本数:</span>
-            ${report.samples}
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  function updateHealthAnalysis(health) {
-    state.health = health;
-    renderHealth();
-  }
-
-  function renderHealth() {
-    const container = document.getElementById('healthStatus');
-    const issuesList = document.getElementById('issuesList');
-
-    const health = state.health || { overall: 'healthy', issues: [] };
-
-    // 更新状态图标
-    const icon = container.querySelector('.health-icon');
-    const title = container.querySelector('.health-title');
-    const description = container.querySelector('.health-description');
-
-    icon.className = `health-icon ${health.overall}`;
-    icon.textContent = health.overall === 'healthy' ? '✓' :
-                      health.overall === 'degraded' ? '⚠' : '✕';
-
-    title.textContent = health.overall === 'healthy' ? '系统健康' :
-                       health.overall === 'degraded' ? '性能降级' : '系统异常';
-
-    description.textContent = health.overall === 'healthy' ? '所有系统正常运行' :
-                            health.overall === 'degraded' ? '检测到性能问题' : '检测到严重问题';
-
-    // 更新问题列表
-    if (health.issues && health.issues.length > 0) {
-      issuesList.innerHTML = health.issues.map(issue => `
-        <div class="issue-item ${issue.severity}">
-          <div class="issue-header">
-            <span class="issue-severity ${issue.severity}">${issue.severity === 'high' ? '高' : issue.severity === 'medium' ? '中' : '低'}</span>
-          </div>
-          <div class="issue-message">${escapeHtml(issue.message)}</div>
-          <div class="issue-suggestion">${escapeHtml(issue.suggestion)}</div>
-        </div>
-      `).join('');
-    } else {
-      issuesList.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-state-icon">✓</div>
-          <div>未发现问题</div>
-        </div>
-      `;
-    }
-  }
-
-  // ========== 事件处理 ==========
-
-  function requestState() {
-    send('getState');
-  }
-
-  function handleSubscriptionEvent(event) {
-    // 更新订阅数
-    if (event === 'added') {
-      state.stats.subscriptions++;
-    } else if (event === 'removed') {
-      state.stats.subscriptions = Math.max(0, state.stats.subscriptions - 1);
-    } else if (event === 'cleared') {
-      state.stats.subscriptions = 0;
-    }
-    updateStats();
-  }
-
-  function handlePluginEvent(event) {
-    console.log('插件事件:', event);
-  }
-
-  function handleRecorderEvent(event) {
-    if (event === 'start') {
-      updateRecordingStatus(true);
-    } else if (event === 'stop') {
-      updateRecordingStatus(false);
-    }
-  }
-
-  function showError(data) {
-    console.error('EventBus 错误:', data.error);
-    if (data.diagnosis) {
-      console.error('诊断:', data.diagnosis);
-    }
-  }
-
-  // ========== 标签页切换 ==========
-
-  function setupTabs() {
-    const tabs = document.querySelectorAll('.tab');
-    const contents = document.querySelectorAll('.tab-content');
-
-    tabs.forEach(tab => {
-      tab.addEventListener('click', () => {
-        const tabName = tab.dataset.tab;
-
-        tabs.forEach(t => t.classList.remove('active'));
-        contents.forEach(c => c.classList.remove('active'));
-
-        tab.classList.add('active');
-        document.getElementById(tabName).classList.add('active');
-
-        state.currentTab = tabName;
-
-        // 刷新当前标签页数据
-        if (tabName === 'messages') {
-          renderMessages();
-        } else if (tabName === 'performance') {
-          send('getMemoryReport');
-        } else if (tabName === 'health') {
-          send('getHealthAnalysis');
-        } else if (tabName === 'dashboard') {
-          send('getChart', 'messages');
-        }
-      });
-    });
-  }
-
-  // ========== 按钮事件 ==========
-
-  function setupButtons() {
-    // 录制控制
-    document.getElementById('startRecording').addEventListener('click', () => {
-      send('startRecording', { timestamp: Date.now() });
-    });
-
-    document.getElementById('stopRecording').addEventListener('click', () => {
-      send('stopRecording');
-    });
-
-    document.getElementById('replayRecording').addEventListener('click', () => {
-      if (state.recording && state.recording.messages) {
-        send('replay', { messages: state.recording.messages });
-      }
-    });
-
-    document.getElementById('exportRecording').addEventListener('click', () => {
-      if (state.recording) {
-        const data = JSON.stringify(state.recording, null, 2);
-        downloadFile('eventbus-recording.json', data);
-      }
-    });
-
-    document.getElementById('clearRecording').addEventListener('click', () => {
-      send('clearRecording');
-      state.recording = null;
-      renderRecording();
-    });
-
-    // 消息控制
-    document.getElementById('clearMessages').addEventListener('click', () => {
-      state.messages = [];
-      renderMessages();
-    });
-
-    document.getElementById('exportMessages').addEventListener('click', () => {
-      const data = JSON.stringify(state.messages, null, 2);
-      downloadFile('eventbus-messages.json', data);
-    });
-
-    // 搜索
-    const searchInput = document.getElementById('messageSearch');
-    if (searchInput) {
-      searchInput.addEventListener('input', debounce(() => {
-        renderMessages();
-      }, 300));
-    }
-  }
-
-  // ========== 工具函数 ==========
-
-  function formatNumber(num) {
-    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
-    if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
-    return num.toString();
-  }
-
-  function formatLatency(ms) {
-    if (ms >= 1000) return (ms / 1000).toFixed(2) + 's';
-    if (ms >= 1) return ms.toFixed(2) + 'ms';
-    return (ms * 1000).toFixed(2) + 'μs';
-  }
-
-  function formatUptime(ms) {
-    const seconds = Math.floor(ms / 1000);
-    if (seconds >= 3600) return Math.floor(seconds / 3600) + 'h';
-    if (seconds >= 60) return Math.floor(seconds / 60) + 'm';
-    return seconds + 's';
-  }
-
-  function formatTime(timestamp) {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString('zh-CN', { hour12: false });
-  }
-
-  function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-  }
-
-  function generateId() {
-    return 'msg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-  }
-
-  function debounce(fn, delay) {
-    let timeout;
-    return function (...args) {
-      clearTimeout(timeout);
-      timeout = setTimeout(() => fn.apply(this, args), delay);
+  // 更新连接状态
+  function updateConnectionStatus(status) {
+    state.connectionStatus = status;
+    if (!elements.connectionStatus) return;
+
+    const statusMap = {
+      connected: { class: 'connected', text: '已连接' },
+      disconnected: { class: 'disconnected', text: '已断开' },
+      connecting: { class: 'recording', text: '连接中...' }
     };
+
+    const config = statusMap[status] || statusMap.disconnected;
+    elements.connectionStatus.className = `status-badge ${config.class}`;
+    elements.connectionStatus.innerHTML = `<span class="recording-dot"></span>${config.text}`;
+
+    // 连接成功后启用监控
+    if (status === 'connected') {
+      const tabId = chrome.devtools.inspectedWindow.tabId;
+      enableContentScriptMonitoring(tabId);
+    } else if (status === 'disconnected') {
+      disableContentScriptMonitoring();
+    }
   }
 
-  function downloadFile(filename, content) {
-    const blob = new Blob([content], { type: 'application/json' });
+  // 更新统计数据
+  function updateStats() {
+    const sent = state.messages.filter(m => m.direction === 'send').length;
+    const received = state.messages.filter(m => m.direction === 'receive').length;
+    const failed = state.messages.filter(m => m.error).length;
+
+    if (elements.statSent) elements.statSent.textContent = sent;
+    if (elements.statReceived) elements.statReceived.textContent = received;
+    if (elements.statFailed) elements.statFailed.textContent = failed;
+    if (elements.statSubscriptions) elements.statSubscriptions.textContent = '0';
+    if (elements.statUptime) elements.statUptime.textContent = formatUptime(Date.now());
+  }
+
+  // 从数据更新统计
+  function updateStatsFromData(data) {
+    if (data.sent !== undefined && elements.statSent) {
+      elements.statSent.textContent = data.sent;
+    }
+    if (data.received !== undefined && elements.statReceived) {
+      elements.statReceived.textContent = data.received;
+    }
+    if (data.failed !== undefined && elements.statFailed) {
+      elements.statFailed.textContent = data.failed;
+    }
+    if (data.avgLatency !== undefined && elements.statLatency) {
+      elements.statLatency.textContent = `${data.avgLatency}ms`;
+    }
+    if (data.subscriptions !== undefined && elements.statSubscriptions) {
+      elements.statSubscriptions.textContent = data.subscriptions;
+    }
+  }
+
+  // 开始录制
+  function startRecording() {
+    state.isRecording = true;
+    state.recordings = [];
+
+    elements.startRecording.disabled = true;
+    elements.stopRecording.disabled = false;
+    elements.replayRecording.disabled = true;
+    elements.exportRecording.disabled = true;
+
+    renderRecordings();
+  }
+
+  // 停止录制
+  function stopRecording() {
+    state.isRecording = false;
+
+    elements.startRecording.disabled = false;
+    elements.stopRecording.disabled = true;
+    elements.replayRecording.disabled = state.recordings.length === 0;
+    elements.exportRecording.disabled = state.recordings.length === 0;
+  }
+
+  // 回放录制
+  async function replayRecording() {
+    if (state.recordings.length === 0) return;
+
+    for (const msg of state.recordings) {
+      try {
+        await chrome.runtime.sendMessage(msg);
+        await new Promise(r => setTimeout(r, 100));
+      } catch (e) {
+        console.error('[DevTools] 回放失败:', e);
+      }
+    }
+  }
+
+  // 导出录制
+  function exportRecording() {
+    const data = JSON.stringify(state.recordings, null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
+
     const a = document.createElement('a');
     a.href = url;
-    a.download = filename;
+    a.download = `eventbus-recording-${Date.now()}.json`;
     a.click();
+
     URL.revokeObjectURL(url);
   }
 
-  // ========== 定时更新 ==========
+  // 清空录制
+  function clearRecording() {
+    state.recordings = [];
+    renderRecordings();
 
-  function startAutoUpdate() {
-    // 每秒更新统计数据
-    setInterval(() => {
-      if (state.connected && state.currentTab === 'dashboard') {
-        requestState();
-        send('getChart', 'messages');
-      }
-    }, 1000);
-
-    // 每5秒更新性能数据
-    setInterval(() => {
-      if (state.connected && state.currentTab === 'performance') {
-        send('getMemoryReport');
-      }
-    }, 5000);
-
-    // 每10秒更新健康状态
-    setInterval(() => {
-      if (state.connected && state.currentTab === 'health') {
-        send('getHealthAnalysis');
-      }
-    }, 10000);
+    elements.replayRecording.disabled = true;
+    elements.exportRecording.disabled = true;
   }
 
-  // ========== 初始化 ==========
+  // 渲染录制列表
+  function renderRecordings() {
+    if (!elements.recordingItems) return;
 
-  function init() {
-    setupTabs();
-    setupButtons();
-    connect();
-    startAutoUpdate();
+    if (state.recordings.length === 0) {
+      elements.recordingItems.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">⏺️</div>
+          <div>${state.isRecording ? '等待消息...' : '点击"开始录制"开始记录消息'}</div>
+        </div>
+      `;
+    } else {
+      elements.recordingItems.innerHTML = state.recordings.map((msg, i) => `
+        <div class="message-item">
+          <div class="message-icon ${msg.type || 'request'}">${i + 1}</div>
+          <div class="message-content">
+            <div class="message-type">${msg.type || 'Unknown'}</div>
+            <div class="message-meta">${formatTime(msg.timestamp)}</div>
+          </div>
+        </div>
+      `).join('');
+    }
 
-    console.log('[EventBus DevTools] 面板已初始化');
+    elements.recordingCount.textContent = `${state.recordings.length} 条`;
   }
 
-  // 页面加载完成后初始化
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
+  // 导出消息
+  function exportMessages() {
+    const data = JSON.stringify(state.messages, null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `eventbus-messages-${Date.now()}.json`;
+    a.click();
+
+    URL.revokeObjectURL(url);
   }
+
+  // 格式化时间
+  function formatTime(timestamp) {
+    if (!timestamp) return '';
+    const d = new Date(timestamp);
+    return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}.${(d.getMilliseconds() / 1000).toFixed(3).slice(2)}`;
+  }
+
+  // 格式化运行时间
+  function formatUptime(startTime) {
+    const seconds = Math.floor((Date.now() - startTime) / 1000);
+    if (seconds < 60) return `${seconds}s`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+    return `${Math.floor(seconds / 3600)}h`;
+  }
+
+  // 启动
+  document.addEventListener('DOMContentLoaded', init);
 })();

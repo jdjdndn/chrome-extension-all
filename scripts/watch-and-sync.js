@@ -24,6 +24,10 @@ const SYNC_CONFIG = {
     { src: 'styles.css', dest: 'dist/styles.css' },
     { src: 'rules.json', dest: 'dist/rules.json' },
     { src: 'welcome.html', dest: 'dist/welcome.html' },
+    { src: 'event-bus-v4.6.js', dest: 'dist/event-bus-v4.6.js' },
+    { src: 'eventbus-test.js', dest: 'dist/eventbus-test.js' },
+    { src: 'eventbus-devtools.html', dest: 'dist/devtools/eventbus-devtools.html' },
+    { src: 'eventbus-devtools.js', dest: 'dist/devtools/eventbus-devtools.js' },
   ],
   // 目录映射
   directories: [
@@ -264,11 +268,34 @@ function singleSync() {
   process.exit(0);
 }
 
+// 清理 dist 目录
+function cleanDist() {
+  log('yellow', '🧹 清理 dist 目录...');
+
+  if (fs.existsSync('dist')) {
+    try {
+      fs.rmSync('dist', { recursive: true, force: true });
+      log('green', '✓ 已删除 dist 目录');
+    } catch (error) {
+      log('red', `✗ 删除 dist 失败: ${error.message}`);
+      process.exit(1);
+    }
+  } else {
+    log('blue', 'ℹ dist 目录不存在，跳过清理');
+  }
+}
+
 // 主函数
 function main() {
   const args = process.argv.slice(2);
 
-  if (args.includes('--once') || args.includes('-o')) {
+  if (args.includes('--clean') || args.includes('-c')) {
+    // 清理并构建
+    cleanDist();
+    initialSync();
+    log('green', '🎉 清理构建完成! 退出...');
+    process.exit(0);
+  } else if (args.includes('--once') || args.includes('-o')) {
     // 单次同步模式
     singleSync();
   } else {

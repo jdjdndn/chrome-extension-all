@@ -1,6 +1,71 @@
 // 控制面板逻辑
 'use strict';
 
+// ========== EventBus V4.6 初始化 ==========
+// DevTools 环境中初始化 EventBus
+let eventBusReady = false;
+
+async function initEventBus() {
+  if (typeof EventBus === 'undefined') {
+    console.warn('[DevTools] EventBus 未加载');
+    return false;
+  }
+
+  try {
+    // 检查是否已初始化
+    const state = EventBus.getState ? EventBus.getState() : null;
+    if (state && state.isReady) {
+      eventBusReady = true;
+      console.log('[DevTools] EventBus 已就绪');
+      return true;
+    }
+
+    // 初始化 EventBus
+    await EventBus.init();
+
+    // 配置 DevTools 环境
+    EventBus.configure({
+      DEBUG_MODE: false,
+      ENABLE_TRACKING: true,
+      ENABLE_STATISTICS: false,
+      ENABLE_PERFORMANCE_MONITORING: false
+    });
+
+    eventBusReady = true;
+    console.log('[DevTools] EventBus V4.6 初始化完成');
+    return true;
+  } catch (error) {
+    console.warn('[DevTools] EventBus 初始化失败:', error);
+    eventBusReady = false;
+    return false;
+  }
+}
+
+// ========== StorageBridge 初始化 ==========
+let storageBridgeReady = false;
+
+function initStorageBridge() {
+  if (typeof StorageBridge === 'undefined') {
+    console.warn('[DevTools] StorageBridge 未加载');
+    return false;
+  }
+
+  try {
+    StorageBridge.init();
+    storageBridgeReady = true;
+    console.log('[DevTools] StorageBridge 初始化完成');
+    return true;
+  } catch (error) {
+    console.warn('[DevTools] StorageBridge 初始化失败:', error);
+    storageBridgeReady = false;
+    return false;
+  }
+}
+
+// 初始化
+initEventBus();
+initStorageBridge();
+
 // ========== Port 持久连接管理 ==========
 let backgroundPort = null;
 let portReconnectTimer = null;
@@ -9,6 +74,13 @@ let portReconnectTimer = null;
  * 建立 Port 持久连接
  */
 function connectToBackground() {
+  // 检查上下文是否有效
+  if (!isExtensionContextValid()) {
+    console.warn('[DevTools] 扩展上下文已失效');
+    showContextInvalidatedWarning();
+    return null;
+  }
+
   if (backgroundPort) return backgroundPort;
 
   try {
@@ -23,13 +95,21 @@ function connectToBackground() {
 
     backgroundPort.onDisconnect.addListener(() => {
       backgroundPort = null;
+
+      // 检查上下文是否仍然有效
+      if (!isExtensionContextValid()) {
+        console.warn('[DevTools] 扩展上下文已失效，请关闭并重新打开 DevTools');
+        showContextInvalidatedWarning();
+        return;
+      }
+
       console.log('[DevTools] Port 连接断开，准备重连...');
       // 延迟重连
       if (portReconnectTimer) clearTimeout(portReconnectTimer);
       portReconnectTimer = setTimeout(connectToBackground, 1000);
     });
 
-    // 注册当前 tab
+    // 立即注册，不等待
     backgroundPort.postMessage({
       type: 'REGISTER_DEVTOOLS',
       tabId: chrome.devtools.inspectedWindow.tabId
@@ -39,6 +119,9 @@ function connectToBackground() {
     return backgroundPort;
   } catch (error) {
     console.error('[DevTools] Port 连接失败:', error);
+    // 延迟重试
+    if (portReconnectTimer) clearTimeout(portReconnectTimer);
+    portReconnectTimer = setTimeout(connectToBackground, 2000);
     return null;
   }
 }
@@ -62,6 +145,26 @@ function sendPortMessage(message) {
     }
   }
   return false;
+}
+
+/**
+ * 统一发送消息函数（EventBus 优先，降级原生）
+ * 用于一次性消息，Port 连接仍使用 sendPortMessage
+ * @param {string} type - 消息类型
+ * @param {object} data - 消息数据
+ * @returns {Promise<any>}
+ */
+async function sendMessage(type, data = {}) {
+  // 优先使用 EventBus（检查是否已初始化）
+  if (eventBusReady && typeof EventBus !== 'undefined' && EventBus.request) {
+    try {
+      return await EventBus.request(type, data, { timeout: 5000 });
+    } catch (error) {
+      console.warn('[DevTools] EventBus 发送失败，降级原生:', error.message);
+    }
+  }
+  // 降级到原生 chrome.runtime.sendMessage
+  return await chrome.runtime.sendMessage({ type, ...data });
 }
 
 // 立即建立连接
@@ -180,10 +283,9 @@ document.querySelectorAll('.info-sub-tab').forEach(tab => {
       loadMemoryInfo();
     }
 
-    // 如果切换到元素标签页，加载元素信息
+    // 如果切换到元素标签页
     if (subtabId === 'element') {
-      refreshElementInfo();
-      loadHiddenElementsFromStorage();
+      // 元素标签页初始化
     }
   });
 });
@@ -215,7 +317,7 @@ async function loadMemoryInfo() {
 
   try {
     // 发送消息到background获取页面性能信息
-    const response = await chrome.runtime.sendMessage({ type: 'GET_MEMORY_INFO' });
+    const response = await sendMessage('GET_MEMORY_INFO');
 
     if (response && response.success && response.data) {
       renderMemoryInfoFromBackground(response.data);
@@ -472,303 +574,6 @@ if (refreshMemoryBtn) {
   });
 }
 
-// ========== 元素操作功能 ==========
-const refreshElementBtn = document.getElementById('refresh-element-btn');
-const elementSelectorInput = document.getElementById('element-selector');
-const selectorMatchBadge = document.getElementById('selector-match-badge');
-const elementTagEl = document.getElementById('element-tag');
-const elementIdEl = document.getElementById('element-id');
-const elementClassEl = document.getElementById('element-class');
-const copySelectorBtn = document.getElementById('copy-selector-btn');
-const hideElementBtn = document.getElementById('hide-element-btn');
-const showElementBtn = document.getElementById('show-element-btn');
-const deleteElementBtn = document.getElementById('delete-element-btn');
-const elementHiddenList = document.getElementById('element-hidden-list');
-const elementHiddenItems = document.getElementById('element-hidden-items');
-
-// 存储已隐藏的元素选择器
-const hiddenElements = new Map();
-
-// 生成 CSS 选择器（BFS 广度优先，保证最短且精确）
-function generateSelector() {
-  const code = `
-    (function() {
-      const target = $0;
-      if (!target || !target.tagName) return null;
-      if (target === document.body) return 'body';
-      if (target === document.documentElement) return 'html';
-
-      // === 辅助函数 ===
-      const hasValidId = (node) => node && node.id && !node.id.includes(' ') && !/^\\d/.test(node.id);
-
-      const getValidClasses = (node) => {
-        if (!node.className || typeof node.className !== 'string') return [];
-        return node.className.trim().split(' ').filter(c => {
-          if (!c || /^[0-9]/.test(c)) return false;
-          if (/^(css-|styled-|sc-|js-|_|__|Mui|jss|css_|_)/.test(c) || c.length > 30) return false;
-          return /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(c);
-        });
-      };
-
-      const getValidAttributes = (node) => {
-        if (!node.attributes) return [];
-        const skipAttrs = ['data-ep-selected', 'data-ep-uid', 'class', 'id', 'style',
-          'title', 'alt', 'aria-label', 'aria-describedby', 'aria-labelledby',
-          'placeholder', 'value', 'name', 'href', 'src', 'data-tooltip',
-          'tabindex', 'role', 'disabled', 'type'];
-        const attrs = [];
-        for (const attr of node.attributes) {
-          if (skipAttrs.includes(attr.name) || !attr.value || attr.value.length > 50 || /^\\d+$/.test(attr.value)) continue;
-          attrs.push({ name: attr.name, value: attr.value });
-        }
-        return attrs;
-      };
-
-      const getNthOfType = (node) => {
-        const parent = node.parentElement;
-        if (!parent) return 0;
-        const siblings = Array.from(parent.children).filter(c => c.tagName === node.tagName);
-        return siblings.length > 1 ? siblings.indexOf(node) + 1 : 0;
-      };
-
-      const testSelector = (sel) => {
-        try {
-          const found = document.querySelectorAll(sel);
-          return { count: found.length, elements: Array.from(found) };
-        } catch { return { count: 999, elements: [] }; }
-      };
-
-      const isExactMatch = (sel) => {
-        const result = testSelector(sel);
-        return result.count === 1 && result.elements[0] === target;
-      };
-
-      // 收集目标元素信息
-      const tag = target.tagName.toLowerCase();
-      const classes = getValidClasses(target);
-      const attrs = getValidAttributes(target);
-      const nth = getNthOfType(target);
-
-      // 收集祖先链
-      const ancestors = [];
-      let cur = target.parentElement;
-      while (cur && cur !== document.documentElement) {
-        ancestors.push({
-          node: cur,
-          tag: cur.tagName.toLowerCase(),
-          classes: getValidClasses(cur),
-          id: cur.id,
-          hasId: hasValidId(cur)
-        });
-        cur = cur.parentElement;
-      }
-
-      // === BFS: 按层级生成候选选择器 ===
-
-      // Level 1: 目标元素自身的各种组合
-      const candidates = [];
-
-      // 1.1 ID（如果存在）
-      if (hasValidId(target)) {
-        candidates.push('#' + CSS.escape(target.id));
-      }
-
-      // 1.2 单个 class
-      for (const cls of classes) {
-        candidates.push('.' + CSS.escape(cls));
-        candidates.push(tag + '.' + CSS.escape(cls));
-      }
-
-      // 1.3 属性
-      for (const attr of attrs) {
-        candidates.push('[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]');
-        candidates.push(tag + '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]');
-      }
-
-      // 1.4 多个 class 组合
-      if (classes.length >= 2) {
-        candidates.push(tag + '.' + classes.map(c => CSS.escape(c)).join('.'));
-        candidates.push('.' + classes.map(c => CSS.escape(c)).join('.'));
-      }
-
-      // 1.5 class + attr
-      if (classes.length > 0 && attrs.length > 0) {
-        candidates.push(tag + '.' + CSS.escape(classes[0]) + '[' + CSS.escape(attrs[0].name) + '="' + CSS.escape(attrs[0].value) + '"]');
-      }
-
-      // 1.6 nth-of-type
-      if (nth > 0) {
-        candidates.push(tag + ':nth-of-type(' + nth + ')');
-      }
-
-      // 测试 Level 1
-      for (const sel of candidates) {
-        if (isExactMatch(sel)) return sel;
-      }
-
-      // === Level 2-N: 逐层添加祖先 ===
-      // 使用 BFS，每次添加一个祖先层级
-      let currentLevel = candidates.map(c => ({ selector: c, ancestorIndex: -1 }));
-
-      for (let aIdx = 0; aIdx < ancestors.length; aIdx++) {
-        const ancestor = ancestors[aIdx];
-        const nextLevel = [];
-
-        // 祖先的选择器变体
-        const ancestorParts = [];
-        if (ancestor.hasId) {
-          ancestorParts.push('#' + CSS.escape(ancestor.id));
-        }
-        for (const cls of ancestor.classes.slice(0, 2)) {
-          ancestorParts.push(ancestor.tag + '.' + CSS.escape(cls));
-        }
-        ancestorParts.push(ancestor.tag);
-
-        for (const item of currentLevel) {
-          for (const ancPart of ancestorParts) {
-            const newSel = ancPart + ' > ' + item.selector;
-            if (isExactMatch(newSel)) return newSel;
-            nextLevel.push({ selector: newSel, ancestorIndex: aIdx });
-          }
-        }
-
-        // 如果祖先有 ID，可以提前终止（ID 通常是唯一的）
-        if (ancestor.hasId) {
-          currentLevel = nextLevel;
-          break;
-        }
-
-        currentLevel = nextLevel;
-      }
-
-      // 如果还没找到，返回当前最优（匹配数最少的）
-      let best = null;
-      let bestCount = Infinity;
-
-      for (const item of currentLevel) {
-        const result = testSelector(item.selector);
-        if (result.count < bestCount && result.elements.includes(target)) {
-          best = item.selector;
-          bestCount = result.count;
-          if (bestCount === 1) break;
-        }
-      }
-
-      // 从 Level 1 候选中也找一下
-      for (const sel of candidates) {
-        const result = testSelector(sel);
-        if (result.count < bestCount && result.elements.includes(target)) {
-          best = sel;
-          bestCount = result.count;
-          if (bestCount === 1) break;
-        }
-      }
-
-      return best || tag;
-    })()
-  `;
-
-  return new Promise((resolve) => {
-    chrome.devtools.inspectedWindow.eval(code, (result, error) => {
-      if (error) {
-        console.error('获取选择器失败:', error);
-        resolve(null);
-      } else {
-        resolve(result);
-      }
-    });
-  });
-}
-
-// 获取元素信息
-function getElementInfo() {
-  const code = `
-    (function(element) {
-      if (!element) return null;
-
-      return {
-        tagName: element.tagName.toLowerCase(),
-        id: element.id || '',
-        className: element.className || '',
-        classList: element.classList ? Array.from(element.classList) : []
-      };
-    })($0)
-  `;
-
-  return new Promise((resolve) => {
-    chrome.devtools.inspectedWindow.eval(code, (result, error) => {
-      if (error) {
-        console.error('获取元素信息失败:', error);
-        resolve(null);
-      } else {
-        resolve(result);
-      }
-    });
-  });
-}
-
-// 获取选择器匹配数量
-async function getSelectorMatchCount(selector) {
-  if (!selector) return 0;
-
-  const code = `(function() {
-    try {
-      return document.querySelectorAll('${selector.replace(/'/g, "\\'")}').length;
-    } catch(e) {
-      return 0;
-    }
-  })()`;
-
-  return new Promise((resolve) => {
-    chrome.devtools.inspectedWindow.eval(code, (result) => {
-      resolve(result || 0);
-    });
-  });
-}
-
-// 更新匹配数量徽章
-function updateMatchBadge(matchCount) {
-  if (!selectorMatchBadge) return;
-
-  if (!matchCount || matchCount === 0) {
-    selectorMatchBadge.textContent = '';
-    selectorMatchBadge.className = 'selector-match-badge';
-    return;
-  }
-
-  selectorMatchBadge.className = 'selector-match-badge ' + (matchCount === 1 ? 'exact' : 'multiple');
-  selectorMatchBadge.title = matchCount === 1 ? '精确匹配' : `匹配 ${matchCount} 个元素`;
-  selectorMatchBadge.textContent = matchCount === 1 ? '✓1' : `⚠️${matchCount}`;
-}
-
-// 刷新元素信息
-async function refreshElementInfo() {
-  const selector = await generateSelector();
-  const info = await getElementInfo();
-
-  if (selector) {
-    elementSelectorInput.value = selector;
-    // 获取并显示匹配数量
-    const matchCount = await getSelectorMatchCount(selector);
-    updateMatchBadge(matchCount);
-  } else {
-    elementSelectorInput.value = '未选中元素';
-    updateMatchBadge(0);
-  }
-
-  if (info) {
-    elementTagEl.textContent = info.tagName || '-';
-    elementIdEl.textContent = info.id || '-';
-    elementClassEl.textContent = info.classList.length > 0 ? info.classList.slice(0, 3).join(', ') + (info.classList.length > 3 ? '...' : '') : '-';
-  } else {
-    elementTagEl.textContent = '-';
-    elementIdEl.textContent = '-';
-    elementClassEl.textContent = '-';
-  }
-
-  updateHiddenList();
-}
-
 // 获取当前域名
 async function getCurrentDomain() {
   return new Promise((resolve) => {
@@ -776,296 +581,6 @@ async function getCurrentDomain() {
       resolve(result);
     });
   });
-}
-
-// 同步隐藏元素设置到 popup 存储
-async function syncHideElementsToStorage(domain, selectors, enabled) {
-  const result = await chrome.storage.local.get(['hideElementsSettings']);
-  const allSettings = result.hideElementsSettings || {};
-  allSettings[domain] = { enabled, selectors };
-  await chrome.storage.local.set({ hideElementsSettings: allSettings });
-
-  // 通知 content script
-  const tabId = chrome.devtools.inspectedWindow.tabId;
-  if (tabId) {
-    chrome.tabs.sendMessage(tabId, {
-      type: 'UPDATE_HIDE_ELEMENTS',
-      enabled,
-      selectors
-    }).catch(() => {
-      console.log('[DevTools] Content script 未就绪，忽略消息');
-    });
-  }
-}
-
-// 添加隐藏样式（与 content script 使用相同的 style ID 和格式）
-async function addHideStyle(selector) {
-  const code = `
-    (function(selector) {
-      let styleEl = document.getElementById('extension-hide-elements-style');
-      if (!styleEl) {
-        styleEl = document.createElement('style');
-        styleEl.id = 'extension-hide-elements-style';
-        document.head.appendChild(styleEl);
-      }
-
-      // 使用与 content script 相同的格式
-      const rule = selector + ' { display: none !important; }';
-      const currentStyles = styleEl.textContent || '';
-      if (!currentStyles.includes(rule)) {
-        styleEl.textContent = currentStyles + (currentStyles.endsWith('\\n') ? '' : '\\n') + rule;
-        return true;
-      }
-      return false;
-    })(${JSON.stringify(selector)})
-  `;
-
-  const added = await new Promise((resolve) => {
-    chrome.devtools.inspectedWindow.eval(code, (result, error) => {
-      if (error) {
-        console.error('添加隐藏样式失败:', error);
-        resolve(false);
-      } else {
-        resolve(result);
-      }
-    });
-  });
-
-  if (added) {
-    // 同步到 popup 存储
-    const domain = await getCurrentDomain();
-    if (domain) {
-      const result = await chrome.storage.local.get(['hideElementsSettings']);
-      const allSettings = result.hideElementsSettings || {};
-      const domainSettings = allSettings[domain] || { enabled: false, selectors: [] };
-
-      if (!domainSettings.selectors.includes(selector)) {
-        domainSettings.selectors.push(selector);
-        domainSettings.enabled = true;
-        await syncHideElementsToStorage(domain, domainSettings.selectors, true);
-      }
-    }
-  }
-
-  return added;
-}
-
-// 移除隐藏样式（与 content script 使用相同的 style ID 和格式）
-async function removeHideStyle(selector) {
-  const code = `
-    (function(selector) {
-      const styleEl = document.getElementById('extension-hide-elements-style');
-      if (!styleEl) return false;
-
-      // 使用与 content script 相同的格式
-      const rule = selector + ' { display: none !important; }';
-      let currentStyles = styleEl.textContent || '';
-      if (currentStyles.includes(rule)) {
-        currentStyles = currentStyles.replace(rule, '').replace(/^\\n+|\\n+$/g, '');
-        styleEl.textContent = currentStyles;
-        return true;
-      }
-      return false;
-    })(${JSON.stringify(selector)})
-  `;
-
-  const removed = await new Promise((resolve) => {
-    chrome.devtools.inspectedWindow.eval(code, (result, error) => {
-      if (error) {
-        console.error('移除隐藏样式失败:', error);
-        resolve(false);
-      } else {
-        resolve(result);
-      }
-    });
-  });
-
-  if (removed) {
-    // 同步到 popup 存储
-    const domain = await getCurrentDomain();
-    if (domain) {
-      const result = await chrome.storage.local.get(['hideElementsSettings']);
-      const allSettings = result.hideElementsSettings || {};
-      const domainSettings = allSettings[domain] || { enabled: false, selectors: [] };
-
-      const index = domainSettings.selectors.indexOf(selector);
-      if (index > -1) {
-        domainSettings.selectors.splice(index, 1);
-        // 如果没有选择器了，保持开启但清空列表（用户可以继续添加）
-        await syncHideElementsToStorage(domain, domainSettings.selectors, domainSettings.enabled);
-      }
-    }
-  }
-
-  return removed;
-}
-
-// 删除元素
-function deleteElement(selector) {
-  const code = `
-    (function(selector) {
-      const element = document.querySelector(selector);
-      if (element) {
-        element.remove();
-        return true;
-      }
-      return false;
-    })(${JSON.stringify(selector)})
-  `;
-
-  return new Promise((resolve) => {
-    chrome.devtools.inspectedWindow.eval(code, (result, error) => {
-      if (error) {
-        console.error('删除元素失败:', error);
-        resolve(false);
-      } else {
-        resolve(result);
-      }
-    });
-  });
-}
-
-// 更新已隐藏列表
-function updateHiddenList() {
-  if (hiddenElements.size === 0) {
-    elementHiddenList.style.display = 'none';
-    return;
-  }
-
-  elementHiddenList.style.display = 'block';
-  elementHiddenItems.innerHTML = '';
-
-  hiddenElements.forEach((name, selector) => {
-    const item = document.createElement('div');
-    item.className = 'element-hidden-item';
-    item.innerHTML = `
-      <span>${name}</span>
-      <span class="remove-btn" data-selector="${selector}">×</span>
-    `;
-    item.querySelector('.remove-btn').addEventListener('click', async () => {
-      if (await removeHideStyle(selector)) {
-        hiddenElements.delete(selector);
-        updateHiddenList();
-        showNotification('元素已显示');
-      }
-    });
-    elementHiddenItems.appendChild(item);
-  });
-}
-
-// 刷新按钮
-if (refreshElementBtn) {
-  refreshElementBtn.addEventListener('click', refreshElementInfo);
-}
-
-// 复制选择器按钮
-if (copySelectorBtn) {
-  copySelectorBtn.addEventListener('click', async () => {
-    const selector = elementSelectorInput.value;
-    if (selector && selector !== '未选中元素') {
-      await copyToClipboard(selector);
-      showNotification('选择器已复制');
-    }
-  });
-}
-
-// 隐藏元素按钮
-if (hideElementBtn) {
-  hideElementBtn.addEventListener('click', async () => {
-    const selector = elementSelectorInput.value;
-    if (!selector || selector === '未选中元素') {
-      showNotification('请先选中元素');
-      return;
-    }
-
-    if (await addHideStyle(selector)) {
-      // 生成一个简短名称
-      const name = selector.split('>').pop().split(':').pop().substring(0, 20);
-      hiddenElements.set(selector, name || selector);
-      updateHiddenList();
-      showNotification('元素已隐藏');
-    } else {
-      showNotification('元素已隐藏');
-    }
-  });
-}
-
-// 显示元素按钮
-if (showElementBtn) {
-  showElementBtn.addEventListener('click', async () => {
-    const selector = elementSelectorInput.value;
-    if (!selector || selector === '未选中元素') {
-      showNotification('请先选中元素');
-      return;
-    }
-
-    if (await removeHideStyle(selector)) {
-      hiddenElements.delete(selector);
-      updateHiddenList();
-      showNotification('元素已显示');
-    } else {
-      showNotification('元素未隐藏');
-    }
-  });
-}
-
-// 删除元素按钮
-if (deleteElementBtn) {
-  deleteElementBtn.addEventListener('click', async () => {
-    const selector = elementSelectorInput.value;
-    if (!selector || selector === '未选中元素') {
-      showNotification('请先选中元素');
-      return;
-    }
-
-    if (confirm('确定要删除此元素吗？')) {
-      if (await deleteElement(selector)) {
-        showNotification('元素已删除');
-        refreshElementInfo();
-      } else {
-        showNotification('删除失败');
-      }
-    }
-  });
-}
-
-// 从 popup 存储加载隐藏元素并应用到页面
-async function loadHiddenElementsFromStorage() {
-  const domain = await getCurrentDomain();
-  if (!domain) return;
-
-  const result = await chrome.storage.local.get(['hideElementsSettings']);
-  const allSettings = result.hideElementsSettings || {};
-  const domainSettings = allSettings[domain] || { enabled: false, selectors: [] };
-
-  // 更新本地 hiddenElements Map
-  hiddenElements.clear();
-  domainSettings.selectors.forEach(selector => {
-    const name = selector.split('>').pop().split(':').pop().substring(0, 20);
-    hiddenElements.set(selector, name || selector);
-  });
-
-  // 如果已启用，确保样式已应用到页面（使用与 content script 相同的格式）
-  if (domainSettings.enabled && domainSettings.selectors.length > 0) {
-    const code = `
-      (function(selectors) {
-        let styleEl = document.getElementById('extension-hide-elements-style');
-        if (!styleEl) {
-          styleEl = document.createElement('style');
-          styleEl.id = 'extension-hide-elements-style';
-          document.head.appendChild(styleEl);
-        }
-
-        // 使用与 content script 相同的格式
-        let css = selectors.map(s => s + ' { display: none !important; }').join('\\n');
-        styleEl.textContent = css;
-        return true;
-      })(${JSON.stringify(domainSettings.selectors)})
-    `;
-    chrome.devtools.inspectedWindow.eval(code);
-  }
-
-  updateHiddenList();
 }
 
 // ========== 批量元素选择功能 ==========
@@ -1235,21 +750,21 @@ function setupPickerMessageListener() {
 
 // 处理拾取器消息
 function handlePickerMessage(message) {
+  console.log('[DevTools] 收到拾取器消息:', message.type, message);
 
   switch (message.type) {
     case 'ELEMENT_PICKER_STARTED':
       batchPickerState.isActive = true;
       updatePickerStatus();
-      showNotification('选择模式已启动，点击页面元素进行选择');
       break;
 
     case 'ELEMENT_PICKER_STOPPED':
       batchPickerState.isActive = false;
       updatePickerStatus();
-      showNotification('选择模式已停止');
       break;
 
     case 'ELEMENT_SELECTION_CHANGED':
+      console.log('[DevTools] 元素选择变化, 数量:', message.elements?.length || 0);
       batchPickerState.selectedElements = message.elements || [];
       updateSelectedElementsUI();
       break;
@@ -1284,18 +799,19 @@ function updateSelectedElementsUI() {
     batchSelectedCount.textContent = count;
   }
 
-  // 显示/隐藏区域
+  // 选择模式激活时始终显示区域
+  const shouldShow = batchPickerState.isActive || count > 0;
   if (batchSelectedInfo) {
-    batchSelectedInfo.style.display = count > 0 ? 'block' : 'none';
+    batchSelectedInfo.style.display = shouldShow ? 'block' : 'none';
   }
   if (batchMergedSelectorSection) {
-    batchMergedSelectorSection.style.display = count > 0 ? 'block' : 'none';
+    batchMergedSelectorSection.style.display = shouldShow ? 'block' : 'none';
   }
 
   // 更新元素列表
   if (batchSelectedList) {
     if (count === 0) {
-      batchSelectedList.innerHTML = '<div class="empty-state" style="color: #999; font-size: 11px;">暂无选中的元素</div>';
+      batchSelectedList.innerHTML = '<div class="empty-state" style="color: #999; font-size: 11px;">点击页面元素选择...</div>';
     } else {
       batchSelectedList.innerHTML = batchPickerState.selectedElements.map((el, index) => {
         const matchCount = el.matchCount || 1;
@@ -1370,13 +886,13 @@ async function updateSelectorOptionsDisplay() {
         <div class="selector-option-text">${escapeHtml(opt.selector)}</div>
         <div class="selector-option-meta">
           <span class="selector-option-tag ${index === 0 ? 'recommended' : ''}">${opt.type}</span>
-          <span class="selector-match-count" data-selector="${escapeHtml(opt.selector)}" data-expected="${opt.matchCount}">
+          <span class="selector-match-count" data-index="${index}" data-expected="${opt.matchCount}">
             <span class="match-loading">查询中...</span>
           </span>
           ${opt.savedChars > 0 ? `<span style="color: #10b981;">节省 ${opt.savedChars} 字符</span>` : ''}
         </div>
       </div>
-      <button class="selector-option-copy" data-selector="${escapeHtml(opt.selector)}" title="复制">📋</button>
+      <button class="selector-option-copy" data-index="${index}" title="复制">📋</button>
     </div>
   `).join('');
 
@@ -1401,10 +917,13 @@ async function updateSelectorOptionsDisplay() {
   container.querySelectorAll('.selector-option-copy').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
-      const selector = btn.dataset.selector;
-      await copyToClipboard(selector);
-      btn.textContent = '✓';
-      setTimeout(() => btn.textContent = '📋', 1000);
+      const index = parseInt(btn.dataset.index);
+      const selector = options[index]?.selector;
+      if (selector) {
+        await copyToClipboard(selector);
+        btn.textContent = '✓';
+        setTimeout(() => btn.textContent = '📋', 1000);
+      }
     });
   });
 
@@ -1420,8 +939,9 @@ async function updateSelectorOptionsDisplay() {
  * 异步查询每个选择器的匹配数量
  */
 async function querySelectorMatches(options) {
-  for (const opt of options) {
-    const countEl = document.querySelector(`.selector-match-count[data-selector="${CSS.escape(opt.selector)}"]`);
+  for (let i = 0; i < options.length; i++) {
+    const opt = options[i];
+    const countEl = document.querySelector(`.selector-match-count[data-index="${i}"]`);
     if (!countEl) continue;
 
     const expected = parseInt(countEl.dataset.expected);
@@ -1552,20 +1072,55 @@ async function getSelectorMatchCount(selector) {
 }
 
 /**
+ * 移除选择器中的状态伪类（hover, focus, active 等）
+ */
+function removeStatePseudoClasses(selector) {
+  // 移除 :hover, :focus, :active, :visited, :target, :focus-within, :focus-visible 等状态伪类
+  return selector.replace(/:(hover|focus|active|visited|target|focus-within|focus-visible|checked|enabled|disabled|read-only|read-write|placeholder-shown|default|valid|invalid|in-range|out-of-range|required|optional)(?=[^a-z-]|$)/gi, '');
+}
+
+/**
  * 生成多个选择器选项
  */
 function generateSelectorOptions(elements) {
   if (!elements || elements.length === 0) return [];
   if (elements.length === 1) {
-    return [{
-      selector: elements[0].selector,
-      type: '单个选择器',
+    // 移除状态伪类
+    const cleanSelector = removeStatePseudoClasses(elements[0].selector);
+    const options = [{
+      selector: cleanSelector,
+      type: '完整选择器',
       matchCount: 1,
       savedChars: 0
     }];
+
+    // 为单个元素也生成精简选项
+    const simplified = simplifySelector(cleanSelector);
+    if (simplified && simplified !== cleanSelector) {
+      options.push({
+        selector: simplified,
+        type: '精简版',
+        matchCount: 1,
+        savedChars: cleanSelector.length - simplified.length
+      });
+    }
+
+    // 极简后缀
+    const suffix = extractSuffixSelector(cleanSelector, 2);
+    if (suffix && suffix !== cleanSelector && suffix !== simplified) {
+      options.push({
+        selector: suffix,
+        type: '极简后缀',
+        matchCount: 1,
+        savedChars: cleanSelector.length - suffix.length
+      });
+    }
+
+    return options;
   }
 
-  const selectors = elements.map(el => el.selector);
+  // 先清理所有选择器中的状态伪类
+  const selectors = elements.map(el => removeStatePseudoClasses(el.selector));
   const uniqueSelectors = [...new Set(selectors)];
   const simpleJoin = uniqueSelectors.join(', ');
   const options = [];
@@ -1605,6 +1160,18 @@ function generateSelectorOptions(elements) {
         savedChars: minimal.length < simpleJoin.length ? simpleJoin.length - minimal.length : 0
       });
     }
+
+    // 选项1.7: 极简后缀（只保留最后2-3个有特征的层级）
+    const suffixSelector = extractSuffixSelector(smartMerged, 3);
+    if (suffixSelector && suffixSelector !== smartMerged && suffixSelector !== simplified && suffixSelector !== minimal && !seenSelectors.has(suffixSelector)) {
+      seenSelectors.add(suffixSelector);
+      options.push({
+        selector: suffixSelector,
+        type: '极简后缀',
+        matchCount: elements.length,
+        savedChars: suffixSelector.length < simpleJoin.length ? simpleJoin.length - suffixSelector.length : 0
+      });
+    }
   }
 
   // 选项2: :is() 合并（提取共同特征）
@@ -1628,6 +1195,63 @@ function generateSelectorOptions(elements) {
       type: '共同类名',
       matchCount: elements.length,
       savedChars: commonClass.length < simpleJoin.length ? simpleJoin.length - commonClass.length : 0
+    });
+  }
+
+  // 选项4: :not() 排除法合并
+  const notMerged = tryNotMerge(elements);
+  if (notMerged && !seenSelectors.has(notMerged)) {
+    seenSelectors.add(notMerged);
+    options.push({
+      selector: notMerged,
+      type: ':not() 排除',
+      matchCount: elements.length,
+      savedChars: notMerged.length < simpleJoin.length ? simpleJoin.length - notMerged.length : 0
+    });
+  }
+
+  // 选项5: 伪类合并（nth-child 范围）
+  const pseudoMerged = tryPseudoClassMerge(elements);
+  if (pseudoMerged && !seenSelectors.has(pseudoMerged)) {
+    seenSelectors.add(pseudoMerged);
+    options.push({
+      selector: pseudoMerged,
+      type: '伪类合并',
+      matchCount: elements.length,
+      savedChars: pseudoMerged.length < simpleJoin.length ? simpleJoin.length - pseudoMerged.length : 0
+    });
+  }
+
+  // 选项6: 直接连接（保底选项 - 始终添加）
+  if (!seenSelectors.has(simpleJoin)) {
+    seenSelectors.add(simpleJoin);
+    options.push({
+      selector: simpleJoin,
+      type: '直接连接',
+      matchCount: elements.length,
+      savedChars: 0
+    });
+  }
+
+  // 选项7: 共同祖先 + 后代选择器
+  const commonAncestorSelector = tryCommonAncestorMerge(elements);
+  if (commonAncestorSelector && !seenSelectors.has(commonAncestorSelector)) {
+    seenSelectors.add(commonAncestorSelector);
+    options.push({
+      selector: commonAncestorSelector,
+      type: '共同祖先',
+      matchCount: elements.length,
+      savedChars: commonAncestorSelector.length < simpleJoin.length ? simpleJoin.length - commonAncestorSelector.length : 0
+    });
+  }
+
+  // 如果没有任何选项，至少返回直接连接
+  if (options.length === 0) {
+    options.push({
+      selector: simpleJoin,
+      type: '直接连接',
+      matchCount: elements.length,
+      savedChars: 0
     });
   }
 
@@ -1712,6 +1336,38 @@ function simplifySelector(selector) {
 }
 
 /**
+ * 提取后缀选择器（只保留最后几个有特征的层级）
+ * @param {string} selector - 原始选择器
+ * @param {number} maxLevels - 最多保留的层级数
+ * @returns {string|null} - 极简选择器或 null
+ */
+function extractSuffixSelector(selector, maxLevels = 3) {
+  if (!selector) return null;
+
+  // 解析选择器为层级数组（处理 > 和空格）
+  const parts = selector.split(/\s*>\s*|\s+/).filter(p => p);
+  if (parts.length <= 2) return null; // 太短，不需要精简
+
+  // 从最后一个层级开始，向前收集有特征的层级
+  const suffixParts = [];
+  for (let i = parts.length - 1; i >= 0 && suffixParts.length < maxLevels; i--) {
+    const part = parts[i];
+    // 跳过纯标签名（除非是最后一个）
+    if (suffixParts.length === 0 || /\.[a-zA-Z]/.test(part) || /#/.test(part) || /\[/.test(part)) {
+      suffixParts.unshift(part);
+    }
+  }
+
+  // 如果没有移除任何层级，返回 null
+  if (suffixParts.length === parts.length) return null;
+
+  // 用空格连接（后代选择器）
+  const suffix = suffixParts.join(' ');
+
+  return suffix !== selector ? suffix : null;
+}
+
+/**
  * 解析选择器为层级数组
  */
 function parseSelectorParts(selector) {
@@ -1754,10 +1410,153 @@ function isEssentialPart(part) {
 }
 
 /**
+ * 尝试共同祖先合并
+ * 找出所有元素的共同祖先，然后使用后代选择器
+ */
+function tryCommonAncestorMerge(elements) {
+  if (elements.length < 2) return null;
+
+  const selectors = elements.map(el => el.selector);
+  const pathsArray = selectors.map(s => s.split(/\s*>\s*/));
+
+  // 找出共同前缀
+  let commonPrefixLength = 0;
+  const minLength = Math.min(...pathsArray.map(p => p.length));
+
+  for (let i = 0; i < minLength; i++) {
+    const parts = pathsArray.map(p => p[i]);
+    const uniqueParts = [...new Set(parts)];
+    if (uniqueParts.length === 1) {
+      commonPrefixLength++;
+    } else {
+      break;
+    }
+  }
+
+  // 如果没有共同前缀，返回 null
+  if (commonPrefixLength === 0) return null;
+
+  // 构建共同祖先选择器
+  const ancestorParts = pathsArray[0].slice(0, commonPrefixLength);
+
+  // 尝试简化祖先选择器（只保留有特征的部分）
+  const simplifiedAncestor = ancestorParts.filter((part, index) => {
+    // 保留有特征的部分或最后一部分
+    return isEssentialPart(part) || index === ancestorParts.length - 1;
+  });
+
+  // 获取各元素在共同祖先后的部分
+  const descendantParts = pathsArray.map(p => p.slice(commonPrefixLength));
+
+  // 如果后代部分都相同，直接返回完整选择器
+  const uniqueDescendants = [...new Set(descendantParts.map(d => d.join(' > ')))];
+  if (uniqueDescendants.length === 1) {
+    return [...simplifiedAncestor, ...descendantParts[0]].join(' > ');
+  }
+
+  // 使用 :is() 合并后代部分
+  const mergedDescendants = tryMergeDescendants(descendantParts);
+  if (mergedDescendants) {
+    return [...simplifiedAncestor, mergedDescendants].join(' ');
+  }
+
+  return null;
+}
+
+/**
+ * 尝试合并后代选择器
+ */
+function tryMergeDescendants(descendantParts) {
+  if (descendantParts.length < 2) return null;
+
+  // 检查第一层是否可以合并
+  const firstLevel = descendantParts.map(d => d[0]);
+  const uniqueFirst = [...new Set(firstLevel)];
+
+  if (uniqueFirst.length > 1 && uniqueFirst.length <= 5) {
+    // 尝试用 :is() 合并第一层
+    const mergedFirst = tryMergeLayerByParts(uniqueFirst);
+    if (mergedFirst) {
+      // 检查剩余部分是否相同
+      const remainingParts = descendantParts.map(d => d.slice(1));
+      const uniqueRemaining = [...new Set(remainingParts.map(r => r.join(' > ')))];
+
+      if (uniqueRemaining.length === 1 && uniqueRemaining[0]) {
+        return [mergedFirst, ...remainingParts[0]].join(' > ');
+      } else if (uniqueRemaining.length === 1) {
+        return mergedFirst;
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * 尝试合并选择器部分
+ */
+function tryMergeLayerByParts(parts) {
+  // 解析每个部分
+  const parsed = parts.map(p => parseSelectorPart(p));
+
+  // 检查是否有共同的标签
+  const tags = [...new Set(parsed.map(p => p.tag).filter(t => t))];
+  const hasCommonTag = tags.length === 1;
+
+  // 收集所有类名
+  const allClasses = new Set();
+  parsed.forEach(p => p.classes?.forEach(c => allClasses.add(c)));
+
+  // 收集所有属性
+  const allAttributes = [];
+  parsed.forEach(p => p.attributes?.forEach(a => allAttributes.push(a)));
+
+  // 如果有共同标签，尝试构建 :is() 选择器
+  if (hasCommonTag) {
+    const tag = tags[0];
+    const differences = [];
+
+    // 找出不同的部分
+    for (const part of parsed) {
+      const diff = [];
+      if (part.id) diff.push(`#${part.id}`);
+      if (part.classes?.length > 0) diff.push(part.classes.map(c => `.${c}`).join(''));
+      if (part.nthChild && part.nthChild !== 1) diff.push(`:nth-child(${part.nthChild})`);
+      if (diff.length > 0) differences.push(diff.join(''));
+    }
+
+    if (differences.length > 0 && differences.length <= 5) {
+      return `${tag}:is(${differences.join(', ')})`;
+    }
+  }
+
+  // 如果没有共同标签，但类名相似
+  if (allClasses.size > 0 && allClasses.size <= 3) {
+    return `:is(${parts.join(', ')})`;
+  }
+
+  return null;
+}
+
+/**
  * 尝试使用 :is() 合并
+ * 增强版：支持路径分析、确定性属性过滤
  */
 function tryIsMerge(elements) {
   if (elements.length < 2) return null;
+
+  // 确定性属性白名单（用于合并）
+  const STABLE_ATTRS = new Set([
+    'type', 'role', 'data-type', 'data-role', 'data-kind',
+    'data-variant', 'data-size', 'data-testid', 'data-test', 'data-id',
+    'lang', 'dir', 'target', 'rel', 'colspan', 'rowspan', 'scope'
+  ]);
+
+  // 检查属性是否是确定性属性
+  const isStableAttr = (attrStr) => {
+    const match = attrStr.match(/^\[([^\]=]+)/);
+    return match && STABLE_ATTRS.has(match[1]);
+  };
 
   // 提取每个元素的特征选择器
   const featureSelectors = elements.map(el => {
@@ -1774,10 +1573,11 @@ function tryIsMerge(elements) {
       }
     }
 
-    // 使用选择器中的属性
-    const attrMatch = el.selector.match(/\[[^\]]+\]/);
-    if (attrMatch) {
-      return attrMatch[0];
+    // 使用选择器中的确定性属性（仅使用白名单中的属性）
+    const attrMatches = el.selector.match(/\[[^\]]+\]/g) || [];
+    const stableAttr = attrMatches.find(attr => isStableAttr(attr));
+    if (stableAttr) {
+      return stableAttr;
     }
 
     return null;
@@ -1789,6 +1589,39 @@ function tryIsMerge(elements) {
     if (uniqueFeatures.length > 1 && uniqueFeatures.length <= 10) {
       return `:is(${uniqueFeatures.join(', ')})`;
     }
+  }
+
+  // 尝试路径合并
+  const pathsArray = elements.map(el => el.selector.split(/\s*>\s*/));
+  if (pathsArray.length >= 2 && pathsArray.every(p => p.length === pathsArray[0].length)) {
+    const pathLength = pathsArray[0].length;
+    const mergedPath = [];
+
+    for (let i = 0; i < pathLength; i++) {
+      const parts = pathsArray.map(p => p[i]);
+      const uniqueParts = [...new Set(parts)];
+
+      if (uniqueParts.length === 1) {
+        mergedPath.push(uniqueParts[0]);
+      } else if (uniqueParts.length <= 5) {
+        // 移除伪类后检查是否相同
+        const baseParts = uniqueParts.map(p => p.replace(/:[a-z-]+\([^)]*\)|:[a-z-]+/gi, ''));
+        const uniqueBase = [...new Set(baseParts)];
+
+        if (uniqueBase.length === 1) {
+          // 基础选择器相同，只是伪类不同
+          mergedPath.push(`${uniqueBase[0]}:is(${uniqueParts.join(', ')})`);
+        } else {
+          // 基础选择器也不同，用 :is() 直接合并
+          mergedPath.push(`:is(${uniqueParts.join(', ')})`);
+        }
+      } else {
+        // 差异太大，不适合合并
+        return null;
+      }
+    }
+
+    return mergedPath.join(' > ');
   }
 
   return null;
@@ -1822,6 +1655,196 @@ function tryCommonClassMerge(elements) {
   return null;
 }
 
+/**
+ * 尝试使用 :not() 排除法合并
+ * 适用于：同一父元素下选中大部分子元素，用 :not() 排除未选中的
+ */
+function tryNotMerge(elements) {
+  if (elements.length < 3) return null;
+
+  // 解析选择器，提取父路径和索引信息
+  const parsed = elements.map(el => {
+    const selector = el.selector;
+    const parts = selector.split(/\s*>\s*/);
+    const lastPart = parts[parts.length - 1];
+    const parentPath = parts.slice(0, -1).join(' > ');
+
+    // 提取 nth-child 索引
+    const nthMatch = lastPart.match(/:nth-child\((\d+)\)/);
+    if (nthMatch) {
+      return {
+        base: lastPart.replace(/:nth-child\(\d+\)/, ''),
+        index: parseInt(nthMatch[1]),
+        parentPath,
+        tag: lastPart.replace(/:[a-z-]+\([^)]*\)|:[a-z-]+/gi, '').split(/[.#\[]/)[0] || '*'
+      };
+    }
+    return null;
+  }).filter(p => p !== null);
+
+  // 所有选择器都必须有解析结果
+  if (parsed.length !== elements.length || parsed.length < 3) return null;
+
+  // 必须有相同的父路径
+  const parentPaths = new Set(parsed.map(p => p.parentPath));
+  if (parentPaths.size !== 1) return null;
+
+  const parentPath = [...parentPaths][0];
+  const firstTag = parsed[0].tag;
+  const firstBase = parsed[0].base;
+
+  // 标签必须相同
+  const tags = new Set(parsed.map(p => p.tag));
+  if (tags.size !== 1) return null;
+
+  // 收集选中的索引
+  const selectedIndices = [...new Set(parsed.map(p => p.index))].sort((a, b) => a - b);
+  const maxIndex = Math.max(...selectedIndices);
+
+  // 如果最大索引等于元素数量，说明是连续的，不需要 :not()
+  if (maxIndex === selectedIndices.length && isConsecutive(selectedIndices)) {
+    return null;
+  }
+
+  // 找出未选中的索引（间隙）
+  const gaps = [];
+  for (let i = 1; i <= maxIndex; i++) {
+    if (!selectedIndices.includes(i)) {
+      gaps.push(i);
+    }
+  }
+
+  // 如果排除的数量少于选中的数量，且排除数量 <= 3，使用 :not() 更简洁
+  if (gaps.length > 0 && gaps.length < selectedIndices.length && gaps.length <= 3) {
+    const notParts = gaps.map(i => `:not(:nth-child(${i}))`);
+    const selector = parentPath
+      ? `${parentPath} > ${firstBase}:nth-child(n)${notParts.join('')}`
+      : `${firstBase}:nth-child(n)${notParts.join('')}`;
+
+    return selector;
+  }
+
+  return null;
+}
+
+/**
+ * 尝试使用伪类合并（nth-child 范围选择器）
+ */
+function tryPseudoClassMerge(elements) {
+  if (elements.length < 2) return null;
+
+  // 解析选择器，提取索引信息
+  const parsed = elements.map(el => {
+    const selector = el.selector;
+    const parts = selector.split(/\s*>\s*/);
+    const lastPart = parts[parts.length - 1];
+    const parentPath = parts.slice(0, -1).join(' > ');
+
+    // 提取标签和伪类信息
+    const tag = lastPart.replace(/:[a-z-]+\([^)]*\)|:[a-z-]+/gi, '').split(/[.#\[]/)[0] || '*';
+    const classes = [];
+    const classMatches = lastPart.match(/\.[a-zA-Z_-][a-zA-Z0-9_-]*/g);
+    if (classMatches) {
+      classes.push(...classMatches.map(c => c.slice(1)));
+    }
+
+    // 提取 nth-child
+    const nthMatch = lastPart.match(/:nth-child\((\d+)\)/);
+    const nthIndex = nthMatch ? parseInt(nthMatch[1]) : null;
+
+    // 检查特殊伪类
+    const hasFirstChild = lastPart.includes(':first-child');
+    const hasLastChild = lastPart.includes(':last-child');
+    const hasOnlyChild = lastPart.includes(':only-child');
+
+    return {
+      tag,
+      classes,
+      parentPath,
+      nthIndex,
+      hasFirstChild,
+      hasLastChild,
+      hasOnlyChild,
+      baseSelector: tag + (classes.length > 0 ? '.' + classes.join('.') : '')
+    };
+  });
+
+  // 检查是否有相同的父路径和基础选择器
+  const parentPaths = new Set(parsed.map(p => p.parentPath));
+  const baseSelectors = new Set(parsed.map(p => p.baseSelector));
+
+  if (parentPaths.size !== 1 || baseSelectors.size !== 1) return null;
+
+  const parentPath = [...parentPaths][0];
+  const baseSelector = [...baseSelectors][0];
+
+  // 收集所有索引
+  const indices = parsed.map(p => p.nthIndex).filter(i => i !== null);
+
+  if (indices.length !== elements.length) return null;
+
+  const sortedIndices = [...indices].sort((a, b) => a - b);
+  const minIdx = sortedIndices[0];
+  const maxIdx = sortedIndices[sortedIndices.length - 1];
+
+  // 检查是否连续
+  if (isConsecutive(sortedIndices)) {
+    // 连续索引，使用范围选择器
+    if (minIdx === maxIdx) {
+      // 所有元素在同一个位置（不应该发生）
+      return null;
+    } else {
+      // 使用范围选择器
+      const selector = parentPath
+        ? `${parentPath} > ${baseSelector}:nth-child(n+${minIdx}):nth-child(-n+${maxIdx})`
+        : `${baseSelector}:nth-child(n+${minIdx}):nth-child(-n+${maxIdx})`;
+      return selector;
+    }
+  }
+
+  // 检查是否是奇偶位置
+  const allOdd = sortedIndices.every(i => i % 2 === 1);
+  const allEven = sortedIndices.every(i => i % 2 === 0);
+
+  if (allOdd && sortedIndices.length > 2) {
+    const selector = parentPath
+      ? `${parentPath} > ${baseSelector}:nth-child(odd)`
+      : `${baseSelector}:nth-child(odd)`;
+    return selector;
+  }
+
+  if (allEven && sortedIndices.length > 2) {
+    const selector = parentPath
+      ? `${parentPath} > ${baseSelector}:nth-child(even)`
+      : `${baseSelector}:nth-child(even)`;
+    return selector;
+  }
+
+  // 检查是否是 first-child 和 last-child 组合
+  const hasFirst = sortedIndices.includes(1);
+  const hasLast = parsed.some(p => p.hasLastChild);
+
+  if (hasFirst && hasLast && elements.length === 2) {
+    const selector = parentPath
+      ? `${parentPath} > ${baseSelector}:is(:first-child, :last-child)`
+      : `${baseSelector}:is(:first-child, :last-child)`;
+    return selector;
+  }
+
+  return null;
+}
+
+/**
+ * 检查数组是否连续
+ */
+function isConsecutive(arr) {
+  if (arr.length < 2) return true;
+  for (let i = 1; i < arr.length; i++) {
+    if (arr[i] !== arr[i - 1] + 1) return false;
+  }
+  return true;
+}
+
 // 获取当前选中的选择器
 function getSelectedSelector() {
   const container = document.getElementById('selector-options-container');
@@ -1845,12 +1868,14 @@ function getSelectedSelector() {
 
 /**
  * 智能合并选择器（多策略并行）
+ * 增强版：移除状态伪类、支持 :not() 排除法、伪类合并
  */
 function smartMergeSelectors(elements) {
   if (!elements || elements.length === 0) return '';
-  if (elements.length === 1) return elements[0].selector;
+  if (elements.length === 1) return removeStatePseudoClasses(elements[0].selector);
 
-  const selectors = elements.map(el => el.selector);
+  // 先移除所有选择器中的状态伪类
+  const selectors = elements.map(el => removeStatePseudoClasses(el.selector));
   const uniqueSelectors = [...new Set(selectors)];
 
   // 策略1: 如果所有选择器完全相同，直接返回
@@ -1861,19 +1886,31 @@ function smartMergeSelectors(elements) {
   // 解析所有选择器为路径数组
   const pathsArray = uniqueSelectors.map(s => s.split(/\s*>\s*/));
 
-  // 策略2: 智能路径合并 - 找出相同和不同的层级，用 :is() 合并
-  const pathMergeResult = trySmartPathMerge(pathsArray, elements);
-  if (pathMergeResult) {
-    return pathMergeResult;
+  // 策略2: 伪类合并（nth-child 范围、奇偶等）
+  const pseudoMerged = tryPseudoClassMerge(elements);
+  if (pseudoMerged) {
+    return removeStatePseudoClasses(pseudoMerged);
   }
 
-  // 策略3: 找出精确的共同后缀
+  // 策略3: :not() 排除法合并
+  const notMerged = tryNotMerge(elements);
+  if (notMerged) {
+    return removeStatePseudoClasses(notMerged);
+  }
+
+  // 策略4: 智能路径合并 - 找出相同和不同的层级，用 :is() 合并
+  const pathMergeResult = trySmartPathMerge(pathsArray, elements);
+  if (pathMergeResult) {
+    return removeStatePseudoClasses(pathMergeResult);
+  }
+
+  // 策略5: 找出精确的共同后缀
   const commonSuffix = findCommonSuffix(uniqueSelectors);
   if (commonSuffix && commonSuffix.length > 0) {
     return commonSuffix;
   }
 
-  // 策略4: 返回逗号分隔（最安全）
+  // 策略6: 返回逗号分隔（最安全）
   return uniqueSelectors.join(', ');
 }
 
@@ -2442,9 +2479,6 @@ async function batchHideElements(selectors) {
     }
 
     showNotification(`已隐藏 ${result.addedCount} 个元素`);
-
-    // 更新已隐藏列表
-    await loadHiddenElementsFromStorage();
   }
 }
 
@@ -2514,15 +2548,19 @@ async function batchShowElements(selectors) {
     }
 
     showNotification(`已显示 ${result.removedCount} 个元素`);
-
-    // 更新已隐藏列表
-    await loadHiddenElementsFromStorage();
   }
 }
 
 // 初始化批量选择功能
 async function initBatchPicker() {
-  // 设置消息监听
+  // 确保 Port 连接已建立
+  if (!backgroundPort) {
+    connectToBackground();
+    // 等待连接建立
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+
+  // 设置消息监听器，将页面中的 element-picker-message 事件转发到 background
   setupPickerMessageListener();
 
   // 尝试同步当前状态（处理 DevTools 刷新的情况）
@@ -2544,6 +2582,14 @@ async function initBatchPicker() {
           // 立即更新本地状态
           batchPickerState.isActive = true;
           updatePickerStatus();
+          // 立即显示选中元素区域
+          if (batchSelectedInfo) {
+            batchSelectedInfo.style.display = 'block';
+          }
+          if (batchMergedSelectorSection) {
+            batchMergedSelectorSection.style.display = 'block';
+          }
+          updateSelectedElementsUI();
           await sendPickerCommand('START');
         }
       }
@@ -2556,7 +2602,6 @@ async function initBatchPicker() {
       batchPickerState.selectedElements = [];
       updateSelectedElementsUI();
       await sendPickerCommand('CLEAR');
-      showNotification('已清除所有选择');
     });
   }
 
@@ -2586,6 +2631,79 @@ async function initBatchPicker() {
       }
     });
   }
+
+  // 快捷操作按钮
+  const selectAllBtn = document.getElementById('select-all-btn');
+  const deselectAllBtn = document.getElementById('deselect-all-btn');
+  const invertSelectionBtn = document.getElementById('invert-selection-btn');
+
+  if (selectAllBtn) {
+    selectAllBtn.addEventListener('click', () => {
+      batchSelectedList.querySelectorAll('.batch-item-checkbox').forEach(cb => {
+        cb.checked = true;
+      });
+      updateSelectorOptionsDisplay();
+      showNotification('已全选');
+    });
+  }
+
+  if (deselectAllBtn) {
+    deselectAllBtn.addEventListener('click', () => {
+      batchSelectedList.querySelectorAll('.batch-item-checkbox').forEach(cb => {
+        cb.checked = false;
+      });
+      updateSelectorOptionsDisplay();
+      showNotification('已取消全选');
+    });
+  }
+
+  if (invertSelectionBtn) {
+    invertSelectionBtn.addEventListener('click', () => {
+      batchSelectedList.querySelectorAll('.batch-item-checkbox').forEach(cb => {
+        cb.checked = !cb.checked;
+      });
+      updateSelectorOptionsDisplay();
+      showNotification('已反选');
+    });
+  }
+
+  // 键盘快捷键
+  document.addEventListener('keydown', (e) => {
+    // 只在批量选择区域可见时响应
+    const batchInfo = document.getElementById('batch-selected-info');
+    if (!batchInfo || batchInfo.style.display === 'none') return;
+
+    // Ctrl+A: 全选
+    if (e.ctrlKey && e.key === 'a') {
+      e.preventDefault();
+      batchSelectedList.querySelectorAll('.batch-item-checkbox').forEach(cb => {
+        cb.checked = true;
+      });
+      updateSelectorOptionsDisplay();
+      showNotification('已全选 (Ctrl+A)');
+    }
+
+    // Delete: 删除选中的元素
+    if (e.key === 'Delete') {
+      const checkedBoxes = batchSelectedList.querySelectorAll('.batch-item-checkbox:checked');
+      if (checkedBoxes.length > 0) {
+        const indicesToRemove = [...checkedBoxes]
+          .map(cb => parseInt(cb.dataset.index))
+          .sort((a, b) => b - a); // 从后往前删除，避免索引变化
+
+        for (const index of indicesToRemove) {
+          batchPickerState.selectedElements.splice(index, 1);
+        }
+        updateSelectedElementsUI();
+        showNotification(`已删除 ${indicesToRemove.length} 个元素`);
+
+        // 通知注入脚本移除高亮
+        for (const index of indicesToRemove) {
+          sendPickerCommand('REMOVE_ELEMENT_HIGHLIGHT', { index });
+        }
+      }
+    }
+  });
 
   // 应用隐藏按钮
   if (applyHideBtn) {
@@ -2661,7 +2779,7 @@ async function cleanupResources(type) {
       case 'cookies':
         // 通过background清理cookies
         try {
-          const response = await chrome.runtime.sendMessage({ type: 'CLEANUP_COOKIES' });
+          const response = await sendMessage('CLEANUP_COOKIES');
           if (response && response.success) {
             message = `已清理 ${response.count || 0} 个Cookies`;
           } else {
@@ -4197,6 +4315,33 @@ function isContextInvalidatedError(error) {
          message.includes('Extension context invalid');
 }
 
+// 显示上下文失效警告
+function showContextInvalidatedWarning() {
+  // 检查是否已存在警告
+  if (document.getElementById('context-invalidated-warning')) return;
+
+  const warning = document.createElement('div');
+  warning.id = 'context-invalidated-warning';
+  warning.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: #ff4444;
+    color: white;
+    padding: 12px 20px;
+    text-align: center;
+    z-index: 99999;
+    font-size: 14px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  `;
+  warning.innerHTML = `
+    ⚠️ 扩展已重新加载，请关闭并重新打开 DevTools 面板以恢复功能
+    <button onclick="this.parentElement.remove()" style="margin-left: 10px; padding: 4px 12px; cursor: pointer; border: none; background: white; color: #ff4444; border-radius: 4px;">关闭</button>
+  `;
+  document.body.appendChild(warning);
+}
+
 // 从后台加载被阻止的域名并添加到排除模式
 async function loadBlockedDomainsToExclude() {
   // Check if extension context is still valid
@@ -4205,7 +4350,7 @@ async function loadBlockedDomainsToExclude() {
   }
 
   try {
-    const response = await chrome.runtime.sendMessage({ type: 'GET_BLOCKED_DOMAINS' });
+    const response = await sendMessage('GET_BLOCKED_DOMAINS');
     if (response && response.allDomainBlockedData) {
       // Get current domain's blocked domains
       const currentDomain = currentInspectedDomain;
@@ -5872,12 +6017,9 @@ async function clearBrowsingData() {
 
     // Send message to background script to clear browsing data
     console.log('[清除数据] 发送消息:', { since, dataTypes });
-    const response = await chrome.runtime.sendMessage({
-      type: 'CLEAR_BROWSING_DATA',
-      data: {
-        since,
-        dataTypes
-      }
+    const response = await sendMessage('CLEAR_BROWSING_DATA', {
+      since,
+      dataTypes
     });
     console.log('[清除数据] 收到响应:', response);
 

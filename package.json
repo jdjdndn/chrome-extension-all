@@ -4,9 +4,10 @@
   "description": "Chrome 扩展 - 减少资源使用",
   "private": true,
   "scripts": {
-    "watch": "node scripts/watch-and-sync.js",
+    "clean": "node scripts/watch-and-sync.js --clean",
+    "build": "node scripts/watch-and-sync.js --clean",
     "sync": "node scripts/watch-and-sync.js --once",
-    "build": "node scripts/watch-and-sync.js --once"
+    "watch": "node scripts/watch-and-sync.js"
   },
   "devDependencies": {},
   "engines": {

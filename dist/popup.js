@@ -21,42 +21,64 @@ async function waitForEventBus() {
 }
 
 /**
+ * 统一发送消息函数（优先 EventBus，降级原生）
+ * @param {string} type - 消息类型
+ * @param {object} data - 消息数据
+ * @returns {Promise<any>}
+ */
+async function sendMessage(type, data = {}) {
+  // 等待 EventBus 就绪
+  const eventBusReady = await waitForEventBus();
+
+  if (eventBusReady) {
+    try {
+      return await EventBus.request(type, data, { timeout: 5000 });
+    } catch (error) {
+      console.warn('[Popup] EventBus 发送失败，降级原生:', error.message);
+    }
+  }
+
+  // 降级到原生 chrome.runtime.sendMessage
+  return await chrome.runtime.sendMessage({ type, ...data });
+}
+
+/**
  * 发送消息到 content script（使用 EventBus）
  */
 async function sendMessageToContentScript(message) {
-  await waitForEventBus();
-
-  // 将旧的消息格式转换为 EventBus 格式
   const messageType = message.type;
   const messageData = message.data || message;
 
   try {
-    const response = await EventBus.request(messageType, messageData, {
-      target: 'content',
-      timeout: 5000
-    });
-    return response;
-  } catch (error) {
-    console.warn('[Popup] 发送消息失败:', error.message);
-    // 降级方案：尝试直接使用 chrome.tabs.sendMessage
-    try {
-      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (tabs[0]?.id) {
-        return await chrome.tabs.sendMessage(tabs[0].id, message);
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tabs[0]?.id) {
+      // 优先使用 EventBus
+      const eventBusReady = await waitForEventBus();
+      if (eventBusReady) {
+        try {
+          return await EventBus.request(messageType, messageData, {
+            target: { tabId: tabs[0].id },
+            timeout: 5000
+          });
+        } catch (e) {}
       }
-    } catch (e) {
-      console.warn('[Popup] 降级方案也失败:', e.message);
+      // 降级到原生
+      return await chrome.tabs.sendMessage(tabs[0].id, message);
     }
-    return null;
+  } catch (error) {
+    console.warn('[Popup] 发送到 content script 失败:', error.message);
   }
+  return null;
 }
 
 /**
  * 广播消息到所有组件
  */
 async function broadcastMessage(message) {
-  await waitForEventBus();
-  await EventBus.publish(message.type, message.data || message);
+  const eventBusReady = await waitForEventBus();
+  if (eventBusReady) {
+    await EventBus.publish(message.type, message.data || message);
+  }
 }
 
 // Default settings
@@ -71,6 +93,11 @@ const defaultSettings = {
 const statusEl = document.getElementById('status');
 const toggleBtn = document.getElementById('toggle-btn');
 const debugModeCheckbox = document.getElementById('debug-mode');
+
+// AI Settings Elements
+const aiMultiThinkingCheckbox = document.getElementById('ai-multi-thinking-enabled');
+const aiRoundsSetting = document.getElementById('ai-rounds-setting');
+const aiThinkingRoundsSelect = document.getElementById('ai-thinking-rounds');
 
 // Blocked domains UI
 const blockedDomainsList = document.getElementById('blocked-domains-list');
@@ -91,8 +118,29 @@ async function loadSettings() {
   updateStatus(settings.enabled);
   debugModeCheckbox.checked = settings.debugMode || false;
 
+  // Load AI settings
+  loadAISettings(settings);
+
   // Load blocked domains
   await loadBlockedDomains();
+}
+
+// Load AI settings
+function loadAISettings(settings) {
+  const aiSettings = settings.ai || {};
+  const multiThinking = aiSettings.multiThinking || { enabled: false, rounds: 3 };
+
+  if (aiMultiThinkingCheckbox) {
+    aiMultiThinkingCheckbox.checked = multiThinking.enabled;
+  }
+
+  if (aiRoundsSetting) {
+    aiRoundsSetting.style.display = multiThinking.enabled ? 'block' : 'none';
+  }
+
+  if (aiThinkingRoundsSelect) {
+    aiThinkingRoundsSelect.value = String(multiThinking.rounds);
+  }
 }
 
 // Save settings to storage
@@ -148,7 +196,7 @@ debugModeCheckbox.addEventListener('change', () => {
 // Load blocked domains
 async function loadBlockedDomains() {
   try {
-    const result = await chrome.runtime.sendMessage({ type: 'GET_BLOCKED_DOMAINS' });
+    const result = await sendMessage('GET_BLOCKED_DOMAINS');
     console.log('[Blocked Domains] Response:', result);
     if (result) {
       renderBlockedDomains(result.blockedDomains || []);
@@ -215,10 +263,7 @@ function escapeHtml(text) {
 async function addDomain(domain) {
   if (!domain) return;
 
-  const result = await chrome.runtime.sendMessage({
-    type: 'ADD_BLOCKED_DOMAIN',
-    domain: domain
-  });
+  const result = await sendMessage('ADD_BLOCKED_DOMAIN', { domain });
 
   if (result.success) {
     domainInput.value = '';
@@ -230,13 +275,10 @@ async function addDomain(domain) {
 
 // Remove blocked domain
 async function removeDomain(domain) {
-  const result = await chrome.runtime.sendMessage({
-    type: 'REMOVE_BLOCKED_DOMAIN',
-    domain: domain
-  });
+  const result = await sendMessage('REMOVE_BLOCKED_DOMAIN', { domain });
 
   if (result.success) {
-    const updatedResult = await chrome.runtime.sendMessage({ type: 'GET_BLOCKED_DOMAINS' });
+    const updatedResult = await sendMessage('GET_BLOCKED_DOMAINS');
     renderBlockedDomains(updatedResult.blockedDomains || []);
   } else {
     alert('Failed to remove domain');
@@ -247,10 +289,7 @@ async function removeDomain(domain) {
 async function addResponseDomain(domain) {
   if (!domain) return;
 
-  const result = await chrome.runtime.sendMessage({
-    type: 'ADD_BLOCKED_RESPONSE_DOMAIN',
-    domain: domain
-  });
+  const result = await sendMessage('ADD_BLOCKED_RESPONSE_DOMAIN', { domain });
 
   if (result.success) {
     responseDomainInput.value = '';
@@ -266,10 +305,7 @@ async function addResponseDomains(domains) {
   let failedCount = 0;
 
   for (const domain of domains) {
-    const result = await chrome.runtime.sendMessage({
-      type: 'ADD_BLOCKED_RESPONSE_DOMAIN',
-      domain: domain
-    });
+    const result = await sendMessage('ADD_BLOCKED_RESPONSE_DOMAIN', { domain });
 
     if (result.success) {
       addedCount++;
@@ -293,13 +329,10 @@ async function addResponseDomains(domains) {
 
 // Remove blocked response domain
 async function removeResponseDomain(domain) {
-  const result = await chrome.runtime.sendMessage({
-    type: 'REMOVE_BLOCKED_RESPONSE_DOMAIN',
-    domain: domain
-  });
+  const result = await sendMessage('REMOVE_BLOCKED_RESPONSE_DOMAIN', { domain });
 
   if (result.success) {
-    const updatedResult = await chrome.runtime.sendMessage({ type: 'GET_BLOCKED_DOMAINS' });
+    const updatedResult = await sendMessage('GET_BLOCKED_DOMAINS');
     renderBlockedResponseDomains(updatedResult.domains || []);
   } else {
     alert('Failed to remove response domain');
@@ -385,10 +418,7 @@ async function addDomains(domains) {
   let failedCount = 0;
 
   for (const domain of domains) {
-    const result = await chrome.runtime.sendMessage({
-      type: 'ADD_BLOCKED_DOMAIN',
-      domain: domain
-    });
+    const result = await sendMessage('ADD_BLOCKED_DOMAIN', { domain });
 
     if (result.success) {
       addedCount++;
@@ -437,9 +467,7 @@ if (addResponseDomainBtn) {
 
 // Clear all blocked domains
 async function clearAllDomains() {
-  const result = await chrome.runtime.sendMessage({
-    type: 'GET_BLOCKED_DOMAINS'
-  });
+  const result = await sendMessage('GET_BLOCKED_DOMAINS');
 
   if (!result || !result.blockedDomains || result.blockedDomains.length === 0) {
     return;
@@ -447,10 +475,7 @@ async function clearAllDomains() {
 
   // Remove each domain
   for (const domain of result.blockedDomains) {
-    await chrome.runtime.sendMessage({
-      type: 'REMOVE_BLOCKED_DOMAIN',
-      domain: domain
-    });
+    await sendMessage('REMOVE_BLOCKED_DOMAIN', { domain });
   }
 
   // Reload the list
@@ -459,9 +484,7 @@ async function clearAllDomains() {
 
 // Clear all blocked response domains
 async function clearAllResponseDomains() {
-  const result = await chrome.runtime.sendMessage({
-    type: 'GET_BLOCKED_DOMAINS'
-  });
+  const result = await sendMessage('GET_BLOCKED_DOMAINS');
 
   if (!result || !result.blockedResponseDomains || result.blockedResponseDomains.length === 0) {
     return;
@@ -469,10 +492,7 @@ async function clearAllResponseDomains() {
 
   // Remove each domain
   for (const domain of result.blockedResponseDomains) {
-    await chrome.runtime.sendMessage({
-      type: 'REMOVE_BLOCKED_RESPONSE_DOMAIN',
-      domain: domain
-    });
+    await sendMessage('REMOVE_BLOCKED_RESPONSE_DOMAIN', { domain });
   }
 
   // Reload the list

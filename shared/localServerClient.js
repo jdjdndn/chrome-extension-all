@@ -141,6 +141,47 @@
     return result.data;
   }
 
+  /**
+   * AI 辅助生成选择器
+   * @param {Object} context - 元素上下文信息
+   * @returns {Promise<Object>} - AI 生成的选择器建议
+   */
+  async function aiGenerateSelector(context) {
+    // 设置更长的超时时间（AI 响应可能较慢）
+    const originalTimeout = config.timeout;
+    config.timeout = 30000;
+
+    try {
+      const result = await request('/api/ai/selector', {
+        method: 'POST',
+        body: JSON.stringify(context)
+      });
+      return result;
+    } finally {
+      config.timeout = originalTimeout;
+    }
+  }
+
+  /**
+   * AI 分析元素并提供建议
+   * @param {Object} elementInfo - 元素信息
+   * @returns {Promise<Object>} - AI 分析结果
+   */
+  async function aiAnalyzeElement(elementInfo) {
+    const originalTimeout = config.timeout;
+    config.timeout = 30000;
+
+    try {
+      const result = await request('/api/ai/analyze', {
+        method: 'POST',
+        body: JSON.stringify(elementInfo)
+      });
+      return result;
+    } finally {
+      config.timeout = originalTimeout;
+    }
+  }
+
   // 导出
   window.LocalServerClient = {
     setConfig,
@@ -152,6 +193,9 @@
     getDomainData,
     syncDomainData,
     getBatchData,
+    // AI 功能
+    aiGenerateSelector,
+    aiAnalyzeElement,
     // 常量
     DEFAULT_CONFIG
   };

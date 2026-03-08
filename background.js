@@ -2,14 +2,15 @@
 // Runs in the background and handles extension lifecycle events
 
 // ========== EventBus 加载 ==========
-// 在 service worker 中使用 importScripts 加载 event-bus.js
-// 这比 ES6 import 更可靠，因为 event-bus.js 是 IIFE 格式
+// 在 service worker 中使用 importScripts 加载 event-bus-v4.6.js
+// 这比 ES6 import 更可靠，因为 event-bus 是 IIFE 格式
 if (typeof self !== 'undefined' && typeof self.importScripts === 'function') {
-  self.importScripts('event-bus.js');
+  self.importScripts('event-bus-v4.6.js');
 }
 
 // ========== Port 连接管理 ==========
-const devtoolsPorts = new Map(); // tabId -> port
+// 使用 EventBus Transport 管理 Port 连接
+const devtoolsPorts = new Map(); // tabId -> port (保留用于兼容)
 
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name === 'devtools-panel') {
@@ -20,7 +21,15 @@ chrome.runtime.onConnect.addListener((port) => {
       if (message.type === 'REGISTER_DEVTOOLS') {
         // 注册 DevTools 对应的 tabId
         devtoolsPorts.set(message.tabId, port);
+        // 同时注册到 EventBus Transport
+        if (typeof EventBus !== 'undefined' && EventBus.Transport) {
+          EventBus.Transport.registerPort(message.tabId, port);
+        }
         console.log(`[Background] 注册 DevTools: tabId=${message.tabId}`);
+      }
+      // 处理 EventBus 消息
+      if (message.__eventbus__ && typeof EventBus !== 'undefined') {
+        EventBus._handleMessage(message, { tabId: message.tabId });
       }
     });
 
@@ -39,8 +48,21 @@ chrome.runtime.onConnect.addListener((port) => {
 
 /**
  * 向指定 tab 的 DevTools 面板推送消息
+ * 优先使用 EventBus Transport
  */
 function pushToDevTools(tabId, message) {
+  let pushed = false;
+
+  // 尝试 EventBus Transport（仅当 Port 已注册时）
+  if (typeof EventBus !== 'undefined' && EventBus.Transport && EventBus.Transport.ports && EventBus.Transport.ports.has(tabId)) {
+    pushed = EventBus.Transport.sendViaPort(tabId, { type: 'PICKER_MESSAGE_PUSH', data: message });
+    if (pushed) {
+      console.log('[Background] EventBus Transport 推送成功, tabId:', tabId);
+      return true;
+    }
+  }
+
+  // 降级到 devtoolsPorts
   const port = devtoolsPorts.get(tabId);
   if (port) {
     try {
@@ -48,13 +70,15 @@ function pushToDevTools(tabId, message) {
         type: 'PICKER_MESSAGE_PUSH',
         data: message
       });
+      console.log('[Background] devtoolsPorts 推送成功, tabId:', tabId);
       return true;
     } catch (error) {
-      console.log('[Background] 推送消息失败:', error);
+      console.log('[Background] 推送失败:', error);
       devtoolsPorts.delete(tabId);
-      return false;
     }
   }
+
+  console.warn('[Background] 未找到已注册的 DevTools Port, tabId:', tabId);
   return false;
 }
 const SETTINE = 'cy_settings';
@@ -385,6 +409,21 @@ function registerEventBusHandlers() {
     return { success: false, error: 'Missing domain or blockedDomains' };
   });
 
+  // 获取阻止域名数据（供 DevTools 通过 EventBus.request 调用）
+  EventBus.on('GET_BLOCKED_DOMAINS', async () => {
+    const currentDomainForResponse = await getCurrentTabDomain();
+    console.log('[Background] EventBus GET_BLOCKED_DOMAINS - currentDomain:', currentDomainForResponse);
+    const blockedDomains = getBlockedDomainsForDomain(currentDomainForResponse);
+    const blockedResponseDomains = getBlockedResponseDomainsForDomain(currentDomainForResponse);
+    return {
+      currentDomain: currentDomainForResponse,
+      blockedDomains: blockedDomains,
+      blockedResponseDomains: blockedResponseDomains,
+      domainScriptMap: extensionState.domainScriptMap,
+      allDomainBlockedData: _domainBlockedData
+    };
+  });
+
   // 获取隐藏选择器
   EventBus.on('GET_DEFAULT_HIDE_SELECTORS', () => {
     return { success: true, selectors: [] };
@@ -408,6 +447,51 @@ function registerEventBusHandlers() {
   EventBus.on('TOGGLE_EXTENSION', (data) => {
     console.log('[Background] TOGGLE_EXTENSION:', data.enabled);
     return { success: true };
+  });
+
+  // ========== StorageBridge 处理器 ==========
+  // 存储获取
+  EventBus.on('STORAGE_GET', async ({ keys, area = 'local' }) => {
+    try {
+      const result = await chrome.storage[area].get(keys);
+      return { success: true, data: result };
+    } catch (error) {
+      console.error('[Background] STORAGE_GET error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // 存储设置
+  EventBus.on('STORAGE_SET', async ({ data, area = 'local' }) => {
+    try {
+      await chrome.storage[area].set(data);
+      return { success: true };
+    } catch (error) {
+      console.error('[Background] STORAGE_SET error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // 存储删除
+  EventBus.on('STORAGE_REMOVE', async ({ keys, area = 'local' }) => {
+    try {
+      await chrome.storage[area].remove(keys);
+      return { success: true };
+    } catch (error) {
+      console.error('[Background] STORAGE_REMOVE error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // 存储清空
+  EventBus.on('STORAGE_CLEAR', async ({ area = 'local' }) => {
+    try {
+      await chrome.storage[area].clear();
+      return { success: true };
+    } catch (error) {
+      console.error('[Background] STORAGE_CLEAR error:', error);
+      return { success: false, error: error.message };
+    }
   });
 
   console.log('[Background] EventBus 处理器已注册');
@@ -560,6 +644,17 @@ async function handleTabUpdate(tabId, tab) {
     console.log('Tab updated:', tabId, tab.title);
   }
   if (!tab.active) return;
+
+  // 排除 Chrome Web Store 等受保护页面
+  const protectedPatterns = [
+    'chrome.google.com/webstore',
+    'chromewebstore.google.com'
+  ];
+  const isProtected = protectedPatterns.some(pattern => tab.url?.includes(pattern));
+  if (isProtected) {
+    console.log(`[Background] 跳过受保护页面: ${tab.url}`);
+    return;
+  }
 
   // Only apply to specific URLs if needed
   if (tab.url && tab.status === 'complete' && tab.url.startsWith('http')) {
@@ -865,6 +960,17 @@ async function injectAllScriptsForTab(tabId, tabUrl) {
     // 检查 URL 是否允许注入（跳过特殊页面）
     if (!tabUrl || !tabUrl.startsWith('http://') && !tabUrl.startsWith('https://')) {
       console.log(`[Background] 跳过非 HTTP(S) 页面: ${tabUrl}`);
+      return;
+    }
+
+    // 排除 Chrome Web Store 等受保护页面
+    const protectedPatterns = [
+      'chrome.google.com/webstore',
+      'chromewebstore.google.com'
+    ];
+    const isProtected = protectedPatterns.some(pattern => tabUrl?.includes(pattern));
+    if (isProtected) {
+      console.log(`[Background] 跳过受保护页面: ${tabUrl}`);
       return;
     }
 
@@ -1320,13 +1426,18 @@ async function handleMessage(message, sender, sendResponse) {
     // ========== 元素拾取器消息处理 ==========
     case 'PICKER_MESSAGE_RELAY':
       // 转发元素拾取器消息到 DevTools 面板
+      console.log('[Background] 收到 PICKER_MESSAGE_RELAY:', message.data?.type);
       try {
         // 从 sender 获取 tabId
         const senderTabId = sender.tab ? sender.tab.id : null;
+        console.log('[Background] senderTabId:', senderTabId,
+                    'EventBus.ports:', EventBus?.Transport?.ports ? Array.from(EventBus.Transport.ports.keys()) : 'N/A',
+                    'devtoolsPorts:', Array.from(devtoolsPorts.keys()));
 
         if (senderTabId) {
           // 直接通过 Port 推送到 DevTools
           const pushed = pushToDevTools(senderTabId, message.data);
+          console.log('[Background] 推送结果:', pushed);
 
           if (!pushed) {
             // Port 不可用，存储消息作为备用
@@ -1348,6 +1459,7 @@ async function handleMessage(message, sender, sendResponse) {
         }
         sendResponse({ success: true });
       } catch (error) {
+        console.error('[Background] PICKER_MESSAGE_RELAY 错误:', error);
         sendResponse({ success: false, error: error.message });
       }
       break;
@@ -1405,6 +1517,28 @@ async function handleMessage(message, sender, sendResponse) {
         console.error('[ElementPicker] 停止失败:', error);
         sendResponse({ success: false, error: error.message });
       }
+      break;
+
+    case 'EVENTBUS_DEVTOOLS_LOG':
+      // 从 content script 接收 EventBus 事件并转发到 DevTools
+      if (message.events && Array.isArray(message.events)) {
+        const senderTabId = sender.tab?.id;
+        if (senderTabId) {
+          // 批量转发事件到对应 tab 的 DevTools
+          for (const event of message.events) {
+            pushToDevTools(senderTabId, {
+              type: event.type,
+              direction: event.direction,
+              data: event.data,
+              from: event.from,
+              fromEnv: event.fromEnv,
+              timestamp: event.timestamp,
+              id: event.id
+            });
+          }
+        }
+      }
+      sendResponse({ success: true });
       break;
 
     case 'GET_HIDE_ELEMENTS_SETTINGS':
@@ -1535,6 +1669,45 @@ async function handleMessage(message, sender, sendResponse) {
         console.error('[HideElements] 移除选择器失败:', error);
         sendResponse({ success: false, error: error.message });
       }
+      break;
+
+    case 'ELEMENT_SELECTION_CHANGED':
+      // 转发元素选择变化消息到 DevTools 面板
+      console.log('[Background] 收到 ELEMENT_SELECTION_CHANGED:', message);
+      if (sender.tab && sender.tab.id) {
+        const tabId = sender.tab.id;
+        console.log('[Background] 来源 tabId:', tabId);
+
+        // 尝试通过 port 发送
+        const port = devtoolsPorts.get(tabId);
+        if (port) {
+          console.log('[Background] 找到 port, 发送 batch-selection-update');
+          try {
+            port.postMessage({
+              type: 'batch-selection-update',
+              selectors: message.elements?.map(el => ({
+                selector: el.selector,
+                tag: el.tagName
+              })) || []
+            });
+          } catch (e) {
+            console.warn('[Background] Port 发送失败:', e);
+            devtoolsPorts.delete(tabId);
+          }
+        } else {
+          console.log('[Background] 未找到 port, 当前注册的 ports:', Array.from(devtoolsPorts.keys()));
+        }
+      }
+      sendResponse({ success: true });
+      break;
+
+    // 元素被选中消息（来自 content.js，转发给 popup）
+    case 'ELEMENT_PICKED':
+      // 这个消息主要用于通知 popup 有新元素被选中
+      // 如果 popup 打开着，它会通过 chrome.runtime.onMessage 监听
+      // 这里只需要返回成功即可
+      console.log('[Background] 收到 ELEMENT_PICKED:', message.data?.selector);
+      sendResponse({ success: true });
       break;
 
     default:
