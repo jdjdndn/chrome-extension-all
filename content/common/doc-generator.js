@@ -2,6 +2,7 @@
 // @match *://*/*
 // 功能：提取页面标题和内容，生成格式化文档，浮动工具栏展示
 // 支持拖拽移动面板位置
+// 支持 Tab 切换：页面大纲 / 收集链接
 
 'use strict';
 
@@ -20,7 +21,11 @@ if (window.DocGeneratorLoaded) {
       this.isVisible = true;
       this.isMinimized = true;
       this.collectedContent = [];
+      this.collectedLinks = [];  // 收集的链接
+      this.linkElements = [];    // 链接元素引用
       this.outlineCount = 0;
+      this.linkCount = 0;
+      this.currentTab = 'outline';  // 当前 Tab: 'outline' | 'links'
       this.isDragging = false;
       this.dragStart = null;
       this.panelStart = null;
@@ -32,7 +37,7 @@ if (window.DocGeneratorLoaded) {
       this.createUI();
       this.bindEvents();
       this.registerToPositionManager();
-      console.log('[文档生成器] 初始化完成');
+      console.log('[文档生成器] 初始化完成（支持 Tab 切换）');
     }
 
     // 注册到位置管理器
@@ -95,8 +100,13 @@ if (window.DocGeneratorLoaded) {
               <button class="yc-doc-btn-sm" data-action="clear" title="清空">清空</button>
             </div>
           </div>
+          <div class="yc-doc-tabs">
+            <button class="yc-doc-tab active" data-tab="outline">页面大纲</button>
+            <button class="yc-doc-tab" data-tab="links">收集链接</button>
+          </div>
           <div class="yc-doc-panel-body">
-            <div class="yc-doc-content"></div>
+            <div class="yc-doc-content yc-doc-content-outline"></div>
+            <div class="yc-doc-content yc-doc-content-links" style="display: none;"></div>
           </div>
           <div class="yc-doc-status">
             <span class="yc-doc-count">0 项内容</span>
@@ -251,6 +261,37 @@ if (window.DocGeneratorLoaded) {
           background: rgba(255, 255, 255, 0.4);
         }
 
+        /* Tab 样式 */
+        .yc-doc-tabs {
+          display: flex;
+          background: #f8f9fa;
+          border-bottom: 1px solid #eee;
+        }
+
+        .yc-doc-tab {
+          flex: 1;
+          padding: 10px 16px;
+          border: none;
+          background: transparent;
+          color: #666;
+          font-size: 13px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          border-bottom: 2px solid transparent;
+        }
+
+        .yc-doc-tab:hover {
+          color: #667eea;
+          background: #f0f4ff;
+        }
+
+        .yc-doc-tab.active {
+          color: #667eea;
+          border-bottom-color: #667eea;
+          background: #fff;
+        }
+
         .yc-doc-panel-body {
           flex: 1;
           overflow-y: overlay;
@@ -393,6 +434,66 @@ if (window.DocGeneratorLoaded) {
           font-size: 13px;
         }
 
+        /* 链接列表样式 */
+        .yc-doc-link-list {
+          list-style: none;
+          padding: 0;
+          margin: 0;
+        }
+        .yc-doc-link-item {
+          display: flex;
+          align-items: flex-start;
+          gap: 8px;
+          padding: 6px 0;
+          border-bottom: 1px solid #eee;
+        }
+        .yc-doc-link-item:last-child {
+          border-bottom: none;
+        }
+        .yc-doc-link {
+          flex: 1;
+          display: block;
+          font-size: 13px;
+          color: #1a73e8;
+          text-decoration: none;
+          word-break: break-all;
+          line-height: 1.5;
+        }
+        .yc-doc-link:hover {
+          color: #0d47a1;
+          text-decoration: underline;
+        }
+        .yc-doc-locate-btn {
+          flex-shrink: 0;
+          padding: 4px;
+          background: transparent;
+          color: #999;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s ease;
+        }
+        .yc-doc-locate-btn:hover {
+          background: #e8f0fe;
+          color: #1a73e8;
+        }
+        .yc-doc-locate-btn svg {
+          width: 16px;
+          height: 16px;
+        }
+        .yc-doc-empty-hint {
+          text-align: center;
+          padding: 30px;
+          color: #999;
+        }
+        .yc-doc-empty-hint p {
+          margin-top: 12px;
+          font-size: 13px;
+        }
+
         .yc-doc-status {
           padding: 8px 16px;
           background: #f8f9fa;
@@ -457,6 +558,13 @@ if (window.DocGeneratorLoaded) {
           return;
         }
 
+        // 处理 Tab 切换
+        const tab = e.target.closest('.yc-doc-tab');
+        if (tab) {
+          this.switchTab(tab.dataset.tab);
+          return;
+        }
+
         // 处理大纲项点击跳转
         const outlineItem = e.target.closest('.yc-doc-outline-item');
         if (outlineItem) {
@@ -475,6 +583,15 @@ if (window.DocGeneratorLoaded) {
           if (headingText) {
             this.scrollToHeading(headingText);
           }
+          return;
+        }
+
+        // 处理定位按钮点击
+        const locateBtn = e.target.closest('.yc-doc-locate-btn');
+        if (locateBtn) {
+          const index = parseInt(locateBtn.dataset.index, 10);
+          this.locateLinkElement(index);
+          return;
         }
       });
 
@@ -503,6 +620,26 @@ if (window.DocGeneratorLoaded) {
         panelBody.addEventListener('wheel', (e) => {
           e.stopPropagation();
         }, { passive: true });
+      }
+    }
+
+    // 切换 Tab
+    switchTab(tabName) {
+      this.currentTab = tabName;
+
+      // 更新 Tab 按钮状态
+      const tabs = document.querySelectorAll('.yc-doc-tab');
+      tabs.forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.tab === tabName);
+      });
+
+      // 更新内容区域显示
+      const outlineContent = document.querySelector('.yc-doc-content-outline');
+      const linksContent = document.querySelector('.yc-doc-content-links');
+
+      if (outlineContent && linksContent) {
+        outlineContent.style.display = tabName === 'outline' ? 'block' : 'none';
+        linksContent.style.display = tabName === 'links' ? 'block' : 'none';
       }
     }
 
@@ -628,6 +765,32 @@ if (window.DocGeneratorLoaded) {
       this.showToast('未找到对应标题');
     }
 
+    // 定位链接元素
+    locateLinkElement(index) {
+      const element = this.linkElements[index];
+      if (!element) {
+        this.showToast('链接元素已失效，请重新收集');
+        return;
+      }
+
+      // 滚动到元素位置
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+      // 高亮效果
+      const originalOutline = element.style.outline;
+      const originalBg = element.style.backgroundColor;
+      element.style.transition = 'outline 0.3s, background-color 0.3s';
+      element.style.outline = '3px solid #1a73e8';
+      element.style.backgroundColor = '#e8f0fe';
+
+      setTimeout(() => {
+        element.style.outline = originalOutline;
+        element.style.backgroundColor = originalBg;
+      }, 2000);
+
+      this.showToast('已定位到链接元素');
+    }
+
     show() {
       const container = document.getElementById(CONTAINER_ID);
       if (container) {
@@ -662,8 +825,13 @@ if (window.DocGeneratorLoaded) {
       const title = this.getPageTitle();
       const content = this.extractMainContent();
 
+      // 生成大纲内容
       const docContent = this.formatDocument(title, content);
-      this.updatePanel(docContent);
+      this.updateOutlinePanel(docContent);
+
+      // 同时收集链接
+      this.collectLinks();
+
       this.showToast('文档生成完成');
     }
 
@@ -817,6 +985,162 @@ if (window.DocGeneratorLoaded) {
       return null;
     }
 
+    // ==================== 链接收集功能 ====================
+
+    // 判断是否为导航链接（应排除）
+    isNavigationLink(linkEl) {
+      const href = linkEl.getAttribute('href') || '';
+
+      // 1. 排除锚点链接（用于 tab 切换或页内跳转）
+      if (href.startsWith('#')) return true;
+
+      // 2. 排除 JS 链接
+      if (href.startsWith('javascript:')) return true;
+
+      // 3. 排除空链接
+      if (!href.trim() || href === '#') return true;
+
+      // 4. 检查是否在导航区域内
+      let parent = linkEl.parentElement;
+      while (parent && parent !== document.body) {
+        const tagName = parent.tagName.toLowerCase();
+        const role = parent.getAttribute('role');
+
+        // 排除 nav、header、footer 区域
+        if (['nav', 'header', 'footer'].includes(tagName)) {
+          return true;
+        }
+
+        // 排除 role="navigation" 或 role="menu" 区域
+        if (role === 'navigation' || role === 'menu') {
+          return true;
+        }
+
+        // 排除常见的导航类名
+        const className = parent.className || '';
+        const navPatterns = /\b(nav|menu|sidebar|navigation|navbar|topbar|header-nav|footer-nav)\b/i;
+        if (navPatterns.test(className)) {
+          return true;
+        }
+
+        parent = parent.parentElement;
+      }
+
+      return false;
+    }
+
+    // 收集页面链接
+    // 解析重定向链接，提取真实URL
+    unwrapRedirectUrl(url) {
+      try {
+        const urlObj = new URL(url);
+        const params = urlObj.searchParams;
+
+        // 常见的重定向参数名
+        const redirectParams = ['target', 'url', 'redirect', 'goto', 'link', 'dest', 'destination'];
+
+        for (const param of redirectParams) {
+          const target = params.get(param);
+          if (target) {
+            // 解码 URL 编码
+            const decoded = decodeURIComponent(target);
+            // 验证是否为有效 URL
+            if (decoded.startsWith('http://') || decoded.startsWith('https://')) {
+              return decoded;
+            }
+          }
+        }
+      } catch (e) {
+        // URL 解析失败，返回原始 URL
+      }
+      return url;
+    }
+
+    collectLinks() {
+      const links = document.querySelectorAll('a[href]');
+      const seenUrls = new Set();
+      this.collectedLinks = [];
+      this.linkElements = []; // 保存链接元素引用
+
+      links.forEach(link => {
+        // 检查是否隐藏
+        if (this.isHiddenElement(link)) return;
+
+        // 检查是否为导航链接
+        if (this.isNavigationLink(link)) return;
+
+        // 解析重定向链接，获取真实 URL
+        const url = this.unwrapRedirectUrl(link.href);
+        const text = link.textContent.trim();
+
+        // 去重
+        if (seenUrls.has(url)) return;
+        seenUrls.add(url);
+
+        // 过滤无效链接
+        if (!text || text.length < 1) return;
+
+        this.collectedLinks.push({
+          text: text.substring(0, 100), // 限制文本长度
+          url: url
+        });
+        this.linkElements.push(link); // 保存元素引用
+      });
+
+      this.linkCount = this.collectedLinks.length;
+      this.updateLinksPanel();
+      this.updateStatus();
+
+      console.log(`[文档生成器] 收集了 ${this.linkCount} 个链接`);
+    }
+
+    // 更新链接面板内容
+    updateLinksPanel() {
+      const linksContent = document.querySelector('.yc-doc-content-links');
+      if (!linksContent) return;
+
+      if (this.collectedLinks.length === 0) {
+        linksContent.innerHTML = `
+          <div class="yc-doc-empty-hint">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+            </svg>
+            <p>点击"生成文档"自动收集页面链接<br>导航区域的链接会被自动排除</p>
+          </div>
+        `;
+        return;
+      }
+
+      let html = '<ul class="yc-doc-link-list">';
+      this.collectedLinks.forEach((link, index) => {
+        const escapedText = this.escapeHtml(link.text);
+        const escapedUrl = this.escapeHtml(link.url);
+        const displayText = link.text || link.url;
+
+        html += `
+          <li class="yc-doc-link-item">
+            <a class="yc-doc-link"
+               href="${escapedUrl}"
+               target="_blank"
+               rel="noopener noreferrer nofollow"
+               title="${escapedUrl}">
+              ${this.escapeHtml(displayText)}
+            </a>
+            <button class="yc-doc-locate-btn" data-index="${index}" title="定位到页面元素">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M12 2v4m0 12v4M2 12h4m12 0h4"/>
+              </svg>
+            </button>
+          </li>
+        `;
+      });
+      html += '</ul>';
+
+      linksContent.innerHTML = html;
+    }
+
     formatDocument(title, sections) {
       let html = `<h1 title="${this.escapeHtml(title)}">${this.escapeHtml(title)}</h1>`;
 
@@ -878,26 +1202,6 @@ if (window.DocGeneratorLoaded) {
       return html;
     }
 
-    truncateUrl(url, maxLength = 50) {
-      if (url.length <= maxLength) return url;
-
-      try {
-        const urlObj = new URL(url);
-        const base = urlObj.protocol + '//' + urlObj.host;
-        if (base.length >= maxLength - 3) {
-          return base.substring(0, maxLength - 3) + '...';
-        }
-
-        const remaining = maxLength - base.length - 3;
-        if (remaining > 0 && urlObj.pathname) {
-          return base + urlObj.pathname.substring(0, remaining) + '...';
-        }
-        return base + '...';
-      } catch (e) {
-        return url.substring(0, maxLength - 3) + '...';
-      }
-    }
-
     collectSelection() {
       const selection = window.getSelection();
       const text = selection.toString().trim();
@@ -917,11 +1221,11 @@ if (window.DocGeneratorLoaded) {
         const title = this.getPageTitle();
         const sections = this.extractMainContent();
         const docContent = this.formatDocument(title, sections);
-        this.updatePanel(docContent);
+        this.updateOutlinePanel(docContent);
       }
     }
 
-    updatePanel(html) {
+    updateOutlinePanel(html) {
       const panel = document.getElementById(PANEL_ID);
       if (panel) {
         panel.classList.remove('yc-doc-hidden');
@@ -932,7 +1236,7 @@ if (window.DocGeneratorLoaded) {
         }
       }
 
-      const content = document.querySelector('.yc-doc-content');
+      const content = document.querySelector('.yc-doc-content-outline');
       if (content) {
         content.innerHTML = html;
       }
@@ -944,25 +1248,57 @@ if (window.DocGeneratorLoaded) {
       const count = document.querySelector('.yc-doc-count');
       if (count) {
         const outlineNum = this.outlineCount || 0;
-        const collectedNum = this.collectedContent.length;
-        count.textContent = `大纲 ${outlineNum} 项 | 收集 ${collectedNum} 项`;
+        const linkNum = this.linkCount || 0;
+        count.textContent = `大纲 ${outlineNum} 项 | 链接 ${linkNum} 项`;
       }
     }
 
     copyContent() {
-      const content = document.querySelector('.yc-doc-content');
-      if (content) {
-        navigator.clipboard.writeText(content.innerText)
+      // 根据当前 Tab 复制对应内容
+      let textToCopy = '';
+
+      if (this.currentTab === 'links') {
+        // 复制链接列表
+        if (this.collectedLinks.length === 0) {
+          this.showToast('没有可复制的链接');
+          return;
+        }
+        textToCopy = this.collectedLinks.map(link => `${link.text}\n${link.url}`).join('\n\n');
+      } else {
+        // 复制大纲内容
+        const content = document.querySelector('.yc-doc-content-outline');
+        if (content) {
+          textToCopy = content.innerText;
+        }
+      }
+
+      if (textToCopy) {
+        navigator.clipboard.writeText(textToCopy)
           .then(() => this.showToast('已复制到剪贴板'))
           .catch(() => this.showToast('复制失败'));
       }
     }
 
     downloadContent() {
-      const content = document.querySelector('.yc-doc-content');
-      if (content) {
-        const clone = content.cloneNode(true);
+      const title = this.getPageTitle();
+      const filename = `${title.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_')}.md`;
 
+      let markdown = '';
+
+      // 添加来源和生成时间
+      const sourceUrl = window.location.href;
+      const timestamp = new Date().toLocaleString('zh-CN');
+      markdown += `> 来源: ${sourceUrl}\n> 生成时间: ${timestamp}\n\n`;
+
+      // 添加标题
+      markdown += `# ${title}\n\n`;
+
+      // 添加大纲内容
+      const outlineContent = document.querySelector('.yc-doc-content-outline');
+      if (outlineContent && outlineContent.innerHTML.trim()) {
+        const clone = outlineContent.cloneNode(true);
+
+        // 处理大纲项中的链接
         const outlineItems = clone.querySelectorAll('.yc-doc-outline-item');
         outlineItems.forEach(item => {
           const linkBtn = item.querySelector('.yc-doc-link-btn');
@@ -978,28 +1314,29 @@ if (window.DocGeneratorLoaded) {
           }
         });
 
-        const title = this.getPageTitle();
-        const filename = `${title.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_')}.md`;
-
-        let markdown = this.htmlToMarkdown(clone.innerHTML);
-
-        // 下载时添加来源和生成时间
-        const sourceUrl = window.location.href;
-        const timestamp = new Date().toLocaleString('zh-CN');
-        const header = `> 来源: ${sourceUrl}\n> 生成时间: ${timestamp}\n\n`;
-
-        markdown = header + markdown;
-
-        const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        a.click();
-        URL.revokeObjectURL(url);
-
-        this.showToast('文件已下载');
+        markdown += '## 页面大纲\n\n';
+        markdown += this.htmlToMarkdown(clone.innerHTML);
+        markdown += '\n';
       }
+
+      // 添加链接内容
+      if (this.collectedLinks.length > 0) {
+        markdown += '## 收集的链接\n\n';
+        this.collectedLinks.forEach((link, index) => {
+          markdown += `${index + 1}. [${link.text}](${link.url})\n`;
+        });
+        markdown += '\n';
+      }
+
+      const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      this.showToast('文件已下载');
     }
 
     htmlToMarkdown(html) {
@@ -1039,10 +1376,28 @@ if (window.DocGeneratorLoaded) {
 
     clearContent() {
       this.collectedContent = [];
-      const content = document.querySelector('.yc-doc-content');
-      if (content) {
-        content.innerHTML = '<p style="color: #999;">点击"生成文档"或选择文本后点击"收集"</p>';
+      this.collectedLinks = [];
+      this.outlineCount = 0;
+      this.linkCount = 0;
+
+      const outlineContent = document.querySelector('.yc-doc-content-outline');
+      if (outlineContent) {
+        outlineContent.innerHTML = '<p style="color: #999;">点击"生成文档"或选择文本后点击"收集"</p>';
       }
+
+      const linksContent = document.querySelector('.yc-doc-content-links');
+      if (linksContent) {
+        linksContent.innerHTML = `
+          <div class="yc-doc-empty-hint">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+            </svg>
+            <p>点击"生成文档"自动收集页面链接<br>导航区域的链接会被自动排除</p>
+          </div>
+        `;
+      }
+
       this.updateStatus();
       this.showToast('已清空');
     }
