@@ -20,3 +20,13 @@ chrome.devtools.panels.create(
     console.log('Console panel created');
   }
 );
+
+// Create DevTools Tools panel (自定义通用调试方法)
+chrome.devtools.panels.create(
+  'DevTools Tools',
+  null, // Use default icon
+  'devtools/tools-panel.html',
+  function (panel) {
+    console.log('DevTools Tools panel created');
+  }
+);

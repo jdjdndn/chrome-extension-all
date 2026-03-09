@@ -44,6 +44,35 @@ chrome.runtime.onConnect.addListener((port) => {
       }
     });
   }
+
+  // DevTools Tools Panel 连接
+  if (port.name === 'devtools-tools-panel') {
+    console.log('[Background] DevTools Tools 面板已连接');
+
+    port.onMessage.addListener((message) => {
+      if (message.type === 'REGISTER_TOOLS_PANEL') {
+        devtoolsPorts.set(message.tabId, port);
+        if (typeof EventBus !== 'undefined' && EventBus.Transport) {
+          EventBus.Transport.registerPort(message.tabId, port);
+        }
+        console.log(`[Background] 注册 Tools Panel: tabId=${message.tabId}`);
+      }
+      // 处理 EventBus 消息
+      if (message.__eventbus__ && typeof EventBus !== 'undefined') {
+        EventBus._handleMessage(message, { tabId: message.tabId });
+      }
+    });
+
+    port.onDisconnect.addListener(() => {
+      for (const [tabId, p] of devtoolsPorts) {
+        if (p === port) {
+          devtoolsPorts.delete(tabId);
+          console.log(`[Background] Tools Panel 断开: tabId=${tabId}`);
+          break;
+        }
+      }
+    });
+  }
 });
 
 /**

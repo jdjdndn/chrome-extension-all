@@ -66,7 +66,8 @@
         "content/core/security-manager.js",
         "content/core/config-migrator.js",
         "content/core/extension-api.js",
-        "content/core/module-manager.js"
+        "content/core/module-manager.js",
+        "content/devtools/page-helper.js"
       ],
       "run_at": "document_start"
     },
@@ -224,7 +225,9 @@
         "content/modules/IncrementalUpdater.js",
         "content/modules/SelectorPathVisualizer.js",
         "content/modules/OptimizationAdvisor.js",
-        "content/modules/index.js"
+        "content/modules/index.js",
+        "content/devtools/*.js",
+        "shared/*.js"
       ],
       "matches": ["<all_urls>"]
     }

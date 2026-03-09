@@ -604,7 +604,7 @@ function processCurrentVideo() {
 
     // 检测手动上滑返回
     if (isGoingBack) {
-      console.log(`[手动导航] 检测到手动上滑返回，暂停自动处理`);
+      console.log(`[手动导航] 检测到手动上滑返回 (历史位置: ${videoHistory.indexOf(videoId)}/${videoHistory.length - 1})，暂停自动处理`);
       VideoChangeChecker.cancelAll();
       currentVideoId = videoId;
       updateVideoHistory(videoId);
@@ -792,23 +792,71 @@ function init() {
   // 监听用户上滑操作，取消自动下滑检测
   document.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowUp' || e.keyCode === 38) {
-      console.log('[用户操作] 检测到上滑，取消所有自动下滑检测');
+      console.log('[用户操作] 检测到键盘上滑，取消所有自动下滑检测');
+      VideoChangeChecker.cancelAll();
+    }
+    // 用户手动下滑也取消检测（表示用户接管控制）
+    if (e.key === 'ArrowDown' || e.keyCode === 40) {
+      console.log('[用户操作] 检测到键盘下滑，取消自动下滑检测');
       VideoChangeChecker.cancelAll();
     }
   });
 
-  // 触摸上滑检测（移动端）
+  // 触摸上滑检测（移动端）- 使用捕获阶段确保能捕获到事件
   let touchStartY = 0;
+  let touchStartTime = 0;
   document.addEventListener('touchstart', (e) => {
     touchStartY = e.touches[0].clientY;
-  }, { passive: true });
+    touchStartTime = Date.now();
+  }, { passive: true, capture: true });
   document.addEventListener('touchend', (e) => {
     const touchEndY = e.changedTouches[0].clientY;
-    if (touchEndY - touchStartY > 50) {  // 上滑距离超过 50px
-      console.log('[用户操作] 检测到触摸上滑，取消所有自动下滑检测');
+    const deltaY = touchEndY - touchStartY;
+    const deltaTime = Date.now() - touchStartTime;
+    // 降低阈值到 30px，并检测快速滑动（速度判断）
+    const velocity = Math.abs(deltaY) / deltaTime; // px/ms
+    // 上滑检测（deltaY > 0 表示手指向上滑动，页面向下滚动）
+    if (deltaY > 30 || (deltaY > 10 && velocity > 0.3)) {
+      console.log(`[用户操作] 检测到触摸上滑 (deltaY=${deltaY.toFixed(1)}px, velocity=${velocity.toFixed(2)}px/ms)，取消所有自动下滑检测`);
       VideoChangeChecker.cancelAll();
     }
-  }, { passive: true });
+    // 下滑检测（用户主动操作）
+    if (deltaY < -30 || (deltaY < -10 && velocity > 0.3)) {
+      console.log(`[用户操作] 检测到触摸下滑 (deltaY=${deltaY.toFixed(1)}px)，取消自动下滑检测`);
+      VideoChangeChecker.cancelAll();
+    }
+  }, { passive: true, capture: true });
+
+  // 鼠标滚轮上滑检测（桌面端）
+  let wheelTimeout = null;
+  let wheelDeltaY = 0;
+  document.addEventListener('wheel', (e) => {
+    // deltaY < 0 表示向上滚动（上滑返回）
+    if (e.deltaY < 0) {
+      wheelDeltaY += Math.abs(e.deltaY);
+      // 累积滚动量检测
+      if (wheelTimeout) clearTimeout(wheelTimeout);
+      wheelTimeout = setTimeout(() => {
+        if (wheelDeltaY > 50) {
+          console.log(`[用户操作] 检测到滚轮上滑 (累积=${wheelDeltaY.toFixed(1)}px)，取消所有自动下滑检测`);
+          VideoChangeChecker.cancelAll();
+        }
+        wheelDeltaY = 0;
+      }, 100);
+    }
+    // deltaY > 0 表示向下滚动（手动下滑）
+    if (e.deltaY > 0) {
+      wheelDeltaY -= e.deltaY;
+      if (wheelTimeout) clearTimeout(wheelTimeout);
+      wheelTimeout = setTimeout(() => {
+        if (wheelDeltaY < -50) {
+          console.log(`[用户操作] 检测到滚轮下滑 (累积=${Math.abs(wheelDeltaY).toFixed(1)}px)，取消自动下滑检测`);
+          VideoChangeChecker.cancelAll();
+        }
+        wheelDeltaY = 0;
+      }, 100);
+    }
+  }, { passive: true, capture: true });
 
   visibilityChangeHandler = () => {
     if (document.hidden) {
