@@ -2,7 +2,7 @@
 // @match *://*/*
 // 功能：提取页面标题和内容，生成格式化文档，浮动工具栏展示
 // 支持拖拽移动面板位置
-// 支持 Tab 切换：页面大纲 / 收集链接
+// 支持 Tab 切换：页面大纲 / 收集链接 / GitHub 仓库
 
 'use strict';
 
@@ -23,9 +23,12 @@ if (window.DocGeneratorLoaded) {
       this.collectedContent = [];
       this.collectedLinks = [];  // 收集的链接
       this.linkElements = [];    // 链接元素引用
+      this.githubRepos = [];     // GitHub 仓库链接
+      this.githubElements = [];  // GitHub 链接元素引用
       this.outlineCount = 0;
       this.linkCount = 0;
-      this.currentTab = 'outline';  // 当前 Tab: 'outline' | 'links'
+      this.githubCount = 0;
+      this.currentTab = 'outline';  // 当前 Tab: 'outline' | 'links' | 'github'
       this.isDragging = false;
       this.dragStart = null;
       this.panelStart = null;
@@ -103,10 +106,12 @@ if (window.DocGeneratorLoaded) {
           <div class="yc-doc-tabs">
             <button class="yc-doc-tab active" data-tab="outline">页面大纲</button>
             <button class="yc-doc-tab" data-tab="links">收集链接</button>
+            <button class="yc-doc-tab" data-tab="github">GitHub仓库</button>
           </div>
           <div class="yc-doc-panel-body">
             <div class="yc-doc-content yc-doc-content-outline"></div>
             <div class="yc-doc-content yc-doc-content-links" style="display: none;"></div>
+            <div class="yc-doc-content yc-doc-content-github" style="display: none;"></div>
           </div>
           <div class="yc-doc-status">
             <span class="yc-doc-count">0 项内容</span>
@@ -502,6 +507,86 @@ if (window.DocGeneratorLoaded) {
           color: #666;
         }
 
+        /* GitHub 仓库列表样式 */
+        .yc-doc-github-list {
+          list-style: none;
+          padding: 0;
+          margin: 0;
+        }
+        .yc-doc-github-item {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 10px 0;
+          border-bottom: 1px solid #eee;
+          gap: 8px;
+        }
+        .yc-doc-github-item:last-child {
+          border-bottom: none;
+        }
+        .yc-doc-github-info {
+          flex: 1;
+          min-width: 0;
+        }
+        .yc-doc-github-link {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 13px;
+          color: #1a73e8;
+          text-decoration: none;
+          line-height: 1.4;
+        }
+        .yc-doc-github-link:hover {
+          color: #0d47a1;
+          text-decoration: underline;
+        }
+        .yc-doc-github-icon {
+          flex-shrink: 0;
+          color: #333;
+        }
+        .yc-doc-github-name {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .yc-doc-github-path {
+          display: block;
+          font-size: 11px;
+          color: #666;
+          margin-top: 2px;
+          margin-left: 22px;
+        }
+        .yc-doc-github-actions {
+          display: flex;
+          gap: 4px;
+          flex-shrink: 0;
+        }
+        .yc-doc-github-btn {
+          padding: 6px;
+          background: transparent;
+          color: #999;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s ease;
+        }
+        .yc-doc-github-btn:hover {
+          background: #e8f0fe;
+          color: #1a73e8;
+        }
+        .yc-doc-github-btn svg {
+          width: 16px;
+          height: 16px;
+        }
+        .yc-doc-download-btn:hover {
+          background: #e6f4ea;
+          color: #1e8e3e;
+        }
+
         .yc-doc-toast {
           position: fixed;
           bottom: 20px;
@@ -590,7 +675,20 @@ if (window.DocGeneratorLoaded) {
         const locateBtn = e.target.closest('.yc-doc-locate-btn');
         if (locateBtn) {
           const index = parseInt(locateBtn.dataset.index, 10);
-          this.locateLinkElement(index);
+          // 根据父容器判断是哪种类型的定位
+          if (locateBtn.closest('.yc-doc-content-github')) {
+            this.locateGithubElement(index);
+          } else {
+            this.locateLinkElement(index);
+          }
+          return;
+        }
+
+        // 处理 GitHub 下载按钮点击
+        const downloadBtn = e.target.closest('.yc-doc-download-btn');
+        if (downloadBtn) {
+          const index = parseInt(downloadBtn.dataset.index, 10);
+          this.downloadGithubRepo(index);
           return;
         }
       });
@@ -636,10 +734,42 @@ if (window.DocGeneratorLoaded) {
       // 更新内容区域显示
       const outlineContent = document.querySelector('.yc-doc-content-outline');
       const linksContent = document.querySelector('.yc-doc-content-links');
+      const githubContent = document.querySelector('.yc-doc-content-github');
 
-      if (outlineContent && linksContent) {
+      if (outlineContent && linksContent && githubContent) {
         outlineContent.style.display = tabName === 'outline' ? 'block' : 'none';
         linksContent.style.display = tabName === 'links' ? 'block' : 'none';
+        githubContent.style.display = tabName === 'github' ? 'block' : 'none';
+      }
+
+      // 根据当前 tab 执行对应方法
+      this.executeTabAction(tabName);
+    }
+
+    // 根据 tab 名称执行对应的收集方法
+    executeTabAction(tabName) {
+      switch (tabName) {
+        case 'outline':
+          // 如果大纲内容为空，则生成文档
+          if (this.outlineCount === 0) {
+            const title = this.getPageTitle();
+            const content = this.extractMainContent();
+            const docContent = this.formatDocument(title, content);
+            this.updateOutlinePanel(docContent);
+          }
+          break;
+        case 'links':
+          // 如果链接列表为空，则收集链接
+          if (this.linkCount === 0) {
+            this.collectLinks();
+          }
+          break;
+        case 'github':
+          // 如果 GitHub 仓库列表为空，则收集 GitHub 仓库
+          if (this.githubCount === 0) {
+            this.collectGithubRepos();
+          }
+          break;
       }
     }
 
@@ -811,12 +941,18 @@ if (window.DocGeneratorLoaded) {
     togglePanel() {
       const panel = document.getElementById(PANEL_ID);
       if (panel) {
+        const wasHidden = panel.classList.contains('yc-doc-hidden');
         panel.classList.toggle('yc-doc-hidden');
         this.isMinimized = panel.classList.contains('yc-doc-hidden');
 
         // 通知位置管理器
         if (window.PanelPositionManager) {
           window.PanelPositionManager.handlePanelToggle('doc-generator', !this.isMinimized);
+        }
+
+        // 面板展开时，执行当前 tab 的方法
+        if (wasHidden && !this.isMinimized) {
+          this.executeTabAction(this.currentTab);
         }
       }
     }
@@ -831,6 +967,9 @@ if (window.DocGeneratorLoaded) {
 
       // 同时收集链接
       this.collectLinks();
+
+      // 收集 GitHub 仓库链接
+      this.collectGithubRepos();
 
       this.showToast('文档生成完成');
     }
@@ -1094,6 +1233,198 @@ if (window.DocGeneratorLoaded) {
       console.log(`[文档生成器] 收集了 ${this.linkCount} 个链接`);
     }
 
+    // ==================== GitHub 仓库收集功能 ====================
+
+    // 收集 GitHub 仓库链接
+    collectGithubRepos() {
+      const links = document.querySelectorAll('a[href]');
+      const seenRepos = new Set();
+      this.githubRepos = [];
+      this.githubElements = [];
+
+      // GitHub 仓库 URL 正则：匹配 owner/repo 格式
+      const githubRepoPattern = /^https?:\/\/github\.com\/([a-zA-Z0-9_-]+)\/([a-zA-Z0-9_.-]+)\/?$/;
+      // 也匹配带 tree/blob 等的链接，但只提取仓库部分
+      const githubRepoPathPattern = /^https?:\/\/github\.com\/([a-zA-Z0-9_-]+)\/([a-zA-Z0-9_.-]+)(?:\/|$)/;
+
+      links.forEach(link => {
+        // 检查是否隐藏
+        if (this.isHiddenElement(link)) return;
+
+        const href = link.href;
+        const match = href.match(githubRepoPathPattern);
+
+        if (match) {
+          const owner = match[1];
+          const repo = match[2];
+
+          // 排除 GitHub 自己的特殊页面
+          const excludePatterns = [
+            /^(features|pricing|security|about|blog|careers|press|shop|sponsors|topics|trending|collections|events|explore|settings|notifications|pulls|issues|marketplace|orgs|new|import|gist)$/i
+          ];
+
+          if (excludePatterns.some(p => p.test(owner))) return;
+
+          // 排除组织页面
+          if (href.match(/^https?:\/\/github\.com\/orgs\//)) return;
+
+          const repoKey = `${owner}/${repo}`;
+
+          // 去重
+          if (seenRepos.has(repoKey)) return;
+          seenRepos.add(repoKey);
+
+          const text = link.textContent.trim() || repo;
+
+          this.githubRepos.push({
+            owner: owner,
+            repo: repo,
+            url: `https://github.com/${owner}/${repo}`,
+            text: text.substring(0, 100),
+            originalUrl: href
+          });
+          this.githubElements.push(link);
+        }
+      });
+
+      this.githubCount = this.githubRepos.length;
+      this.updateGithubPanel();
+      this.updateStatus();
+
+      console.log(`[文档生成器] 收集了 ${this.githubCount} 个 GitHub 仓库`);
+    }
+
+    // 更新 GitHub 仓库面板内容
+    updateGithubPanel() {
+      const githubContent = document.querySelector('.yc-doc-content-github');
+      if (!githubContent) return;
+
+      if (this.githubRepos.length === 0) {
+        githubContent.innerHTML = `
+          <div class="yc-doc-empty-hint">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1">
+              <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
+            </svg>
+            <p>当前页面没有发现 GitHub 仓库链接<br>访问包含 GitHub 链接的页面后点击"生成文档"</p>
+          </div>
+        `;
+        return;
+      }
+
+      let html = '<ul class="yc-doc-github-list">';
+      this.githubRepos.forEach((repo, index) => {
+        const escapedText = this.escapeHtml(repo.text);
+        const escapedUrl = this.escapeHtml(repo.url);
+        const displayText = repo.text || `${repo.owner}/${repo.repo}`;
+
+        html += `
+          <li class="yc-doc-github-item">
+            <div class="yc-doc-github-info">
+              <a class="yc-doc-github-link"
+                 href="${escapedUrl}"
+                 target="_blank"
+                 rel="noopener noreferrer"
+                 title="${escapedUrl}">
+                <span class="yc-doc-github-icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.605-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 21.795 24 17.295 24 12c0-6.63-5.37-12-12-12"/>
+                  </svg>
+                </span>
+                <span class="yc-doc-github-name">${this.escapeHtml(displayText)}</span>
+              </a>
+              <span class="yc-doc-github-path">${repo.owner}/${repo.repo}</span>
+            </div>
+            <div class="yc-doc-github-actions">
+              <button class="yc-doc-github-btn yc-doc-download-btn" data-index="${index}" title="下载仓库 (ZIP)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+              </button>
+              <button class="yc-doc-github-btn yc-doc-locate-btn" data-index="${index}" title="定位到页面元素">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="M12 2v4m0 12v4M2 12h4m12 0h4"/>
+                </svg>
+              </button>
+            </div>
+          </li>
+        `;
+      });
+      html += '</ul>';
+
+      githubContent.innerHTML = html;
+    }
+
+    // 定位 GitHub 链接元素
+    locateGithubElement(index) {
+      const element = this.githubElements[index];
+      if (!element) {
+        this.showToast('链接元素已失效，请重新收集');
+        return;
+      }
+
+      // 滚动到元素位置
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+      // 高亮效果
+      const originalOutline = element.style.outline;
+      const originalBg = element.style.backgroundColor;
+      element.style.transition = 'outline 0.3s, background-color 0.3s';
+      element.style.outline = '3px solid #1a73e8';
+      element.style.backgroundColor = '#e8f0fe';
+
+      setTimeout(() => {
+        element.style.outline = originalOutline;
+        element.style.backgroundColor = originalBg;
+      }, 2000);
+
+      this.showToast('已定位到链接元素');
+    }
+
+    // 下载 GitHub 仓库
+    async downloadGithubRepo(index) {
+      const repo = this.githubRepos[index];
+      if (!repo) {
+        this.showToast('仓库信息已失效，请重新收集');
+        return;
+      }
+
+      const downloadUrl = `https://github.com/${repo.owner}/${repo.repo}/archive/refs/heads/main.zip`;
+      const masterUrl = `https://github.com/${repo.owner}/${repo.repo}/archive/refs/heads/master.zip`;
+
+      this.showToast(`正在下载 ${repo.owner}/${repo.repo}...`);
+
+      // 尝试 main 分支
+      try {
+        const response = await fetch(downloadUrl, { method: 'HEAD' });
+        if (response.ok) {
+          window.open(downloadUrl, '_blank');
+          this.showToast(`已开始下载 ${repo.repo} (main 分支)`);
+          return;
+        }
+      } catch (e) {
+        // 继续尝试 master
+      }
+
+      // 尝试 master 分支
+      try {
+        const response = await fetch(masterUrl, { method: 'HEAD' });
+        if (response.ok) {
+          window.open(masterUrl, '_blank');
+          this.showToast(`已开始下载 ${repo.repo} (master 分支)`);
+          return;
+        }
+      } catch (e) {
+        // 继续使用默认方式
+      }
+
+      // 直接打开下载页面
+      window.open(`https://github.com/${repo.owner}/${repo.repo}/archive/refs/heads/main.zip`, '_blank');
+      this.showToast(`已打开下载链接`);
+    }
+
     // 更新链接面板内容
     updateLinksPanel() {
       const linksContent = document.querySelector('.yc-doc-content-links');
@@ -1249,7 +1580,8 @@ if (window.DocGeneratorLoaded) {
       if (count) {
         const outlineNum = this.outlineCount || 0;
         const linkNum = this.linkCount || 0;
-        count.textContent = `大纲 ${outlineNum} 项 | 链接 ${linkNum} 项`;
+        const githubNum = this.githubCount || 0;
+        count.textContent = `大纲 ${outlineNum} | 链接 ${linkNum} | GitHub ${githubNum}`;
       }
     }
 
@@ -1264,6 +1596,13 @@ if (window.DocGeneratorLoaded) {
           return;
         }
         textToCopy = this.collectedLinks.map(link => `${link.text}\n${link.url}`).join('\n\n');
+      } else if (this.currentTab === 'github') {
+        // 复制 GitHub 仓库列表
+        if (this.githubRepos.length === 0) {
+          this.showToast('没有可复制的 GitHub 仓库');
+          return;
+        }
+        textToCopy = this.githubRepos.map(repo => `${repo.owner}/${repo.repo}\n${repo.url}`).join('\n\n');
       } else {
         // 复制大纲内容
         const content = document.querySelector('.yc-doc-content-outline');
@@ -1328,6 +1667,15 @@ if (window.DocGeneratorLoaded) {
         markdown += '\n';
       }
 
+      // 添加 GitHub 仓库内容
+      if (this.githubRepos.length > 0) {
+        markdown += '## GitHub 仓库\n\n';
+        this.githubRepos.forEach((repo, index) => {
+          markdown += `${index + 1}. [${repo.owner}/${repo.repo}](${repo.url}) - ${repo.text}\n`;
+        });
+        markdown += '\n';
+      }
+
       const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -1377,8 +1725,11 @@ if (window.DocGeneratorLoaded) {
     clearContent() {
       this.collectedContent = [];
       this.collectedLinks = [];
+      this.githubRepos = [];
+      this.githubElements = [];
       this.outlineCount = 0;
       this.linkCount = 0;
+      this.githubCount = 0;
 
       const outlineContent = document.querySelector('.yc-doc-content-outline');
       if (outlineContent) {
@@ -1394,6 +1745,18 @@ if (window.DocGeneratorLoaded) {
               <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
             </svg>
             <p>点击"生成文档"自动收集页面链接<br>导航区域的链接会被自动排除</p>
+          </div>
+        `;
+      }
+
+      const githubContent = document.querySelector('.yc-doc-content-github');
+      if (githubContent) {
+        githubContent.innerHTML = `
+          <div class="yc-doc-empty-hint">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1">
+              <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
+            </svg>
+            <p>当前页面没有发现 GitHub 仓库链接<br>访问包含 GitHub 链接的页面后点击"生成文档"</p>
           </div>
         `;
       }

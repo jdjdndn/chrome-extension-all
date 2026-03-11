@@ -12,25 +12,59 @@ if (window._contentScriptLoaded) {
 }
 window._contentScriptLoaded = true;
 
-// ========== 架构初始化 ==========
-// 初始化 Store（如果可用）
+// ========== 懒初始化支持 ==========
+// 使用 LazyInitManager 进行分层懒初始化
+// L1: 基础层 - 立即初始化（EventBus、Logger、Storage）
+// L2: 核心层 - 懒初始化（Store、Services、Pipeline）
+// L3: DevTools层 - DevTools 打开时初始化
+// L4: 功能层 - 首次使用时初始化
+
 let storeReady = false;
-if (typeof AppStore !== 'undefined') {
-  AppStore.init({
-    storageArea: 'local',
-    storageKey: 'contentState',
-    initialState: {
-      enabled: false,
-      debugMode: false,
-      hideElements: { enabled: false, selectors: [] }
+
+/**
+ * 注册 L2 核心层初始化回调
+ */
+function registerL2InitCallbacks() {
+  if (!window.LazyInitManager) return;
+
+  // Store 初始化
+  LazyInitManager.registerInitCallback('L2', async () => {
+    if (typeof AppStore !== 'undefined' && !storeReady) {
+      try {
+        await AppStore.init({
+          storageArea: 'local',
+          storageKey: 'contentState',
+          initialState: {
+            enabled: false,
+            debugMode: false,
+            hideElements: { enabled: false, selectors: [] }
+          }
+        });
+        storeReady = true;
+        console.log('[Content] Store 初始化完成');
+      } catch (e) {
+        console.warn('[Content] Store 初始化失败:', e);
+      }
     }
-  }).then(() => {
-    storeReady = true;
-    console.log('[Content] Store 初始化完成');
-  }).catch(e => {
-    console.warn('[Content] Store 初始化失败:', e);
-  });
+  }, 'Store初始化');
 }
+
+/**
+ * 注册 L4 功能层初始化回调
+ */
+function registerL4InitCallbacks() {
+  if (!window.LazyInitManager) return;
+
+  // 隐藏元素功能初始化
+  LazyInitManager.registerInitCallback('L4', async () => {
+    await initHideElements();
+    console.log('[Content] 隐藏元素功能初始化完成');
+  }, '隐藏元素初始化');
+}
+
+// 立即注册回调（不执行）
+registerL2InitCallbacks();
+registerL4InitCallbacks();
 
 // ========== Inject Page Context Script ==========
 // Inject the script into the page context to intercept XHR/Fetch at page level
@@ -201,8 +235,9 @@ async function initHideElements() {
   console.log(`[隐藏元素] ${domain} 合并后选择器:`, mergedSelectors.length, '个 (默认:', defaultSelectors.length, ', 服务器:', serverSelectors.length, ', 用户:', userSelectors.length, ')');
 }
 
-// Initialize hide elements
-initHideElements();
+// Initialize hide elements - 延迟到激活时初始化
+// initHideElements(); // 移除立即初始化
+console.log('[Content] 隐藏元素功能已注册为懒初始化');
 
 // Expose API
 window.ExtensionAPI = {
@@ -222,6 +257,37 @@ StorageUtils.onChanged((changes, areaName) => {
 
 // ========== Message Handler ==========
 MessagingUtils.createMessageHandler('content_main_handler', {
+  // ========== 激活消息处理 ==========
+  'EXTENSION_ACTIVATE': async (message) => {
+    const source = message.source || 'unknown';
+    console.log(`[Content] 收到激活消息 (来源: ${source})`);
+
+    if (window.LazyInitManager) {
+      const result = await LazyInitManager.activate(source);
+      console.log('[Content] 激活结果:', result);
+    }
+
+    return { success: true, activated: true };
+  },
+
+  'DEVTOOLS_ACTIVATE': async (message) => {
+    console.log('[Content] 收到 DevTools 激活消息');
+
+    if (window.LazyInitManager) {
+      await LazyInitManager.onDevToolsOpen();
+      console.log('[Content] DevTools 激活完成');
+    }
+
+    return { success: true };
+  },
+
+  'GET_LAZY_INIT_STATE': () => {
+    if (window.LazyInitManager) {
+      return { success: true, state: LazyInitManager.getState() };
+    }
+    return { success: false, error: 'LazyInitManager 未加载' };
+  },
+
   'GET_DEFAULT_HIDE_SELECTORS': () => {
     const selectors = getDomainDefaultHideSelectors();
     console.log('[Content] 返回默认隐藏选择器:', selectors);

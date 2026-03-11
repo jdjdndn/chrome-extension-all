@@ -14,7 +14,8 @@
     "bookmarks",
     "history",
     "notifications",
-    "contextMenus"
+    "contextMenus",
+    "downloads"
   ],
   "host_permissions": ["*://*/*", "http://localhost/*", "http://127.0.0.1/*"],
   "declarative_net_request": {
@@ -67,7 +68,7 @@
         "content/core/config-migrator.js",
         "content/core/extension-api.js",
         "content/core/module-manager.js",
-        "content/devtools/page-helper.js"
+        "content/core/lazy-init-manager.js"
       ],
       "run_at": "document_start"
     },
@@ -204,6 +205,11 @@
     {
       "matches": ["*://github.com/*", "*://*.github.com/*"],
       "js": ["content/github.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["*://claudemarketplaces.com/*", "*://*.claudemarketplaces.com/*"],
+      "js": ["content/claude-market.js"],
       "run_at": "document_start"
     }
   ],

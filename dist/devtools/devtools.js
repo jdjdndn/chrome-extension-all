@@ -1,6 +1,27 @@
 // DevTools panels registration
 'use strict';
 
+/**
+ * 激活 content script 的 DevTools 功能
+ */
+async function activateContentScript() {
+  const tabId = chrome.devtools.inspectedWindow.tabId;
+  console.log('[DevTools] 激活 content script, tabId:', tabId);
+
+  try {
+    await chrome.runtime.sendMessage({
+      type: 'DEVTOOLS_ACTIVATE',
+      tabId: tabId
+    });
+    console.log('[DevTools] 激活成功');
+  } catch (error) {
+    console.warn('[DevTools] 激活失败:', error);
+  }
+}
+
+// DevTools 打开时立即激活
+activateContentScript();
+
 // Create EventBus Monitor panel
 chrome.devtools.panels.create(
   'EventBus Monitor',
@@ -8,6 +29,8 @@ chrome.devtools.panels.create(
   'devtools/eventbus-devtools.html',
   function (panel) {
     console.log('EventBus Monitor panel created');
+    // 面板创建时也激活一次（确保）
+    activateContentScript();
   }
 );
 

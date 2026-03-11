@@ -1095,6 +1095,77 @@ async function handleMessage(message, sender, sendResponse) {
 
   try {
     switch (message.type) {
+    // ========== 文件下载 ==========
+    case 'DOWNLOAD_FILE':
+      console.log('[Background] 收到下载请求:', message.url);
+      try {
+        chrome.downloads.download({
+          url: message.url,
+          filename: message.fileName,
+          saveAs: false
+        }, (downloadId) => {
+          if (chrome.runtime.lastError) {
+            console.error('[Background] 下载失败:', chrome.runtime.lastError.message);
+            sendResponse({ success: false, error: chrome.runtime.lastError.message });
+          } else {
+            console.log('[Background] 下载已开始, downloadId:', downloadId);
+            sendResponse({ success: true, downloadId });
+          }
+        });
+      } catch (error) {
+        console.error('[Background] 下载异常:', error);
+        sendResponse({ success: false, error: error.message });
+      }
+      return true; // 保持消息通道开放
+
+    // ========== 懒初始化激活消息 ==========
+    case 'EXTENSION_ACTIVATE':
+      // popup 打开时激活当前 tab 的 content script
+      console.log('[Background] 收到激活请求，来源:', message.source);
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tab?.id) {
+          await chrome.tabs.sendMessage(tab.id, {
+            type: 'EXTENSION_ACTIVATE',
+            source: message.source || 'popup'
+          });
+          sendResponse({ success: true, tabId: tab.id });
+        } else {
+          sendResponse({ success: false, error: 'No active tab' });
+        }
+      } catch (error) {
+        console.error('[Background] 激活失败:', error);
+        sendResponse({ success: false, error: error.message });
+      }
+      break;
+
+    case 'DEVTOOLS_ACTIVATE':
+      // DevTools 打开时激活对应 tab 的 content script
+      console.log('[Background] 收到 DevTools 激活请求, tabId:', message.tabId);
+      try {
+        if (message.tabId) {
+          // 注入 page-helper.js
+          await chrome.scripting.executeScript({
+            target: { tabId: message.tabId },
+            files: ['content/devtools/page-helper.js']
+          });
+          console.log('[Background] page-helper.js 已注入');
+
+          // 发送激活消息
+          await chrome.tabs.sendMessage(message.tabId, {
+            type: 'DEVTOOLS_ACTIVATE',
+            source: 'devtools'
+          });
+          sendResponse({ success: true });
+        } else {
+          sendResponse({ success: false, error: 'Missing tabId' });
+        }
+      } catch (error) {
+        console.error('[Background] DevTools 激活失败:', error);
+        sendResponse({ success: false, error: error.message });
+      }
+      break;
+
     case 'GET_EXTENSION_INFO':
       const currentDomainForInfo = await getCurrentTabDomain();
       sendResponse({

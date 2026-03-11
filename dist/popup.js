@@ -373,8 +373,46 @@ function renderBlockedResponseDomains(domains) {
   }
 }
 
+/**
+ * 激活 content script（触发懒初始化）
+ */
+async function activateContentScript() {
+  console.log('[Popup] 激活 content script');
+  try {
+    // 获取当前激活的 tab
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id || !tab.url) {
+      console.log('[Popup] 无有效 tab，跳过激活');
+      return;
+    }
+
+    // 排除扩展程序页面和特殊页面
+    const url = tab.url;
+    if (url.startsWith('chrome://') ||
+        url.startsWith('chrome-extension://') ||
+        url.startsWith('about:') ||
+        url.startsWith('edge://') ||
+        url.startsWith('brave://')) {
+      console.log('[Popup] 当前 tab 是特殊页面，跳过激活:', url.substring(0, 50));
+      return;
+    }
+
+    // 发送激活消息
+    await sendMessage('EXTENSION_ACTIVATE', { source: 'popup' });
+    console.log('[Popup] 激活成功');
+  } catch (error) {
+    // 忽略常见错误（如 tab 没有 content script）
+    if (!error.message?.includes('Receiving end does not exist')) {
+      console.warn('[Popup] 激活失败:', error);
+    }
+  }
+}
+
 // Initialize popup
 loadSettings().catch(console.error);
+
+// popup 打开时激活 content script
+activateContentScript();
 
 // Listen for messages from other parts of the extension
 chrome.runtime.onMessage.addListener((message, _sender, _sendResponse) => {
