@@ -200,6 +200,11 @@
       "matches": ["*://*.youtube.com/*"],
       "js": ["content/base/SiteScript.js", "content/youtube.js"],
       "run_at": "document_start"
+    },
+    {
+      "matches": ["*://github.com/*", "*://*.github.com/*"],
+      "js": ["content/github.js"],
+      "run_at": "document_start"
     }
   ],
   "background": {

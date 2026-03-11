@@ -346,6 +346,11 @@ if (window.KeyboardPaginationLoaded) {
 
         const key = e.key;
 
+        // 如果页面有可见视频，不拦截左右键（让视频播放器处理快进/快退）
+        if ((key === 'ArrowLeft' || key === 'ArrowRight') && this.hasVisibleVideo()) {
+          return;
+        }
+
         // 上一页
         if (this.config.prevKeys.includes(key)) {
           if (this.prevButton) {
@@ -380,17 +385,79 @@ if (window.KeyboardPaginationLoaded) {
       const active = document.activeElement;
       if (!active) return false;
 
+      // 1. 输入框检测
       const inputTypes = ['INPUT', 'TEXTAREA', 'SELECT'];
       if (inputTypes.includes(active.tagName)) return true;
 
+      // 2. 可编辑元素检测
       if (active.isContentEditable) return true;
 
-      // 检查是否在编辑器中
+      // 3. 代码编辑器检测
       const editors = ['.CodeMirror', '.ace_editor', '.monaco-editor', '[contenteditable="true"]'];
       for (const selector of editors) {
         if (active.closest(selector)) return true;
       }
 
+      // 4. 视频播放器控件检测（避免干扰视频进度条等控件）
+      const videoSelectors = [
+        'video',                          // video 元素
+        'audio',                          // audio 元素
+        '.bpx-player',                    // B站播放器
+        '.bilibili-player',               // B站旧播放器
+        '.bpx-player-control-wrap',       // B站控制栏
+        '.xgplayer',                      // 西瓜/抖音播放器
+        '.dplayer',                       // DPlayer
+        '.vjs-player',                    // Video.js
+        '.jw-player',                     // JW Player
+        '.plyr',                          // Plyr
+        '[class*="player"][class*="control"]', // 通用播放器控件
+      ];
+      for (const selector of videoSelectors) {
+        try {
+          if (active.matches?.(selector) || active.closest?.(selector)) {
+            return true;
+          }
+        } catch (e) {
+          // 选择器不支持，跳过
+        }
+      }
+
+      // 5. 进度条/滑块检测（视频进度条、音量条等）
+      const sliderSelectors = [
+        '[role="slider"]',                // ARIA 滑块
+        'input[type="range"]',            // range 输入
+        '.bpx-player-progress',           // B站进度条
+        '.bilibili-player-progress',      // B站旧进度条
+        '[class*="progress"][class*="bar"]', // 通用进度条
+        '[class*="seekbar"]',             // 通用 seekbar
+        '[class*="timeline"]',            // 通用时间线
+        '.xgplayer-progress',             // 西瓜播放器进度条
+        '.xgplayer-slider',               // 西瓜播放器滑块
+      ];
+      for (const selector of sliderSelectors) {
+        try {
+          if (active.matches?.(selector) || active.closest?.(selector)) {
+            return true;
+          }
+        } catch (e) {
+          // 选择器不支持，跳过
+        }
+      }
+
+      return false;
+    }
+
+    // 检测页面是否有可见的视频播放器
+    hasVisibleVideo() {
+      const videos = document.querySelectorAll('video');
+      for (const video of videos) {
+        const rect = video.getBoundingClientRect();
+        // 视频可见且尺寸足够大（排除小视频广告等）
+        if (rect.width > 200 && rect.height > 150 &&
+            rect.top < window.innerHeight && rect.bottom > 0) {
+          return true;
+        }
+      }
       return false;
     }
 
