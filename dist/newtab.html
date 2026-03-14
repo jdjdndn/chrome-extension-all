@@ -193,26 +193,9 @@
       box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
       padding: 40px;
       margin-top: 20px;
-      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
       max-height: calc(100vh - 120px);
-    }
-
-    /* 隐藏滚动条但保持滚动功能 */
-    .container::-webkit-scrollbar {
-      width: 6px;
-    }
-
-    .container::-webkit-scrollbar-track {
-      background: transparent;
-    }
-
-    .container::-webkit-scrollbar-thumb {
-      background: rgba(0, 0, 0, 0.2);
-      border-radius: 3px;
-    }
-
-    .container::-webkit-scrollbar-thumb:hover {
-      background: rgba(0, 0, 0, 0.3);
     }
 
     .header {
@@ -427,6 +410,74 @@
       font-size: 13px;
     }
 
+    /* Tab 导航 */
+    .tab-nav {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 24px;
+      padding: 4px;
+      background: #f0f0f0;
+      border-radius: 12px;
+      flex-shrink: 0;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 12px 20px;
+      border: none;
+      background: transparent;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #666;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .tab-btn:hover {
+      color: #333;
+      background: rgba(255, 255, 255, 0.5);
+    }
+
+    .tab-btn.active {
+      background: #fff;
+      color: #667eea;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .tab-content {
+      display: none;
+      overflow-y: auto;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Tab 内容滚动条 */
+    .tab-content::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .tab-content::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .tab-content::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 3px;
+    }
+
+    .tab-content::-webkit-scrollbar-thumb:hover {
+      background: rgba(0, 0, 0, 0.3);
+    }
+
     .tools-section {
       border-top: 1px solid #e0e0e0;
       padding-top: 24px;
@@ -555,6 +606,263 @@
       margin-top: 6px;
       font-weight: 500;
     }
+
+    /* 学习资源样式 */
+    .learn-section {
+      margin-bottom: 24px;
+    }
+
+    .learn-category {
+      background: #f8f9fa;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .learn-category-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    .learn-category-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .learn-category-icon {
+      font-size: 18px;
+    }
+
+    .learn-category-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .learn-category-btn {
+      padding: 6px 12px;
+      background: #667eea;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .learn-category-btn:hover {
+      background: #5568d3;
+      transform: translateY(-1px);
+    }
+
+    .learn-category-btn.delete {
+      background: #e74c3c;
+    }
+
+    .learn-category-btn.delete:hover {
+      background: #c0392b;
+    }
+
+    .learn-links-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 10px;
+    }
+
+    .learn-link-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      background: #fff;
+      border-radius: 8px;
+      text-decoration: none;
+      color: #333;
+      transition: all 0.2s ease;
+      border: 1px solid #e0e0e0;
+    }
+
+    .learn-link-item:hover {
+      border-color: #667eea;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+    }
+
+    .learn-link-favicon {
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+
+    .learn-link-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .learn-link-name {
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .learn-link-url {
+      font-size: 11px;
+      color: #999;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .learn-link-delete {
+      padding: 4px 8px;
+      background: transparent;
+      border: none;
+      color: #999;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: all 0.2s ease;
+      opacity: 0;
+    }
+
+    .learn-link-item:hover .learn-link-delete {
+      opacity: 1;
+    }
+
+    .learn-link-delete:hover {
+      background: #fee;
+      color: #e74c3c;
+    }
+
+    .add-category-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 16px;
+      background: rgba(102, 126, 234, 0.08);
+      border: 2px dashed #667eea;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      width: 100%;
+      color: #667eea;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .add-category-btn:hover {
+      background: rgba(102, 126, 234, 0.15);
+      border-color: #5568d3;
+    }
+
+    .learn-empty {
+      text-align: center;
+      padding: 40px 20px;
+      color: #999;
+    }
+
+    .learn-empty-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+    }
+
+    .learn-empty-text {
+      font-size: 14px;
+    }
+
+    /* 模态框 */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 300;
+    }
+
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal {
+      background: #fff;
+      border-radius: 16px;
+      padding: 24px;
+      width: 90%;
+      max-width: 400px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+
+    .modal-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 20px;
+    }
+
+    .modal-input {
+      width: 100%;
+      padding: 12px 14px;
+      font-size: 14px;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      outline: none;
+      margin-bottom: 12px;
+      transition: all 0.2s ease;
+    }
+
+    .modal-input:focus {
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    .modal-btn {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .modal-btn.cancel {
+      background: #f0f0f0;
+      color: #666;
+    }
+
+    .modal-btn.cancel:hover {
+      background: #e0e0e0;
+    }
+
+    .modal-btn.confirm {
+      background: #667eea;
+      color: #fff;
+    }
+
+    .modal-btn.confirm:hover {
+      background: #5568d3;
+    }
   </style>
 </head>
 <body>
@@ -572,8 +880,8 @@
       <div class="setting-item">
         <label class="setting-label">每行图标个数</label>
         <div style="display: flex; align-items: center;">
-          <input type="range" class="setting-range" id="columnsRange" min="3" max="15" value="10">
-          <span class="setting-range-value" id="columnsValue">6</span>
+          <input type="range" class="setting-range" id="columnsRange" min="8" max="15" value="10">
+          <span class="setting-range-value" id="columnsValue">10</span>
         </div>
       </div>
       <div class="setting-item">
@@ -599,25 +907,39 @@
       <input type="text" class="search-input" id="searchInput" placeholder="搜索或输入网址..." autofocus>
     </div>
 
-    <div class="quick-links" id="quickLinks">
-      <!-- 快捷方式由 JS 动态生成 -->
-      <div class="add-link-btn" id="addLinkBtn">
-        <span class="add-link-btn-icon">+</span>
-        <span class="add-link-btn-text">添加</span>
-      </div>
+    <!-- Tab 导航 -->
+    <div class="tab-nav">
+      <button class="tab-btn active" data-tab="home">
+        <span>🏠</span>
+        <span>主页</span>
+      </button>
+      <button class="tab-btn" data-tab="learn">
+        <span>📚</span>
+        <span>学习资源</span>
+      </button>
     </div>
 
-    <!-- 历史记录区域 -->
-    <div class="history-section" id="historySection">
-      <div class="history-title">🕐 最近访问</div>
-      <div class="history-container" id="historyContainer">
-        <div class="history-empty">加载中...</div>
+    <!-- 主页 Tab -->
+    <div class="tab-content active" id="tab-home">
+      <div class="quick-links" id="quickLinks">
+        <!-- 快捷方式由 JS 动态生成 -->
+        <div class="add-link-btn" id="addLinkBtn">
+          <span class="add-link-btn-icon">+</span>
+          <span class="add-link-btn-text">添加</span>
+        </div>
       </div>
-    </div>
 
-    <div class="tools-section">
-      <div class="tools-title">🛠️ 实用工具</div>
-      <div class="tools-grid">
+      <!-- 历史记录区域 -->
+      <div class="history-section" id="historySection">
+        <div class="history-title">🕐 最近访问</div>
+        <div class="history-container" id="historyContainer">
+          <div class="history-empty">加载中...</div>
+        </div>
+      </div>
+
+      <div class="tools-section">
+        <div class="tools-title">🛠️ 实用工具</div>
+        <div class="tools-grid">
         <a href="https://www.google.com/search?q=chrome+extensions" target="_blank" class="tool-item">
           <div class="tool-icon">⚙️</div>
           <div class="tool-info">
@@ -730,6 +1052,38 @@
             <div class="tool-desc">Google图片压缩工具</div>
           </div>
         </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 学习资源 Tab -->
+    <div class="tab-content" id="tab-learn">
+      <div class="learn-section" id="learnSection">
+        <!-- 学习分类由 JS 动态生成 -->
+      </div>
+      <div style="display: flex; gap: 12px; margin-top: 16px;">
+        <button class="add-category-btn" id="addCategoryBtn" style="flex: 1;">
+          <span>➕</span>
+          <span>添加新分类</span>
+        </button>
+        <button class="add-category-btn" id="importBookmarkBtn" style="flex: 1; border-color: #52c41a; color: #52c41a;">
+          <span>📖</span>
+          <span>从书签导入</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 模态框 -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+      <div class="modal-title" id="modalTitle">添加分类</div>
+      <input type="text" class="modal-input" id="modalInput1" placeholder="分类名称">
+      <input type="text" class="modal-input" id="modalInput2" placeholder="分类图标（emoji）">
+      <input type="text" class="modal-input" id="modalInput3" placeholder="">
+      <div class="modal-actions">
+        <button class="modal-btn cancel" id="modalCancel">取消</button>
+        <button class="modal-btn confirm" id="modalConfirm">确认</button>
       </div>
     </div>
   </div>

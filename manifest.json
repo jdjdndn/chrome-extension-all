@@ -206,11 +206,6 @@
       "matches": ["*://github.com/*", "*://*.github.com/*"],
       "js": ["content/github.js"],
       "run_at": "document_start"
-    },
-    {
-      "matches": ["*://claudemarketplaces.com/*", "*://*.claudemarketplaces.com/*"],
-      "js": ["content/claude-market.js"],
-      "run_at": "document_start"
     }
   ],
   "background": {

@@ -550,3 +550,559 @@ document.addEventListener('keydown', (e) => {
     searchInput.focus();
   }
 });
+
+// ========== Tab 切换 ==========
+const tabBtns = document.querySelectorAll('.tab-btn');
+const tabContents = document.querySelectorAll('.tab-content');
+
+tabBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tabId = btn.dataset.tab;
+
+    // 切换按钮状态
+    tabBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    // 切换内容
+    tabContents.forEach(content => {
+      content.classList.remove('active');
+      if (content.id === `tab-${tabId}`) {
+        content.classList.add('active');
+      }
+    });
+  });
+});
+
+// ========== 学习资源管理 ==========
+const LEARN_RESOURCES_KEY = 'learnResources';
+const DEFAULT_LEARN_CATEGORIES = [
+  {
+    id: 'plc',
+    name: 'PLC/工控',
+    icon: '🏭',
+    links: [
+      { name: '西门子工业支持', url: 'https://support.industry.siemens.com/', favicon: '' },
+      { name: '三菱电机自动化', url: 'https://www.mitsubishielectric.com.cn/afa/', favicon: '' },
+      { name: '欧姆龙自动化', url: 'https://www.omron.com.cn/', favicon: '' },
+      { name: '工控论坛', url: 'https://www.gkong.com/', favicon: '' },
+      { name: '中华工控网', url: 'https://www.gongkong.com/', favicon: '' },
+      { name: 'PLC之家', url: 'https://www.plc100.com/', favicon: '' },
+      { name: '台达电子', url: 'https://www.deltaww.com/', favicon: '' },
+      { name: 'ABB机器人', url: 'https://new.abb.com/products/robotics', favicon: '' }
+    ]
+  },
+  {
+    id: 'programming',
+    name: '编程学习',
+    icon: '💻',
+    links: [
+      { name: 'MDN Web Docs', url: 'https://developer.mozilla.org/', favicon: '' },
+      { name: 'LeetCode', url: 'https://leetcode.cn/', favicon: '' },
+      { name: '掘金', url: 'https://juejin.cn/', favicon: '' },
+      { name: 'Stack Overflow', url: 'https://stackoverflow.com/', favicon: '' },
+      { name: 'GitHub', url: 'https://github.com/', favicon: '' },
+      { name: 'Gitee', url: 'https://gitee.com/', favicon: '' },
+      { name: '菜鸟教程', url: 'https://www.runoob.com/', favicon: '' },
+      { name: 'W3Schools', url: 'https://www.w3schools.com/', favicon: '' },
+      { name: '力扣中国', url: 'https://leetcode.cn/', favicon: '' },
+      { name: '牛客网', url: 'https://www.nowcoder.com/', favicon: '' }
+    ]
+  },
+  {
+    id: 'ai',
+    name: 'AI/机器学习',
+    icon: '🤖',
+    links: [
+      { name: 'OpenAI', url: 'https://openai.com/', favicon: '' },
+      { name: 'Hugging Face', url: 'https://huggingface.co/', favicon: '' },
+      { name: 'Kaggle', url: 'https://www.kaggle.com/', favicon: '' },
+      { name: 'Papers With Code', url: 'https://paperswithcode.com/', favicon: '' },
+      { name: 'TensorFlow', url: 'https://www.tensorflow.org/', favicon: '' },
+      { name: 'PyTorch', url: 'https://pytorch.org/', favicon: '' },
+      { name: '飞桨PaddlePaddle', url: 'https://www.paddlepaddle.org.cn/', favicon: '' },
+      { name: 'ModelScope魔搭', url: 'https://modelscope.cn/', favicon: '' }
+    ]
+  },
+  {
+    id: 'design',
+    name: '设计/创意',
+    icon: '🎨',
+    links: [
+      { name: 'Figma', url: 'https://www.figma.com/', favicon: '' },
+      { name: 'Dribbble', url: 'https://dribbble.com/', favicon: '' },
+      { name: 'Behance', url: 'https://www.behance.net/', favicon: '' },
+      { name: '站酷', url: 'https://www.zcool.com.cn/', favicon: '' },
+      { name: '花瓣网', url: 'https://huaban.com/', favicon: '' },
+      { name: 'Pinterest', url: 'https://www.pinterest.com/', favicon: '' },
+      { name: 'Unsplash', url: 'https://unsplash.com/', favicon: '' },
+      { name: 'iconfont', url: 'https://www.iconfont.cn/', favicon: '' }
+    ]
+  },
+  {
+    id: 'language',
+    name: '语言学习',
+    icon: '🌍',
+    links: [
+      { name: '多邻国', url: 'https://www.duolingo.com/', favicon: '' },
+      { name: '百词斩', url: 'https://www.baicizhan.com/', favicon: '' },
+      { name: '扇贝单词', url: 'https://www.shanbay.com/', favicon: '' },
+      { name: '流利说', url: 'https://www.liulishuo.com/', favicon: '' },
+      { name: 'TED', url: 'https://www.ted.com/', favicon: '' },
+      { name: 'BBC Learning', url: 'https://www.bbc.co.uk/learningenglish/', favicon: '' },
+      { name: '沪江英语', url: 'https://www.hjenglish.com/', favicon: '' },
+      { name: '每日英语听力', url: 'https://dict.eudic.net/', favicon: '' }
+    ]
+  },
+  {
+    id: 'exam',
+    name: '考试认证',
+    icon: '📜',
+    links: [
+      { name: '中国教育考试网', url: 'https://www.neea.edu.cn/', favicon: '' },
+      { name: '学信网', url: 'https://www.chsi.com.cn/', favicon: '' },
+      { name: '研招网', url: 'https://yz.chsi.com.cn/', favicon: '' },
+      { name: '软考网', url: 'https://www.ruankao.org.cn/', favicon: '' },
+      { name: 'PMP中国', url: 'https://www.pmi.org/', favicon: '' },
+      { name: '中国大学MOOC', url: 'https://www.icourse163.org/', favicon: '' },
+      { name: '公务员考试网', url: 'http://www.chinagwy.org/', favicon: '' },
+      { name: '注协网', url: 'https://www.cicpa.org.cn/', favicon: '' }
+    ]
+  },
+  {
+    id: 'video',
+    name: '视频教程',
+    icon: '📺',
+    links: [
+      { name: 'B站', url: 'https://www.bilibili.com/', favicon: '' },
+      { name: 'YouTube', url: 'https://www.youtube.com/', favicon: '' },
+      { name: '慕课网', url: 'https://www.imooc.com/', favicon: '' },
+      { name: '网易云课堂', url: 'https://study.163.com/', favicon: '' },
+      { name: '腾讯课堂', url: 'https://ke.qq.com/', favicon: '' },
+      { name: '学堂在线', url: 'https://www.xuetangx.com/', favicon: '' },
+      { name: 'Coursera', url: 'https://www.coursera.org/', favicon: '' },
+      { name: 'Udemy', url: 'https://www.udemy.com/', favicon: '' }
+    ]
+  },
+  {
+    id: 'electronics',
+    name: '电子/硬件',
+    icon: '🔧',
+    links: [
+      { name: '立创EDA', url: 'https://lceda.cn/', favicon: '' },
+      { name: '嘉立创', url: 'https://www.jlc.com/', favicon: '' },
+      { name: '得捷电子', url: 'https://www.digikey.com/', favicon: '' },
+      { name: '贸泽电子', url: 'https://www.mouser.com/', favicon: '' },
+      { name: 'EEWorld', url: 'https://www.eeworld.com.cn/', favicon: '' },
+      { name: '电子发烧友', url: 'https://www.elecfans.com/', favicon: '' },
+      { name: '21ic电子网', url: 'https://www.21ic.com/', favicon: '' },
+      { name: 'Arduino', url: 'https://www.arduino.cc/', favicon: '' }
+    ]
+  },
+  {
+    id: 'data',
+    name: '数据分析',
+    icon: '📊',
+    links: [
+      { name: 'Kaggle', url: 'https://www.kaggle.com/', favicon: '' },
+      { name: '天池', url: 'https://tianchi.aliyun.com/', favicon: '' },
+      { name: '和鲸社区', url: 'https://www.heywhale.com/', favicon: '' },
+      { name: 'DataCamp', url: 'https://www.datacamp.com/', favicon: '' },
+      { name: 'Tableau', url: 'https://www.tableau.com/', favicon: '' },
+      { name: 'Power BI', url: 'https://powerbi.microsoft.com/', favicon: '' },
+      { name: '国家统计局', url: 'http://www.stats.gov.cn/', favicon: '' },
+      { name: '世界银行数据', url: 'https://data.worldbank.org/', favicon: '' }
+    ]
+  },
+  {
+    id: 'devops',
+    name: '运维/DevOps',
+    icon: '⚙️',
+    links: [
+      { name: 'Docker Hub', url: 'https://hub.docker.com/', favicon: '' },
+      { name: 'Kubernetes', url: 'https://kubernetes.io/', favicon: '' },
+      { name: 'Jenkins', url: 'https://www.jenkins.io/', favicon: '' },
+      { name: '阿里云', url: 'https://www.aliyun.com/', favicon: '' },
+      { name: '腾讯云', url: 'https://cloud.tencent.com/', favicon: '' },
+      { name: '华为云', url: 'https://www.huaweicloud.com/', favicon: '' },
+      { name: 'AWS', url: 'https://aws.amazon.com/', favicon: '' },
+      { name: 'Linux命令大全', url: 'https://www.linuxcool.com/', favicon: '' }
+    ]
+  },
+  {
+    id: 'product',
+    name: '产品/运营',
+    icon: '📱',
+    links: [
+      { name: '人人都是产品经理', url: 'https://www.woshipm.com/', favicon: '' },
+      { name: '产品壹佰', url: 'https://www.chanpin100.com/', favicon: '' },
+      { name: '鸟哥笔记', url: 'https://www.niaogebiji.com/', favicon: '' },
+      { name: '运营派', url: 'https://www.yunyingpai.com/', favicon: '' },
+      { name: '增长黑客', url: 'https://growthbox.net/', favicon: '' },
+      { name: 'PMCAFF', url: 'https://www.pmcaff.com/', favicon: '' },
+      { name: '36氪', url: 'https://36kr.com/', favicon: '' },
+      { name: '虎嗅', url: 'https://www.huxiu.com/', favicon: '' }
+    ]
+  },
+  {
+    id: 'self-improvement',
+    name: '个人提升',
+    icon: '📈',
+    links: [
+      { name: '知乎', url: 'https://www.zhihu.com/', favicon: '' },
+      { name: '少数派', url: 'https://sspai.com/', favicon: '' },
+      { name: '即刻', url: 'https://okjike.com/', favicon: '' },
+      { name: '豆瓣', url: 'https://www.douban.com/', favicon: '' },
+      { name: '微信读书', url: 'https://weread.qq.com/', favicon: '' },
+      { name: '得到', url: 'https://www.dedao.cn/', favicon: '' },
+      { name: 'Notion', url: 'https://www.notion.so/', favicon: '' },
+      { name: 'flomo浮墨', url: 'https://flomoapp.com/', favicon: '' }
+    ]
+  }
+];
+
+// 获取学习资源
+function getLearnResources(callback) {
+  chrome.storage.local.get([LEARN_RESOURCES_KEY], (result) => {
+    if (result[LEARN_RESOURCES_KEY] && result[LEARN_RESOURCES_KEY].length > 0) {
+      callback(result[LEARN_RESOURCES_KEY]);
+    } else {
+      callback(DEFAULT_LEARN_CATEGORIES);
+    }
+  });
+}
+
+// 保存学习资源
+function saveLearnResources(categories) {
+  chrome.storage.local.set({ [LEARN_RESOURCES_KEY]: categories });
+}
+
+// 获取 favicon URL
+function getFaviconUrl(url) {
+  try {
+    const urlObj = new URL(url);
+    return `${urlObj.origin}/favicon.ico`;
+  } catch (e) {
+    return '';
+  }
+}
+
+// 渲染学习资源
+function renderLearnResources(categories) {
+  const learnSection = document.getElementById('learnSection');
+
+  if (!categories || categories.length === 0) {
+    learnSection.innerHTML = `
+      <div class="learn-empty">
+        <div class="learn-empty-icon">📚</div>
+        <div class="learn-empty-text">暂无学习资源，点击下方添加分类</div>
+      </div>
+    `;
+    return;
+  }
+
+  learnSection.innerHTML = categories.map(category => `
+    <div class="learn-category" data-id="${category.id}">
+      <div class="learn-category-header">
+        <div class="learn-category-title">
+          <span class="learn-category-icon">${category.icon}</span>
+          <span>${category.name}</span>
+        </div>
+        <div class="learn-category-actions">
+          <button class="learn-category-btn" data-action="add-link" data-category="${category.id}">添加链接</button>
+          <button class="learn-category-btn delete" data-action="delete-category" data-category="${category.id}">删除分类</button>
+        </div>
+      </div>
+      <div class="learn-links-grid">
+        ${category.links.map((link, index) => `
+          <a href="${link.url}" target="_blank" class="learn-link-item" data-category="${category.id}" data-index="${index}">
+            <img src="${link.favicon || getFaviconUrl(link.url)}" class="learn-link-favicon" alt="" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2280%22>🔗</text></svg>'">
+            <div class="learn-link-info">
+              <div class="learn-link-name">${link.name}</div>
+              <div class="learn-link-url">${new URL(link.url).hostname}</div>
+            </div>
+            <button class="learn-link-delete" data-action="delete-link" data-category="${category.id}" data-index="${index}">✕</button>
+          </a>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+
+  // 绑定事件
+  bindLearnEvents();
+}
+
+// 绑定学习资源事件
+function bindLearnEvents() {
+  // 删除链接
+  document.querySelectorAll('[data-action="delete-link"]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const categoryId = btn.dataset.category;
+      const index = parseInt(btn.dataset.index);
+
+      getLearnResources((categories) => {
+        const category = categories.find(c => c.id === categoryId);
+        if (category) {
+          category.links.splice(index, 1);
+          saveLearnResources(categories);
+          renderLearnResources(categories);
+        }
+      });
+    });
+  });
+
+  // 添加链接
+  document.querySelectorAll('[data-action="add-link"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const categoryId = btn.dataset.category;
+      showAddLinkModal(categoryId);
+    });
+  });
+
+  // 删除分类
+  document.querySelectorAll('[data-action="delete-category"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const categoryId = btn.dataset.category;
+      if (confirm('确定要删除该分类吗？')) {
+        getLearnResources((categories) => {
+          categories = categories.filter(c => c.id !== categoryId);
+          saveLearnResources(categories);
+          renderLearnResources(categories);
+        });
+      }
+    });
+  });
+}
+
+// 模态框操作
+const modalOverlay = document.getElementById('modalOverlay');
+const modalTitle = document.getElementById('modalTitle');
+const modalInput1 = document.getElementById('modalInput1');
+const modalInput2 = document.getElementById('modalInput2');
+const modalInput3 = document.getElementById('modalInput3');
+const modalCancel = document.getElementById('modalCancel');
+const modalConfirm = document.getElementById('modalConfirm');
+
+let currentModalAction = null;
+let currentModalData = null;
+
+function showModal(title, input1Placeholder, input2Placeholder, input3Placeholder = '', action, data = null) {
+  modalTitle.textContent = title;
+  modalInput1.placeholder = input1Placeholder;
+  modalInput2.placeholder = input2Placeholder;
+  modalInput3.placeholder = input3Placeholder;
+  modalInput3.style.display = input3Placeholder ? 'block' : 'none';
+
+  modalInput1.value = '';
+  modalInput2.value = '';
+  modalInput3.value = '';
+
+  currentModalAction = action;
+  currentModalData = data;
+
+  modalOverlay.classList.add('open');
+  modalInput1.focus();
+}
+
+function hideModal() {
+  modalOverlay.classList.remove('open');
+  currentModalAction = null;
+  currentModalData = null;
+}
+
+modalCancel.addEventListener('click', hideModal);
+modalOverlay.addEventListener('click', (e) => {
+  if (e.target === modalOverlay) hideModal();
+});
+
+// 添加分类
+document.getElementById('addCategoryBtn').addEventListener('click', () => {
+  showModal('添加分类', '分类名称', '分类图标（emoji）', '', 'add-category');
+});
+
+// 添加链接
+function showAddLinkModal(categoryId) {
+  showModal('添加链接', '链接名称', '链接URL', '', 'add-link', { categoryId });
+}
+
+// 确认操作
+modalConfirm.addEventListener('click', () => {
+  const value1 = modalInput1.value.trim();
+  const value2 = modalInput2.value.trim();
+  const value3 = modalInput3.value.trim();
+
+  if (!value1 || !value2) {
+    alert('请填写必要信息');
+    return;
+  }
+
+  if (currentModalAction === 'add-category') {
+    getLearnResources((categories) => {
+      const newCategory = {
+        id: Date.now().toString(),
+        name: value1,
+        icon: value2 || '📁',
+        links: []
+      };
+      categories.push(newCategory);
+      saveLearnResources(categories);
+      renderLearnResources(categories);
+      hideModal();
+    });
+  } else if (currentModalAction === 'add-link') {
+    let url = value2;
+    if (!url.match(/^https?:\/\//i)) {
+      url = 'https://' + url;
+    }
+
+    getLearnResources((categories) => {
+      const category = categories.find(c => c.id === currentModalData.categoryId);
+      if (category) {
+        category.links.push({
+          name: value1,
+          url: url,
+          favicon: getFaviconUrl(url)
+        });
+        saveLearnResources(categories);
+        renderLearnResources(categories);
+      }
+      hideModal();
+    });
+  }
+});
+
+// Enter 键确认
+modalInput1.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') modalInput2.focus();
+});
+modalInput2.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') {
+    if (modalInput3.style.display !== 'none') {
+      modalInput3.focus();
+    } else {
+      modalConfirm.click();
+    }
+  }
+});
+modalInput3.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') modalConfirm.click();
+});
+
+// 加载学习资源
+function loadLearnResources() {
+  getLearnResources((categories) => {
+    renderLearnResources(categories);
+  });
+}
+
+// 初始化学习资源
+loadLearnResources();
+
+// ========== 从书签导入 ==========
+// 递归查找"学习"相关的书签文件夹
+function findLearnBookmarkFolders(bookmarks, results = []) {
+  for (const bookmark of bookmarks) {
+    if (bookmark.children) {
+      // 检查文件夹名称是否包含学习相关关键词
+      const learnKeywords = ['学习', '教程', '资源', '教程', '知识', 'learn', 'tutorial', 'study', 'course'];
+      const isLearnFolder = learnKeywords.some(keyword =>
+        bookmark.title.toLowerCase().includes(keyword.toLowerCase())
+      );
+      if (isLearnFolder) {
+        results.push(bookmark);
+      }
+      // 递归查找子文件夹
+      findLearnBookmarkFolders(bookmark.children, results);
+    }
+  }
+  return results;
+}
+
+// 从书签节点提取链接
+function extractLinksFromBookmarkNode(node) {
+  const links = [];
+  if (node.url) {
+    links.push({
+      name: node.title || new URL(node.url).hostname,
+      url: node.url,
+      favicon: getFaviconUrl(node.url)
+    });
+  }
+  if (node.children) {
+    for (const child of node.children) {
+      links.push(...extractLinksFromBookmarkNode(child));
+    }
+  }
+  return links;
+}
+
+// 从书签导入学习资源
+function importFromBookmarks() {
+  chrome.bookmarks.getTree((bookmarks) => {
+    const learnFolders = findLearnBookmarkFolders(bookmarks);
+
+    if (learnFolders.length === 0) {
+      alert('未找到"学习"相关的书签文件夹\n\n请在书签中创建名为"学习"的文件夹，或将已有文件夹重命名包含"学习"、"教程"、"资源"等关键词');
+      return;
+    }
+
+    // 获取所有学习文件夹中的链接
+    const folderData = learnFolders.map(folder => ({
+      id: folder.id,
+      title: folder.title,
+      links: extractLinksFromBookmarkNode(folder)
+    })).filter(f => f.links.length > 0);
+
+    if (folderData.length === 0) {
+      alert('学习文件夹中没有找到链接');
+      return;
+    }
+
+    // 显示导入确认
+    const totalLinks = folderData.reduce((sum, f) => sum + f.links.length, 0);
+    const folderNames = folderData.map(f => `"${f.title}" (${f.links.length}个)`).join('\n');
+
+    if (!confirm(`找到以下学习文件夹：\n${folderNames}\n\n共 ${totalLinks} 个链接，是否导入？`)) {
+      return;
+    }
+
+    // 导入到学习资源
+    getLearnResources((categories) => {
+      const existingUrls = new Set();
+      categories.forEach(cat => cat.links.forEach(link => existingUrls.add(link.url)));
+
+      let importedCount = 0;
+
+      folderData.forEach(folder => {
+        // 查找或创建对应分类
+        let category = categories.find(c => c.name === folder.title);
+        if (!category) {
+          category = {
+            id: `bookmark-${folder.id}`,
+            name: folder.title,
+            icon: '📚',
+            links: []
+          };
+          categories.push(category);
+        }
+
+        // 添加新链接（去重）
+        folder.links.forEach(link => {
+          if (!existingUrls.has(link.url)) {
+            category.links.push(link);
+            existingUrls.add(link.url);
+            importedCount++;
+          }
+        });
+      });
+
+      saveLearnResources(categories);
+      renderLearnResources(categories);
+      alert(`成功导入 ${importedCount} 个新链接`);
+    });
+  });
+}
+
+// 绑定导入按钮事件
+document.getElementById('importBookmarkBtn').addEventListener('click', importFromBookmarks);
