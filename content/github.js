@@ -398,6 +398,12 @@ if (window.GithubCopyFileLoaded) {
         return; // 让默认行为处理
       }
 
+      // 检查是否有选中的文本内容
+      const selection = window.getSelection();
+      if (selection && selection.toString().trim().length > 0) {
+        return; // 有选中内容，让浏览器默认复制选中内容
+      }
+
       const treeItem = getTargetTreeItem();
       if (!treeItem) return;
 
@@ -486,6 +492,8 @@ if (window.GithubCopyFileLoaded) {
 
     // 监听鼠标移入/移出链接事件（使用事件委托）
     document.addEventListener('mouseenter', (e) => {
+      // 确保 e.target 是 Element 类型
+      if (!e.target || typeof e.target.closest !== 'function') return;
       const link = e.target.closest('a[href]');
       if (link) {
         // 检查是否是文件/文件夹链接
@@ -497,6 +505,8 @@ if (window.GithubCopyFileLoaded) {
     }, true);
 
     document.addEventListener('mouseleave', (e) => {
+      // 确保 e.target 是 Element 类型
+      if (!e.target || typeof e.target.closest !== 'function') return;
       const link = e.target.closest('a[href]');
       if (link && link === hoveredLink) {
         hoveredLink = null;

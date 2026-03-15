@@ -715,8 +715,23 @@ async function loadDomainHideSettings() {
 
 // ========== 初始化 ==========
 async function registerBlockedDomains() {
-  const result = await MessagingUtils.registerBlockedDomains('douyin.com', BLOCKED_DOMAINS);
-  if (result?.success) console.log('[抖音脚本] 已向 background 注册 blockedDomains');
+  // 检查扩展上下文是否有效
+  if (!MessagingUtils.isExtensionContextValid()) {
+    console.warn('[抖音脚本] 扩展上下文已失效，跳过注册域名');
+    return;
+  }
+
+  try {
+    const result = await MessagingUtils.registerBlockedDomains('douyin.com', BLOCKED_DOMAINS);
+    if (result?.success) {
+      console.log('[抖音脚本] 已向 background 注册 blockedDomains');
+    } else {
+      console.log('[抖音脚本] 注册域名结果:', result);
+    }
+  } catch (err) {
+    // 静默处理错误，不影响主流程
+    console.warn('[抖音脚本] 注册域名跳过:', err.message);
+  }
 }
 
 // 添加自定义样式
@@ -803,27 +818,45 @@ function init() {
   });
 
   // 触摸上滑检测（移动端）- 使用捕获阶段确保能捕获到事件
-  let touchStartY = 0;
-  let touchStartTime = 0;
+  // 使用 Map 跟踪每个触摸点，避免快速连续滑动时数据覆盖
+  const touchTracker = new Map();
   document.addEventListener('touchstart', (e) => {
-    touchStartY = e.touches[0].clientY;
-    touchStartTime = Date.now();
+    // 记录每个触摸点的起始位置和时间
+    for (const touch of e.changedTouches) {
+      touchTracker.set(touch.identifier, {
+        startY: touch.clientY,
+        startTime: Date.now()
+      });
+    }
   }, { passive: true, capture: true });
   document.addEventListener('touchend', (e) => {
-    const touchEndY = e.changedTouches[0].clientY;
-    const deltaY = touchEndY - touchStartY;
-    const deltaTime = Date.now() - touchStartTime;
-    // 降低阈值到 30px，并检测快速滑动（速度判断）
-    const velocity = Math.abs(deltaY) / deltaTime; // px/ms
-    // 上滑检测（deltaY > 0 表示手指向上滑动，页面向下滚动）
-    if (deltaY > 30 || (deltaY > 10 && velocity > 0.3)) {
-      console.log(`[用户操作] 检测到触摸上滑 (deltaY=${deltaY.toFixed(1)}px, velocity=${velocity.toFixed(2)}px/ms)，取消所有自动下滑检测`);
-      VideoChangeChecker.cancelAll();
+    for (const touch of e.changedTouches) {
+      const tracker = touchTracker.get(touch.identifier);
+      if (!tracker) continue;
+
+      const touchEndY = touch.clientY;
+      const deltaY = touchEndY - tracker.startY;
+      const deltaTime = Date.now() - tracker.startTime;
+      // 降低阈值到 30px，并检测快速滑动（速度判断）
+      const velocity = deltaTime > 0 ? Math.abs(deltaY) / deltaTime : 0; // px/ms
+      // 上滑检测（deltaY > 0 表示手指向上滑动，页面向下滚动）
+      if (deltaY > 30 || (deltaY > 10 && velocity > 0.3)) {
+        console.log(`[用户操作] 检测到触摸上滑 (deltaY=${deltaY.toFixed(1)}px, velocity=${velocity.toFixed(2)}px/ms)，取消所有自动下滑检测`);
+        VideoChangeChecker.cancelAll();
+      }
+      // 下滑检测（用户主动操作）
+      if (deltaY < -30 || (deltaY < -10 && velocity > 0.3)) {
+        console.log(`[用户操作] 检测到触摸下滑 (deltaY=${deltaY.toFixed(1)}px)，取消自动下滑检测`);
+        VideoChangeChecker.cancelAll();
+      }
+      // 清理已结束的触摸点
+      touchTracker.delete(touch.identifier);
     }
-    // 下滑检测（用户主动操作）
-    if (deltaY < -30 || (deltaY < -10 && velocity > 0.3)) {
-      console.log(`[用户操作] 检测到触摸下滑 (deltaY=${deltaY.toFixed(1)}px)，取消自动下滑检测`);
-      VideoChangeChecker.cancelAll();
+  }, { passive: true, capture: true });
+  // 触摸取消时也要清理
+  document.addEventListener('touchcancel', (e) => {
+    for (const touch of e.changedTouches) {
+      touchTracker.delete(touch.identifier);
     }
   }, { passive: true, capture: true });
 

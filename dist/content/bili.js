@@ -9,11 +9,27 @@
     return;
   }
 
-  // 使用 LazyLoader 确保 site-base 已加载
-  if (typeof LazyLoader !== 'undefined') {
-    await LazyLoader.load('site-base');
-  } else if (typeof SiteBase === 'undefined') {
-    console.error('[Bilibili脚本] SiteBase 未定义且 LazyLoader 不可用');
+  // 等待依赖加载（带重试机制）
+  async function waitForDependencies(maxRetries = 10, interval = 100) {
+    for (let i = 0; i < maxRetries; i++) {
+      // 优先使用 LazyLoader
+      if (typeof LazyLoader !== 'undefined') {
+        await LazyLoader.load('site-base');
+        return true;
+      }
+      // 直接检查 SiteBase
+      if (typeof SiteBase !== 'undefined') {
+        return true;
+      }
+      // 等待后重试
+      await new Promise(resolve => setTimeout(resolve, interval));
+    }
+    return false;
+  }
+
+  const depsLoaded = await waitForDependencies();
+  if (!depsLoaded) {
+    console.error('[Bilibili脚本] 依赖加载超时 (LazyLoader/SiteBase)');
     return;
   }
 

@@ -12,7 +12,19 @@
    * @returns {boolean}
    */
   function isExtensionContext() {
-    return typeof chrome !== 'undefined' && chrome.runtime;
+    return typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id;
+  }
+
+  /**
+   * 检查扩展上下文是否有效
+   * @returns {boolean}
+   */
+  function isExtensionContextValid() {
+    try {
+      return typeof chrome !== 'undefined' && chrome.runtime && !!chrome.runtime.id;
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -48,32 +60,71 @@
   }
 
   /**
-   * 发送消息到 background script（使用 EventBus）
+   * 发送消息到 background script（使用 EventBus，带重试机制）
    * @param {object} message - 消息对象
+   * @param {object} options - 选项
+   * @param {number} options.retries - 重试次数，默认 2
+   * @param {number} options.retryDelay - 重试延迟(ms)，默认 1000
+   * @param {number} options.timeout - 超时时间(ms)，默认 5000
    * @returns {Promise<any>}
    */
-  async function sendToBackground(message) {
-    if (!isExtensionContext()) {
-      console.warn('[Messaging] 非扩展环境，无法发送消息');
+  async function sendToBackground(message, options = {}) {
+    const { retries = 2, retryDelay = 1000, timeout = 5000 } = options;
+
+    if (!isExtensionContextValid()) {
+      console.warn('[Messaging] 扩展上下文已失效，请刷新页面');
       return null;
     }
 
-    // 优先使用 EventBus
-    if (isEventBusReady()) {
+    let lastError = null;
+
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      // 检查扩展上下文是否仍然有效
+      if (!isExtensionContextValid()) {
+        console.warn('[Messaging] 扩展上下文已失效，请刷新页面');
+        return null;
+      }
+
+      // 优先使用 EventBus
+      if (isEventBusReady()) {
+        try {
+          return await EventBus.request(message.type, message, { timeout });
+        } catch (error) {
+          lastError = error;
+          // 扩展上下文失效，不重试
+          if (error.message?.includes('Extension context invalidated')) {
+            console.warn('[Messaging] 扩展上下文已失效，请刷新页面');
+            return null;
+          }
+          // 超时错误，尝试重试
+          if (error.message?.includes('Timeout') && attempt < retries) {
+            console.log(`[Messaging] ${message.type} 超时，第 ${attempt + 1}/${retries} 次重试...`);
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+            continue;
+          }
+          // 降级到原生 API
+          console.warn('[Messaging] EventBus 发送失败，降级到原生:', error.message);
+        }
+      }
+
+      // 降级到原生 chrome.runtime
       try {
-        return await EventBus.request(message.type, message, { timeout: 5000 });
+        return await chrome.runtime.sendMessage(message);
       } catch (error) {
-        console.warn('[Messaging] EventBus 发送失败，降级到原生:', error.message);
+        lastError = error;
+        if (error.message?.includes('Extension context invalidated')) {
+          console.warn('[Messaging] 扩展上下文已失效，请刷新页面');
+          return null;
+        }
+        if (attempt < retries) {
+          console.log(`[Messaging] 原生 API 失败，第 ${attempt + 1}/${retries} 次重试...`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+        }
       }
     }
 
-    // 降级到原生 chrome.runtime
-    try {
-      return await chrome.runtime.sendMessage(message);
-    } catch (error) {
-      console.error('[Messaging] 发送消息失败:', error);
-      return null;
-    }
+    console.error('[Messaging] 发送消息失败:', lastError?.message || '未知错误');
+    return null;
   }
 
   /**
@@ -141,17 +192,30 @@
   }
 
   /**
-   * 向 background 注册阻止域名列表
+   * 向 background 注册阻止域名列表（带重试和等待 EventBus 就绪）
    * @param {string} domain - 当前域名
    * @param {string[]} blockedDomains - 要阻止的域名列表
    * @returns {Promise<any>}
    */
   async function registerBlockedDomains(domain, blockedDomains) {
+    // 等待 EventBus 就绪
+    const isReady = await waitForEventBus(3000);
+    if (!isReady) {
+      console.warn('[Messaging] EventBus 未就绪，跳过注册域名');
+      return { success: false, reason: 'EventBus not ready' };
+    }
+
+    // 检查扩展上下文
+    if (!isExtensionContextValid()) {
+      console.warn('[Messaging] 扩展上下文已失效，跳过注册域名');
+      return { success: false, reason: 'Extension context invalidated' };
+    }
+
     return sendToBackground({
       type: 'REGISTER_BLOCKED_DOMAINS',
       domain,
       blockedDomains,
-    });
+    }, { retries: 3, retryDelay: 500, timeout: 8000 });
   }
 
   /**
@@ -182,6 +246,7 @@
   // 导出工具函数
   window.MessagingUtils = {
     isExtensionContext,
+    isExtensionContextValid,
     isEventBusReady,
     waitForEventBus,
     sendToBackground,

@@ -356,8 +356,9 @@ async function initialize() {
 
   // 处理浏览器启动时已存在的标签页
   // 延迟执行，确保 service worker 完全就绪
+  // 使用延迟注入模式：只注入当前激活的 tab，其他 tab 等激活时再注入
   setTimeout(() => {
-    injectScriptsToExistingTabs();
+    markTabsForLazyInjection();
   }, 500);
 
   console.log('Extension initialized successfully');
@@ -615,9 +616,27 @@ function setupEventListeners() {
       chrome.tabs.create({ url: 'welcome.html' });
     }
 
-    // 处理已存在的标签页（安装、更新时都要处理）
+    // 无论安装还是更新，都使用延迟注入模式
     if (details.reason === 'install' || details.reason === 'update') {
-      await injectScriptsToExistingTabs();
+      await markTabsForLazyInjection();
+    }
+  });
+
+  // 监听 tab 激活事件：在 tab 激活时注入脚本
+  chrome.tabs.onActivated.addListener(async (activeInfo) => {
+    await injectScriptsOnTabActivate(activeInfo.tabId);
+  });
+
+  // 监听窗口焦点变化：提前感知即将激活的 tab
+  chrome.windows.onFocusChanged.addListener(async (windowId) => {
+    if (windowId === chrome.windows.WINDOW_ID_NONE) return;
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, windowId });
+      if (tab && tab.id) {
+        await injectScriptsOnTabActivate(tab.id);
+      }
+    } catch (error) {
+      // 忽略错误
     }
   });
 
@@ -940,46 +959,87 @@ async function injectScriptsForTab(tabId, tabUrl) {
   }
 }
 
-// 向已存在的标签页注入脚本（扩展安装/更新或浏览器启动时调用）
-async function injectScriptsToExistingTabs() {
+// 标记需要延迟注入的 tab（扩展安装/更新时调用）
+async function markTabsForLazyInjection() {
   try {
     const tabs = await chrome.tabs.query({});
-    console.log('[Background] 检查已存在的标签页，共', tabs.length, '个');
+    console.log('[Background] 扩展更新，标记需要延迟注入的标签页');
 
-    // 清理旧的注入记录（超过1小时的记录）
-    const result = await chrome.storage.local.get('injectedTabs');
+    // 获取当前注入记录
+    const result = await chrome.storage.local.get(['injectedTabs', 'pendingInjectionTabs']);
     const injectedTabs = result.injectedTabs || {};
+    const pendingTabs = result.pendingInjectionTabs || {};
     const now = Date.now();
 
+    // 清理旧记录
     for (const [tabId, timestamp] of Object.entries(injectedTabs)) {
-      if (now - timestamp > 3600000) { // 1小时
+      if (now - timestamp > 3600000) {
         delete injectedTabs[tabId];
       }
     }
-    await chrome.storage.local.set({ injectedTabs });
 
+    // 标记所有 http/https tab 为待注入（排除已注入的）
     for (const tab of tabs) {
-      // 只处理 http/https 页面
       if (tab.url && tab.url.startsWith('http')) {
         const tabKey = String(tab.id);
-        // 检查是否已经注入过
-        if (!injectedTabs[tabKey]) {
+        // 清除旧的注入记录，强制重新注入
+        delete injectedTabs[tabKey];
+        // 标记为待注入
+        pendingTabs[tabKey] = { url: tab.url, timestamp: now };
+
+        // 如果是当前激活的 tab，立即注入
+        if (tab.active) {
           try {
             await injectAllScriptsForTab(tab.id, tab.url);
-            // 记录已注入
             injectedTabs[tabKey] = now;
-            await chrome.storage.local.set({ injectedTabs });
+            delete pendingTabs[tabKey];
+            console.log(`[Background] 激活标签页 ${tab.id} 已立即注入`);
           } catch (error) {
-            // 某些页面可能无法注入（如 chrome:// 页面）
-            console.log(`[Background] 无法注入标签页 ${tab.id}:`, error.message);
+            console.log(`[Background] 无法注入激活标签页 ${tab.id}:`, error.message);
           }
-        } else {
-          console.log(`[Background] 标签页 ${tab.id} 已注入过，跳过`);
         }
       }
     }
+
+    await chrome.storage.local.set({ injectedTabs, pendingInjectionTabs: pendingTabs });
+    console.log('[Background] 已标记', Object.keys(pendingTabs).length, '个标签页待注入');
   } catch (error) {
-    console.error('[Background] 注入已存在标签页失败:', error);
+    console.error('[Background] 标记待注入标签页失败:', error);
+  }
+}
+
+// 在 tab 激活时注入脚本
+async function injectScriptsOnTabActivate(tabId) {
+  try {
+    const result = await chrome.storage.local.get(['injectedTabs', 'pendingInjectionTabs']);
+    const injectedTabs = result.injectedTabs || {};
+    const pendingTabs = result.pendingInjectionTabs || {};
+    const tabKey = String(tabId);
+
+    // 如果已经注入过，跳过
+    if (injectedTabs[tabKey]) {
+      return;
+    }
+
+    // 获取 tab 信息
+    const tab = await chrome.tabs.get(tabId);
+    if (!tab || !tab.url || !tab.url.startsWith('http')) {
+      return;
+    }
+
+    // 检查是否在待注入列表中
+    if (pendingTabs[tabKey]) {
+      console.log(`[Background] Tab ${tabId} 激活，开始注入脚本`);
+      await injectAllScriptsForTab(tabId, tab.url);
+
+      // 更新记录
+      injectedTabs[tabKey] = Date.now();
+      delete pendingTabs[tabKey];
+      await chrome.storage.local.set({ injectedTabs, pendingInjectionTabs: pendingTabs });
+    }
+  } catch (error) {
+    // tab 可能已关闭
+    console.log(`[Background] Tab ${tabId} 注入失败:`, error.message);
   }
 }
 
@@ -1023,10 +1083,39 @@ async function injectAllScriptsForTab(tabId, tabUrl) {
 
     // 基础工具脚本（所有页面都需要）
     const baseScripts = [
+      'event-bus-v4.6.js',
       'content/utils/logger.js',
+      'content/eventbus-integration.js',
       'content/utils/storage.js',
+      'content/utils/storage-bridge.js',
       'content/utils/dom.js',
       'content/utils/messaging.js'
+    ];
+
+    // 核心模块脚本（所有页面都需要）
+    const coreScripts = [
+      'content/core/store.js',
+      'content/core/services.js',
+      'content/core/pipeline.js',
+      'content/core/site-base.js',
+      'content/core/site-factory.js',
+      'content/core/plugin-system.js',
+      'content/core/config-manager.js',
+      'content/core/selector-merger.js',
+      'content/core/keyword-manager.js',
+      'content/core/rule-manager.js',
+      'content/core/lazy-loader.js',
+      'content/core/cache-manager.js',
+      'content/core/batch.js',
+      'content/core/history-manager.js',
+      'content/core/rule-conflict.js',
+      'content/core/debug-panel.js',
+      'content/core/input-validator.js',
+      'content/core/security-manager.js',
+      'content/core/config-migrator.js',
+      'content/core/extension-api.js',
+      'content/core/module-manager.js',
+      'content/core/lazy-init-manager.js'
     ];
 
     // 通用脚本（所有页面都需要）
@@ -1056,8 +1145,8 @@ async function injectAllScriptsForTab(tabId, tabUrl) {
       'youtube.com': ['content/base/SiteScript.js', 'content/youtube.js']
     };
 
-    // 收集需要注入的脚本
-    const scriptsToInject = [...baseScripts, ...commonScripts];
+    // 收集需要注入的脚本（按顺序：基础 -> 核心 -> 通用 -> 域名特定）
+    const scriptsToInject = [...baseScripts, ...coreScripts, ...commonScripts];
 
     // 添加域名特定脚本
     for (const [domain, scripts] of Object.entries(domainScripts)) {
