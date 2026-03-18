@@ -68,6 +68,9 @@ let currentVideoId = null;
 let visibilityChangeHandler = null;
 let beforeUnloadHandler = null;
 
+// 本次会话中用户返回的视频 - 这些视频不会触发自动下滑，直到用户滑到全新视频
+const returnedVideosThisSession = new Set();
+
 // ========== 视频状态管理器 (WeakMap) ==========
 const VideoStateManager = {
   uuid: new WeakMap(),
@@ -593,6 +596,16 @@ function processCurrentVideo() {
   if (!videoBody) return;
 
   const videoId = getVideoUUID(videoBody);
+
+  // 如果视频在本次会话中被用户返回过，跳过所有自动处理
+  if (returnedVideosThisSession.has(videoId)) {
+    if (currentVideoId !== videoId) {
+      currentVideoId = videoId;
+      console.log(`[手动导航] 视频 ${videoId.substring(0, 8)} 已被返回过，跳过自动处理`);
+    }
+    return;
+  }
+
   if (currentVideoId === videoId) return;
 
   // 判断是否是手动返回（在更新历史之前检查）
@@ -604,11 +617,22 @@ function processCurrentVideo() {
 
     // 检测手动上滑返回
     if (isGoingBack) {
-      console.log(`[手动导航] 检测到手动上滑返回 (历史位置: ${videoHistory.indexOf(videoId)}/${videoHistory.length - 1})，暂停自动处理`);
+      console.log(`[手动导航] 检测到上滑返回 (历史位置: ${videoHistory.indexOf(videoId)}/${videoHistory.length - 1})，记录该视频`);
       VideoChangeChecker.cancelAll();
       currentVideoId = videoId;
       updateVideoHistory(videoId);
+
+      // 将该视频加入返回记录，本次会话不再自动处理
+      returnedVideosThisSession.add(videoId);
       return;
+    }
+
+    // 用户下滑到新视频（不在历史中），清空返回记录，恢复自动处理
+    if (!videoHistory.includes(videoId)) {
+      if (returnedVideosThisSession.size > 0) {
+        console.log(`[手动导航] 检测到全新视频，清空返回记录 (${returnedVideosThisSession.size} 个)，恢复自动处理`);
+        returnedVideosThisSession.clear();
+      }
     }
 
     updateVideoHistory(videoId);
