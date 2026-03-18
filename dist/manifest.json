@@ -206,6 +206,15 @@
       "matches": ["*://github.com/*", "*://*.github.com/*"],
       "js": ["content/github.js"],
       "run_at": "document_start"
+    },
+    {
+      "matches": ["*://modelscope.cn/models*", "*://*.modelscope.cn/models*"],
+      "js": ["content/modelscope.js"]
+    },
+    {
+      "matches": ["*://modelscope.cn/*", "*://*.modelscope.cn/*"],
+      "js": ["content/eventbus-integration.js"],
+      "run_at": "document_end"
     }
   ],
   "background": {

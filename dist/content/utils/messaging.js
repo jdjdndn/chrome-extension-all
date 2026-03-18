@@ -91,9 +91,8 @@
           return await EventBus.request(message.type, message, { timeout });
         } catch (error) {
           lastError = error;
-          // 扩展上下文失效，不重试
+          // 扩展上下文失效，静默返回（扩展刷新后的正常情况）
           if (error.message?.includes('Extension context invalidated')) {
-            console.warn('[Messaging] 扩展上下文已失效，请刷新页面');
             return null;
           }
           // 超时错误，尝试重试
@@ -112,8 +111,8 @@
         return await chrome.runtime.sendMessage(message);
       } catch (error) {
         lastError = error;
+        // 扩展上下文失效，静默返回
         if (error.message?.includes('Extension context invalidated')) {
-          console.warn('[Messaging] 扩展上下文已失效，请刷新页面');
           return null;
         }
         if (attempt < retries) {
@@ -123,7 +122,10 @@
       }
     }
 
-    console.error('[Messaging] 发送消息失败:', lastError?.message || '未知错误');
+    // 只在非上下文失效错误时打印错误
+    if (lastError && !lastError.message?.includes('Extension context invalidated')) {
+      console.error('[Messaging] 发送消息失败:', lastError?.message || '未知错误');
+    }
     return null;
   }
 

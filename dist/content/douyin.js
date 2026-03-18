@@ -715,6 +715,12 @@ async function loadDomainHideSettings() {
 
 // ========== 初始化 ==========
 async function registerBlockedDomains() {
+  // 检查 MessagingUtils 是否已加载
+  if (!window.MessagingUtils || typeof window.MessagingUtils.isExtensionContextValid !== 'function') {
+    console.warn('[抖音脚本] MessagingUtils 未就绪，跳过注册域名');
+    return;
+  }
+
   // 检查扩展上下文是否有效
   if (!MessagingUtils.isExtensionContextValid()) {
     console.warn('[抖音脚本] 扩展上下文已失效，跳过注册域名');
