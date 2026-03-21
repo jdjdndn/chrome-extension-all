@@ -7,6 +7,8 @@
 
 if (window.TextToLinkLoaded) {
   console.log('[通用脚本] 文本链接转换已加载，跳过');
+} else if (!window.getScriptSwitch || !window.getScriptSwitch('text-to-link')) {
+  console.log('[通用脚本] 文本链接转换已禁用');
 } else {
   window.TextToLinkLoaded = true;
 

@@ -1122,7 +1122,6 @@ async function injectAllScriptsForTab(tabId, tabUrl) {
     const commonScripts = [
       'content/common/redirect-links.js',
       'content/common/text-to-link.js',
-      'content/common/lang-to-zh.js',
       'content/common/link-blank.js',
       'content/common/add-title.js',
       'content.js'

@@ -75,9 +75,9 @@
     {
       "matches": ["<all_urls>"],
       "js": [
+        "content/common/script-switch.js",
         "content/common/redirect-links.js",
         "content/common/text-to-link.js",
-        "content/common/lang-to-zh.js",
         "content/common/link-blank.js",
         "content/common/add-title.js",
         "content/common/panel-position-manager.js",

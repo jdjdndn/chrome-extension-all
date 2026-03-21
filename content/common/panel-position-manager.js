@@ -12,7 +12,11 @@
 'use strict';
 
 if (!window.PanelPositionManager) {
-  window.PanelPositionManager = {
+  // 检查开关
+  if (window.getScriptSwitch && !window.getScriptSwitch('panel-position-manager')) {
+    console.log('[面板位置管理器] 已禁用');
+  } else {
+    window.PanelPositionManager = {
     STORAGE_KEY: 'yc-panel-position-manager-v32',
 
     config: {
@@ -96,7 +100,7 @@ if (!window.PanelPositionManager) {
     // ==================== 统一计算位置 ====================
 
     calculatePositions() {
-      const { edgeMargin, maxPanelWidth, iconWidth, iconHeight, panelAvoidGap, spaceUsageRatio, zIndexBase, zIndexIcon, zIndexPanel } = this.config;
+      const { edgeMargin, minPanelWidth, maxPanelWidth, iconWidth, iconHeight, panelAvoidGap, spaceUsageRatio, zIndexBase, zIndexIcon, zIndexPanel } = this.config;
       const vh = window.innerHeight;
       const vw = window.innerWidth;
       const hasH = this.hasHTags();
@@ -1981,4 +1985,5 @@ if (!window.PanelPositionManager) {
   } else {
     window.PanelPositionManager.init();
   }
+  } // end of else (script enabled)
 }

@@ -8,6 +8,8 @@
 
 if (window.DocGeneratorLoaded) {
   console.log('[文档生成器] 已加载，跳过');
+} else if (!window.getScriptSwitch || !window.getScriptSwitch('doc-generator')) {
+  console.log('[文档生成器] 已禁用');
 } else {
   window.DocGeneratorLoaded = true;
 

@@ -5,6 +5,8 @@
 
 if (window.AddTitleLoaded) {
   console.log('[通用脚本] title 添加已加载，跳过');
+} else if (!window.getScriptSwitch || !window.getScriptSwitch('add-title')) {
+  console.log('[通用脚本] title 添加已禁用');
 } else {
   window.AddTitleLoaded = true;
 

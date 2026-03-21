@@ -121,6 +121,9 @@ async function loadSettings() {
   // Load AI settings
   loadAISettings(settings);
 
+  // Load script switches
+  await loadScriptSwitches();
+
   // Load blocked domains
   await loadBlockedDomains();
 }
@@ -190,6 +193,67 @@ toggleBtn.addEventListener('click', toggleExtension);
 
 debugModeCheckbox.addEventListener('change', () => {
   saveSettings({ debugMode: debugModeCheckbox.checked });
+});
+
+// ========== Script Switches Management ==========
+const SCRIPT_SWITCHES_KEY = 'scriptSwitches';
+
+// 获取所有脚本开关 checkbox
+const scriptSwitchCheckboxes = document.querySelectorAll('[data-script]');
+
+// 加载脚本开关状态
+async function loadScriptSwitches() {
+  try {
+    const result = await chrome.storage.local.get(SCRIPT_SWITCHES_KEY);
+    const switches = result[SCRIPT_SWITCHES_KEY] || {};
+
+    // 获取默认开关配置
+    const defaultSwitches = {
+      'redirect-links': true,
+      'text-to-link': true,
+      'link-blank': true,
+      'add-title': true,
+      'doc-generator': true,
+      'text-collector': true,
+      'keyboard-pagination': true,
+      'panel-position-manager': true
+    };
+
+    // 合并默认值和存储的值
+    const mergedSwitches = { ...defaultSwitches, ...switches };
+
+    // 更新 UI
+    scriptSwitchCheckboxes.forEach(checkbox => {
+      const scriptName = checkbox.dataset.script;
+      checkbox.checked = mergedSwitches[scriptName] !== false;
+    });
+
+    console.log('[ScriptSwitches] 已加载:', mergedSwitches);
+  } catch (error) {
+    console.error('[ScriptSwitches] 加载失败:', error);
+  }
+}
+
+// 保存单个脚本开关状态
+async function saveScriptSwitch(scriptName, enabled) {
+  try {
+    const result = await chrome.storage.local.get(SCRIPT_SWITCHES_KEY);
+    const switches = result[SCRIPT_SWITCHES_KEY] || {};
+    switches[scriptName] = enabled;
+    await chrome.storage.local.set({ [SCRIPT_SWITCHES_KEY]: switches });
+    console.log(`[ScriptSwitches] 已保存 ${scriptName}: ${enabled}`);
+  } catch (error) {
+    console.error('[ScriptSwitches] 保存失败:', error);
+  }
+}
+
+// 为每个脚本开关添加事件监听
+scriptSwitchCheckboxes.forEach(checkbox => {
+  checkbox.addEventListener('change', () => {
+    const scriptName = checkbox.dataset.script;
+    const enabled = checkbox.checked;
+    saveScriptSwitch(scriptName, enabled);
+  });
 });
 
 

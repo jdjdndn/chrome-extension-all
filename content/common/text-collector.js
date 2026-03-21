@@ -8,6 +8,8 @@
 
 if (window.TextCollectorLoaded) {
   console.log('[文本收集器] 已加载，跳过');
+} else if (!window.getScriptSwitch || !window.getScriptSwitch('text-collector')) {
+  console.log('[文本收集器] 已禁用');
 } else {
   window.TextCollectorLoaded = true;
 

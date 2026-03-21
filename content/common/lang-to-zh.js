@@ -19,11 +19,9 @@ if (window.LangToZhLoaded) {
       const origin = urlObj.origin;
 
       for (const lang of LANG_PATTERNS) {
-        const pattern = new RegExp(`\/${lang}\/`, 'gi');
-        const match = pathname.match(pattern);
-        if (match) {
-          const newUrl = origin + `/${TARGET_LANG}/` + pathname.slice(match[0].length);
-          return newUrl;
+        const pattern = new RegExp(`\/${lang}\/`, 'i');
+        if (pattern.test(pathname)) {
+          return origin + pathname.replace(pattern, `/${TARGET_LANG}/`);
         }
       }
       return false;

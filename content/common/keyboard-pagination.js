@@ -6,6 +6,8 @@
 
 if (window.KeyboardPaginationLoaded) {
   console.log('[键盘翻页] 已加载，跳过');
+} else if (!window.getScriptSwitch || !window.getScriptSwitch('keyboard-pagination')) {
+  console.log('[键盘翻页] 已禁用');
 } else {
   window.KeyboardPaginationLoaded = true;
 

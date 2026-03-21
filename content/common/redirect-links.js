@@ -6,6 +6,8 @@
 
 if (window.RedirectLinksLoaded) {
   console.log('[通用脚本] 重定向链接替换已加载，跳过');
+} else if (!window.getScriptSwitch || !window.getScriptSwitch('redirect-links')) {
+  console.log('[通用脚本] 重定向链接替换已禁用');
 } else {
   window.RedirectLinksLoaded = true;
 

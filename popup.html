@@ -537,38 +537,68 @@
       </div>
     </div>
 
-    <!-- AI Settings -->
+    <!-- Script Switches -->
     <div class="settings" style="margin-top: 12px;">
-      <h2 style="font-size: 16px; margin: 0 0 12px 0">AI 配置</h2>
+      <h2 style="font-size: 16px; margin: 0 0 12px 0">脚本开关</h2>
 
       <div class="setting-item">
         <div class="toggle-container">
-          <label for="ai-multi-thinking-enabled">启用多轮思考</label>
-          <input type="checkbox" id="ai-multi-thinking-enabled" />
-        </div>
-        <div class="info-box" style="margin-top: 8px;">
-          <small>启用后，AI 会对思考结果进行多轮优化，提高输出质量（会增加响应时间）</small>
+          <label for="script-redirect-links">重定向链接替换</label>
+          <input type="checkbox" id="script-redirect-links" data-script="redirect-links" />
         </div>
       </div>
 
-      <div class="setting-item" id="ai-rounds-setting" style="margin-top: 12px; display: none;">
-        <label for="ai-thinking-rounds">思考轮数</label>
-        <select id="ai-thinking-rounds" style="width: 100%;">
-          <option value="1">1 轮（直接输出）</option>
-          <option value="2">2 轮（一次优化）</option>
-          <option value="3" selected>3 轮（二次优化，推荐）</option>
-          <option value="4">4 轮（三次优化）</option>
-          <option value="5">5 轮（深度优化）</option>
-        </select>
-        <div class="info-box" style="margin-top: 8px;">
-          <small>
-            <strong>轮数说明：</strong><br />
-            • 1 轮：直接返回结果<br />
-            • 2 轮：对结果进行一次优化<br />
-            • 3 轮：对优化结果再进行优化（推荐）<br />
-            • 4-5 轮：更深度优化，响应时间更长
-          </small>
+      <div class="setting-item">
+        <div class="toggle-container">
+          <label for="script-text-to-link">文本转链接</label>
+          <input type="checkbox" id="script-text-to-link" data-script="text-to-link" />
         </div>
+      </div>
+
+      <div class="setting-item">
+        <div class="toggle-container">
+          <label for="script-link-blank">非同源链接新窗口打开</label>
+          <input type="checkbox" id="script-link-blank" data-script="link-blank" />
+        </div>
+      </div>
+
+      <div class="setting-item">
+        <div class="toggle-container">
+          <label for="script-add-title">添加 title 属性</label>
+          <input type="checkbox" id="script-add-title" data-script="add-title" />
+        </div>
+      </div>
+
+      <div class="setting-item">
+        <div class="toggle-container">
+          <label for="script-doc-generator">文档生成器</label>
+          <input type="checkbox" id="script-doc-generator" data-script="doc-generator" />
+        </div>
+      </div>
+
+      <div class="setting-item">
+        <div class="toggle-container">
+          <label for="script-text-collector">文本收集器</label>
+          <input type="checkbox" id="script-text-collector" data-script="text-collector" />
+        </div>
+      </div>
+
+      <div class="setting-item">
+        <div class="toggle-container">
+          <label for="script-keyboard-pagination">键盘翻页</label>
+          <input type="checkbox" id="script-keyboard-pagination" data-script="keyboard-pagination" />
+        </div>
+      </div>
+
+      <div class="setting-item">
+        <div class="toggle-container">
+          <label for="script-panel-position-manager">面板位置管理</label>
+          <input type="checkbox" id="script-panel-position-manager" data-script="panel-position-manager" />
+        </div>
+      </div>
+
+      <div class="info-box" style="margin-top: 8px;">
+        <small>开关修改后需要刷新页面才能生效</small>
       </div>
     </div>
 

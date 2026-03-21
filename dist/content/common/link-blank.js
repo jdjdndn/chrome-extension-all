@@ -6,6 +6,8 @@
 
 if (window.LinkBlankLoaded) {
   console.log('[通用脚本] 链接新页面打开已加载，跳过');
+} else if (!window.getScriptSwitch || !window.getScriptSwitch('link-blank')) {
+  console.log('[通用脚本] 链接新页面打开已禁用');
 } else {
   window.LinkBlankLoaded = true;
 
