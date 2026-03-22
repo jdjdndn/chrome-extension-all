@@ -602,41 +602,6 @@
       </div>
     </div>
 
-    <!-- AI Settings -->
-    <div class="settings" style="margin-top: 12px;">
-      <h2 style="font-size: 16px; margin: 0 0 12px 0">AI 配置</h2>
-
-      <div class="setting-item">
-        <div class="toggle-container">
-          <label for="ai-multi-thinking-enabled">启用多轮思考</label>
-          <input type="checkbox" id="ai-multi-thinking-enabled" />
-        </div>
-        <div class="info-box" style="margin-top: 8px;">
-          <small>启用后，AI 会对思考结果进行多轮优化，提高输出质量（会增加响应时间）</small>
-        </div>
-      </div>
-
-      <div class="setting-item" id="ai-rounds-setting" style="margin-top: 12px; display: none;">
-        <label for="ai-thinking-rounds">思考轮数</label>
-        <select id="ai-thinking-rounds" style="width: 100%;">
-          <option value="1">1 轮（直接输出）</option>
-          <option value="2">2 轮（一次优化）</option>
-          <option value="3" selected>3 轮（二次优化，推荐）</option>
-          <option value="4">4 轮（三次优化）</option>
-          <option value="5">5 轮（深度优化）</option>
-        </select>
-        <div class="info-box" style="margin-top: 8px;">
-          <small>
-            <strong>轮数说明：</strong><br />
-            • 1 轮：直接返回结果<br />
-            • 2 轮：对结果进行一次优化<br />
-            • 3 轮：对优化结果再进行优化（推荐）<br />
-            • 4-5 轮：更深度优化，响应时间更长
-          </small>
-        </div>
-      </div>
-    </div>
-
     <div class="settings">
       <h2>Blocked Domains</h2>
 

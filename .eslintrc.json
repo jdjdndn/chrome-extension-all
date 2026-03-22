@@ -1,0 +1,23 @@
+{
+  "env": {
+    "browser": true,
+    "es2021": true,
+    "node": true
+  },
+  "extends": ["eslint:recommended"],
+  "globals": {
+    "chrome": "readonly"
+  },
+  "parserOptions": {
+    "ecmaVersion": 2020,
+    "sourceType": "script"
+  },
+  "rules": {
+    "no-unused-vars": "warn",
+    "no-console": ["warn", { "allow": ["warn", "error", "log"] }],
+    "prefer-const": "warn",
+    "prefer-arrow-callback": "warn",
+    "eqeqeq": "warn",
+    "curly": "warn"
+  }
+}
