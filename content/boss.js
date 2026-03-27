@@ -49,7 +49,27 @@ function formatDate(dateStr) {
 }
 
 // 使用 DOMUtils.throttle 进行节流处理
-const throttledProcessJobList = DOMUtils.throttle(() => {
+// 添加防御性检查
+let throttledProcessJobList;
+if (typeof DOMUtils === 'undefined' || !DOMUtils.throttle) {
+  console.warn('[boss] DOMUtils 未加载，使用简单节流');
+  const simpleThrottle = (fn, delay) => {
+    let lastCall = 0;
+    return (...args) => {
+      const now = Date.now();
+      if (now - lastCall >= delay) {
+        lastCall = now;
+        fn(...args);
+      }
+    };
+  };
+  throttledProcessJobList = simpleThrottle(processJobList, 300);
+} else {
+  throttledProcessJobList = DOMUtils.throttle(processJobList, 300);
+}
+
+// 旧的直接引用（已替换）
+// const throttledProcessJobList = DOMUtils.throttle(() => {
   const jobCards = document.querySelectorAll('[class*="job-card"], [ka="search-job-item"]');
 
   jobCards.forEach(card => {
@@ -81,7 +101,19 @@ const throttledProcessJobList = DOMUtils.throttle(() => {
 }
 
 function injectStyles() {
-  DOMUtils.upsertStyle(STYLE_TAG_ID, styles);
+  // 添加防御性检查
+  if (typeof DOMUtils === 'undefined' || !DOMUtils.upsertStyle) {
+    console.warn('[boss] DOMUtils 未加载，手动添加样式');
+    const style = document.getElementById(STYLE_TAG_ID);
+    if (!style) {
+      const newStyle = document.createElement('style');
+      newStyle.id = STYLE_TAG_ID;
+      newStyle.textContent = styles;
+      document.head.appendChild(newStyle);
+    }
+  } else {
+    DOMUtils.upsertStyle(STYLE_TAG_ID, styles);
+  }
 }
 
 function init() {

@@ -1,84 +1,46 @@
 // Popup script runs in the context of the popup window
 
-// ========== EventBus 通信层 ==========
+// ========== 消息通信层 ==========
+// Popup 与 content script 运行在隔离的上下文中，必须使用 Chrome Extension API 通信
 
 /**
- * 等待 EventBus 就绪
- */
-async function waitForEventBus() {
-  const maxWait = 5000;
-  const checkInterval = 100;
-  const startTime = Date.now();
-
-  while (Date.now() - startTime < maxWait) {
-    if (window.EventBus && EventBus.getState && EventBus.getState().isReady) {
-      return true;
-    }
-    await new Promise(resolve => setTimeout(resolve, checkInterval));
-  }
-  console.warn('[Popup] EventBus 未就绪，继续尝试');
-  return false;
-}
-
-/**
- * 统一发送消息函数（优先 EventBus，降级原生）
+ * 统一发送消息函数（直接使用 Chrome API）
  * @param {string} type - 消息类型
  * @param {object} data - 消息数据
  * @returns {Promise<any>}
  */
 async function sendMessage(type, data = {}) {
-  // 等待 EventBus 就绪
-  const eventBusReady = await waitForEventBus();
-
-  if (eventBusReady) {
-    try {
-      return await EventBus.request(type, data, { timeout: 5000 });
-    } catch (error) {
-      console.warn('[Popup] EventBus 发送失败，降级原生:', error.message);
-    }
+  try {
+    return await chrome.runtime.sendMessage({ type, ...data });
+  } catch (error) {
+    console.error('[Popup] 发送消息失败:', error.message);
+    return null;
   }
-
-  // 降级到原生 chrome.runtime.sendMessage
-  return await chrome.runtime.sendMessage({ type, ...data });
 }
 
 /**
- * 发送消息到 content script（使用 EventBus）
+ * 发送消息到 content script
  */
 async function sendMessageToContentScript(message) {
-  const messageType = message.type;
-  const messageData = message.data || message;
-
   try {
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
     if (tabs[0]?.id) {
-      // 优先使用 EventBus
-      const eventBusReady = await waitForEventBus();
-      if (eventBusReady) {
-        try {
-          return await EventBus.request(messageType, messageData, {
-            target: { tabId: tabs[0].id },
-            timeout: 5000
-          });
-        } catch (e) {}
-      }
-      // 降级到原生
       return await chrome.tabs.sendMessage(tabs[0].id, message);
     }
   } catch (error) {
-    console.warn('[Popup] 发送到 content script 失败:', error.message);
+    // 如果 content script 未加载，静默失败（这是正常情况）
+    if (!error.message.includes('Receiving end does not exist')) {
+      console.warn('[Popup] 发送到 content script 失败:', error.message);
+    }
   }
   return null;
 }
 
 /**
- * 广播消息到所有组件
+ * 广播消息到所有组件（通过 background）
  */
 async function broadcastMessage(message) {
-  const eventBusReady = await waitForEventBus();
-  if (eventBusReady) {
-    await EventBus.publish(message.type, message.data || message);
-  }
+  await sendMessage('BROADCAST_MESSAGE', message);
 }
 
 // Default settings

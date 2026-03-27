@@ -42,6 +42,7 @@
       "js": [
         "event-bus-v4.6.js",
         "content/utils/logger.js",
+        "content/core/script-loader.js",
         "content/eventbus-integration.js",
         "content/utils/storage.js",
         "content/utils/storage-bridge.js",

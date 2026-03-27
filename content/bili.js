@@ -1,7 +1,8 @@
 // Content script for bilibili.com
 // 使用 SiteBase 基类重构，集成关键词过滤功能
+// 使用 ScriptLoader 进行依赖管理
 
-(async function() {
+(function() {
   'use strict';
 
   if (window.BiliScriptLoaded) {
@@ -9,31 +10,46 @@
     return;
   }
 
-  // 等待依赖加载（带重试机制）
-  async function waitForDependencies(maxRetries = 10, interval = 100) {
-    for (let i = 0; i < maxRetries; i++) {
-      // 优先使用 LazyLoader
-      if (typeof LazyLoader !== 'undefined') {
-        await LazyLoader.load('site-base');
-        return true;
+  // ========== 主初始化函数（由 ScriptLoader 调用）==========
+  async function initBiliScript() {
+    console.log('[Bilibili脚本] 依赖已就绪，开始初始化');
+    await runBiliScript();
+  }
+
+  // ========== 降级初始化函数（兼容旧环境）==========
+  async function initBiliScriptLegacy() {
+    console.log('[Bilibili脚本] ScriptLoader 未加载，使用降级模式');
+
+    // 等待依赖加载（带重试机制）
+    async function waitForDependencies(maxRetries = 10, interval = 100) {
+      for (let i = 0; i < maxRetries; i++) {
+        // 优先使用 LazyLoader
+        if (typeof LazyLoader !== 'undefined') {
+          await LazyLoader.load('site-base');
+          return true;
+        }
+        // 直接检查 SiteBase
+        if (typeof SiteBase !== 'undefined') {
+          return true;
+        }
+        // 等待后重试
+        await new Promise(resolve => setTimeout(resolve, interval));
       }
-      // 直接检查 SiteBase
-      if (typeof SiteBase !== 'undefined') {
-        return true;
-      }
-      // 等待后重试
-      await new Promise(resolve => setTimeout(resolve, interval));
+      return false;
     }
-    return false;
+
+    const depsLoaded = await waitForDependencies();
+    if (!depsLoaded) {
+      console.error('[Bilibili脚本] 依赖加载超时 (LazyLoader/SiteBase)');
+      return;
+    }
+
+    await runBiliScript();
   }
 
-  const depsLoaded = await waitForDependencies();
-  if (!depsLoaded) {
-    console.error('[Bilibili脚本] 依赖加载超时 (LazyLoader/SiteBase)');
-    return;
-  }
-
-  window.BiliScriptLoaded = true;
+  // ========== 主脚本逻辑 ==========
+  async function runBiliScript() {
+    window.BiliScriptLoaded = true;
 
   // ========== Bilibili 站点脚本类 ==========
   class BiliSite extends SiteBase {
@@ -379,6 +395,8 @@
     }
   });
 
+  } // runBiliScript 函数结束
+
   // ========== 启动 ==========
   async function init() {
     await biliSite.init();
@@ -391,10 +409,16 @@
     }
   }
 
-  if (document.readyState === 'loading') {
-    window.addEventListener('DOMContentLoaded', init);
+  // ========== 使用 ScriptLoader 声明依赖（放在文件末尾，确保所有变量已定义）==========
+  if (window.ScriptLoader) {
+    ScriptLoader.declare({
+      name: 'bili-script',
+      dependencies: ['EventBus', 'MessagingUtils', 'SiteBase'],
+      onReady: initBiliScript
+    });
   } else {
-    init();
+    // 降级：使用旧的等待机制
+    initBiliScriptLegacy();
   }
 
   console.log('[Bilibili脚本] 已加载');

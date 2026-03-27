@@ -1917,18 +1917,33 @@ if (!window.PanelPositionManager) {
 
     saveToStorage() {
       try {
+        // 检查 localStorage 是否可用（沙盒 iframe 中不可用）
+        if (typeof localStorage === 'undefined' || localStorage === null) {
+          console.warn('[位置管理器] localStorage 不可用，跳过保存');
+          return;
+        }
         localStorage.setItem(this.STORAGE_KEY, JSON.stringify({
           customPositions: this.customPositions,
           collapsedStates: this.collapsedStates,
           userPanelPositions: this.userPanelPositions
         }));
       } catch (e) {
-        console.warn('[位置管理器] 保存失败:', e);
+        // SecurityError: 沙盒环境或跨域限制
+        if (e.name === 'SecurityError' || e.code === 18) {
+          console.warn('[位置管理器] 沙盒环境，无法使用 localStorage');
+        } else {
+          console.warn('[位置管理器] 保存失败:', e.message || e);
+        }
       }
     },
 
     loadFromStorage() {
       try {
+        // 检查 localStorage 是否可用
+        if (typeof localStorage === 'undefined' || localStorage === null) {
+          console.warn('[位置管理器] localStorage 不可用，使用默认值');
+          return;
+        }
         const saved = localStorage.getItem(this.STORAGE_KEY);
         if (saved) {
           const data = JSON.parse(saved);
@@ -1937,7 +1952,12 @@ if (!window.PanelPositionManager) {
           this.userPanelPositions = data.userPanelPositions || {};
         }
       } catch (e) {
-        console.warn('[位置管理器] 加载失败:', e);
+        // SecurityError: 沙盒环境或跨域限制
+        if (e.name === 'SecurityError' || e.code === 18) {
+          console.warn('[位置管理器] 沙盒环境，无法使用 localStorage');
+        } else {
+          console.warn('[位置管理器] 加载失败:', e.message || e);
+        }
       }
     },
 

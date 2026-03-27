@@ -2,6 +2,8 @@
  * EventBus 集成模块 - 通用版
  * 为所有 content scripts 添加 EventBus 支持
  * 取代 MessagingUtils，提供统一的通信接口
+ *
+ * 使用 ScriptLoader 进行依赖管理
  */
 
 (function () {
@@ -13,6 +15,15 @@
   const MessagingUtilsCompat = {
     isExtensionContext() {
       return typeof chrome !== 'undefined' && chrome.runtime;
+    },
+
+    // 检查扩展上下文是否有效
+    isExtensionContextValid() {
+      try {
+        return typeof chrome !== 'undefined' && chrome.runtime && !!chrome.runtime.id;
+      } catch {
+        return false;
+      }
     },
 
     // 发送消息到 background（使用 EventBus）
@@ -71,6 +82,53 @@
         currentDomain,
         requestDomain
       }, { target: 'background' });
+    },
+
+    // 检查 EventBus 是否就绪
+    isEventBusReady() {
+      return typeof EventBus !== 'undefined' && EventBus.getState && EventBus.getState().isReady;
+    },
+
+    // 等待 EventBus 就绪（使用 ScriptLoader 事件驱动）
+    async waitForEventBus(timeout = 3000) {
+      // 如果已就绪，立即返回
+      if (this.isEventBusReady()) {
+        return true;
+      }
+
+      // 优先使用 ScriptLoader 的事件驱动机制
+      if (window.ScriptLoader) {
+        return ScriptLoader.waitFor(['EventBus'], timeout);
+      }
+
+      // 降级到轮询（兼容旧代码）
+      return new Promise((resolve) => {
+        const startTime = Date.now();
+        const checkInterval = setInterval(() => {
+          if (this.isEventBusReady()) {
+            clearInterval(checkInterval);
+            resolve(true);
+          } else if (Date.now() - startTime > timeout) {
+            clearInterval(checkInterval);
+            resolve(false);
+          }
+        }, 100);
+      });
+    },
+
+    // 订阅事件
+    subscribe(type, callback) {
+      if (this.isEventBusReady()) {
+        return EventBus.subscribe(type, callback);
+      }
+      return () => {};
+    },
+
+    // 发布事件
+    async publish(type, data) {
+      if (this.isEventBusReady()) {
+        await EventBus.publish(type, data);
+      }
     }
   };
 
@@ -83,11 +141,34 @@
     const checkInterval = 100;
     let attempts = 0;
 
+    // 立即检查一次，如果 EventBus 已就绪则直接执行
+    if (window.EventBus && EventBus.getState && EventBus.getState().isReady) {
+      console.log('[EventBus集成] ✓ EventBus 已就绪（立即）');
+      // 通知 ScriptLoader
+      if (window.ScriptLoader) {
+        ScriptLoader.markReady('EventBus');
+      }
+      callback();
+      return;
+    }
+
+    // 如果 EventBus 存在但未初始化，尝试主动初始化
+    if (window.EventBus && EventBus.init && !EventBus.getState().isReady) {
+      console.log('[EventBus集成] 触发 EventBus 初始化');
+      EventBus.init();
+    }
+
     const interval = setInterval(() => {
       attempts++;
+
+      // 检查 EventBus 是否存在且就绪
       if (window.EventBus && EventBus.getState && EventBus.getState().isReady) {
         clearInterval(interval);
         console.log('[EventBus集成] ✓ EventBus 已就绪');
+        // 通知 ScriptLoader
+        if (window.ScriptLoader) {
+          ScriptLoader.markReady('EventBus');
+        }
         callback();
       } else if (attempts * checkInterval >= maxWait) {
         clearInterval(interval);
@@ -207,6 +288,12 @@
   waitForEventBus(() => {
     registerHandlers();
     markReady();
+
+    // 通知 ScriptLoader：MessagingUtils 已就绪
+    if (window.ScriptLoader) {
+      ScriptLoader.markReady('MessagingUtils');
+      console.log('[EventBus集成] ✓ 已通知 ScriptLoader: MessagingUtils 就绪');
+    }
   });
 
 })();

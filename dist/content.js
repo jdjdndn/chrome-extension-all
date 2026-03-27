@@ -98,6 +98,11 @@ const DOMAIN_DEFAULT_HIDE_SELECTORS = {
  * Get default hide selectors for current domain
  */
 function getDomainDefaultHideSelectors() {
+  // 安全检查 DOMUtils 是否可用
+  if (typeof DOMUtils === 'undefined' || !DOMUtils.getCurrentDomain) {
+    console.warn('[Content] DOMUtils 未加载，无法获取域名');
+    return [];
+  }
   const domain = DOMUtils.getCurrentDomain();
   return DOMAIN_DEFAULT_HIDE_SELECTORS[domain] || [];
 }
@@ -151,9 +156,22 @@ let hideElementsState = {
 };
 
 /**
+ * 安全检查 DOMUtils 是否可用
+ */
+function isDOMUtilsReady() {
+  if (typeof DOMUtils === 'undefined') {
+    // 静默返回，不显示警告（因为在某些时序下这是正常的）
+    return false;
+  }
+  return true;
+}
+
+/**
  * Apply hide elements by creating/updating style tag
  */
 function applyHideElementsStyle(selectors) {
+  if (!isDOMUtilsReady()) return;
+
   if (!selectors || selectors.length === 0) {
     DOMUtils.removeStyle(HIDE_ELEMENTS_STYLE_ID);
     return;
@@ -171,6 +189,8 @@ function updateHideElements(enabled, selectors) {
 
   hideElementsState.enabled = enabled;
   hideElementsState.selectors = selectors;
+
+  if (!isDOMUtilsReady()) return;
 
   if (enabled && selectors && selectors.length > 0) {
     applyHideElementsStyle(selectors);
@@ -191,6 +211,11 @@ function updateHideElements(enabled, selectors) {
  * 分功能控制：默认选择器始终自动应用，用户自定义选择器根据设置决定
  */
 async function initHideElements() {
+  if (!isDOMUtilsReady()) {
+    console.log('[隐藏元素] DOMUtils 未就绪，跳过初始化');
+    return;
+  }
+
   const domain = DOMUtils.getCurrentDomain();
   if (!domain) {
     console.log('[隐藏元素] 无法获取当前域名，跳过初始化');

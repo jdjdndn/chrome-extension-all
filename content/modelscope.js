@@ -1,7 +1,8 @@
 /**
  * ModelScope 脚本
  * 功能：监控模型标题元素，自动复制文本
- * 依赖: content/utils/logger.js, storage.js, dom.js, messaging.js
+ * 依赖: DOMUtils
+ * 使用 ScriptLoader 进行依赖管理
  */
 
 (function () {
@@ -14,6 +15,36 @@
   }
   if (!window.ModelScopeScript) {
     window.ModelScopeScript = { isInitialized: false };
+  }
+
+  // ========== 使用 ScriptLoader 声明依赖 ==========
+  if (window.ScriptLoader) {
+    ScriptLoader.declare({
+      name: 'modelscope-script',
+      dependencies: ['DOMUtils'],
+      onReady: initModelScopeScript
+    });
+  } else {
+    // 降级：直接初始化（兼容旧环境）
+    console.log('[ModelScope] ScriptLoader 未加载，使用降级模式');
+    initModelScopeScriptLegacy();
+  }
+
+  // ========== 主初始化函数（由 ScriptLoader 调用）==========
+  async function initModelScopeScript() {
+    console.log('[ModelScope] 依赖已就绪，开始初始化');
+    init();
+  }
+
+  // ========== 降级初始化函数（兼容旧环境）==========
+  async function initModelScopeScriptLegacy() {
+    // 等待 DOMUtils 就绪
+    const domUtilsReady = await waitForDOMUtils();
+    if (!domUtilsReady) {
+      console.error('[ModelScope] DOMUtils 未加载，无法初始化');
+      return;
+    }
+    init();
   }
 
   // ========== 配置 ==========
@@ -29,11 +60,30 @@
     if (!text || text === lastCopiedText) return;
 
     try {
-      await navigator.clipboard.writeText(text);
-      lastCopiedText = text;
-      console.log(`[ModelScope] 已复制标题: ${text}`);
+      // 优先使用 navigator.clipboard（需要安全上下文）
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        lastCopiedText = text;
+        console.log(`[ModelScope] 已复制标题: ${text}`);
+      } else {
+        // 降级方案：使用 execCommand（已废弃但仍可用）
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0;';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        lastCopiedText = text;
+        console.log(`[ModelScope] 已复制标题(降级方案): ${text}`);
+      }
     } catch (err) {
-      console.error('[ModelScope] 复制失败:', err);
+      // SecurityError 或其他错误
+      if (err.name === 'SecurityError') {
+        console.warn('[ModelScope] 安全限制，无法访问剪贴板');
+      } else {
+        console.error('[ModelScope] 复制失败:', err.message || err);
+      }
     }
   }
 
@@ -87,13 +137,6 @@
       return;
     }
 
-    // 等待 DOMUtils 就绪
-    const domUtilsReady = await waitForDOMUtils();
-    if (!domUtilsReady) {
-      console.error('[ModelScope] DOMUtils 未加载，无法初始化');
-      return;
-    }
-
     window.ModelScopeScript.isInitialized = true;
 
     // 确保 document.body 存在
@@ -139,12 +182,5 @@
 
   // 页面卸载时清理
   window.addEventListener('beforeunload', cleanup);
-
-  // 启动
-  if (document.readyState === 'loading') {
-    window.addEventListener('DOMContentLoaded', init);
-  } else {
-    setTimeout(init, 100);
-  }
 
 })();

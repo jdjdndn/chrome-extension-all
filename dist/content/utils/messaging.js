@@ -1,5 +1,6 @@
 // ========== 消息通信工具模块 ==========
 // 封装 Chrome Runtime 消息通信（基于 EventBus）
+// 使用 ScriptLoader 进行依赖管理
 
 (function () {
   'use strict';
@@ -36,16 +37,23 @@
   }
 
   /**
-   * 等待 EventBus 就绪
+   * 等待 EventBus 就绪（使用 ScriptLoader 事件驱动）
    * @param {number} timeout - 超时时间（毫秒）
    * @returns {Promise<boolean>}
    */
   function waitForEventBus(timeout = 3000) {
+    // 如果已就绪，立即返回
+    if (isEventBusReady()) {
+      return Promise.resolve(true);
+    }
+
+    // 优先使用 ScriptLoader 的事件驱动机制
+    if (window.ScriptLoader) {
+      return ScriptLoader.waitFor(['EventBus'], timeout);
+    }
+
+    // 降级到轮询（兼容旧代码）
     return new Promise((resolve) => {
-      if (isEventBusReady()) {
-        resolve(true);
-        return;
-      }
       const startTime = Date.now();
       const checkInterval = setInterval(() => {
         if (isEventBusReady()) {
@@ -258,6 +266,11 @@
     subscribe,
     publish,
   };
+
+  // 通知 ScriptLoader：MessagingUtils 已就绪
+  if (window.ScriptLoader) {
+    ScriptLoader.markReady('MessagingUtils');
+  }
 
   console.log('[Messaging] 消息通信模块已加载 (EventBus 增强版)');
 })();

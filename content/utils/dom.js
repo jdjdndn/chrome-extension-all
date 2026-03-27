@@ -302,5 +302,10 @@
     findAllInViewport,
   };
 
+  // 通知 ScriptLoader：DOMUtils 已就绪
+  if (window.ScriptLoader) {
+    ScriptLoader.markReady('DOMUtils');
+  }
+
   console.log('[DOM] DOM工具模块已加载');
 })();

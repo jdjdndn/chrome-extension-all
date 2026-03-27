@@ -4,11 +4,29 @@
 
 'use strict';
 
-if (window.RedirectLinksLoaded) {
-  console.log('[通用脚本] 重定向链接替换已加载，跳过');
-} else if (!window.getScriptSwitch || !window.getScriptSwitch('redirect-links')) {
-  console.log('[通用脚本] 重定向链接替换已禁用');
+// 使用 ScriptLoader 管理依赖
+if (window.ScriptLoader) {
+  ScriptLoader.declare({
+    name: 'redirect-links',
+    dependencies: ['DOMUtils'],
+    onReady: () => initRedirectLinks()
+  });
 } else {
+  // 降级处理：ScriptLoader 未加载时直接初始化
+  initRedirectLinks();
+}
+
+function initRedirectLinks() {
+  if (window.RedirectLinksLoaded) {
+    console.log('[通用脚本] 重定向链接替换已加载，跳过');
+    return;
+  }
+
+  if (!window.getScriptSwitch || !window.getScriptSwitch('redirect-links')) {
+    console.log('[通用脚本] 重定向链接替换已禁用');
+    return;
+  }
+
   window.RedirectLinksLoaded = true;
 
   // 需要新窗口打开的链接模式

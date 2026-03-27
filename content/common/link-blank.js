@@ -4,11 +4,29 @@
 
 'use strict';
 
-if (window.LinkBlankLoaded) {
-  console.log('[通用脚本] 链接新页面打开已加载，跳过');
-} else if (!window.getScriptSwitch || !window.getScriptSwitch('link-blank')) {
-  console.log('[通用脚本] 链接新页面打开已禁用');
+// 使用 ScriptLoader 管理依赖
+if (window.ScriptLoader) {
+  ScriptLoader.declare({
+    name: 'link-blank',
+    dependencies: ['DOMUtils'],
+    onReady: () => initLinkBlank()
+  });
 } else {
+  // 降级处理：ScriptLoader 未加载时直接初始化
+  initLinkBlank();
+}
+
+function initLinkBlank() {
+  if (window.LinkBlankLoaded) {
+    console.log('[通用脚本] 链接新页面打开已加载，跳过');
+    return;
+  }
+
+  if (!window.getScriptSwitch || !window.getScriptSwitch('link-blank')) {
+    console.log('[通用脚本] 链接新页面打开已禁用');
+    return;
+  }
+
   window.LinkBlankLoaded = true;
 
   const NO_TARGET_ATTR = 'yc-no-target';
@@ -62,7 +80,9 @@ if (window.LinkBlankLoaded) {
   }
 
   // 使用 DOMUtils.throttle 进行节流处理
-  const throttledProcess = DOMUtils.throttle(() => {
+  const throttledProcess = DOMUtils.throttle;
+
+  const throttledHandler = throttledProcess(() => {
     const anchors = document.querySelectorAll(`a[href]:not([${PROCESSED_ATTR}]):not([target="_blank"]):not([${NO_TARGET_ATTR}])`);
     processAnchors(anchors);
   }, 300);
@@ -81,14 +101,14 @@ if (window.LinkBlankLoaded) {
     }
 
     // 使用 MutationObserver 监听 DOM 变化
-    const observer = new MutationObserver(throttledProcess);
+    const observer = new MutationObserver(throttledHandler);
     observer.observe(document.body, { childList: true, subtree: true, attributes: true });
 
     // 存储 observer 以便清理
     window._ycLinkBlankObserver = observer;
 
     // 初始执行
-    throttledProcess();
+    throttledHandler();
 
     console.log('[通用脚本] 链接新页面打开已加载');
   }

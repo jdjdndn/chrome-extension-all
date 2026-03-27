@@ -3,11 +3,29 @@
 
 'use strict';
 
-if (window.AddTitleLoaded) {
-  console.log('[通用脚本] title 添加已加载，跳过');
-} else if (!window.getScriptSwitch || !window.getScriptSwitch('add-title')) {
-  console.log('[通用脚本] title 添加已禁用');
+// 使用 ScriptLoader 管理依赖
+if (window.ScriptLoader) {
+  ScriptLoader.declare({
+    name: 'add-title',
+    dependencies: ['DOMUtils'],
+    onReady: () => initAddTitle()
+  });
 } else {
+  // 降级处理：ScriptLoader 未加载时直接初始化
+  initAddTitle();
+}
+
+function initAddTitle() {
+  if (window.AddTitleLoaded) {
+    console.log('[通用脚本] title 添加已加载，跳过');
+    return;
+  }
+
+  if (!window.getScriptSwitch || !window.getScriptSwitch('add-title')) {
+    console.log('[通用脚本] title 添加已禁用');
+    return;
+  }
+
   window.AddTitleLoaded = true;
 
   const PROCESSED_ATTR = 'yc-title-processed';

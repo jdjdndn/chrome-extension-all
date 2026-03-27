@@ -488,11 +488,12 @@
         // 扩展上下文失效时静默失败
         if (error.message?.includes('Extension context invalidated')) {
           DevToolsMonitor.disable();
-          console.warn('[EventBus] Extension context invalidated, please reload the page');
+          // 静默处理，不显示警告（这是正常情况）
+          // console.warn('[EventBus] Extension context invalidated, please reload the page');
           return;
         }
         // 其他错误也静默处理，避免影响页面
-        console.warn('[EventBus] Broadcast failed:', error.message);
+        // console.warn('[EventBus] Broadcast failed:', error.message);
       }
     },
 

@@ -1,7 +1,9 @@
 /**
  * 抖音自动化脚本
  * 功能：自动展开评论、跳过广告、跳过AI视频、不感兴趣关键词过滤
- * 依赖: content/utils/logger.js, storage.js, dom.js, messaging.js
+ * 依赖: EventBus, MessagingUtils, DOMUtils
+ *
+ * 使用 ScriptLoader 进行依赖管理
  */
 
 (function () {
@@ -16,46 +18,58 @@
     window.DouyinScript = { isInitialized: false };
   }
 
+  // ========== 主初始化函数（由 ScriptLoader 调用）==========
+  function initDouyinScript() {
+    console.log('[抖音脚本] 依赖已就绪，开始初始化');
+    init();
+  }
+
+  // ========== 降级初始化函数（兼容旧环境）==========
+  function initDouyinScriptLegacy() {
+    console.log('[抖音脚本] ScriptLoader 未加载，直接初始化');
+    init();
+  }
+
   // ========== 配置 ==========
   const STYLE_TAG_ID = 'douyin-content-hide-style';
   let currentSelectors = [];
 
-const DEFAULT_HIDE_SELECTORS = ['.qmhaloYp:nth-child(n):not(:nth-child(2)):not(:nth-child(5))',
-  '.ooIf2jbM', '._e7lJDCC', '#island_076c3', '.ai-note-container', '.cursorPointer+*', 'xg-right-grid>xg-icon:not([class*="automatic-continuous"]):not([class*="xgplayer-volume"])', '.danmakuContainer', '#douyin-header-menuCt>div>pace-island>div>*:not(:last-child)'
-];
-console.log('[抖音脚本] DEFAULT_HIDE_SELECTORS 已定义，数量:', DEFAULT_HIDE_SELECTORS.length);
+  const DEFAULT_HIDE_SELECTORS = ['.qmhaloYp:nth-child(n):not(:nth-child(2)):not(:nth-child(5))',
+    '.ooIf2jbM', '._e7lJDCC', '#island_076c3', '.ai-note-container', '.cursorPointer+*', 'xg-right-grid>xg-icon:not([class*="automatic-continuous"]):not([class*="xgplayer-volume"])', '.danmakuContainer', '#douyin-header-menuCt>div>pace-island>div>*:not(:last-child)'
+  ];
+  console.log('[抖音脚本] DEFAULT_HIDE_SELECTORS 已定义，数量:', DEFAULT_HIDE_SELECTORS.length);
 
-const BLOCKED_DOMAINS = [
-  'mcs.zijieapi.com/list',
-  'vc-gate-edge.ndcpp.com/sdk/get_peer',
-  'security.zijieapi.com/api/metrics/emit',
-  'tnc0-aliec2.zijieapi.com/get_domains'
-];
+  const BLOCKED_DOMAINS = [
+    'mcs.zijieapi.com/list',
+    'vc-gate-edge.ndcpp.com/sdk/get_peer',
+    'security.zijieapi.com/api/metrics/emit',
+    'tnc0-aliec2.zijieapi.com/get_domains'
+  ];
 
-const NOT_INTERESTED_KEYWORDS = [
-  "抽象", "漫画", "国漫", "修仙", "玄幻", "系统", "动画", "动漫", "小说",
-  "黑神话", "解说", "好剧", "儿童", "孩子", "观影", "案件", "国学",
-  "狗", "猫", "宠物", "娃", "王者荣耀", "射手", "对抗路", "中单", "上单",
-  "打野", "巅峰赛", "游戏日常", "综艺", "游戏", "美食", "测评", "小品",
-  "春晚", "相亲", "恋爱", "情侣日常", "国服", "驾照", "考试", "结婚",
-  "率土之滨", "程序员", "前端", "动物", "电商", "追剧", "军旅", "短剧",
-  "恐怖", "影视", "电影", "司机", "工地", "情侣", "原生家庭", "影娱",
-  "好片", "亲子", "幼儿园", "育儿", "育婴", "宝宝", "母婴", "妈妈",
-  "父母", "爸妈", "早教", "幼教", "学前", "音乐", "热歌", "健身",
-  "分手", "股票", "情感", "驾驶", "街头", "手势"
-];
+  const NOT_INTERESTED_KEYWORDS = [
+    "抽象", "漫画", "国漫", "修仙", "玄幻", "系统", "动画", "动漫", "小说",
+    "黑神话", "解说", "好剧", "儿童", "孩子", "观影", "案件", "国学",
+    "狗", "猫", "宠物", "娃", "王者荣耀", "射手", "对抗路", "中单", "上单",
+    "打野", "巅峰赛", "游戏日常", "综艺", "游戏", "美食", "测评", "小品",
+    "春晚", "相亲", "恋爱", "情侣日常", "国服", "驾照", "考试", "结婚",
+    "率土之滨", "程序员", "前端", "动物", "电商", "追剧", "军旅", "短剧",
+    "恐怖", "影视", "电影", "司机", "工地", "情侣", "原生家庭", "影娱",
+    "好片", "亲子", "幼儿园", "育儿", "育婴", "宝宝", "母婴", "妈妈",
+    "父母", "爸妈", "早教", "幼教", "学前", "音乐", "热歌", "健身",
+    "分手", "股票", "情感", "驾驶", "街头", "手势"
+  ];
 
-const AUTO_FOLLOW_KEYWORDS = ['ootd'];
+  const AUTO_FOLLOW_KEYWORDS = ['ootd'];
 
-const AD_SVG_PATHS = [
-  '<path d="M9.492 2.004L8.22 2.22c.216.336.408.72.588 1.128h-4.38v3.636c-.024 2.34-.348 4.176-.972 5.496l.96.852c.744-1.596 1.128-3.708 1.164-6.348V4.452h8.796V3.348h-4.308a16.717 16.717 0 0 0-.576-1.344zm15.564 6.672h-8.04v4.548h1.152v-.576h5.736v.576h1.152V8.676zm-6.888 2.904V9.756h5.736v1.824h-5.736zm-.276-6.732h2.688v1.656h-5.04V7.62h10.92V6.504h-4.74V4.848h3.828V3.756H21.72V2.148h-1.14v1.608h-2.016c.204-.408.372-.852.516-1.32l-1.128-.144c-.384 1.248-1.104 2.292-2.16 3.144l.684.9a8.301 8.301 0 0 0 1.416-1.488z" fill="#fff" fill-opacity=".5"></path>',
-];
+  const AD_SVG_PATHS = [
+    '<path d="M9.492 2.004L8.22 2.22c.216.336.408.72.588 1.128h-4.38v3.636c-.024 2.34-.348 4.176-.972 5.496l.96.852c.744-1.596 1.128-3.708 1.164-6.348V4.452h8.796V3.348h-4.308a16.717 16.717 0 0 0-.576-1.344zm15.564 6.672h-8.04v4.548h1.152v-.576h5.736v.576h1.152V8.676zm-6.888 2.904V9.756h5.736v1.824h-5.736zm-.276-6.732h2.688v1.656h-5.04V7.62h10.92V6.504h-4.74V4.848h3.828V3.756H21.72V2.148h-1.14v1.608h-2.016c.204-.408.372-.852.516-1.32l-1.128-.144c-.384 1.248-1.104 2.292-2.16 3.144l.684.9a8.301 8.301 0 0 0 1.416-1.488z" fill="#fff" fill-opacity=".5"></path>',
+  ];
 
-const AI_KEYWORDS = ['AI'];
+  const AI_KEYWORDS = ['AI'];
 
-const THROTTLE_CONFIG = {
-  SKIP_VIDEO: 400,
-  OPEN_COMMENT: 600,
+  const THROTTLE_CONFIG = {
+    SKIP_VIDEO: 400,
+    OPEN_COMMENT: 600,
   FOLLOW: 500
 };
 
@@ -587,17 +601,19 @@ function setVideoTime() {
 
 // ========== 主处理循环 ==========
 function processCurrentVideo() {
-  // ========== 第一步：直播检测（优先级最高） ==========
-  if (detectAndSkipLive()) {
-    return; // 检测到直播并已触发跳过
-  }
-
   const videoBody = findOne('.playerContainer');
-  if (!videoBody) return;
+  if (!videoBody) {
+    // 没有普通视频容器，检查是否是直播
+    if (detectAndSkipLive()) {
+      return; // 检测到直播并已触发跳过
+    }
+    return;
+  }
 
   const videoId = getVideoUUID(videoBody);
 
   // 如果视频在本次会话中被用户返回过，跳过所有自动处理
+  // 注意：这个检查必须在所有其他检查之前，优先级最高
   if (returnedVideosThisSession.has(videoId)) {
     if (currentVideoId !== videoId) {
       currentVideoId = videoId;
@@ -739,9 +755,18 @@ async function loadDomainHideSettings() {
 
 // ========== 初始化 ==========
 async function registerBlockedDomains() {
-  // 检查 MessagingUtils 是否已加载
-  if (!window.MessagingUtils || typeof window.MessagingUtils.isExtensionContextValid !== 'function') {
-    console.warn('[抖音脚本] MessagingUtils 未就绪，跳过注册域名');
+  // 增加超时时间到 10 秒，给 background 更多的初始化时间
+  const TIMEOUT = 10000;
+
+  // 使用 ScriptLoader 等待 MessagingUtils 就绪
+  if (window.ScriptLoader) {
+    const ready = await ScriptLoader.waitFor(['MessagingUtils'], TIMEOUT);
+    if (!ready) {
+      console.warn('[抖音脚本] MessagingUtils 等待超时，跳过注册域名（这是正常的，不影响功能）');
+      return;
+    }
+  } else if (!window.MessagingUtils || typeof window.MessagingUtils.isExtensionContextValid !== 'function') {
+    console.warn('[抖音脚本] MessagingUtils 未就绪，跳过注册域名（这是正常的，不影响功能）');
     return;
   }
 
@@ -752,15 +777,23 @@ async function registerBlockedDomains() {
   }
 
   try {
-    const result = await MessagingUtils.registerBlockedDomains('douyin.com', BLOCKED_DOMAINS);
+    // 增加超时时间
+    const result = await Promise.race([
+      MessagingUtils.registerBlockedDomains('douyin.com', BLOCKED_DOMAINS),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Timeout')), TIMEOUT)
+      )
+    ]);
+
     if (result?.success) {
       console.log('[抖音脚本] 已向 background 注册 blockedDomains');
     } else {
-      console.log('[抖音脚本] 注册域名结果:', result);
+      // 静默处理，不显示错误日志
+      // console.log('[抖音脚本] 注册域名结果:', result);
     }
   } catch (err) {
-    // 静默处理错误，不影响主流程
-    console.warn('[抖音脚本] 注册域名跳过:', err.message);
+    // 静默处理错误，不影响主流程，不显示警告
+    // console.warn('[抖音脚本] 注册域名跳过:', err.message);
   }
 }
 
@@ -775,6 +808,7 @@ function injectCustomStyles() {
   document.head.appendChild(style);
 }
 
+// ========== 主初始化函数（由 ScriptLoader 调用）==========
 function init() {
   console.log('[抖音脚本] init 函数被调用');
   if (window.DouyinScript.isInitialized) {
@@ -1013,5 +1047,17 @@ MessagingUtils.createMessageHandler('douyin_message_handler', {
     return { success: true };
   }
 });
+
+// ========== 使用 ScriptLoader 声明依赖（放在文件末尾，确保所有变量已定义）==========
+if (window.ScriptLoader) {
+  ScriptLoader.declare({
+    name: 'douyin-script',
+    dependencies: ['EventBus', 'MessagingUtils', 'DOMUtils'],
+    onReady: initDouyinScript
+  });
+} else {
+  // 降级：直接初始化（兼容旧环境）
+  initDouyinScriptLegacy();
+}
 
 })();

@@ -719,6 +719,19 @@ async function handleTabUpdate(tabId, tab) {
 
     // 检查是否 manifest.json 已自动注入（通过检查 ExtensionAPI）
     try {
+      // 先检查 tab 状态，避免在错误页面注入
+      const tab = await chrome.tabs.get(tabId);
+      if (!tab || tab.status === 'unloaded') {
+        console.log(`[Background] 标签页 ${tabId} 未加载完成，跳过检查`);
+        return;
+      }
+
+      // 检查是否是错误页面（chrome-error:// 或 about:blank 等）
+      if (tab.url && (tab.url.startsWith('chrome-error://') || tab.url === 'about:blank')) {
+        console.log(`[Background] 标签页 ${tabId} 是错误页面，跳过注入`);
+        return;
+      }
+
       const checkResult = await chrome.scripting.executeScript({
         target: { tabId },
         func: () => typeof window.ExtensionAPI !== 'undefined'
@@ -735,7 +748,12 @@ async function handleTabUpdate(tabId, tab) {
       injectedTabs[tabKey] = Date.now();
       await chrome.storage.local.set({ injectedTabs });
     } catch (error) {
-      console.error('[Background] 检查/注入失败:', error);
+      // 特定错误处理
+      if (error.message?.includes('error page') || error.message?.includes('cannot access')) {
+        console.log(`[Background] 标签页 ${tabId} 无法注入（错误页面或受限页面）`);
+      } else {
+        console.error('[Background] 检查/注入失败:', error.message || error);
+      }
     }
   }
 }
@@ -1063,6 +1081,19 @@ async function injectAllScriptsForTab(tabId, tabUrl) {
       return;
     }
 
+    // 检查 tab 状态
+    const tab = await chrome.tabs.get(tabId);
+    if (!tab || tab.status === 'unloaded') {
+      console.log(`[Background] 标签页 ${tabId} 未加载完成，跳过注入`);
+      return;
+    }
+
+    // 检查是否是错误页面
+    if (tab.url && (tab.url.startsWith('chrome-error://') || tab.url === 'about:blank')) {
+      console.log(`[Background] 跳过错误页面: ${tab.url}`);
+      return;
+    }
+
     // 首先检查脚本是否已经注入过（检查 window.ExtensionAPI 是否存在）
     const checkResult = await chrome.scripting.executeScript({
       target: { tabId },
@@ -1213,16 +1244,53 @@ async function handleMessage(message, sender, sendResponse) {
       try {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         if (tab?.id) {
-          await chrome.tabs.sendMessage(tab.id, {
-            type: 'EXTENSION_ACTIVATE',
-            source: message.source || 'popup'
-          });
-          sendResponse({ success: true, tabId: tab.id });
+          // 检查是否是特殊页面（无法注入 content script）
+          if (tab.url && (
+            tab.url.startsWith('chrome://') ||
+            tab.url.startsWith('chrome-extension://') ||
+            tab.url.startsWith('about:') ||
+            tab.url.startsWith('edge://')
+          )) {
+            console.log('[Background] 跳过特殊页面:', tab.url);
+            sendResponse({ success: false, error: 'Cannot activate on special pages' });
+            break;
+          }
+
+          // 尝试发送激活消息，带重试机制
+          let retries = 3;
+          let lastError = null;
+
+          while (retries > 0) {
+            try {
+              await chrome.tabs.sendMessage(tab.id, {
+                type: 'EXTENSION_ACTIVATE',
+                source: message.source || 'popup'
+              });
+              console.log('[Background] 激活成功, tabId:', tab.id);
+              sendResponse({ success: true, tabId: tab.id });
+              break;
+            } catch (error) {
+              lastError = error;
+              retries--;
+
+              // 如果是 "Receiving end does not exist" 错误，等待后重试
+              if (error.message?.includes('Receiving end does not exist') && retries > 0) {
+                console.log(`[Background] content script 未就绪，等待重试 (剩余 ${retries} 次)`);
+                await new Promise(resolve => setTimeout(resolve, 500));
+              } else {
+                throw error;
+              }
+            }
+          }
+
+          if (retries === 0) {
+            throw lastError;
+          }
         } else {
           sendResponse({ success: false, error: 'No active tab' });
         }
       } catch (error) {
-        console.error('[Background] 激活失败:', error);
+        console.error('[Background] 激活失败:', error.message);
         sendResponse({ success: false, error: error.message });
       }
       break;

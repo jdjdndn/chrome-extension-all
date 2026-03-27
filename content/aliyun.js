@@ -31,14 +31,29 @@ function fixSaveButton() {
   const saveButtons = document.querySelectorAll('button[class*="save"], [class*="SaveButton"]');
 
   saveButtons.forEach(btn => {
-    if (!DOMUtils.isElementInViewport(btn)) {
-      // 可以添加额外的处理逻辑
+    // 添加防御性检查
+    if (typeof DOMUtils !== 'undefined' && DOMUtils.isElementInViewport) {
+      if (!DOMUtils.isElementInViewport(btn)) {
+        // 可以添加额外的处理逻辑
+      }
     }
   });
 }
 
 function injectStyles() {
-  DOMUtils.upsertStyle(STYLE_TAG_ID, styles);
+  // 添加防御性检查
+  if (typeof DOMUtils === 'undefined' || !DOMUtils.upsertStyle) {
+    console.warn('[aliyun] DOMUtils 未加载，手动添加样式');
+    const style = document.getElementById(STYLE_TAG_ID);
+    if (!style) {
+      const newStyle = document.createElement('style');
+      newStyle.id = STYLE_TAG_ID;
+      newStyle.textContent = styles;
+      document.head.appendChild(newStyle);
+    }
+  } else {
+    DOMUtils.upsertStyle(STYLE_TAG_ID, styles);
+  }
 }
 
 function init() {
