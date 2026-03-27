@@ -143,9 +143,6 @@ function initRedirectLinks() {
     }
   }
 
-  // 使用 DOMUtils.throttle 进行节流处理
-  const throttledProcessLinks = DOMUtils.throttle(processLinks, 500);
-
   // 初始化函数：确保 document.body 存在后执行
   function init() {
     if (!document.body) {
@@ -158,6 +155,9 @@ function initRedirectLinks() {
       }
       return;
     }
+
+    // 使用 DOMUtils.throttle 进行节流处理（在 init 内部调用确保 DOMUtils 已加载）
+    const throttledProcessLinks = DOMUtils.throttle(processLinks, 500);
 
     // 使用 MutationObserver 监听 DOM 变化（使用节流版本）
     const observer = new MutationObserver(throttledProcessLinks);

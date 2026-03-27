@@ -43,7 +43,7 @@
         "event-bus-v4.6.js",
         "content/utils/logger.js",
         "content/core/script-loader.js",
-        "content/eventbus-integration.js",
+        "content/domain-config.js",
         "content/utils/storage.js",
         "content/utils/storage-bridge.js",
         "content/utils/dom.js",
@@ -69,153 +69,11 @@
         "content/core/config-migrator.js",
         "content/core/extension-api.js",
         "content/core/module-manager.js",
-        "content/core/lazy-init-manager.js"
+        "content/core/lazy-init-manager.js",
+        "content/main.js"
       ],
+      "css": ["styles.css"],
       "run_at": "document_start"
-    },
-    {
-      "matches": ["<all_urls>"],
-      "js": [
-        "content/common/script-switch.js",
-        "content/common/redirect-links.js",
-        "content/common/text-to-link.js",
-        "content/common/link-blank.js",
-        "content/common/add-title.js",
-        "content/common/panel-position-manager.js",
-        "content/common/doc-generator.js",
-        "content/common/text-collector.js",
-        "content/common/keyboard-pagination.js",
-        "content.js"
-      ],
-      "css": ["styles.css"]
-    },
-    {
-      "matches": ["*://*.bilibili.com/*"],
-      "js": ["content/bili.js"],
-      "run_at": "document_start"
-    },
-    {
-      "matches": ["*://*.bilibili.com/*"],
-      "js": ["content/eventbus-integration.js"],
-      "run_at": "document_end"
-    },
-    {
-      "matches": ["*://*.douyin.com/*"],
-      "js": ["content/utils/localServer.js", "content/douyin.js"]
-    },
-    {
-      "matches": ["*://*.douyin.com/*"],
-      "js": ["content/eventbus-integration.js", "content/eventbus-integration-douyin.js"],
-      "run_at": "document_end"
-    },
-    {
-      "matches": ["*://*.4hu.tv/*"],
-      "js": ["content/4hu.js"]
-    },
-    {
-      "matches": ["*://*.4hu.tv/*"],
-      "js": ["content/eventbus-integration.js"],
-      "run_at": "document_end"
-    },
-    {
-      "matches": ["*://*.weread.qq.com/*"],
-      "js": ["content/weread.js"]
-    },
-    {
-      "matches": ["*://*.weread.qq.com/*"],
-      "js": ["content/eventbus-integration.js"],
-      "run_at": "document_end"
-    },
-    {
-      "matches": ["*://*.quark.cn/*"],
-      "js": ["content/quark.js"]
-    },
-    {
-      "matches": ["*://*.quark.cn/*"],
-      "js": ["content/eventbus-integration.js"],
-      "run_at": "document_end"
-    },
-    {
-      "matches": ["*://*.18comic.vip/*"],
-      "js": ["content/comic18.js"]
-    },
-    {
-      "matches": ["*://*.18comic.vip/*"],
-      "js": ["content/eventbus-integration.js"],
-      "run_at": "document_end"
-    },
-    {
-      "matches": ["*://*.aliyundrive.com/*"],
-      "js": ["content/aliyun.js"]
-    },
-    {
-      "matches": ["*://*.aliyundrive.com/*"],
-      "js": ["content/eventbus-integration.js"],
-      "run_at": "document_end"
-    },
-    {
-      "matches": ["*://*.baidu.com/*"],
-      "js": ["content/baiduPan.js"]
-    },
-    {
-      "matches": ["*://*.baidu.com/*"],
-      "js": ["content/eventbus-integration.js"],
-      "run_at": "document_end"
-    },
-    {
-      "matches": ["*://*.zhipin.com/*"],
-      "js": ["content/boss.js"]
-    },
-    {
-      "matches": ["*://*.zhipin.com/*"],
-      "js": ["content/eventbus-integration.js"],
-      "run_at": "document_end"
-    },
-    {
-      "matches": ["*://*.xiaohongshu.com/*"],
-      "js": ["content/xiaohongshu.js"]
-    },
-    {
-      "matches": ["*://*.xiaohongshu.com/*"],
-      "js": ["content/eventbus-integration.js"],
-      "run_at": "document_end"
-    },
-    {
-      "matches": ["*://*.wyaqpx.com/*"],
-      "js": ["content/dianGong.js"]
-    },
-    {
-      "matches": ["*://*.wyaqpx.com/*"],
-      "js": ["content/eventbus-integration.js"],
-      "run_at": "document_end"
-    },
-    {
-      "matches": ["*://*.ymmfa.com/*"],
-      "js": ["content/gongkong.js"]
-    },
-    {
-      "matches": ["*://*.ymmfa.com/*"],
-      "js": ["content/eventbus-integration.js"],
-      "run_at": "document_end"
-    },
-    {
-      "matches": ["*://*.youtube.com/*"],
-      "js": ["content/base/SiteScript.js", "content/youtube.js"],
-      "run_at": "document_start"
-    },
-    {
-      "matches": ["*://github.com/*", "*://*.github.com/*"],
-      "js": ["content/github.js"],
-      "run_at": "document_start"
-    },
-    {
-      "matches": ["*://modelscope.cn/models*", "*://*.modelscope.cn/models*"],
-      "js": ["content/modelscope.js"]
-    },
-    {
-      "matches": ["*://modelscope.cn/*", "*://*.modelscope.cn/*"],
-      "js": ["content/eventbus-integration.js"],
-      "run_at": "document_end"
     }
   ],
   "background": {
@@ -228,20 +86,13 @@
     {
       "resources": [
         "inject.js",
+        "content.js",
         "content/*.js",
         "content/common/*.js",
+        "content/utils/*.js",
+        "content/core/*.js",
+        "content/base/*.js",
         "content/modules/*.js",
-        "content/modules/SelectorEngine.js",
-        "content/modules/Highlighter.js",
-        "content/modules/VirtualList.js",
-        "content/modules/StorageManager.js",
-        "content/modules/SmartRecommender.js",
-        "content/modules/DOMWatcher.js",
-        "content/modules/SelectorWorker.js",
-        "content/modules/IncrementalUpdater.js",
-        "content/modules/SelectorPathVisualizer.js",
-        "content/modules/OptimizationAdvisor.js",
-        "content/modules/index.js",
         "content/devtools/*.js",
         "shared/*.js"
       ],

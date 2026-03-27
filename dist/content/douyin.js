@@ -85,6 +85,9 @@ let beforeUnloadHandler = null;
 // 本次会话中用户返回的视频 - 这些视频不会触发自动下滑，直到用户滑到全新视频
 const returnedVideosThisSession = new Set();
 
+// 用户导航方向跟踪 - 用于检测上滑返回操作
+let lastNavigationDirection = null;
+
 // ========== 视频状态管理器 (WeakMap) ==========
 const VideoStateManager = {
   uuid: new WeakMap(),
@@ -612,8 +615,17 @@ function processCurrentVideo() {
 
   const videoId = getVideoUUID(videoBody);
 
+  // 检查导航方向 - 用户上滑返回时跳过自动处理
+  // 这个检查优先级最高，不依赖 videoId 的稳定性
+  if (lastNavigationDirection === 'up') {
+    if (currentVideoId !== videoId) {
+      currentVideoId = videoId;
+      console.log(`[手动导航] 检测到上滑方向，视频 ${videoId.substring(0, 8)} 跳过自动处理`);
+    }
+    return;
+  }
+
   // 如果视频在本次会话中被用户返回过，跳过所有自动处理
-  // 注意：这个检查必须在所有其他检查之前，优先级最高
   if (returnedVideosThisSession.has(videoId)) {
     if (currentVideoId !== videoId) {
       currentVideoId = videoId;
@@ -905,12 +917,14 @@ function init() {
       const velocity = deltaTime > 0 ? Math.abs(deltaY) / deltaTime : 0; // px/ms
       // 上滑检测（deltaY > 0 表示手指向上滑动，页面向下滚动）
       if (deltaY > 30 || (deltaY > 10 && velocity > 0.3)) {
-        console.log(`[用户操作] 检测到触摸上滑 (deltaY=${deltaY.toFixed(1)}px, velocity=${velocity.toFixed(2)}px/ms)，取消所有自动下滑检测`);
+        console.log(`[用户操作] 检测到触摸上滑 (deltaY=${deltaY.toFixed(1)}px, velocity=${velocity.toFixed(2)}px/ms)`);
+        lastNavigationDirection = 'up';
         VideoChangeChecker.cancelAll();
       }
       // 下滑检测（用户主动操作）
       if (deltaY < -30 || (deltaY < -10 && velocity > 0.3)) {
-        console.log(`[用户操作] 检测到触摸下滑 (deltaY=${deltaY.toFixed(1)}px)，取消自动下滑检测`);
+        console.log(`[用户操作] 检测到触摸下滑 (deltaY=${deltaY.toFixed(1)}px)`);
+        lastNavigationDirection = 'down';
         VideoChangeChecker.cancelAll();
       }
       // 清理已结束的触摸点

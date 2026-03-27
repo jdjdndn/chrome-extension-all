@@ -153,9 +153,18 @@
     }
 
     // 如果 EventBus 存在但未初始化，尝试主动初始化
-    if (window.EventBus && EventBus.init && !EventBus.getState().isReady) {
+    if (window.EventBus && EventBus.init && EventBus.getState && !EventBus.getState().isReady) {
       console.log('[EventBus集成] 触发 EventBus 初始化');
-      EventBus.init();
+      try {
+        EventBus.init();
+      } catch (e) {
+        console.warn('[EventBus集成] EventBus 初始化失败:', e);
+      }
+    }
+
+    // 如果 EventBus 不存在，检查是否需要等待
+    if (!window.EventBus) {
+      console.warn('[EventBus集成] EventBus 未定义，可能未正确加载');
     }
 
     const interval = setInterval(() => {
@@ -183,8 +192,24 @@
   function registerHandlers() {
     // 检查 EventBus 是否可用
     if (!window.EventBus) {
-      console.warn('[EventBus集成] EventBus 不可用，跳过处理器注册');
+      console.warn('[EventBus集成] EventBus 不可用，使用降级模式');
+      // 即使 EventBus 不可用，也标记 MessagingUtils 就绪以允许其他脚本继续
+      if (window.ScriptLoader) {
+        ScriptLoader.markReady('MessagingUtils');
+      }
       return;
+    }
+
+    // 检查 EventBus 是否已初始化
+    if (!EventBus.getState || !EventBus.getState().isReady) {
+      console.warn('[EventBus集成] EventBus 存在但未初始化，尝试初始化...');
+      try {
+        if (EventBus.init) {
+          EventBus.init();
+        }
+      } catch (e) {
+        console.warn('[EventBus集成] 初始化失败:', e);
+      }
     }
 
     console.log('[EventBus集成] 注册消息处理器...');

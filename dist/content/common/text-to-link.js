@@ -5,11 +5,29 @@
 
 'use strict';
 
-if (window.TextToLinkLoaded) {
-  console.log('[通用脚本] 文本链接转换已加载，跳过');
-} else if (!window.getScriptSwitch || !window.getScriptSwitch('text-to-link')) {
-  console.log('[通用脚本] 文本链接转换已禁用');
+// 使用 ScriptLoader 管理依赖
+if (window.ScriptLoader) {
+  ScriptLoader.declare({
+    name: 'text-to-link',
+    dependencies: ['DOMUtils'],
+    onReady: () => initTextToLink()
+  });
 } else {
+  // 降级处理：ScriptLoader 未加载时直接初始化
+  initTextToLink();
+}
+
+function initTextToLink() {
+  if (window.TextToLinkLoaded) {
+    console.log('[通用脚本] 文本链接转换已加载，跳过');
+    return;
+  }
+
+  if (!window.getScriptSwitch || !window.getScriptSwitch('text-to-link')) {
+    console.log('[通用脚本] 文本链接转换已禁用');
+    return;
+  }
+
   window.TextToLinkLoaded = true;
 
   const YC_ATTR = 'yc-text-link-processed';
@@ -226,9 +244,6 @@ if (window.TextToLinkLoaded) {
     }
   }
 
-  // 防抖处理 - 使用 DOMUtils.debounce
-  const debouncedProcessLinks = DOMUtils.debounce(processLinks, 500);
-
   // 初始化函数：确保 document.body 存在后执行
   function init() {
     if (!document.body) {
@@ -241,6 +256,9 @@ if (window.TextToLinkLoaded) {
       }
       return;
     }
+
+    // 防抖处理 - 使用 DOMUtils.debounce（在 init 内部调用确保 DOMUtils 已加载）
+    const debouncedProcessLinks = DOMUtils.debounce(processLinks, 500);
 
     // 使用 MutationObserver 监听 DOM 变化
     const observer = new MutationObserver((mutations) => {

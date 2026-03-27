@@ -404,11 +404,19 @@ function createQuickLink(link) {
   if (link.favicon) {
     linkEl.innerHTML = `
       <div class="quick-link-icon" style="background: #fff; overflow: hidden;">
-        <img src="${link.favicon}" style="width: 100%; height: 100%; object-fit: contain;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+        <img src="${link.favicon}" style="width: 100%; height: 100%; object-fit: contain;">
         <span style="display:none;">${link.icon}</span>
       </div>
       <span class="quick-link-title">${link.title}</span>
     `;
+    // CSP 要求：不能使用内联 onerror，改为事件监听
+    const img = linkEl.querySelector('.quick-link-icon img');
+    if (img) {
+      img.addEventListener('error', function() {
+        this.style.display = 'none';
+        this.nextElementSibling.style.display = 'flex';
+      });
+    }
   } else {
     linkEl.innerHTML = `
       <div class="quick-link-icon">${link.icon}</div>
@@ -815,7 +823,7 @@ function renderLearnResources(categories) {
       <div class="learn-links-grid">
         ${category.links.map((link, index) => `
           <a href="${link.url}" target="_blank" class="learn-link-item" data-category="${category.id}" data-index="${index}">
-            <img src="${link.favicon || getFaviconUrl(link.url)}" class="learn-link-favicon" alt="" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2280%22>🔗</text></svg>'">
+            <img src="${link.favicon || getFaviconUrl(link.url)}" class="learn-link-favicon" alt="">
             <div class="learn-link-info">
               <div class="learn-link-name">${link.name}</div>
               <div class="learn-link-url">${new URL(link.url).hostname}</div>
@@ -871,6 +879,13 @@ function bindLearnEvents() {
           renderLearnResources(categories);
         });
       }
+    });
+  });
+
+  // CSP 要求：图片加载失败时显示默认图标
+  document.querySelectorAll('.learn-link-favicon').forEach(img => {
+    img.addEventListener('error', function() {
+      this.src = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='80'>🔗</text></svg>";
     });
   });
 }
