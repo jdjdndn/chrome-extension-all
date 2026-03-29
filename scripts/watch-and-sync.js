@@ -46,6 +46,11 @@ const SYNC_CONFIG = {
     /dist$/,
     /\.claude$/,
   ],
+  // 已打包为 bundle 的目录，不需要同步源文件到 dist
+  bundledDirs: [
+    'content/utils',  // utils 已打包到 core-bundle 和 common-bundle 中
+    'content/entries', // 入口文件仅供 esbuild 使用
+  ],
 };
 
 // 颜色输出
@@ -103,6 +108,13 @@ function copyDirectory(src, dest, verbose = true) {
       fs.mkdirSync(currentDest, { recursive: true });
     }
 
+    // 跳过已打包的目录（源文件含 ES module export，不需要同步到 dist）
+    const absPath = path.resolve(root, currentSrc).replace(/\\/g, '/');
+    const relPath = path.relative(root, absPath).replace(/\\/g, '/');
+    if (SYNC_CONFIG.bundledDirs.some(dir => relPath === dir)) {
+      return;
+    }
+
     const entries = fs.readdirSync(currentSrc, { withFileTypes: true });
 
     for (const entry of entries) {
@@ -143,7 +155,7 @@ function copyDirectory(src, dest, verbose = true) {
 }
 
 // 初始同步
-function initialSync() {
+async function initialSync() {
   log('cyan', '═══════════════════════════════════════');
   log('cyan', '       Chrome 扩展自动打包工具');
   log('cyan', '═══════════════════════════════════════');
@@ -168,14 +180,28 @@ function initialSync() {
     }
   }
 
+  // 打包站点脚本 (esbuild bundle)
+  try {
+    await require('./build-site-bundles.js').buildAll();
+  } catch (err) {
+    log('red', `✗ 打包失败: ${err.message}`);
+  }
+
   log('blue', '\n✅ 初始同步完成!\n');
 }
 
 // 监控文件变化
-function watchFiles() {
+async function watchFiles() {
   log('cyan', '═══════════════════════════════════════');
   log('yellow', '👀 正在监控文件变化... (按 Ctrl+C 停止)');
   log('cyan', '═══════════════════════════════════════\n');
+
+  // 启动 esbuild watch
+  try {
+    await require('./build-site-bundles.js').watchAll();
+  } catch (err) {
+    log('red', `✗ esbuild watch 启动失败: ${err.message}`);
+  }
 
   // 监控单个文件
   for (const file of SYNC_CONFIG.files) {
@@ -201,6 +227,11 @@ function watchFiles() {
 // 递归监控目录
 function watchDirectory(srcDir, destDir) {
   if (!fs.existsSync(srcDir)) return;
+
+  // 跳过已打包的目录
+  const absDir = path.resolve(root, srcDir).replace(/\\/g, '/');
+  const relDir = path.relative(root, absDir).replace(/\\/g, '/');
+  if (SYNC_CONFIG.bundledDirs.some(dir => relDir === dir)) return;
 
   // 监控当前目录
   fs.watch(srcDir, (eventType, filename) => {
@@ -286,22 +317,22 @@ function cleanDist() {
 }
 
 // 主函数
-function main() {
+async function main() {
   const args = process.argv.slice(2);
 
   if (args.includes('--clean') || args.includes('-c')) {
     // 清理并构建
     cleanDist();
-    initialSync();
+    await initialSync();
     log('green', '🎉 清理构建完成! 退出...');
     process.exit(0);
   } else if (args.includes('--once') || args.includes('-o')) {
     // 单次同步模式
-    singleSync();
+    await singleSync();
   } else {
     // 持续监控模式
-    initialSync();
-    watchFiles();
+    await initialSync();
+    await watchFiles();
   }
 }
 

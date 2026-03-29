@@ -1112,71 +1112,33 @@ async function injectAllScriptsForTab(tabId, tabUrl) {
     const url = new URL(tabUrl);
     const hostname = url.hostname;
 
-    // 基础工具脚本（所有页面都需要）
+    // 打包后的 bundle 脚本（所有页面都需要）
     const baseScripts = [
-      'event-bus-v4.6.js',
-      'content/utils/logger.js',
-      'content/eventbus-integration.js',
-      'content/utils/storage.js',
-      'content/utils/storage-bridge.js',
-      'content/utils/dom.js',
-      'content/utils/messaging.js'
+      'content/core-bundle.js',
+      'content/common-bundle.js'
     ];
 
-    // 核心模块脚本（所有页面都需要）
-    const coreScripts = [
-      'content/core/store.js',
-      'content/core/services.js',
-      'content/core/pipeline.js',
-      'content/core/site-base.js',
-      'content/core/site-factory.js',
-      'content/core/plugin-system.js',
-      'content/core/config-manager.js',
-      'content/core/selector-merger.js',
-      'content/core/keyword-manager.js',
-      'content/core/rule-manager.js',
-      'content/core/lazy-loader.js',
-      'content/core/cache-manager.js',
-      'content/core/batch.js',
-      'content/core/history-manager.js',
-      'content/core/rule-conflict.js',
-      'content/core/debug-panel.js',
-      'content/core/input-validator.js',
-      'content/core/security-manager.js',
-      'content/core/config-migrator.js',
-      'content/core/extension-api.js',
-      'content/core/module-manager.js',
-      'content/core/lazy-init-manager.js'
-    ];
-
-    // 通用脚本（所有页面都需要）
-    const commonScripts = [
-      'content/common/redirect-links.js',
-      'content/common/text-to-link.js',
-      'content/common/link-blank.js',
-      'content/common/add-title.js',
-      'content.js'
-    ];
-
-    // 域名特定脚本映射（与 manifest.json 中的 content_scripts 保持一致）
+    // 域名特定脚本映射（使用打包后的 bundle）
     const domainScripts = {
-      'bilibili.com': ['content/bili.js'],
-      'douyin.com': ['content/utils/localServer.js', 'content/douyin.js'],
-      '4hu.tv': ['content/4hu.js'],
-      'weread.qq.com': ['content/weread.js'],
-      'quark.cn': ['content/quark.js'],
-      '18comic.vip': ['content/comic18.js'],
-      'aliyundrive.com': ['content/aliyun.js'],
-      'baidu.com': ['content/baiduPan.js'],
-      'zhipin.com': ['content/boss.js'],
-      'xiaohongshu.com': ['content/xiaohongshu.js'],
-      'wyaqpx.com': ['content/dianGong.js'],
-      'ymmfa.com': ['content/gongkong.js'],
-      'youtube.com': ['content/base/SiteScript.js', 'content/youtube.js']
+      'bilibili.com': ['content/bundled/bili.bundle.js'],
+      'douyin.com': ['content/bundled/douyin.bundle.js'],
+      '4hu.tv': ['content/bundled/4hu.bundle.js'],
+      'weread.qq.com': ['content/bundled/weread.bundle.js'],
+      'quark.cn': ['content/bundled/quark.bundle.js'],
+      '18comic.vip': ['content/bundled/comic18.bundle.js'],
+      'aliyundrive.com': ['content/bundled/aliyun.bundle.js'],
+      'baidu.com': ['content/bundled/baiduPan.bundle.js'],
+      'zhipin.com': ['content/bundled/boss.bundle.js'],
+      'xiaohongshu.com': ['content/bundled/xiaohongshu.bundle.js'],
+      'wyaqpx.com': ['content/bundled/dianGong.bundle.js'],
+      'ymmfa.com': ['content/bundled/gongkong.bundle.js'],
+      'youtube.com': ['content/bundled/youtube.bundle.js'],
+      'github.com': ['content/bundled/github.bundle.js'],
+      'modelscope.cn': ['content/bundled/modelscope.bundle.js']
     };
 
-    // 收集需要注入的脚本（按顺序：基础 -> 核心 -> 通用 -> 域名特定）
-    const scriptsToInject = [...baseScripts, ...coreScripts, ...commonScripts];
+    // 收集需要注入的脚本
+    const scriptsToInject = [...baseScripts];
 
     // 添加域名特定脚本
     for (const [domain, scripts] of Object.entries(domainScripts)) {

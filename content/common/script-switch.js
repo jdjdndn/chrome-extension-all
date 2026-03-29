@@ -16,6 +16,7 @@
     'doc-generator': true,     // 文档生成器
     'text-collector': true,    // 文本收集器
     'keyboard-pagination': true, // 键盘翻页
+    'keyboard-click': true,     // 键盘快捷点击
     'panel-position-manager': true // 面板位置管理
   };
 
@@ -121,6 +122,7 @@
     'doc-generator': '文档生成器',
     'text-collector': '文本收集器',
     'keyboard-pagination': '键盘翻页',
+    'keyboard-click': '键盘快捷点击',
     'panel-position-manager': '面板位置管理'
   };
 

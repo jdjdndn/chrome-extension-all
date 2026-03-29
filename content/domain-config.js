@@ -17,112 +17,74 @@
     return hostname === pattern || hostname.endsWith('.' + pattern);
   }
 
-  // 通用脚本配置（所有页面加载）
+  // 通用脚本配置（所有页面加载 - 已打包为单个 bundle）
   const COMMON_SCRIPTS = [
-    'content/common/script-switch.js',
-    'content/common/redirect-links.js',
-    'content/common/text-to-link.js',
-    'content/common/link-blank.js',
-    'content/common/add-title.js',
-    'content/common/panel-position-manager.js',
-    'content/common/doc-generator.js',
-    'content/common/text-collector.js',
-    'content/common/keyboard-pagination.js'
+    'content/common-bundle.js'
   ];
 
-  // 域名特定脚本配置
+  // 域名特定脚本配置（所有站点已打包为自包含 bundle）
   const DOMAIN_SCRIPTS = [
-    // Bilibili
     {
       patterns: ['*://*.bilibili.com/*'],
-      scripts: ['content/bili.js'],
-      runAt: 'document_start',
-      eventbusIntegration: true
+      scripts: ['content/bundled/bili.bundle.js'],
     },
-    // Douyin
     {
       patterns: ['*://*.douyin.com/*'],
-      scripts: ['content/utils/localServer.js', 'content/douyin.js'],
-      eventbusIntegration: true,
-      eventbusScript: 'content/eventbus-integration-douyin.js'
+      scripts: ['content/bundled/douyin.bundle.js'],
     },
-    // 4hu
     {
       patterns: ['*://*.4hu.tv/*'],
-      scripts: ['content/4hu.js'],
-      eventbusIntegration: true
+      scripts: ['content/bundled/4hu.bundle.js'],
     },
-    // Weread
     {
       patterns: ['*://*.weread.qq.com/*'],
-      scripts: ['content/weread.js'],
-      eventbusIntegration: true
+      scripts: ['content/bundled/weread.bundle.js'],
     },
-    // Quark
     {
       patterns: ['*://*.quark.cn/*'],
-      scripts: ['content/quark.js'],
-      eventbusIntegration: true
+      scripts: ['content/bundled/quark.bundle.js'],
     },
-    // 18comic
     {
       patterns: ['*://*.18comic.vip/*'],
-      scripts: ['content/comic18.js'],
-      eventbusIntegration: true
+      scripts: ['content/bundled/comic18.bundle.js'],
     },
-    // Aliyun
     {
       patterns: ['*://*.aliyundrive.com/*'],
-      scripts: ['content/aliyun.js'],
-      eventbusIntegration: true
+      scripts: ['content/bundled/aliyun.bundle.js'],
     },
-    // Baidu
     {
       patterns: ['*://*.baidu.com/*'],
-      scripts: ['content/baiduPan.js'],
-      eventbusIntegration: true
+      scripts: ['content/bundled/baiduPan.bundle.js'],
     },
-    // Boss
     {
       patterns: ['*://*.zhipin.com/*'],
-      scripts: ['content/boss.js'],
-      eventbusIntegration: true
+      scripts: ['content/bundled/boss.bundle.js'],
     },
-    // Xiaohongshu
     {
       patterns: ['*://*.xiaohongshu.com/*'],
-      scripts: ['content/xiaohongshu.js'],
-      eventbusIntegration: true
+      scripts: ['content/bundled/xiaohongshu.bundle.js'],
     },
-    // DianGong
     {
       patterns: ['*://*.wyaqpx.com/*'],
-      scripts: ['content/dianGong.js'],
-      eventbusIntegration: true
+      scripts: ['content/bundled/dianGong.bundle.js'],
     },
-    // Gongkong
     {
       patterns: ['*://*.ymmfa.com/*'],
-      scripts: ['content/gongkong.js'],
-      eventbusIntegration: true
+      scripts: ['content/bundled/gongkong.bundle.js'],
     },
-    // YouTube
     {
       patterns: ['*://*.youtube.com/*'],
-      scripts: ['content/base/SiteScript.js', 'content/youtube.js'],
+      scripts: ['content/bundled/youtube.bundle.js'],
       runAt: 'document_start'
     },
-    // GitHub
     {
       patterns: ['*://github.com/*', '*://*.github.com/*'],
-      scripts: ['content/github.js'],
+      scripts: ['content/bundled/github.bundle.js'],
       runAt: 'document_start'
     },
-    // Modelscope
     {
       patterns: ['*://modelscope.cn/models*', '*://*.modelscope.cn/models*'],
-      scripts: ['content/modelscope.js'],
-      eventbusIntegration: true
+      scripts: ['content/bundled/modelscope.bundle.js'],
     }
   ];
 

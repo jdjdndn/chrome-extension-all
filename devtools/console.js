@@ -278,301 +278,12 @@ document.querySelectorAll('.info-sub-tab').forEach(tab => {
     });
     document.getElementById(`info-${subtabId}`).classList.add('active');
 
-    // 如果切换到内存标签页，加载内存数据
-    if (subtabId === 'memory') {
-      loadMemoryInfo();
-    }
-
     // 如果切换到元素标签页
     if (subtabId === 'element') {
       // 元素标签页初始化
     }
   });
 });
-
-// ========== 内存信息功能 ==========
-const memoryOutput = document.getElementById('memory-output');
-const refreshMemoryBtn = document.getElementById('refresh-memory-btn');
-
-// 格式化字节大小
-function formatMemoryBytes(bytes) {
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
-  if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
-  return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
-}
-
-// 获取内存状态样式类
-function getMemoryStatusClass(percentage) {
-  if (percentage < 50) return 'good';
-  if (percentage < 80) return 'warning';
-  return 'danger';
-}
-
-// 加载内存信息
-async function loadMemoryInfo() {
-  if (!memoryOutput) return;
-
-  memoryOutput.innerHTML = '<div class="memory-loading">正在获取内存数据...</div>';
-
-  try {
-    // 发送消息到background获取页面性能信息
-    const response = await sendMessage('GET_MEMORY_INFO');
-
-    if (response && response.success && response.data) {
-      renderMemoryInfoFromBackground(response.data);
-    } else {
-      // 如果background不支持，使用performance API直接获取
-      renderMemoryInfoFromPerformance();
-    }
-  } catch (e) {
-    console.log('[Info] 无法从background获取内存信息，使用本地performance API:', e);
-    // 回退到直接使用performance API
-    renderMemoryInfoFromPerformance();
-  }
-}
-
-// 从performance API渲染内存信息
-function renderMemoryInfoFromPerformance() {
-  const memoryInfo = {};
-
-  // 尝试获取JS堆内存信息
-  if (performance.memory) {
-    memoryInfo.jsHeapSizeLimit = performance.memory.jsHeapSizeLimit;
-    memoryInfo.totalJSHeapSize = performance.memory.totalJSHeapSize;
-    memoryInfo.usedJSHeapSize = performance.memory.usedJSHeapSize;
-  }
-
-  // 获取性能指标
-  if (performance.timing) {
-    const timing = performance.timing;
-    memoryInfo.loadTime = timing.loadEventEnd - timing.navigationStart;
-    memoryInfo.domReady = timing.domContentLoadedEventEnd - timing.navigationStart;
-  }
-
-  // 获取导航信息
-  if (performance.getEntriesByType) {
-    const navigation = performance.getEntriesByType('navigation')[0];
-    if (navigation) {
-      memoryInfo.domContentLoaded = navigation.domContentLoadedEventEnd;
-      memoryInfo.loadComplete = navigation.loadEventEnd;
-      memoryInfo.domInteractive = navigation.domInteractive;
-      memoryInfo.transferSize = navigation.transferSize;
-      memoryInfo.encodedBodySize = navigation.encodedBodySize;
-      memoryInfo.decodedBodySize = navigation.decodedBodySize;
-    }
-
-    // 获取资源数量
-    const resources = performance.getEntriesByType('resource');
-    memoryInfo.resourceCount = resources.length;
-    memoryInfo.resourceSize = resources.reduce((sum, r) => sum + (r.transferSize || 0), 0);
-  }
-
-  renderMemoryInfo(memoryInfo);
-}
-
-// 渲染从background获取的内存信息
-function renderMemoryInfoFromBackground(data) {
-  const memoryInfo = {};
-
-  // JS堆内存
-  if (data.jsHeapSizeLimit) {
-    memoryInfo.jsHeapSizeLimit = data.jsHeapSizeLimit;
-    memoryInfo.totalJSHeapSize = data.totalJSHeapSize;
-    memoryInfo.usedJSHeapSize = data.usedJSHeapSize;
-  }
-
-  // 性能指标
-  if (data.domContentLoaded !== undefined) {
-    memoryInfo.domContentLoaded = data.domContentLoaded;
-  }
-  if (data.loadComplete !== undefined) {
-    memoryInfo.loadComplete = data.loadComplete;
-  }
-  if (data.domInteractive !== undefined) {
-    memoryInfo.domInteractive = data.domInteractive;
-  }
-
-  // 资源信息
-  if (data.resourceCount !== undefined) {
-    memoryInfo.resourceCount = data.resourceCount;
-  }
-  if (data.resourceSize !== undefined) {
-    memoryInfo.resourceSize = data.resourceSize;
-  }
-  if (data.transferSize !== undefined) {
-    memoryInfo.transferSize = data.transferSize;
-  }
-  if (data.decodedBodySize !== undefined) {
-    memoryInfo.decodedBodySize = data.decodedBodySize;
-  }
-
-  renderMemoryInfo(memoryInfo);
-}
-
-// 渲染内存信息
-function renderMemoryInfo(data) {
-  if (!memoryOutput) return;
-
-  let html = '';
-
-  // JS堆内存部分
-  if (data.jsHeapSizeLimit || data.totalJSHeapSize || data.usedJSHeapSize) {
-    const usedJSHeap = data.usedJSHeapSize || 0;
-    const totalJSHeap = data.totalJSHeapSize || 0;
-    const heapLimit = data.jsHeapSizeLimit || 0;
-    const usedPercent = heapLimit > 0 ? (usedJSHeap / heapLimit * 100) : 0;
-    const statusClass = getMemoryStatusClass(usedPercent);
-
-    html += `
-      <div class="memory-section">
-        <div class="memory-section-header">
-          <span class="memory-section-icon">▼</span>
-          <span class="memory-section-title">JavaScript 堆内存</span>
-        </div>
-        <div class="memory-section-content">
-          <div class="memory-stat">
-            <span class="memory-stat-label">已使用堆内存</span>
-            <span class="memory-stat-value ${statusClass}">${formatMemoryBytes(usedJSHeap)}</span>
-          </div>
-          <div class="memory-stat">
-            <span class="memory-stat-label">总堆内存</span>
-            <span class="memory-stat-value">${formatMemoryBytes(totalJSHeap)}</span>
-          </div>
-          <div class="memory-stat">
-            <span class="memory-stat-label">堆内存限制</span>
-            <span class="memory-stat-value">${formatMemoryBytes(heapLimit)}</span>
-          </div>
-          <div class="memory-stat" style="flex-direction: column; align-items: stretch;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-              <span class="memory-stat-label">内存使用率</span>
-              <span class="memory-stat-value ${statusClass}">${usedPercent.toFixed(1)}%</span>
-            </div>
-            <div class="memory-bar">
-              <div class="memory-bar-fill ${statusClass}" style="width: ${Math.min(usedPercent, 100)}%"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  // 页面加载性能
-  if (data.loadTime !== undefined || data.domReady !== undefined || data.loadComplete !== undefined) {
-    html += `
-      <div class="memory-section">
-        <div class="memory-section-header">
-          <span class="memory-section-icon">▼</span>
-          <span class="memory-section-title">页面加载性能</span>
-        </div>
-        <div class="memory-section-content">
-          ${data.domInteractive !== undefined ? `
-            <div class="memory-stat">
-              <span class="memory-stat-label">DOM 可交互时间</span>
-              <span class="memory-stat-value">${data.domInteractive.toFixed(0)} ms</span>
-            </div>
-          ` : ''}
-          ${data.domContentLoaded !== undefined ? `
-            <div class="memory-stat">
-              <span class="memory-stat-label">DOM 内容加载完成</span>
-              <span class="memory-stat-value">${data.domContentLoaded.toFixed(0)} ms</span>
-            </div>
-          ` : ''}
-          ${data.loadComplete !== undefined ? `
-            <div class="memory-stat">
-              <span class="memory-stat-label">页面完全加载</span>
-              <span class="memory-stat-value">${data.loadComplete.toFixed(0)} ms</span>
-            </div>
-          ` : ''}
-          ${data.loadTime !== undefined && data.loadTime > 0 ? `
-            <div class="memory-stat">
-              <span class="memory-stat-label">总加载时间</span>
-              <span class="memory-stat-value">${data.loadTime} ms</span>
-            </div>
-          ` : ''}
-        </div>
-      </div>
-    `;
-  }
-
-  // 资源信息
-  if (data.resourceCount !== undefined || data.resourceSize !== undefined) {
-    html += `
-      <div class="memory-section">
-        <div class="memory-section-header">
-          <span class="memory-section-icon">▼</span>
-          <span class="memory-section-title">页面资源</span>
-        </div>
-        <div class="memory-section-content">
-          ${data.resourceCount !== undefined ? `
-            <div class="memory-stat">
-              <span class="memory-stat-label">资源请求数量</span>
-              <span class="memory-stat-value">${data.resourceCount}</span>
-            </div>
-          ` : ''}
-          ${data.resourceSize !== undefined ? `
-            <div class="memory-stat">
-              <span class="memory-stat-label">资源总大小</span>
-              <span class="memory-stat-value">${formatMemoryBytes(data.resourceSize)}</span>
-            </div>
-          ` : ''}
-          ${data.transferSize !== undefined ? `
-            <div class="memory-stat">
-              <span class="memory-stat-label">传输大小</span>
-              <span class="memory-stat-value">${formatMemoryBytes(data.transferSize)}</span>
-            </div>
-          ` : ''}
-          ${data.decodedBodySize !== undefined ? `
-            <div class="memory-stat">
-              <span class="memory-stat-label">解压后大小</span>
-              <span class="memory-stat-value">${formatMemoryBytes(data.decodedBodySize)}</span>
-            </div>
-          ` : ''}
-        </div>
-      </div>
-    `;
-  }
-
-  // 如果没有任何数据
-  if (!html) {
-    html = `
-      <div class="memory-section">
-        <div class="memory-section-content">
-          <div class="memory-stat">
-            <span class="memory-stat-label">无法获取内存信息</span>
-            <span class="memory-stat-value">当前浏览器不支持或需要刷新页面</span>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  memoryOutput.innerHTML = html;
-
-  // 添加折叠功能
-  memoryOutput.querySelectorAll('.memory-section-header').forEach(header => {
-    header.addEventListener('click', () => {
-      const section = header.parentElement;
-      const content = section.querySelector('.memory-section-content');
-      const icon = header.querySelector('.memory-section-icon');
-
-      if (content.style.display === 'none') {
-        content.style.display = 'block';
-        icon.textContent = '▼';
-      } else {
-        content.style.display = 'none';
-        icon.textContent = '▶';
-      }
-    });
-  });
-}
-
-// 刷新内存按钮点击事件
-if (refreshMemoryBtn) {
-  refreshMemoryBtn.addEventListener('click', () => {
-    loadMemoryInfo();
-  });
-}
 
 // 获取当前域名
 async function getCurrentDomain() {
@@ -849,11 +560,8 @@ function updateSelectedElementsUI() {
   updateSelectorOptionsDisplay();
 }
 
-// 当前选中的选择器索引
-let selectedSelectorIndex = 0;
-
-// 更新选择器选项显示
-async function updateSelectorOptionsDisplay() {
+// 更新选择器行列表显示
+function updateSelectorOptionsDisplay() {
   const container = document.getElementById('selector-options-container');
   if (!container) return;
 
@@ -870,55 +578,31 @@ async function updateSelectorOptionsDisplay() {
     return;
   }
 
-  // 生成多个选择器选项
-  const options = generateSelectorOptions(checkedElements);
-
-  // 确保选中索引有效
-  if (selectedSelectorIndex >= options.length) {
-    selectedSelectorIndex = 0;
+  const lines = generateSelectorLines(checkedElements);
+  if (lines.length === 0) {
+    container.innerHTML = '<div style="color: #999; font-size: 11px; padding: 8px;">无法生成选择器</div>';
+    return;
   }
 
-  // 渲染选项（先显示加载状态）
-  container.innerHTML = options.map((opt, index) => `
-    <div class="selector-option ${index === selectedSelectorIndex ? 'selected' : ''}" data-index="${index}">
-      <div class="selector-option-radio"></div>
-      <div class="selector-option-content">
-        <div class="selector-option-text">${escapeHtml(opt.selector)}</div>
-        <div class="selector-option-meta">
-          <span class="selector-option-tag ${index === 0 ? 'recommended' : ''}">${opt.type}</span>
-          <span class="selector-match-count" data-index="${index}" data-expected="${opt.matchCount}">
-            <span class="match-loading">查询中...</span>
-          </span>
-          ${opt.savedChars > 0 ? `<span style="color: #10b981;">节省 ${opt.savedChars} 字符</span>` : ''}
-        </div>
-      </div>
-      <button class="selector-option-copy" data-index="${index}" title="复制">📋</button>
+  // 渲染行列表：一行一个选择器
+  container.innerHTML = lines.map((line, index) => `
+    <div class="selector-line" data-index="${index}">
+      <span class="selector-line-type">${escapeHtml(line.type)}</span>
+      <code class="selector-line-text">${escapeHtml(line.selector)}</code>
+      <span class="selector-line-match" data-index="${index}">...</span>
+      <button class="selector-line-copy" data-index="${index}" title="复制">📋</button>
     </div>
   `).join('');
 
-  // 异步查询每个选择器的匹配数量
-  querySelectorMatches(options);
+  // 异步查询匹配数
+  querySelectorLineMatches(lines);
 
-  // 添加点击选择事件
-  container.querySelectorAll('.selector-option').forEach(el => {
-    el.addEventListener('click', (e) => {
-      // 如果点击的是复制按钮，不触发选择
-      if (e.target.classList.contains('selector-option-copy')) return;
-
-      const index = parseInt(el.dataset.index);
-      selectedSelectorIndex = index;
-      // 更新选中状态
-      container.querySelectorAll('.selector-option').forEach(opt => opt.classList.remove('selected'));
-      el.classList.add('selected');
-    });
-  });
-
-  // 添加复制按钮事件
-  container.querySelectorAll('.selector-option-copy').forEach(btn => {
+  // 复制按钮事件
+  container.querySelectorAll('.selector-line-copy').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
       const index = parseInt(btn.dataset.index);
-      const selector = options[index]?.selector;
+      const selector = lines[index]?.selector;
       if (selector) {
         await copyToClipboard(selector);
         btn.textContent = '✓';
@@ -927,48 +611,56 @@ async function updateSelectorOptionsDisplay() {
     });
   });
 
+  // 点击行复制
+  container.querySelectorAll('.selector-line').forEach(el => {
+    el.addEventListener('click', async (e) => {
+      if (e.target.closest('.selector-line-copy')) return;
+      const index = parseInt(el.dataset.index);
+      const selector = lines[index]?.selector;
+      if (selector) {
+        await copyToClipboard(selector);
+        const copyBtn = el.querySelector('.selector-line-copy');
+        if (copyBtn) {
+          copyBtn.textContent = '✓';
+          setTimeout(() => copyBtn.textContent = '📋', 1000);
+        }
+      }
+    });
+  });
+
   // 更新合并提示
   const mergeInfo = document.getElementById('batch-merge-info');
-  if (mergeInfo && options.length > 0) {
-    mergeInfo.textContent = `${options.length} 个选项`;
-    mergeInfo.style.display = 'block';
+  if (mergeInfo) {
+    mergeInfo.textContent = `${lines.length} 个选择器`;
+    mergeInfo.style.display = lines.length > 0 ? 'inline' : 'none';
   }
 }
 
 /**
- * 异步查询每个选择器的匹配数量
+ * 异步查询每行选择器的匹配数量
  */
-async function querySelectorMatches(options) {
-  for (let i = 0; i < options.length; i++) {
-    const opt = options[i];
-    const countEl = document.querySelector(`.selector-match-count[data-index="${i}"]`);
+async function querySelectorLineMatches(lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const countEl = document.querySelector(`.selector-line-match[data-index="${i}"]`);
     if (!countEl) continue;
 
-    const expected = parseInt(countEl.dataset.expected);
-    const count = await getSelectorMatchCount(opt.selector);
+    const count = await getSelectorMatchCount(lines[i].selector);
 
     if (count !== null) {
-      const isExact = count === expected;
-      const color = isExact ? '#10b981' : (count > expected ? '#f59e0b' : '#ef4444');
-      const icon = isExact ? '✓' : (count > expected ? '⚠' : '✗');
+      countEl.textContent = `(${count})`;
+      countEl.title = `匹配 ${count} 个元素`;
+      countEl.style.cursor = 'pointer';
 
-      countEl.innerHTML = `
-        <span class="selector-match-result" style="color: ${color}; cursor: pointer;" title="鼠标悬停查看匹配元素">
-          $$(${count}) ${icon}
-        </span>
-      `;
-      countEl.title = `匹配 ${count} 个元素，预期 ${expected} 个${isExact ? '' : (count > expected ? '，可能匹配过多' : '，匹配不足')}，悬停查看`;
-
-      // 鼠标移入高亮，移出取消
-      const resultEl = countEl.querySelector('.selector-match-result');
-      resultEl.addEventListener('mouseenter', () => {
-        highlightElements(opt.selector);
+      // 悬停高亮
+      countEl.addEventListener('mouseenter', () => {
+        highlightElements(lines[i].selector);
       });
-      resultEl.addEventListener('mouseleave', () => {
+      countEl.addEventListener('mouseleave', () => {
         clearHighlight();
       });
     } else {
-      countEl.innerHTML = '<span style="color: #999;">查询失败</span>';
+      countEl.textContent = '(?)';
+      countEl.style.color = '#999';
     }
   }
 }
@@ -1080,291 +772,38 @@ function removeStatePseudoClasses(selector) {
 }
 
 /**
- * 生成多个选择器选项
+ * 生成选择器选项（精简版）
+ * 只保留3种策略：完整选择器、共同类名、智能精简
+ * 每个选项都包含精确性验证
  */
-function generateSelectorOptions(elements) {
+function generateSelectorLines(elements) {
   if (!elements || elements.length === 0) return [];
-  if (elements.length === 1) {
-    // 移除状态伪类
-    const cleanSelector = removeStatePseudoClasses(elements[0].selector);
-    const options = [{
-      selector: cleanSelector,
-      type: '完整选择器',
-      matchCount: 1,
-      savedChars: 0
-    }];
 
-    // 为单个元素也生成精简选项
-    const simplified = simplifySelector(cleanSelector);
-    if (simplified && simplified !== cleanSelector) {
-      options.push({
-        selector: simplified,
-        type: '精简版',
-        matchCount: 1,
-        savedChars: cleanSelector.length - simplified.length
-      });
-    }
-
-    // 极简后缀
-    const suffix = extractSuffixSelector(cleanSelector, 2);
-    if (suffix && suffix !== cleanSelector && suffix !== simplified) {
-      options.push({
-        selector: suffix,
-        type: '极简后缀',
-        matchCount: 1,
-        savedChars: cleanSelector.length - suffix.length
-      });
-    }
-
-    return options;
-  }
-
-  // 先清理所有选择器中的状态伪类
-  const selectors = elements.map(el => removeStatePseudoClasses(el.selector));
-  const uniqueSelectors = [...new Set(selectors)];
-  const simpleJoin = uniqueSelectors.join(', ');
-  const options = [];
+  const lines = [];
   const seenSelectors = new Set();
 
-  // 选项1: 智能合并（推荐）
-  const smartMerged = smartMergeSelectors(elements);
-  if (smartMerged && !seenSelectors.has(smartMerged)) {
-    seenSelectors.add(smartMerged);
-    options.push({
-      selector: smartMerged,
-      type: '智能合并',
-      matchCount: elements.length,
-      savedChars: smartMerged.length < simpleJoin.length ? simpleJoin.length - smartMerged.length : 0
-    });
-
-    // 选项1.5: 精简版（去掉更多不必要的层级）
-    const simplified = simplifySelector(smartMerged);
-    if (simplified && simplified !== smartMerged && !seenSelectors.has(simplified)) {
-      seenSelectors.add(simplified);
-      options.push({
-        selector: simplified,
-        type: '精简版',
-        matchCount: elements.length,
-        savedChars: simplified.length < simpleJoin.length ? simpleJoin.length - simplified.length : 0
-      });
+  // 每个元素的选择器独占一行，去重显示
+  elements.forEach(el => {
+    const cleanSelector = removeStatePseudoClasses(el.selector);
+    if (!seenSelectors.has(cleanSelector)) {
+      seenSelectors.add(cleanSelector);
+      lines.push({ selector: cleanSelector, type: '选择器' });
     }
-
-    // 选项1.6: 最简版（只保留关键特征）
-    const minimal = minimizeSelector(smartMerged);
-    if (minimal && minimal !== smartMerged && minimal !== simplified && !seenSelectors.has(minimal)) {
-      seenSelectors.add(minimal);
-      options.push({
-        selector: minimal,
-        type: '最简版',
-        matchCount: elements.length,
-        savedChars: minimal.length < simpleJoin.length ? simpleJoin.length - minimal.length : 0
-      });
-    }
-
-    // 选项1.7: 极简后缀（只保留最后2-3个有特征的层级）
-    const suffixSelector = extractSuffixSelector(smartMerged, 3);
-    if (suffixSelector && suffixSelector !== smartMerged && suffixSelector !== simplified && suffixSelector !== minimal && !seenSelectors.has(suffixSelector)) {
-      seenSelectors.add(suffixSelector);
-      options.push({
-        selector: suffixSelector,
-        type: '极简后缀',
-        matchCount: elements.length,
-        savedChars: suffixSelector.length < simpleJoin.length ? simpleJoin.length - suffixSelector.length : 0
-      });
-    }
-  }
-
-  // 选项2: :is() 合并（提取共同特征）
-  const isMerged = tryIsMerge(elements);
-  if (isMerged && !seenSelectors.has(isMerged)) {
-    seenSelectors.add(isMerged);
-    options.push({
-      selector: isMerged,
-      type: ':is() 合并',
-      matchCount: elements.length,
-      savedChars: isMerged.length < simpleJoin.length ? simpleJoin.length - isMerged.length : 0
-    });
-  }
-
-  // 选项3: 共同类名（如果有）
-  const commonClass = tryCommonClassMerge(elements);
-  if (commonClass && !seenSelectors.has(commonClass)) {
-    seenSelectors.add(commonClass);
-    options.push({
-      selector: commonClass,
-      type: '共同类名',
-      matchCount: elements.length,
-      savedChars: commonClass.length < simpleJoin.length ? simpleJoin.length - commonClass.length : 0
-    });
-  }
-
-  // 选项4: :not() 排除法合并
-  const notMerged = tryNotMerge(elements);
-  if (notMerged && !seenSelectors.has(notMerged)) {
-    seenSelectors.add(notMerged);
-    options.push({
-      selector: notMerged,
-      type: ':not() 排除',
-      matchCount: elements.length,
-      savedChars: notMerged.length < simpleJoin.length ? simpleJoin.length - notMerged.length : 0
-    });
-  }
-
-  // 选项5: 伪类合并（nth-child 范围）
-  const pseudoMerged = tryPseudoClassMerge(elements);
-  if (pseudoMerged && !seenSelectors.has(pseudoMerged)) {
-    seenSelectors.add(pseudoMerged);
-    options.push({
-      selector: pseudoMerged,
-      type: '伪类合并',
-      matchCount: elements.length,
-      savedChars: pseudoMerged.length < simpleJoin.length ? simpleJoin.length - pseudoMerged.length : 0
-    });
-  }
-
-  // 选项6: 直接连接（保底选项 - 始终添加）
-  if (!seenSelectors.has(simpleJoin)) {
-    seenSelectors.add(simpleJoin);
-    options.push({
-      selector: simpleJoin,
-      type: '直接连接',
-      matchCount: elements.length,
-      savedChars: 0
-    });
-  }
-
-  // 选项7: 共同祖先 + 后代选择器
-  const commonAncestorSelector = tryCommonAncestorMerge(elements);
-  if (commonAncestorSelector && !seenSelectors.has(commonAncestorSelector)) {
-    seenSelectors.add(commonAncestorSelector);
-    options.push({
-      selector: commonAncestorSelector,
-      type: '共同祖先',
-      matchCount: elements.length,
-      savedChars: commonAncestorSelector.length < simpleJoin.length ? simpleJoin.length - commonAncestorSelector.length : 0
-    });
-  }
-
-  // 如果没有任何选项，至少返回直接连接
-  if (options.length === 0) {
-    options.push({
-      selector: simpleJoin,
-      type: '直接连接',
-      matchCount: elements.length,
-      savedChars: 0
-    });
-  }
-
-  return options;
-}
-
-/**
- * 最小化选择器（只保留关键特征）
- * 保留: ID, 类名, 属性, :is(), 非1的nth-child
- * 移除: 纯标签名, :nth-child(1)
- * 把 > 改为空格
- */
-function minimizeSelector(selector) {
-  if (!selector) return null;
-
-  const parts = parseSelectorParts(selector);
-  if (parts.length <= 2) return null;
-
-  // 只保留有特征的层级
-  const essentialParts = parts.filter((part, index) => {
-    // 始终保留第一个和最后一个
-    if (index === 0 || index === parts.length - 1) return true;
-    // 保留有特征的
-    return isEssentialPart(part);
   });
 
-  // 如果没有移除任何层级，返回 null
-  if (essentialParts.length === parts.length) return null;
-
-  // 移除每个层级的 :nth-child(1)
-  const cleanedParts = essentialParts.map(part => part.replace(/:nth-child\(1\)/g, ''));
-
-  // 用空格连接（后代选择器）
-  const minimal = cleanedParts.join(' ');
-
-  return minimal !== selector ? minimal : null;
+  return lines;
 }
 
-/**
- * 精简选择器（去掉更多不必要的层级）
- * 使用贪心算法：逐步移除层级，验证是否仍然精确匹配
- */
-function simplifySelector(selector) {
-  if (!selector) return null;
+// 获取所有当前显示的选择器（逗号分隔合并）
+function getAllCombinedSelector() {
+  const container = document.getElementById('selector-options-container');
+  if (!container) return null;
 
-  // 解析选择器为层级数组
-  const parts = parseSelectorParts(selector);
-  if (parts.length <= 2) return null; // 太短，不需要精简
+  const codeEls = container.querySelectorAll('.selector-line-text');
+  if (codeEls.length === 0) return null;
 
-  let simplified = selector;
-
-  // 策略1: 去掉 :nth-child(1)（因为第一个子元素是默认的）
-  simplified = simplified.replace(/:nth-child\(1\)/g, '');
-
-  // 策略2: 尝试把 > 改为空格（后代选择器更宽松）
-  simplified = simplified.replace(/\s*>\s*/g, ' ');
-
-  // 策略3: 尝试移除中间层级（从后往前尝试）
-  const currentParts = parseSelectorParts(simplified);
-  const minimalParts = [currentParts[0]]; // 保留第一个
-
-  for (let i = 1; i < currentParts.length - 1; i++) {
-    // 尝试跳过这个层级
-    const testParts = [...minimalParts, ...currentParts.slice(i + 1)];
-    const testSelector = testParts.join(' ');
-
-    // 这里我们假设跳过后仍然有效（实际应该验证）
-    // 为了性能，我们只跳过看起来不重要的层级
-    const part = currentParts[i];
-    if (isEssentialPart(part)) {
-      minimalParts.push(part);
-    }
-    // 否则跳过
-  }
-
-  minimalParts.push(currentParts[currentParts.length - 1]); // 保留最后一个
-
-  const result = minimalParts.join(' ');
-
-  // 如果结果不同，返回精简版
-  return result !== selector ? result : null;
-}
-
-/**
- * 提取后缀选择器（只保留最后几个有特征的层级）
- * @param {string} selector - 原始选择器
- * @param {number} maxLevels - 最多保留的层级数
- * @returns {string|null} - 极简选择器或 null
- */
-function extractSuffixSelector(selector, maxLevels = 3) {
-  if (!selector) return null;
-
-  // 解析选择器为层级数组（处理 > 和空格）
-  const parts = selector.split(/\s*>\s*|\s+/).filter(p => p);
-  if (parts.length <= 2) return null; // 太短，不需要精简
-
-  // 从最后一个层级开始，向前收集有特征的层级
-  const suffixParts = [];
-  for (let i = parts.length - 1; i >= 0 && suffixParts.length < maxLevels; i--) {
-    const part = parts[i];
-    // 跳过纯标签名（除非是最后一个）
-    if (suffixParts.length === 0 || /\.[a-zA-Z]/.test(part) || /#/.test(part) || /\[/.test(part)) {
-      suffixParts.unshift(part);
-    }
-  }
-
-  // 如果没有移除任何层级，返回 null
-  if (suffixParts.length === parts.length) return null;
-
-  // 用空格连接（后代选择器）
-  const suffix = suffixParts.join(' ');
-
-  return suffix !== selector ? suffix : null;
+  const selectors = [...codeEls].map(el => el.textContent);
+  return selectors.join(', ');
 }
 
 /**
@@ -1656,377 +1095,6 @@ function tryCommonClassMerge(elements) {
 }
 
 /**
- * 尝试使用 :not() 排除法合并
- * 适用于：同一父元素下选中大部分子元素，用 :not() 排除未选中的
- */
-function tryNotMerge(elements) {
-  if (elements.length < 3) return null;
-
-  // 解析选择器，提取父路径和索引信息
-  const parsed = elements.map(el => {
-    const selector = el.selector;
-    const parts = selector.split(/\s*>\s*/);
-    const lastPart = parts[parts.length - 1];
-    const parentPath = parts.slice(0, -1).join(' > ');
-
-    // 提取 nth-child 索引
-    const nthMatch = lastPart.match(/:nth-child\((\d+)\)/);
-    if (nthMatch) {
-      return {
-        base: lastPart.replace(/:nth-child\(\d+\)/, ''),
-        index: parseInt(nthMatch[1]),
-        parentPath,
-        tag: lastPart.replace(/:[a-z-]+\([^)]*\)|:[a-z-]+/gi, '').split(/[.#\[]/)[0] || '*'
-      };
-    }
-    return null;
-  }).filter(p => p !== null);
-
-  // 所有选择器都必须有解析结果
-  if (parsed.length !== elements.length || parsed.length < 3) return null;
-
-  // 必须有相同的父路径
-  const parentPaths = new Set(parsed.map(p => p.parentPath));
-  if (parentPaths.size !== 1) return null;
-
-  const parentPath = [...parentPaths][0];
-  const firstTag = parsed[0].tag;
-  const firstBase = parsed[0].base;
-
-  // 标签必须相同
-  const tags = new Set(parsed.map(p => p.tag));
-  if (tags.size !== 1) return null;
-
-  // 收集选中的索引
-  const selectedIndices = [...new Set(parsed.map(p => p.index))].sort((a, b) => a - b);
-  const maxIndex = Math.max(...selectedIndices);
-
-  // 如果最大索引等于元素数量，说明是连续的，不需要 :not()
-  if (maxIndex === selectedIndices.length && isConsecutive(selectedIndices)) {
-    return null;
-  }
-
-  // 找出未选中的索引（间隙）
-  const gaps = [];
-  for (let i = 1; i <= maxIndex; i++) {
-    if (!selectedIndices.includes(i)) {
-      gaps.push(i);
-    }
-  }
-
-  // 如果排除的数量少于选中的数量，且排除数量 <= 3，使用 :not() 更简洁
-  if (gaps.length > 0 && gaps.length < selectedIndices.length && gaps.length <= 3) {
-    const notParts = gaps.map(i => `:not(:nth-child(${i}))`);
-    const selector = parentPath
-      ? `${parentPath} > ${firstBase}:nth-child(n)${notParts.join('')}`
-      : `${firstBase}:nth-child(n)${notParts.join('')}`;
-
-    return selector;
-  }
-
-  return null;
-}
-
-/**
- * 尝试使用伪类合并（nth-child 范围选择器）
- */
-function tryPseudoClassMerge(elements) {
-  if (elements.length < 2) return null;
-
-  // 解析选择器，提取索引信息
-  const parsed = elements.map(el => {
-    const selector = el.selector;
-    const parts = selector.split(/\s*>\s*/);
-    const lastPart = parts[parts.length - 1];
-    const parentPath = parts.slice(0, -1).join(' > ');
-
-    // 提取标签和伪类信息
-    const tag = lastPart.replace(/:[a-z-]+\([^)]*\)|:[a-z-]+/gi, '').split(/[.#\[]/)[0] || '*';
-    const classes = [];
-    const classMatches = lastPart.match(/\.[a-zA-Z_-][a-zA-Z0-9_-]*/g);
-    if (classMatches) {
-      classes.push(...classMatches.map(c => c.slice(1)));
-    }
-
-    // 提取 nth-child
-    const nthMatch = lastPart.match(/:nth-child\((\d+)\)/);
-    const nthIndex = nthMatch ? parseInt(nthMatch[1]) : null;
-
-    // 检查特殊伪类
-    const hasFirstChild = lastPart.includes(':first-child');
-    const hasLastChild = lastPart.includes(':last-child');
-    const hasOnlyChild = lastPart.includes(':only-child');
-
-    return {
-      tag,
-      classes,
-      parentPath,
-      nthIndex,
-      hasFirstChild,
-      hasLastChild,
-      hasOnlyChild,
-      baseSelector: tag + (classes.length > 0 ? '.' + classes.join('.') : '')
-    };
-  });
-
-  // 检查是否有相同的父路径和基础选择器
-  const parentPaths = new Set(parsed.map(p => p.parentPath));
-  const baseSelectors = new Set(parsed.map(p => p.baseSelector));
-
-  if (parentPaths.size !== 1 || baseSelectors.size !== 1) return null;
-
-  const parentPath = [...parentPaths][0];
-  const baseSelector = [...baseSelectors][0];
-
-  // 收集所有索引
-  const indices = parsed.map(p => p.nthIndex).filter(i => i !== null);
-
-  if (indices.length !== elements.length) return null;
-
-  const sortedIndices = [...indices].sort((a, b) => a - b);
-  const minIdx = sortedIndices[0];
-  const maxIdx = sortedIndices[sortedIndices.length - 1];
-
-  // 检查是否连续
-  if (isConsecutive(sortedIndices)) {
-    // 连续索引，使用范围选择器
-    if (minIdx === maxIdx) {
-      // 所有元素在同一个位置（不应该发生）
-      return null;
-    } else {
-      // 使用范围选择器
-      const selector = parentPath
-        ? `${parentPath} > ${baseSelector}:nth-child(n+${minIdx}):nth-child(-n+${maxIdx})`
-        : `${baseSelector}:nth-child(n+${minIdx}):nth-child(-n+${maxIdx})`;
-      return selector;
-    }
-  }
-
-  // 检查是否是奇偶位置
-  const allOdd = sortedIndices.every(i => i % 2 === 1);
-  const allEven = sortedIndices.every(i => i % 2 === 0);
-
-  if (allOdd && sortedIndices.length > 2) {
-    const selector = parentPath
-      ? `${parentPath} > ${baseSelector}:nth-child(odd)`
-      : `${baseSelector}:nth-child(odd)`;
-    return selector;
-  }
-
-  if (allEven && sortedIndices.length > 2) {
-    const selector = parentPath
-      ? `${parentPath} > ${baseSelector}:nth-child(even)`
-      : `${baseSelector}:nth-child(even)`;
-    return selector;
-  }
-
-  // 检查是否是 first-child 和 last-child 组合
-  const hasFirst = sortedIndices.includes(1);
-  const hasLast = parsed.some(p => p.hasLastChild);
-
-  if (hasFirst && hasLast && elements.length === 2) {
-    const selector = parentPath
-      ? `${parentPath} > ${baseSelector}:is(:first-child, :last-child)`
-      : `${baseSelector}:is(:first-child, :last-child)`;
-    return selector;
-  }
-
-  return null;
-}
-
-/**
- * 检查数组是否连续
- */
-function isConsecutive(arr) {
-  if (arr.length < 2) return true;
-  for (let i = 1; i < arr.length; i++) {
-    if (arr[i] !== arr[i - 1] + 1) return false;
-  }
-  return true;
-}
-
-// 获取当前选中的选择器
-function getSelectedSelector() {
-  const container = document.getElementById('selector-options-container');
-  if (!container) return null;
-
-  const checkedElements = [];
-  batchSelectedList.querySelectorAll('.batch-item-checkbox:checked').forEach(checkbox => {
-    const index = parseInt(checkbox.dataset.index);
-    if (batchPickerState.selectedElements[index]) {
-      checkedElements.push(batchPickerState.selectedElements[index]);
-    }
-  });
-
-  if (checkedElements.length === 0) return null;
-
-  const options = generateSelectorOptions(checkedElements);
-  if (options.length === 0) return null;
-
-  return options[selectedSelectorIndex]?.selector || options[0].selector;
-}
-
-/**
- * 智能合并选择器（多策略并行）
- * 增强版：移除状态伪类、支持 :not() 排除法、伪类合并
- */
-function smartMergeSelectors(elements) {
-  if (!elements || elements.length === 0) return '';
-  if (elements.length === 1) return removeStatePseudoClasses(elements[0].selector);
-
-  // 先移除所有选择器中的状态伪类
-  const selectors = elements.map(el => removeStatePseudoClasses(el.selector));
-  const uniqueSelectors = [...new Set(selectors)];
-
-  // 策略1: 如果所有选择器完全相同，直接返回
-  if (uniqueSelectors.length === 1) {
-    return uniqueSelectors[0];
-  }
-
-  // 解析所有选择器为路径数组
-  const pathsArray = uniqueSelectors.map(s => s.split(/\s*>\s*/));
-
-  // 策略2: 伪类合并（nth-child 范围、奇偶等）
-  const pseudoMerged = tryPseudoClassMerge(elements);
-  if (pseudoMerged) {
-    return removeStatePseudoClasses(pseudoMerged);
-  }
-
-  // 策略3: :not() 排除法合并
-  const notMerged = tryNotMerge(elements);
-  if (notMerged) {
-    return removeStatePseudoClasses(notMerged);
-  }
-
-  // 策略4: 智能路径合并 - 找出相同和不同的层级，用 :is() 合并
-  const pathMergeResult = trySmartPathMerge(pathsArray, elements);
-  if (pathMergeResult) {
-    return removeStatePseudoClasses(pathMergeResult);
-  }
-
-  // 策略5: 找出精确的共同后缀
-  const commonSuffix = findCommonSuffix(uniqueSelectors);
-  if (commonSuffix && commonSuffix.length > 0) {
-    return commonSuffix;
-  }
-
-  // 策略6: 返回逗号分隔（最安全）
-  return uniqueSelectors.join(', ');
-}
-
-/**
- * 智能路径合并
- * 分析路径层级，对不同层级使用 :is() 合并，并简化无特征的中间层级
- */
-function trySmartPathMerge(pathsArray, elements) {
-  if (pathsArray.length < 2) return null;
-
-  const numPaths = pathsArray.length;
-  const pathLength = pathsArray[0].length;
-
-  // 所有路径长度必须相同
-  if (!pathsArray.every(p => p.length === pathLength)) return null;
-
-  // 分析每一层级的差异
-  const layerAnalysis = [];
-  for (let i = 0; i < pathLength; i++) {
-    const parts = pathsArray.map(p => p[i]);
-    const uniqueParts = [...new Set(parts)];
-
-    // 解析每个部分
-    const parsedParts = parts.map(part => parseSelectorPart(part));
-
-    layerAnalysis.push({
-      index: i,
-      parts,
-      uniqueParts,
-      parsedParts,
-      isSame: uniqueParts.length === 1,
-      isDifferent: uniqueParts.length > 1,
-      // 判断是否有特征（类名、ID、非1的nth-child）
-      hasFeature: hasSelectorFeature(parsedParts)
-    });
-  }
-
-  // 构建合并后的选择器路径
-  const mergedPath = [];
-  for (let i = 0; i < pathLength; i++) {
-    const layer = layerAnalysis[i];
-
-    if (layer.isSame) {
-      mergedPath.push(layer.parts[0]);
-    } else {
-      const merged = tryMergeLayer(layer, elements);
-      if (merged) {
-        mergedPath.push(merged);
-      } else {
-        return null;
-      }
-    }
-  }
-
-  // 找出需要保留的层级索引（有特征或差异的层级）
-  const keepIndexes = [];
-  for (let i = 0; i < layerAnalysis.length; i++) {
-    // 保留：有特征、有差异、第一层、最后一层
-    if (layerAnalysis[i].hasFeature ||
-        layerAnalysis[i].isDifferent ||
-        i === 0 ||
-        i === pathLength - 1) {
-      keepIndexes.push(i);
-    }
-  }
-
-  // 构建最终选择器
-  const selectorParts = [];
-  for (let i = 0; i < keepIndexes.length; i++) {
-    const idx = keepIndexes[i];
-    selectorParts.push(mergedPath[idx]);
-
-    // 如果下一个保留的层级不是紧邻的，使用后代选择器（空格）
-    if (i < keepIndexes.length - 1) {
-      const nextIdx = keepIndexes[i + 1];
-      if (nextIdx > idx + 1) {
-        // 中间有被跳过的层级，用空格连接
-        selectorParts.push(' ');  // 后代选择器
-      } else {
-        selectorParts.push(' > '); // 子选择器
-      }
-    }
-  }
-
-  // 移除多余的连接符，构建最终选择器
-  let finalSelector = '';
-  for (let i = 0; i < selectorParts.length; i++) {
-    const part = selectorParts[i];
-    if (part === ' ' || part === ' > ') {
-      finalSelector += part;
-    } else {
-      finalSelector += part;
-    }
-  }
-
-  return finalSelector;
-}
-
-/**
- * 判断层级是否有特征（值得保留）
- */
-function hasSelectorFeature(parsedParts) {
-  return parsedParts.some(p => {
-    // 有类名
-    if (p.classes && p.classes.length > 0) return true;
-    // 有 ID
-    if (p.id) return true;
-    // 有属性
-    if (p.attributes && p.attributes.length > 0) return true;
-    // nth-child 不是 1
-    if (p.nthChild && p.nthChild !== 1) return true;
-    return false;
-  });
-}
-
-/**
  * 解析选择器部分
  */
 function parseSelectorPart(part) {
@@ -2074,275 +1142,6 @@ function parseSelectorPart(part) {
   return result;
 }
 
-/**
- * 尝试合并同一层级的不同部分
- */
-function tryMergeLayer(layer, elements) {
-  const { parsedParts, uniqueParts } = layer;
-
-  // 检查是否只是 nth-child 不同
-  const firstParsed = parsedParts[0];
-  const sameBase = parsedParts.every(p =>
-    p.tag === firstParsed.tag &&
-    p.id === firstParsed.id &&
-    p.classes.join('.') === firstParsed.classes.join('.')
-  );
-
-  if (sameBase && firstParsed.nthChild !== null) {
-    // 只有 nth-child 不同，用 :is() 合并索引
-    const indices = [...new Set(parsedParts.map(p => p.nthChild))].sort((a, b) => a - b);
-
-    // 构建基础选择器
-    let baseSelector = firstParsed.tag;
-    if (firstParsed.id) baseSelector += '#' + firstParsed.id;
-    if (firstParsed.classes.length > 0) {
-      baseSelector += '.' + firstParsed.classes.join('.');
-    }
-
-    // 使用 :is() 合并不同的 nth-child
-    const nthList = indices.map(i => `:nth-child(${i})`).join(', ');
-    return `${baseSelector}:is(${nthList})`;
-  }
-
-  // 检查是否是兄弟元素（父级是兄弟）
-  // 这种情况下，可能需要跳过中间层级
-  if (canMergeAsSiblings(parsedParts)) {
-    // 使用 :is() 合并不同的部分
-    const mergedParts = uniqueParts.map(p => {
-      // 移除 nth-child，保留其他特征
-      return p.replace(/:nth-child\(\d+\)/, '');
-    });
-    const uniqueMerged = [...new Set(mergedParts)];
-
-    if (uniqueMerged.length === 1) {
-      // 去掉 nth-child 后相同，直接使用
-      return uniqueMerged[0];
-    } else {
-      // 使用 :is() 合并
-      return `:is(${uniqueMerged.join(', ')})`;
-    }
-  }
-
-  // 尝试用 :is() 直接合并
-  return `:is(${uniqueParts.join(', ')})`;
-}
-
-/**
- * 检查是否可以作为兄弟元素合并
- */
-function canMergeAsSiblings(parsedParts) {
-  // 检查标签名是否相同
-  const tags = [...new Set(parsedParts.map(p => p.tag))];
-  if (tags.length !== 1) return false;
-
-  // 至少有一个共同特征（类名或属性）
-  const first = parsedParts[0];
-  if (first.classes.length > 0 || first.attributes.length > 0 || first.id) {
-    return true;
-  }
-
-  return false;
-}
-
-/**
- * 验证合并后的选择器是否精确匹配
- */
-function validateMergedSelector(selector, expectedCount) {
-  // 这个验证需要在页面上下文中执行
-  // 返回 true 表示通过验证（由调用者进行实际验证）
-  return true;
-}
-
-/**
- * 找出所有选择器的共同后缀（完整路径段，包括 nth-child）
- */
-function findCommonSuffix(selectors) {
-  if (selectors.length < 2) return null;
-
-  const partsArray = selectors.map(s => s.split(/\s*>\s*/));
-  const minLen = Math.min(...partsArray.map(p => p.length));
-
-  const commonSuffix = [];
-
-  for (let i = 1; i <= minLen; i++) {
-    const tailParts = partsArray.map(parts => parts[parts.length - i]);
-    const firstPart = tailParts[0];
-    const allSame = tailParts.every(part => part === firstPart);
-
-    if (allSame) {
-      commonSuffix.unshift(firstPart);
-    } else {
-      break;
-    }
-  }
-
-  // 只有当共同后缀足够长（>=2段）时才使用
-  if (commonSuffix.length >= 2) {
-    return commonSuffix.join(' > ');
-  }
-
-  return null;
-}
-
-/**
- * 尝试用 :not() 排除法合并
- * 适用于：同一父元素下选中大部分子元素，用 :not() 排除未选中的
- */
-function tryMergeWithNot(elements, selectors) {
-  if (selectors.length < 3) return null;
-
-  // 解析选择器
-  const parsed = selectors.map(sel => {
-    const parts = sel.split(/\s*>\s*/);
-    const lastPart = parts[parts.length - 1];
-    const match = lastPart.match(/^(.+):nth-child\((\d+)\)$/);
-    if (match) {
-      return {
-        base: match[1],
-        index: parseInt(match[2]),
-        parentPath: parts.slice(0, -1).join(' > ')
-      };
-    }
-    return null;
-  });
-
-  // 所有选择器都必须有 nth-child
-  if (parsed.some(p => p === null)) return null;
-
-  // 必须有相同的父路径和基础标签
-  const firstParent = parsed[0].parentPath;
-  const firstBase = parsed[0].base;
-
-  const sameParentAndBase = parsed.every(p =>
-    p.parentPath === firstParent && p.base === firstBase
-  );
-
-  if (!sameParentAndBase) return null;
-
-  // 收集选中的索引
-  const selectedIndices = [...new Set(parsed.map(p => p.index))].sort((a, b) => a - b);
-  const maxIndex = Math.max(...selectedIndices);
-
-  // 找出未选中的索引（间隙）
-  const gaps = [];
-  for (let i = 1; i <= maxIndex; i++) {
-    if (!selectedIndices.includes(i)) {
-      gaps.push(i);
-    }
-  }
-
-  // 如果排除的数量少于选中的数量，且排除数量 <= 3，使用 :not() 更简洁
-  if (gaps.length > 0 && gaps.length < selectedIndices.length && gaps.length <= 3) {
-    const notParts = gaps.map(i => `:not(:nth-child(${i}))`);
-    const selector = firstParent
-      ? `${firstParent} > ${firstBase}:nth-child(n)${notParts.join('')}`
-      : `${firstBase}:nth-child(n)${notParts.join('')}`;
-
-    return selector;
-  }
-
-  return null;
-}
-
-/**
- * 尝试合并后缀部分
- */
-function tryMergeSuffixParts(suffixParts) {
-  if (suffixParts.length === 0) return null;
-
-  // 检查是否都是单个部分（只有一层）
-  const allSingle = suffixParts.every(s => s.length === 1);
-  if (!allSingle) return null;
-
-  const parts = suffixParts.map(s => s[0]);
-
-  // 检查是否都是相同的基础选择器（类名或标签）
-  const baseSelectors = parts.map(p => p.replace(/:nth-child\([^)]+\)|:first-child|:last-child|:only-child/g, ''));
-  const uniqueBase = [...new Set(baseSelectors)];
-
-  if (uniqueBase.length === 1) {
-    const base = uniqueBase[0];
-
-    // 提取所有的 nth-child 索引
-    const indices = [];
-    parts.forEach(p => {
-      const match = p.match(/:nth-child\((\d+)\)/);
-      if (match) {
-        indices.push(parseInt(match[1]));
-      } else if (p.includes(':first-child')) {
-        indices.push(1);
-      } else if (p.includes(':last-child')) {
-        // 需要知道总数，这里简化处理
-        indices.push(-1); // 标记为 last
-      } else if (p.includes(':only-child')) {
-        indices.push(1);
-      }
-    });
-
-    if (indices.length === 0) {
-      // 没有 nth-child，说明都是相同的基础选择器
-      return base;
-    }
-
-    // 检查是否是连续的索引
-    const positiveIndices = indices.filter(i => i > 0).sort((a, b) => a - b);
-    if (positiveIndices.length === indices.length && isConsecutive(positiveIndices)) {
-      // 连续索引，使用范围选择器
-      const start = positiveIndices[0];
-      const end = positiveIndices[positiveIndices.length - 1];
-
-      if (start === end) {
-        return `${base}:nth-child(${start})`;
-      } else {
-        return `${base}:nth-child(n+${start}):nth-child(-n+${end})`;
-      }
-    }
-
-    // 无法合并索引，返回带索引的选择器列表
-    return parts.join(', ');
-  }
-
-  return null;
-}
-
-/**
- * 检查数组是否连续
- */
-function isConsecutive(arr) {
-  if (arr.length < 2) return true;
-  for (let i = 1; i < arr.length; i++) {
-    if (arr[i] !== arr[i - 1] + 1) return false;
-  }
-  return true;
-}
-
-/**
- * 尝试通过共同类名合并
- */
-function tryMergeByCommonClass(elements) {
-  if (elements.length < 2) return null;
-
-  // 从选择器中提取类名
-  const allClasses = elements.map(el => {
-    const matches = el.selector.match(/\.[a-zA-Z_-][a-zA-Z0-9_-]*/g) || [];
-    return matches.map(c => c.slice(1)); // 移除点号
-  });
-
-  // 找出所有元素共有的类名
-  const firstClasses = allClasses[0] || [];
-  const commonClasses = firstClasses.filter(cls => {
-    return allClasses.every(classes => classes.includes(cls));
-  });
-
-  if (commonClasses.length === 0) return null;
-
-  // 使用共同类名构建选择器
-  const selector = '.' + commonClasses.map(c => CSS.escape ? CSS.escape(c) : c).join('.');
-
-  return selector;
-}
-
-// 移除选中的元素
 function removeSelectedElement(index) {
   const removed = batchPickerState.selectedElements.splice(index, 1);
   updateSelectedElementsUI();
@@ -2356,15 +1155,14 @@ function removeSelectedElement(index) {
   }
 }
 
-// 获取选中的选择器（优先使用合并后的选择器）
+// 获取当前显示的所有选择器（用于隐藏/显示等操作）
 async function getCheckedSelectors() {
-  // 使用用户选中的选择器
-  const selectedSelector = getSelectedSelector();
-  if (selectedSelector) {
-    return [selectedSelector];
+  const combined = getAllCombinedSelector();
+  if (combined) {
+    return [combined];
   }
 
-  // 回退逻辑
+  // 回退：直接用勾选元素的选择器
   const checkedElements = [];
   batchSelectedList.querySelectorAll('.batch-item-checkbox:checked').forEach(checkbox => {
     const index = parseInt(checkbox.dataset.index);
@@ -2374,36 +1172,7 @@ async function getCheckedSelectors() {
   });
 
   if (checkedElements.length === 0) return [];
-
-  // 返回原始选择器
   return checkedElements.map(el => el.selector);
-}
-
-/**
- * 验证合并后的选择器是否精确匹配预期数量
- */
-async function validateMergedSelectorCount(selector, expectedCount) {
-  const code = `
-    (function(selector) {
-      try {
-        const elements = document.querySelectorAll(selector);
-        return { count: elements.length, valid: elements.length === ${expectedCount} };
-      } catch (e) {
-        return { count: 0, valid: false, error: e.message };
-      }
-    })(${JSON.stringify(selector)})
-  `;
-
-  return new Promise((resolve) => {
-    chrome.devtools.inspectedWindow.eval(code, (result, error) => {
-      if (error || !result) {
-        console.warn('[BatchPicker] 验证选择器失败:', error);
-        resolve(false);
-      } else {
-        resolve(result.valid);
-      }
-    });
-  });
 }
 
 // 批量隐藏元素
@@ -2624,7 +1393,7 @@ async function initBatchPicker() {
   // 复制合并选择器按钮
   if (copyMergedSelectorBtn) {
     copyMergedSelectorBtn.addEventListener('click', async () => {
-      const selector = getSelectedSelector();
+      const selector = getAllCombinedSelector();
       if (selector) {
         await copyToClipboard(selector);
         showNotification('选择器已复制');
@@ -2717,249 +1486,6 @@ async function initBatchPicker() {
 
 // 启动批量选择功能
 initBatchPicker();
-
-// ========== 内存清理功能 ==========
-let autoCleanupTimer = null;
-
-// 清理资源
-async function cleanupResources(type) {
-  const cleanupSection = document.querySelector('.memory-cleanup-section');
-  let resultEl = cleanupSection.querySelector('.cleanup-result');
-  if (!resultEl) {
-    resultEl = document.createElement('div');
-    resultEl.className = 'cleanup-result';
-    cleanupSection.appendChild(resultEl);
-  }
-
-  try {
-    let message = '';
-    let success = true;
-
-    switch (type) {
-      case 'cache':
-        // 清理Service Worker缓存
-        if ('caches' in window) {
-          const cacheNames = await caches.keys();
-          await Promise.all(cacheNames.map(name => caches.delete(name)));
-          message = `已清理 ${cacheNames.length} 个缓存`;
-        } else {
-          message = '浏览器不支持Cache API';
-        }
-        break;
-
-      case 'localStorage':
-        // 清理本地存储
-        const localKeys = Object.keys(localStorage);
-        localStorage.clear();
-        message = `已清理 ${localKeys.length} 个本地存储项`;
-        break;
-
-      case 'sessionStorage':
-        // 清理会话存储
-        const sessionKeys = Object.keys(sessionStorage);
-        sessionStorage.clear();
-        message = `已清理 ${sessionKeys.length} 个会话存储项`;
-        break;
-
-      case 'indexedDB':
-        // 清理IndexedDB
-        const dbs = await indexedDB.databases();
-        for (const db of dbs) {
-          if (db.name) {
-            await new Promise((resolve, reject) => {
-              const request = indexedDB.deleteDatabase(db.name);
-              request.onsuccess = resolve;
-              request.onerror = reject;
-            });
-          }
-        }
-        message = `已清理 ${dbs.length} 个IndexedDB数据库`;
-        break;
-
-      case 'cookies':
-        // 通过background清理cookies
-        try {
-          const response = await sendMessage('CLEANUP_COOKIES');
-          if (response && response.success) {
-            message = `已清理 ${response.count || 0} 个Cookies`;
-          } else {
-            message = 'Cookies清理完成';
-          }
-        } catch (e) {
-          message = 'Cookies清理需要后台支持';
-        }
-        break;
-
-      case 'all':
-        // 清理所有资源
-        let totalCleaned = 0;
-
-        // 缓存
-        if ('caches' in window) {
-          const cacheNames = await caches.keys();
-          await Promise.all(cacheNames.map(name => caches.delete(name)));
-          totalCleaned += cacheNames.length;
-        }
-
-        // 本地存储
-        totalCleaned += Object.keys(localStorage).length;
-        localStorage.clear();
-
-        // 会话存储
-        totalCleaned += Object.keys(sessionStorage).length;
-        sessionStorage.clear();
-
-        // IndexedDB
-        const allDbs = await indexedDB.databases();
-        for (const db of allDbs) {
-          if (db.name) {
-            await new Promise((resolve) => {
-              const request = indexedDB.deleteDatabase(db.name);
-              request.onsuccess = request.onerror = resolve;
-            });
-          }
-        }
-        totalCleaned += allDbs.length;
-
-        message = `已清理全部资源 (${totalCleaned} 项)`;
-        break;
-
-      default:
-        message = '未知的清理类型';
-        success = false;
-    }
-
-    resultEl.className = `cleanup-result ${success ? 'success' : 'error'}`;
-    resultEl.textContent = message;
-
-    // 3秒后移除提示
-    setTimeout(() => {
-      if (resultEl.parentNode) {
-        resultEl.remove();
-      }
-    }, 3000);
-
-    // 刷新内存信息
-    if (success) {
-      setTimeout(() => loadMemoryInfo(), 500);
-    }
-
-  } catch (e) {
-    resultEl.className = 'cleanup-result error';
-    resultEl.textContent = `清理失败: ${e.message}`;
-    setTimeout(() => {
-      if (resultEl.parentNode) {
-        resultEl.remove();
-      }
-    }, 3000);
-  }
-}
-
-// 设置自动清理
-function setupAutoCleanup() {
-  const autoCleanupEnabled = document.getElementById('auto-cleanup-enabled');
-  const autoCleanupInterval = document.getElementById('auto-cleanup-interval');
-
-  if (!autoCleanupEnabled || !autoCleanupInterval) return;
-
-  // 加载保存的设置
-  chrome.storage.local.get(['autoCleanupEnabled', 'autoCleanupInterval'], (result) => {
-    try {
-      if (result.autoCleanupEnabled !== undefined) {
-        autoCleanupEnabled.checked = result.autoCleanupEnabled;
-      }
-      if (result.autoCleanupInterval !== undefined) {
-        autoCleanupInterval.value = result.autoCleanupInterval;
-      }
-
-      // 如果已启用，启动定时器
-      if (autoCleanupEnabled.checked) {
-        startAutoCleanup(parseInt(autoCleanupInterval.value));
-      }
-    } catch (e) {
-      // Ignore errors during load
-      if (!isContextInvalidatedError(e)) {
-        console.error('[AutoCleanup] Failed to load settings:', e);
-      }
-    }
-  });
-
-  // 切换自动清理
-  autoCleanupEnabled.addEventListener('change', () => {
-    const enabled = autoCleanupEnabled.checked;
-    chrome.storage.local.set({ autoCleanupEnabled: enabled }).catch(err => {
-      if (!isContextInvalidatedError(err)) {
-        console.error('[AutoCleanup] Failed to save enabled state:', err);
-      }
-    });
-
-    if (enabled) {
-      startAutoCleanup(parseInt(autoCleanupInterval.value));
-    } else {
-      stopAutoCleanup();
-    }
-  });
-
-  // 修改清理间隔
-  autoCleanupInterval.addEventListener('change', () => {
-    const interval = parseInt(autoCleanupInterval.value);
-    chrome.storage.local.set({ autoCleanupInterval: interval }).catch(err => {
-      if (!isContextInvalidatedError(err)) {
-        console.error('[AutoCleanup] Failed to save interval:', err);
-      }
-    });
-
-    if (autoCleanupEnabled.checked) {
-      stopAutoCleanup();
-      startAutoCleanup(interval);
-    }
-  });
-}
-
-// 启动自动清理
-function startAutoCleanup(interval) {
-  stopAutoCleanup();
-  autoCleanupTimer = setInterval(() => {
-    // 自动清理缓存和会话存储
-    cleanupResources('cache');
-    cleanupResources('sessionStorage');
-  }, interval);
-
-  // 格式化时间间隔显示
-  let intervalText = '';
-  if (interval >= 31536000000) {
-    intervalText = `${interval / 31536000000}年`;
-  } else if (interval >= 2592000000) {
-    intervalText = `${interval / 2592000000}个月`;
-  } else if (interval >= 604800000) {
-    intervalText = `${interval / 604800000}周`;
-  } else if (interval >= 86400000) {
-    intervalText = `${interval / 86400000}天`;
-  } else {
-    intervalText = `${interval / 1000}秒`;
-  }
-  console.log(`[Memory] 自动清理已启动，间隔: ${intervalText}`);
-}
-
-// 停止自动清理
-function stopAutoCleanup() {
-  if (autoCleanupTimer) {
-    clearInterval(autoCleanupTimer);
-    autoCleanupTimer = null;
-    console.log('[Memory] 自动清理已停止');
-  }
-}
-
-// 绑定清理按钮事件
-document.querySelectorAll('.cleanup-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const cleanupType = btn.dataset.cleanup;
-    cleanupResources(cleanupType);
-  });
-});
-
-// 初始化自动清理设置
-setupAutoCleanup();
 
 // HTML转义
 function escapeHtml(text) {
@@ -5928,127 +4454,6 @@ if (mockTypeTabs) {
       renderMockList(mockFilterInput.value);
     });
   });
-}
-
-// ========== Clear Browsing Data ==========
-const clearCacheCheckbox = document.getElementById('clear-cache');
-const clearCookiesCheckbox = document.getElementById('clear-cookies');
-const clearHistoryCheckbox = document.getElementById('clear-history');
-const clearLocalStorageCheckbox = document.getElementById('clear-local-storage');
-const clearIndexedDBCheckbox = document.getElementById('clear-indexeddb');
-const clearDownloadsCheckbox = document.getElementById('clear-downloads');
-const clearTimeRangeSelect = document.getElementById('clear-time-range');
-const clearBrowsingDataBtn = document.getElementById('clear-browsing-data-btn');
-
-/**
- * Get time range in milliseconds since epoch
- */
-function getTimeRange(rangeType) {
-  const now = Date.now();
-  const ranges = {
-    hour: 60 * 60 * 1000,
-    day: 24 * 60 * 60 * 1000,
-    week: 7 * 24 * 60 * 60 * 1000,
-    month: 30 * 24 * 60 * 60 * 1000,
-    all: 0
-  };
-
-  const duration = ranges[rangeType] || 0;
-  return duration === 0 ? 0 : now - duration;
-}
-
-/**
- * Clear browsing data based on selected options
- */
-async function clearBrowsingData() {
-  const since = getTimeRange(clearTimeRangeSelect.value);
-
-  // Build data types to remove
-  const dataTypes = {};
-
-  if (clearCacheCheckbox && clearCacheCheckbox.checked) {
-    dataTypes.cache = true;
-  }
-  if (clearCookiesCheckbox && clearCookiesCheckbox.checked) {
-    dataTypes.cookies = true;
-  }
-  if (clearHistoryCheckbox && clearHistoryCheckbox.checked) {
-    dataTypes.history = true;
-  }
-  if (clearLocalStorageCheckbox && clearLocalStorageCheckbox.checked) {
-    dataTypes.localStorage = true;
-  }
-  if (clearIndexedDBCheckbox && clearIndexedDBCheckbox.checked) {
-    dataTypes.indexedDB = true;
-  }
-  if (clearDownloadsCheckbox && clearDownloadsCheckbox.checked) {
-    dataTypes.downloads = true;
-  }
-
-  // Check if at least one option is selected
-  if (Object.keys(dataTypes).length === 0) {
-    showNotification('请至少选择一个要清除的数据项', 'error');
-    return;
-  }
-
-  // Confirm before clearing
-  const timeRangeText = clearTimeRangeSelect.options[clearTimeRangeSelect.selectedIndex].text;
-  const selectedItems = Object.keys(dataTypes).map(k => {
-    const labels = {
-      cache: '缓存',
-      cookies: 'Cookies',
-      history: '浏览历史',
-      localStorage: '本地存储',
-      indexedDB: 'IndexedDB',
-      downloads: '下载历史'
-    };
-    return labels[k];
-  }).join('、');
-
-  if (!confirm(`确定要清除 ${timeRangeText} 的 ${selectedItems} 吗？\n此操作无法撤销。`)) {
-    return;
-  }
-
-  try {
-    if (clearBrowsingDataBtn) {
-      clearBrowsingDataBtn.disabled = true;
-      clearBrowsingDataBtn.textContent = '清除中...';
-    }
-
-    // Send message to background script to clear browsing data
-    console.log('[清除数据] 发送消息:', { since, dataTypes });
-    const response = await sendMessage('CLEAR_BROWSING_DATA', {
-      since,
-      dataTypes
-    });
-    console.log('[清除数据] 收到响应:', response);
-
-    if (response && response.success) {
-      if (clearBrowsingDataBtn) {
-        clearBrowsingDataBtn.textContent = '清除成功!';
-        setTimeout(() => {
-          clearBrowsingDataBtn.textContent = '清除选中的数据';
-          clearBrowsingDataBtn.disabled = false;
-        }, 2000);
-      }
-      showNotification(`已清除 ${selectedItems}`, 'success');
-      console.log('[清除数据] 已清除:', dataTypes, '时间范围:', timeRangeText);
-    } else {
-      throw new Error(response?.error || '清除失败');
-    }
-  } catch (error) {
-    console.error('[清除数据] 清除失败:', error);
-    showNotification('清除数据失败: ' + error.message, 'error');
-    if (clearBrowsingDataBtn) {
-      clearBrowsingDataBtn.textContent = '清除选中的数据';
-      clearBrowsingDataBtn.disabled = false;
-    }
-  }
-}
-
-// Add event listener for clear browsing data button
-if (clearBrowsingDataBtn) {
-  clearBrowsingDataBtn.addEventListener('click', clearBrowsingData);
 }
 
 // Initialize mock functionality

@@ -70,6 +70,7 @@ if (typeof DOMUtils === 'undefined' || !DOMUtils.throttle) {
 
 // 旧的直接引用（已替换）
 // const throttledProcessJobList = DOMUtils.throttle(() => {
+function processJobList() {
   const jobCards = document.querySelectorAll('[class*="job-card"], [ka="search-job-item"]');
 
   jobCards.forEach(card => {

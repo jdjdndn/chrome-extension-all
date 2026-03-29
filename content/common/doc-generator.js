@@ -999,22 +999,35 @@ if (window.DocGeneratorLoaded) {
     }
 
     extractMainContent() {
-      const sections = [];
+      let sections = [];
 
-      // 提取标题结构
+      // 第一层：提取标准 h1-h6 标题
+      sections = this.extractStandardHeadings();
+      if (sections.length > 0) {
+        return sections;
+      }
+
+      // 第二层：提取语义化替代标题（常见 class 名、role 属性、粗体大字）
+      sections = this.extractSemanticHeadings();
+      if (sections.length > 0) {
+        return sections;
+      }
+
+      // 第三层：基于段落结构智能分割
+      sections = this.extractParagraphStructure();
+      return sections;
+    }
+
+    // 第一层：提取标准 h1-h6 标题
+    extractStandardHeadings() {
+      const sections = [];
       const headings = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
+
       headings.forEach(h => {
         const text = h.textContent.trim();
-
-        // 检查元素是否隐藏
-        if (this.isHiddenElement(h)) {
-          return;
-        }
-
+        if (this.isHiddenElement(h)) return;
         if (text && text.length < 100) {
-          // 检查h标签自身或父元素是否有链接
           const link = this.findLink(h);
-
           sections.push({
             type: h.tagName.toLowerCase(),
             text: text,
@@ -1024,6 +1037,206 @@ if (window.DocGeneratorLoaded) {
       });
 
       return sections;
+    }
+
+    // 第二层：提取语义化替代标题
+    extractSemanticHeadings() {
+      const sections = [];
+      const seenTexts = new Set();
+
+      // 常见标题类名模式
+      const titleClassPatterns = [
+        '[class*="title"]', '[class*="Title"]', '[class*="heading"]', '[class*="Heading"]',
+        '[class*="section"]', '[class*="Section"]', '[class*="chapter"]', '[class*="Chapter"]',
+        '[class*="-title"]', '[class*="-head"]', '[class*="caption"]', '[class*="Caption"]'
+      ];
+
+      // role="heading" 元素
+      const roleHeadings = document.querySelectorAll('[role="heading"]');
+      roleHeadings.forEach(el => {
+        const text = el.textContent.trim();
+        if (this.isHiddenElement(el)) return;
+        if (text && text.length >= 2 && text.length < 100 && !seenTexts.has(text)) {
+          seenTexts.add(text);
+          const ariaLevel = el.getAttribute('aria-level') || '2';
+          sections.push({
+            type: `h${ariaLevel}`,
+            text: text,
+            link: this.findLink(el)
+          });
+        }
+      });
+
+      // 常见标题类名元素
+      titleClassPatterns.forEach(pattern => {
+        const elements = document.querySelectorAll(pattern);
+        elements.forEach(el => {
+          const text = el.textContent.trim();
+          if (this.isHiddenElement(el)) return;
+          // 排除导航区域内的元素
+          if (this.isInNavigationArea(el)) return;
+          if (text && text.length >= 2 && text.length < 100 && !seenTexts.has(text)) {
+            seenTexts.add(text);
+            sections.push({
+              type: 'h2',
+              text: text,
+              link: this.findLink(el)
+            });
+          }
+        });
+      });
+
+      // 粗体大字段落（可能是小标题）
+      const boldElements = document.querySelectorAll('strong, b');
+      boldElements.forEach(el => {
+        const text = el.textContent.trim();
+        if (this.isHiddenElement(el)) return;
+        if (this.isInNavigationArea(el)) return;
+
+        // 检查是否为独立行（可能是小标题）
+        const parent = el.parentElement;
+        if (parent && parent.tagName === 'P') {
+          const parentText = parent.textContent.trim();
+          // 如果粗体文本占段落大部分内容，可能是标题
+          if (text.length >= 3 && text.length < 80 &&
+              parentText.length < 100 && !seenTexts.has(text)) {
+            seenTexts.add(text);
+            sections.push({
+              type: 'h3',
+              text: text,
+              link: this.findLink(el)
+            });
+          }
+        }
+      });
+
+      // 按文档顺序排序
+      if (sections.length > 0) {
+        sections.sort((a, b) => {
+          // 简单按文本长度排序，短的更像标题
+          return a.text.length - b.text.length;
+        });
+      }
+
+      return sections;
+    }
+
+    // 第三层：基于段落结构智能分割
+    extractParagraphStructure() {
+      const sections = [];
+
+      // 查找主要内容区域
+      const mainContent = this.findMainContentArea();
+      if (!mainContent) return sections;
+
+      // 获取所有段落
+      const paragraphs = mainContent.querySelectorAll('p, div > br, article > div');
+      const validParagraphs = [];
+
+      paragraphs.forEach(p => {
+        if (this.isHiddenElement(p)) return;
+        const text = p.textContent.trim();
+        // 有效段落：有一定长度，不是纯链接
+        if (text.length >= 20 && text.length <= 500) {
+          validParagraphs.push({ element: p, text: text });
+        }
+      });
+
+      if (validParagraphs.length === 0) return sections;
+
+      // 智能分割策略：每 5-8 个段落提取一个作为大纲项
+      const segmentSize = Math.max(5, Math.min(8, Math.floor(validParagraphs.length / 10) + 3));
+      const seenTexts = new Set();
+
+      for (let i = 0; i < validParagraphs.length; i += segmentSize) {
+        const para = validParagraphs[i];
+        // 提取段落首句作为标题
+        let title = this.extractFirstSentence(para.text);
+        if (title && title.length >= 5 && title.length < 80 && !seenTexts.has(title)) {
+          seenTexts.add(title);
+          sections.push({
+            type: 'h3',
+            text: title,
+            link: null
+          });
+        }
+      }
+
+      // 如果仍然没有结果，至少提取第一个段落
+      if (sections.length === 0 && validParagraphs.length > 0) {
+        const firstPara = validParagraphs[0];
+        const title = this.extractFirstSentence(firstPara.text);
+        if (title) {
+          sections.push({
+            type: 'h2',
+            text: title,
+            link: null
+          });
+        }
+      }
+
+      return sections;
+    }
+
+    // 查找主要内容区域
+    findMainContentArea() {
+      // 优先级：article > main > [role="main"] > 常见内容 class
+      const selectors = [
+        'article', 'main', '[role="main"]',
+        '[class*="content"]', '[class*="article"]', '[class*="post"]',
+        '[class*="entry"]', '[class*="body"]'
+      ];
+
+      for (const selector of selectors) {
+        const el = document.querySelector(selector);
+        if (el && !this.isHiddenElement(el) && el.textContent.trim().length > 200) {
+          return el;
+        }
+      }
+
+      // 回退到 body
+      return document.body;
+    }
+
+    // 提取首句作为标题
+    extractFirstSentence(text) {
+      // 移除多余空白
+      text = text.replace(/\s+/g, ' ').trim();
+
+      // 查找句子结束符
+      const match = text.match(/^[^。！？.!?\n]{5,60}[。！？.!?]?/);
+      if (match) {
+        let sentence = match[0].trim();
+        // 移除末尾标点
+        sentence = sentence.replace(/[。！？.!?]$/, '');
+        return sentence.length >= 5 ? sentence : null;
+      }
+
+      // 如果没有找到合适句子，截取前 50 字符
+      if (text.length >= 5) {
+        return text.substring(0, Math.min(50, text.length)) + (text.length > 50 ? '...' : '');
+      }
+
+      return null;
+    }
+
+    // 检查元素是否在导航区域
+    isInNavigationArea(el) {
+      let parent = el.parentElement;
+      while (parent && parent !== document.body) {
+        const tagName = parent.tagName.toLowerCase();
+        const role = parent.getAttribute('role');
+        const className = parent.className || '';
+
+        if (['nav', 'header', 'footer'].includes(tagName)) return true;
+        if (role === 'navigation' || role === 'menu') return true;
+
+        const navPatterns = /\b(nav|menu|sidebar|navigation|navbar|topbar|header-nav|footer-nav)\b/i;
+        if (navPatterns.test(className)) return true;
+
+        parent = parent.parentElement;
+      }
+      return false;
     }
 
     // 检查元素是否隐藏

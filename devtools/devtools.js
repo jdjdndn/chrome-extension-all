@@ -22,18 +22,6 @@ async function activateContentScript() {
 // DevTools 打开时立即激活
 activateContentScript();
 
-// Create EventBus Monitor panel
-chrome.devtools.panels.create(
-  'EventBus Monitor',
-  null, // Use default icon
-  'devtools/eventbus-devtools.html',
-  function (panel) {
-    console.log('EventBus Monitor panel created');
-    // 面板创建时也激活一次（确保）
-    activateContentScript();
-  }
-);
-
 // Create Console panel
 chrome.devtools.panels.create(
   'Tool-info',

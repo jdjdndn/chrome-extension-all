@@ -153,7 +153,7 @@ const VideoChangeChecker = {
     const checkVideo = () => {
       checkCount++;
       const currentVideoBody = findOne('.playerContainer');
-      const currentId = currentVideoBody ? getVideoUUID(currentVideoBody) : null;
+      const currentId = currentVideoBody ? getStableVideoId(currentVideoBody) : null;
 
       // 视频已切换、是直播、是广告时，取消检测
       if (currentId !== expectedVideoId || VideoStateManager.isLiveHandled(currentVideoBody) || VideoStateManager.isSkipAd(currentVideoBody)) {
@@ -210,12 +210,38 @@ function generateUUID() {
 
 function getVideoUUID(videoBody) { return VideoStateManager.getUUID(videoBody); }
 
+// 从 video 元素的 data-xgplayerid 获取真实视频ID
+function getRealVideoId(videoBody) {
+  const container = videoBody || document;
+  const video = container.querySelector('video');
+  if (video) {
+    const playerId = video.getAttribute('data-xgplayerid');
+    if (playerId) return playerId;
+  }
+  return null;
+}
+
+// 获取稳定的视频ID（优先data-xgplayerid，降级用UUID）
+function getStableVideoId(videoBody) {
+  const realId = getRealVideoId(videoBody);
+  if (realId) return realId;
+  return videoBody ? getVideoUUID(videoBody) : generateUUID();
+}
+
 // 使用 DOMUtils.findOneInViewport 替代本地实现
 function findOne(selector) {
+  if (typeof DOMUtils === 'undefined') {
+    console.warn('[抖音脚本] DOMUtils 未就绪，findOne 返回 null');
+    return null;
+  }
   return DOMUtils.findOneInViewport(selector, { checkVisibility: true, checkDimensions: true });
 }
 
 function findPath(pathStr) {
+  if (typeof DOMUtils === 'undefined') {
+    console.warn('[抖音脚本] DOMUtils 未就绪，findPath 返回 undefined');
+    return undefined;
+  }
   return DOMUtils.findAllInViewport('path', { checkVisibility: true, checkDimensions: true })
     .find(it => it.outerHTML === pathStr);
 }
@@ -384,7 +410,7 @@ function checkCommentOpened() {
 function skipToNextVideo(reason) {
   if (!canExecuteAction('skip_video', THROTTLE_CONFIG.SKIP_VIDEO)) return;
   const currentVideoBody = findOne('.playerContainer');
-  const currentId = currentVideoBody ? getVideoUUID(currentVideoBody) : null;
+  const currentId = currentVideoBody ? getStableVideoId(currentVideoBody) : null;
   console.log(`[自动下滑] 原因: ${reason}`);
 
   // 优先点击按钮，备选键盘
@@ -394,6 +420,7 @@ function skipToNextVideo(reason) {
 }
 
 function isElementInViewportAndVisible(element) {
+  if (typeof DOMUtils === 'undefined') return false;
   return DOMUtils.isElementInViewport(element, { checkVisibility: true, checkDimensions: true });
 }
 
@@ -414,7 +441,7 @@ function skipAD(videoBody) {
 
 function detectAIContent(videoBody) {
   if (!videoBody) return false;
-  const videoId = getVideoUUID(videoBody);
+  const videoId = getStableVideoId(videoBody);
   if (processedVideos.has(`skip_ai_${videoId}`)) return false;
   const safetyBar = findOne('.safetyBar');
   if (safetyBar?.innerText.includes('AI')) {
@@ -425,7 +452,7 @@ function detectAIContent(videoBody) {
 }
 
 function skipAi(videoBody) {
-  const videoId = getVideoUUID(videoBody);
+  const videoId = getStableVideoId(videoBody);
   const skipKey = `skip_ai_${videoId}`;
   if (detectAIContent(videoBody)) {
     console.log('[AI检测] 检测到AI相关内容');
@@ -465,7 +492,7 @@ function checkNotInterestedKeywords(videoBody) {
 }
 
 function handleNotInterested(videoBody) {
-  const videoId = getVideoUUID(videoBody);
+  const videoId = getStableVideoId(videoBody);
   const skipKey = `not_interested_${videoId}`;
   if (processedVideos.has(skipKey)) return;
 
@@ -613,7 +640,7 @@ function processCurrentVideo() {
     return;
   }
 
-  const videoId = getVideoUUID(videoBody);
+  const videoId = getStableVideoId(videoBody);
 
   // 检查导航方向 - 用户上滑返回时跳过自动处理
   // 这个检查优先级最高，不依赖 videoId 的稳定性
@@ -741,6 +768,10 @@ function loopFunc(fn) {
 
 // ========== 隐藏元素 ==========
 function updateHideElements(selectors) {
+  if (typeof DOMUtils === 'undefined') {
+    console.warn('[抖音脚本] DOMUtils 未就绪，跳过隐藏元素更新');
+    return;
+  }
   DOMUtils.removeStyle(STYLE_TAG_ID);
   currentSelectors = selectors?.length > 0 ? selectors : [];
   if (currentSelectors.length > 0) {
@@ -750,6 +781,10 @@ function updateHideElements(selectors) {
 }
 
 async function loadDomainHideSettings() {
+  if (typeof DOMUtils === 'undefined') {
+    console.warn('[抖音脚本] DOMUtils 未就绪，跳过加载隐藏设置');
+    return;
+  }
   const domain = DOMUtils.getCurrentDomain();
   const settings = await StorageUtils.getDomainSettings('hideElementsSettings', domain);
 
@@ -1019,7 +1054,7 @@ MessagingUtils.createMessageHandler('douyin_message_handler', {
       console.log('[抖音脚本] 不感兴趣关键词已更新:', NOT_INTERESTED_KEYWORDS);
       const videoBody = findOne('.playerContainer');
       if (videoBody) {
-        processedVideos.delete(`not_interested_${getVideoUUID(videoBody)}`);
+        processedVideos.delete(`not_interested_${getStableVideoId(videoBody)}`);
         setTimeout(() => handleNotInterested(videoBody), 100);
       }
     }
@@ -1056,7 +1091,9 @@ MessagingUtils.createMessageHandler('douyin_message_handler', {
     if (enabled && selectors?.length > 0) {
       updateHideElements(selectors);
     } else {
-      DOMUtils.removeStyle(STYLE_TAG_ID);
+      if (typeof DOMUtils !== 'undefined') {
+        DOMUtils.removeStyle(STYLE_TAG_ID);
+      }
     }
     return { success: true };
   }

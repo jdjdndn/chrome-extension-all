@@ -3,12 +3,13 @@
 // 依赖: content/utils/logger.js, storage.js, dom.js, messaging.js
 // 核心: content/core/store.js, content/core/services.js, content/core/pipeline.js
 
+(function() {
 'use strict';
 
 // 防止重复注入
 if (window._contentScriptLoaded) {
   console.log('[Extension] Content script already loaded, skipping');
-  throw new Error('Content script already loaded');
+  return;
 }
 window._contentScriptLoaded = true;
 
@@ -468,3 +469,4 @@ if (!window._originalFetch) {
     }
   };
 }
+})();

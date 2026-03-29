@@ -4,12 +4,16 @@
   "description": "Chrome 扩展 - 减少资源使用",
   "private": true,
   "scripts": {
+    "bundle": "node scripts/build-site-bundles.js",
+    "bundle:watch": "node scripts/build-site-bundles.js --watch",
     "clean": "node scripts/watch-and-sync.js --clean",
     "build": "node scripts/watch-and-sync.js --clean",
     "sync": "node scripts/watch-and-sync.js --once",
     "watch": "node scripts/watch-and-sync.js"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "esbuild": "^0.27.4"
+  },
   "engines": {
     "node": ">=14.0.0"
   }
