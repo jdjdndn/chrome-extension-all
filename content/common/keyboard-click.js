@@ -60,6 +60,10 @@ if (window.KeyboardClickLoaded) {
     // ========== 键盘 ==========
     _bindKeyboard() {
       document.addEventListener('keydown', (e) => {
+        // 组合键（Ctrl+S 保存、Ctrl+X 剪切等）不拦截
+        if (this._isComboKey(e)) return;
+
+        // 输入框聚焦时不拦截
         if (this._isInputFocused()) return;
 
         switch (e.key) {
@@ -84,7 +88,7 @@ if (window.KeyboardClickLoaded) {
       }, true);
 
       document.addEventListener('keyup', (e) => {
-        if (e.key === 's' || e.key === 'S') {
+        if ((e.key === 's' || e.key === 'S') && !this._isComboKey(e)) {
           this._onSUp(e);
         }
       }, true);
@@ -94,7 +98,33 @@ if (window.KeyboardClickLoaded) {
       const el = document.activeElement;
       if (!el) return false;
       const tag = el.tagName;
-      return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
+
+      // 基本表单元素
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+
+      // contentEditable
+      if (el.isContentEditable) return true;
+
+      // ARIA 文本框 / 编辑器
+      const role = el.getAttribute('role');
+      if (role === 'textbox' || role === 'combobox' || role === 'searchbox' || role === 'editor') return true;
+
+      // 代码编辑器常见容器（CodeMirror, Monaco, ACE 等）
+      if (el.closest('.CodeMirror, .monaco-editor, .ace_editor, .cm-editor, .CodeMirror-code, [class*="editor"]')) return true;
+
+      // 某些 input type 不拦截（checkbox, radio, submit, button 等）
+      if (tag === 'INPUT') {
+        const type = (el.type || '').toLowerCase();
+        const nonTextTypes = ['checkbox', 'radio', 'submit', 'button', 'reset', 'image', 'color', 'range', 'file'];
+        if (nonTextTypes.includes(type)) return false;
+      }
+
+      return false;
+    }
+
+    /** 是否为组合键（Ctrl/Cmd/Alt + 字母），这些应该交给浏览器/页面处理 */
+    _isComboKey(e) {
+      return e.ctrlKey || e.metaKey || e.altKey;
     }
 
     // ========== Space 点击 ==========

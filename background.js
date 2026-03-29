@@ -1686,8 +1686,9 @@ async function handleMessage(message, sender, sendResponse) {
       // DevTools 获取待处理的消息
       const tabIdForMessages = message.tabId;
       const since = message.since || 0;
-      const messages = (globalThis._pickerMessages || [])
-        .filter(m => m.tabId === tabIdForMessages && m.timestamp > since);
+      // _pickerMessages 结构为 { [tabId]: [...] }，不是数组
+      const messages = (globalThis._pickerMessages?.[tabIdForMessages] || [])
+        .filter(m => m.timestamp > since);
       sendResponse({ success: true, messages });
       break;
 
@@ -1695,6 +1696,38 @@ async function handleMessage(message, sender, sendResponse) {
       // 清除消息
       globalThis._pickerMessages = [];
       sendResponse({ success: true });
+      break;
+
+    case 'INJECT_PICKER_LISTENER':
+      // 在 content script 世界中注入 element-picker-message 转发器
+      try {
+        const targetTabId = message.tabId || (sender.tab ? sender.tab.id : null);
+        if (!targetTabId) {
+          sendResponse({ success: false, error: 'No tabId' });
+          break;
+        }
+        await chrome.scripting.executeScript({
+          target: { tabId: targetTabId },
+          func: () => {
+            if (window._pickerMessageListenerSet) return;
+            document.addEventListener('element-picker-message', (event) => {
+              const message = event.detail;
+              if (message) {
+                chrome.runtime.sendMessage({
+                  type: 'PICKER_MESSAGE_RELAY',
+                  data: message
+                }).catch(() => {});
+              }
+            });
+            window._pickerMessageListenerSet = true;
+          }
+        });
+        console.log('[Background] 已注入 picker 消息转发器, tabId:', targetTabId);
+        sendResponse({ success: true });
+      } catch (error) {
+        console.error('[Background] 注入 picker 消息转发器失败:', error);
+        sendResponse({ success: false, error: error.message });
+      }
       break;
 
     case 'START_ELEMENT_PICKER':

@@ -8,6 +8,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const root = path.resolve(__dirname, '..');
 
 // 源目录和目标目录映射
 const SYNC_CONFIG = {

@@ -69,6 +69,7 @@ initStorageBridge();
 // ========== Port 持久连接管理 ==========
 let backgroundPort = null;
 let portReconnectTimer = null;
+let _lastPickerMessageTimestamp = 0;
 
 /**
  * 建立 Port 持久连接
@@ -115,6 +116,9 @@ function connectToBackground() {
       tabId: chrome.devtools.inspectedWindow.tabId
     });
 
+    // 拉取缓冲的 picker 消息（Port 未就绪时 background 会暂存）
+    _fetchBufferedPickerMessages();
+
     console.log('[DevTools] Port 连接已建立');
     return backgroundPort;
   } catch (error) {
@@ -123,6 +127,31 @@ function connectToBackground() {
     if (portReconnectTimer) clearTimeout(portReconnectTimer);
     portReconnectTimer = setTimeout(connectToBackground, 2000);
     return null;
+  }
+}
+
+/**
+ * 拉取缓冲的 picker 消息（Port 未就绪时 background 暂存的消息）
+ */
+async function _fetchBufferedPickerMessages() {
+  try {
+    const tabId = chrome.devtools.inspectedWindow.tabId;
+    const response = await chrome.runtime.sendMessage({
+      type: 'GET_PICKER_MESSAGES',
+      tabId,
+      since: _lastPickerMessageTimestamp
+    });
+    if (response?.success && response.messages?.length > 0) {
+      console.log('[DevTools] 拉取到缓冲消息:', response.messages.length);
+      response.messages.forEach(msg => {
+        handlePickerMessage(msg);
+        if (msg.timestamp) {
+          _lastPickerMessageTimestamp = Math.max(_lastPickerMessageTimestamp, msg.timestamp);
+        }
+      });
+    }
+  } catch (e) {
+    // 忽略，连接可能尚未就绪
   }
 }
 
@@ -311,7 +340,10 @@ const applyHideBtn = document.getElementById('apply-hide-btn');
 // 批量选择状态
 let batchPickerState = {
   isActive: false,
-  selectedElements: [] // { selector, tagName, id, className }
+  selectedElements: [], // { selector, tagName, id, className }
+  mergedSelector: '',   // 匹配所有已选元素的合并选择器
+  mergedMatchCount: 0,
+  computing: false      // 是否正在计算选择器
 };
 
 // 注入元素拾取器脚本
@@ -390,13 +422,20 @@ async function syncPickerState() {
   const code = `
     (function() {
       if (window.ElementPickerInject) {
+        const mergedSelector = window.ElementPickerInject.getMergedSelector();
+        let mergedMatchCount = 0;
+        if (mergedSelector) {
+          try { mergedMatchCount = document.querySelectorAll(mergedSelector).length; } catch(e) {}
+        }
         return {
           hasInstance: true,
           isActive: window.ElementPickerInject.isActive,
-          elements: window.ElementPickerInject.selectedElements || []
+          elements: window.ElementPickerInject.selectedElements || [],
+          mergedSelector,
+          mergedMatchCount
         };
       }
-      return { hasInstance: false, isActive: false, elements: [] };
+      return { hasInstance: false, isActive: false, elements: [], mergedSelector: '' };
     })()
   `;
 
@@ -417,12 +456,16 @@ async function syncPickerState() {
           id: el.id,
           className: el.className
         }));
+        batchPickerState.mergedSelector = result.mergedSelector || '';
+        batchPickerState.mergedMatchCount = result.mergedMatchCount || 0;
         updatePickerStatus();
         updateSelectedElementsUI();
       } else {
         // 没有实例，确保状态为非活动
         batchPickerState.isActive = false;
         batchPickerState.selectedElements = [];
+        batchPickerState.mergedSelector = '';
+        batchPickerState.mergedMatchCount = 0;
         updatePickerStatus();
         updateSelectedElementsUI();
       }
@@ -434,29 +477,21 @@ async function syncPickerState() {
 
 // 监听来自元素拾取器的消息
 function setupPickerMessageListener() {
-  // Port 消息已在文件开头的 connectToBackground 中处理
-  // 这里只需要在页面中设置消息转发到 background
-  const code = `
-    (function() {
-      if (window._pickerMessageListenerSet) return;
-
-      document.addEventListener('element-picker-message', (event) => {
-        const message = event.detail;
-        // 通过 chrome.runtime 发送到 background
-        if (typeof chrome !== 'undefined' && chrome.runtime) {
-          chrome.runtime.sendMessage({
-            type: 'PICKER_MESSAGE_RELAY',
-            data: message
-          });
-        }
-      });
-
-      window._pickerMessageListenerSet = true;
-      return true;
-    })()
-  `;
-
-  chrome.devtools.inspectedWindow.eval(code);
+  // 通过 background 在 content script 世界中注入消息转发器
+  // 页面世界中 element-picker-inject.js 分发的 CustomEvent 可以被
+  // content script 世界的监听器捕获（DOM 事件跨隔离世界传递）
+  chrome.runtime.sendMessage({
+    type: 'INJECT_PICKER_LISTENER',
+    tabId: chrome.devtools.inspectedWindow.tabId
+  }).then(response => {
+    if (response?.success) {
+      console.log('[DevTools] 消息转发器注入成功');
+    } else {
+      console.warn('[DevTools] 消息转发器注入失败:', response?.error);
+    }
+  }).catch(e => {
+    console.warn('[DevTools] 消息转发器注入异常:', e);
+  });
 }
 
 // 处理拾取器消息
@@ -475,14 +510,28 @@ function handlePickerMessage(message) {
       break;
 
     case 'ELEMENT_SELECTION_CHANGED':
-      console.log('[DevTools] 元素选择变化, 数量:', message.elements?.length || 0);
+      console.log('[DevTools] 元素选择变化, 数量:', message.elements?.length || 0,
+                  '计算中:', message.computing, '合并选择器:', message.mergedSelector);
       batchPickerState.selectedElements = message.elements || [];
-      updateSelectedElementsUI();
+      if (message.computing) {
+        // 显示 loading 状态
+        batchPickerState.mergedSelector = '';
+        batchPickerState.mergedMatchCount = 0;
+        batchPickerState.computing = true;
+        updateSelectedElementsUI();
+      } else {
+        batchPickerState.mergedSelector = message.mergedSelector || '';
+        batchPickerState.mergedMatchCount = message.mergedMatchCount || 0;
+        batchPickerState.computing = false;
+        updateSelectedElementsUI();
+      }
       break;
 
     case 'ELEMENT_PICKER_STATE':
       batchPickerState.isActive = message.isActive;
       batchPickerState.selectedElements = message.elements || [];
+      batchPickerState.mergedSelector = message.mergedSelector || '';
+      batchPickerState.mergedMatchCount = message.mergedMatchCount || 0;
       updatePickerStatus();
       updateSelectedElementsUI();
       break;
@@ -782,12 +831,25 @@ function generateSelectorLines(elements) {
   const lines = [];
   const seenSelectors = new Set();
 
-  // 每个元素的选择器独占一行，去重显示
+  // 默认第一行：合并选择器（匹配所有已选元素的最精准选择器）
+  if (batchPickerState.computing) {
+    // 正在计算，显示 loading
+    lines.push({ selector: '⏳ 正在计算最优选择器...', type: '计算中', loading: true });
+  } else if (batchPickerState.mergedSelector) {
+    const merged = removeStatePseudoClasses(batchPickerState.mergedSelector);
+    const selectedCount = batchPickerState.selectedElements.length;
+    const isExact = batchPickerState.mergedMatchCount === selectedCount;
+    const typeLabel = elements.length === 1 ? '精确' : (isExact ? `精准(${batchPickerState.mergedMatchCount})` : `合并(${batchPickerState.mergedMatchCount})`);
+    lines.push({ selector: merged, type: typeLabel });
+    seenSelectors.add(merged);
+  }
+
+  // 每个元素的独立选择器（去重，跳过与合并选择器相同的）
   elements.forEach(el => {
     const cleanSelector = removeStatePseudoClasses(el.selector);
     if (!seenSelectors.has(cleanSelector)) {
       seenSelectors.add(cleanSelector);
-      lines.push({ selector: cleanSelector, type: '选择器' });
+      lines.push({ selector: cleanSelector, type: '独立' });
     }
   });
 

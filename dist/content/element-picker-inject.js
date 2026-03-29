@@ -1035,8 +1035,8 @@
         this.selectAllSiblings();
       }
 
-      // Delete 键清除所有选中
-      if (event.key === 'Delete') {
+      // Delete / Space 键清除所有选中
+      if (event.key === 'Delete' || event.key === ' ') {
         event.preventDefault();
         this.clearSelection();
         this.showToast('已清除所有选中');
@@ -1250,23 +1250,60 @@
     }
 
     /**
-     * 通知选中状态变化
+     * 通知选中状态变化（支持异步计算合并选择器）
      */
     notifySelectionChanged() {
-      const messageData = {
+      const elements = this.selectedElements.map((item, index) => ({
+        pickerUid: item.pickerUid,
+        selector: item.selector,
+        matchCount: item.matchCount || 1,
+        tagName: item.tagName,
+        id: item.id,
+        className: item.className,
+        index: index + 1
+      }));
+
+      // 立即发送 loading 状态
+      this.sendMessage({
         type: 'ELEMENT_SELECTION_CHANGED',
-        elements: this.selectedElements.map((item, index) => ({
-          pickerUid: item.pickerUid,
-          selector: item.selector,
-          matchCount: item.matchCount || 1,
-          tagName: item.tagName,
-          id: item.id,
-          className: item.className,
-          index: index + 1
-        }))
-      };
-      console.log('[ElementPicker] 发送选中变化消息, 元素数量:', messageData.elements.length);
-      this.sendMessage(messageData);
+        elements,
+        mergedSelector: null,
+        computing: true
+      });
+
+      // 异步计算最佳合并选择器
+      if (this.selectedElements.length >= 2) {
+        const actualElements = this.selectedElements
+          .map(item => this.getElementByXPath(item.xpath))
+          .filter(el => el);
+        if (actualElements.length >= 2) {
+          this._computeBestSelector(actualElements).then(mergedSelector => {
+            let mergedMatchCount = 0;
+            try { mergedMatchCount = document.querySelectorAll(mergedSelector).length; } catch (e) {}
+            this.sendMessage({
+              type: 'ELEMENT_SELECTION_CHANGED',
+              elements,
+              mergedSelector,
+              mergedMatchCount,
+              computing: false
+            });
+          });
+          return;
+        }
+      }
+
+      // 单元素或无元素：直接发送结果
+      const mergedSelector = this.selectedElements.length === 1
+        ? this.selectedElements[0].selector : '';
+      let mergedMatchCount = 0;
+      try { mergedMatchCount = mergedSelector ? document.querySelectorAll(mergedSelector).length : 0; } catch (e) {}
+      this.sendMessage({
+        type: 'ELEMENT_SELECTION_CHANGED',
+        elements,
+        mergedSelector,
+        mergedMatchCount,
+        computing: false
+      });
     }
 
     /**
@@ -1927,52 +1964,63 @@
     }
 
     /**
-     * 获取合并后的选择器（智能版本）
-     * 使用贪心算法和提前终止策略，找到能精确匹配所有元素的最简选择器
+     * 获取合并后的选择器（异步版本）
      */
-    getMergedSelector() {
+    async getMergedSelector() {
       if (this.selectedElements.length === 0) return '';
       if (this.selectedElements.length === 1) return this.selectedElements[0].selector;
 
-      // 获取所有元素的实际引用
-      const elements = this.selectedElements.map(item => this.getElementByXPath(item.xpath)).filter(el => el);
-
+      const elements = this.selectedElements
+        .map(item => this.getElementByXPath(item.xpath))
+        .filter(el => el);
       if (elements.length === 0) return this.selectedElements.map(item => item.selector).join(', ');
+      if (elements.length === 1) return this.generateSelector(elements[0]);
 
-      // 尝试智能合并
-      const smartMerged = this._smartMergeSelectors(elements);
-      if (smartMerged) return smartMerged;
-
-      // 回退到逗号分隔
-      const refinedSelectors = elements.map(el => this.generateSelector(el));
-      return refinedSelectors.join(', ');
+      return this._computeBestSelector(elements);
     }
 
     /**
-     * 智能合并选择器 - 贪心算法 + 提前终止
-     * @param {Element[]} elements - 要合并的元素数组
-     * @returns {string|null} - 合并后的选择器，如果没有共同模式则返回 null
+     * 异步分块计算最佳合并选择器
+     * 使用 Generator 惰性生成候选，每块测试50个，超时返回兜底
+     * @param {Element[]} elements - 目标元素数组
+     * @param {number} timeout - 超时时间(ms)
+     * @returns {Promise<string>} - 最佳选择器
      */
-    _smartMergeSelectors(elements) {
-      if (elements.length < 2) return null;
+    async _computeBestSelector(elements, timeout = 3000) {
+      if (elements.length === 0) return '';
+      if (elements.length === 1) return this.generateSelector(elements[0]);
 
-      // === 提取所有元素的特征 ===
-      const features = elements.map(el => this._extractElementFeatures(el));
+      // 提取特征
+      const oldFeatures = elements.map(el => this._extractElementFeatures(el));
+      const common = this._findCommonFeatures(oldFeatures);
+      const allFeatures = elements.map(el => this._decomposeFeatures(el));
 
-      // === 找出共同特征 ===
-      const common = this._findCommonFeatures(features);
+      // 创建 Generator
+      const gen = this.generateCandidates(common, allFeatures, elements);
+      const startTime = performance.now();
+      const fallback = elements.map(el => this.generateSelector(el)).join(', ');
 
-      // === 生成候选选择器（按长度排序，贪心：先测试短的）===
-      const candidates = this._generateMergedCandidates(elements, common);
-
-      // === 测试每个候选（提前终止：第一个精确匹配即返回）===
-      for (const candidate of candidates) {
-        if (this._isExactMatchForAll(candidate, elements)) {
-          return candidate;
-        }
-      }
-
-      return null;
+      return new Promise(resolve => {
+        const processChunk = () => {
+          for (let i = 0; i < 50; i++) {
+            const result = gen.next();
+            if (result.done) {
+              resolve(fallback);
+              return;
+            }
+            if (this._isExactMatchForAll(result.value, elements)) {
+              resolve(result.value);
+              return;
+            }
+          }
+          if (performance.now() - startTime > timeout) {
+            resolve(fallback);
+            return;
+          }
+          setTimeout(processChunk, 0);
+        };
+        processChunk();
+      });
     }
 
     /**
@@ -2130,283 +2178,462 @@
       return common;
     }
 
-    /**
-     * 生成合并候选选择器（按长度排序：短 → 长）
-     * 支持多种合并策略：:is()、:not()、伪类合并、路径分析
-     */
-    _generateMergedCandidates(elements, common) {
-      const candidates = [];
-      const tag = common.tag || elements[0].tagName.toLowerCase();
-
-      // === 策略1: 共同的 class（最短优先）===
-      for (const cls of common.classes) {
-        candidates.push('.' + CSS.escape(cls));
-        candidates.push(tag + '.' + CSS.escape(cls));
-      }
-
-      // === 策略2: 多个共同 class ===
-      if (common.classes.length >= 2) {
-        candidates.push(tag + '.' + common.classes.map(c => CSS.escape(c)).join('.'));
-      }
-
-      // === 策略3: 共同确定性属性（仅使用稳定属性）===
-      for (const attr of common.stableAttributes || []) {
-        candidates.push('[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]');
-        candidates.push(tag + '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]');
-      }
-
-      // === 策略4: class + 确定性属性组合 ===
-      for (const cls of common.classes.slice(0, 2)) {
-        for (const attr of (common.stableAttributes || []).slice(0, 2)) {
-          candidates.push(tag + '.' + CSS.escape(cls) + '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]');
-        }
-      }
-
-      // === 策略5: 层级选择器（使用共同路径前缀）===
-      if (common.commonPathPrefix.length > 0) {
-        const pathStr = common.commonPathPrefix.join(' > ');
-        candidates.push(pathStr + ' > ' + tag);
-
-        // 尝试添加 class 到最后一级
-        if (common.classes.length > 0) {
-          candidates.push(pathStr + ' > ' + tag + '.' + CSS.escape(common.classes[0]));
-        }
-      }
-
-      // === 策略6: 父级共同特征 + tag ===
-      const parents = elements.map(el => el.parentElement).filter(p => p);
-      if (parents.length === elements.length) {
-        const parentCommon = this._findCommonFeatures(parents.map(p => this._extractElementFeatures(p)));
-
-        if (parentCommon.classes.length > 0) {
-          const parentSel = (parentCommon.tag || '') + '.' + CSS.escape(parentCommon.classes[0]);
-          candidates.push(parentSel + ' > ' + tag);
-        }
-
-        if ((parentCommon.stableAttributes || []).length > 0) {
-          const attr = parentCommon.stableAttributes[0];
-          const parentSel = (parentCommon.tag || tag) + '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]';
-          candidates.push(parentSel + ' > ' + tag);
-        }
-      }
-
-      // === 策略7: :is() 伪类合并 ===
-      const isMerged = this._tryIsMerge(elements, common);
-      if (isMerged) candidates.push(isMerged);
-
-      // === 策略8: :not() 排除法 ===
-      const notMerged = this._tryNotMerge(elements, common);
-      if (notMerged) candidates.push(notMerged);
-
-      // === 策略9: 伪类合并（first-child, last-child, nth-child 等）===
-      const pseudoMerged = this._tryPseudoMerge(elements, common);
-      if (pseudoMerged) candidates.push(pseudoMerged);
-
-      // === 策略10: 路径差异合并 ===
-      const pathMerged = this._tryPathMerge(elements, common);
-      if (pathMerged) candidates.push(pathMerged);
-
-      // 按长度排序（贪心：优先测试短选择器）
-      return candidates.sort((a, b) => a.length - b.length);
-    }
 
     /**
-     * 尝试使用 :is() 伪类合并
+     * 内联获取有效 class 列表（用于 generateCandidates 中的 :not(.class) 排除）
      */
-    _tryIsMerge(elements, common) {
-      if (elements.length < 2 || elements.length > 10) return null;
-
-      const tag = common.tag;
-      const tagSet = new Set(elements.map(el => el.tagName.toLowerCase()));
-      if (tagSet.size > 1) return null; // 标签不同，不适合 :is()
-
-      // 收集各元素的独特特征
-      const features = elements.map(el => {
-        const info = this._extractElementFeatures(el);
-        const parts = [];
-
-        // 优先使用 ID
-        if (info.id) return '#' + CSS.escape(info.id);
-
-        // 使用类名
-        if (info.classes.length > 0) {
-          parts.push('.' + CSS.escape(info.classes[0]));
-        }
-
-        // 使用确定性属性
-        if (info.stableAttributes && info.stableAttributes.length > 0) {
-          const attr = info.stableAttributes[0];
-          parts.push('[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]');
-        }
-
-        // 使用伪类信息
-        if (info.pseudoInfo) {
-          if (info.pseudoInfo.isFirst) parts.push(':first-child');
-          else if (info.pseudoInfo.isLast) parts.push(':last-child');
-          else if (info.pseudoInfo.isOnly) parts.push(':only-child');
-          else if (info.pseudoInfo.nthOfType > 0) parts.push(`:nth-child(${info.pseudoInfo.nthOfType})`);
-        }
-
-        return parts.length > 0 ? parts.join('') : null;
-      }).filter(f => f);
-
-      if (features.length === elements.length && features.length >= 2) {
-        const uniqueFeatures = [...new Set(features)];
-        if (uniqueFeatures.length >= 2 && uniqueFeatures.length <= 10) {
-          return `${tag}:is(${uniqueFeatures.join(', ')})`;
-        }
-      }
-
-      return null;
-    }
-
-    /**
-     * 尝试使用 :not() 排除法合并
-     * 适用于：同一父元素下选中大部分子元素，用 :not() 排除未选中的
-     */
-    _tryNotMerge(elements, common) {
-      if (elements.length < 3) return null;
-
-      // 检查是否有共同的父元素
-      const parents = elements.map(el => el.parentElement);
-      const parentSet = new Set(parents);
-      if (parentSet.size !== 1) return null;
-
-      const parent = parents[0];
-      const allChildren = Array.from(parent.children).filter(child => {
-        const style = window.getComputedStyle(child);
-        return style.display !== 'none';
+    _getValidClassesInline(node) {
+      if (!node.className || typeof node.className !== 'string') return [];
+      return node.className.trim().split(' ').filter(c => {
+        if (!c || /^[0-9]/.test(c)) return false;
+        if (/^(css-|styled-|sc-|js-|_|__|Mui|jss|css_|_)/.test(c) || c.length > 30) return false;
+        return /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(c);
       });
-
-      // 如果选中的元素占大部分，考虑用 :not() 排除未选中的
-      const elementSet = new Set(elements);
-      const notSelected = allChildren.filter(child => !elementSet.has(child));
-
-      // 如果未选中的数量 <= 3 且少于选中的数量
-      if (notSelected.length > 0 && notSelected.length <= 3 && notSelected.length < elements.length) {
-        const tag = common.tag || elements[0].tagName.toLowerCase();
-
-        // 找出未选中元素的索引
-        const notIndices = notSelected.map(child => {
-          const index = allChildren.indexOf(child) + 1;
-          return index;
-        }).sort((a, b) => a - b);
-
-        const notParts = notIndices.map(i => `:not(:nth-child(${i}))`);
-        return `${tag}:nth-child(n)${notParts.join('')}`;
-      }
-
-      return null;
     }
 
     /**
-     * 尝试使用伪类合并（连续的 nth-child）
+     * 分解元素特征（用于 Generator 选择器生成）
      */
-    _tryPseudoMerge(elements, common) {
-      if (elements.length < 2) return null;
+    _decomposeFeatures(element) {
+      const hasValidId = (node) => node && node.id && !node.id.includes(' ') && !/^\d/.test(node.id);
+      const getClasses = (node) => this._getValidClassesInline(node);
 
-      // 检查是否是同一父元素下的兄弟元素
-      const parents = elements.map(el => el.parentElement);
-      const parentSet = new Set(parents);
-      if (parentSet.size !== 1) return null;
+      const STABLE_ATTRS = new Set([
+        'type', 'role', 'data-type', 'data-role', 'data-kind',
+        'data-variant', 'data-size', 'data-testid', 'data-test', 'data-id',
+        'name', 'placeholder', 'disabled', 'readonly', 'required', 'checked'
+      ]);
+      const SKIP_ATTRS = new Set([
+        'data-ep-selected', 'data-ep-uid', 'data-ep-index', 'data-ep-original-position',
+        'class', 'id', 'style', 'aria-label', 'title', 'data-tooltip',
+        'onclick', 'onchange', 'onsubmit'
+      ]);
 
-      const parent = parents[0];
-      const allChildren = Array.from(parent.children);
-      const tag = common.tag || elements[0].tagName.toLowerCase();
-
-      // 获取选中元素的索引
-      const indices = elements.map(el => allChildren.indexOf(el) + 1).sort((a, b) => a - b);
-
-      // 检查是否连续
-      let isConsecutive = true;
-      for (let i = 1; i < indices.length; i++) {
-        if (indices[i] !== indices[i - 1] + 1) {
-          isConsecutive = false;
-          break;
+      const getAttrs = (node) => {
+        if (!node.attributes) return [];
+        const attrs = [];
+        for (const attr of node.attributes) {
+          if (SKIP_ATTRS.has(attr.name)) continue;
+          if (!attr.value || attr.value.length > 80 || /^\d+$/.test(attr.value)) continue;
+          attrs.push({ name: attr.name, value: attr.value });
         }
-      }
+        attrs.sort((a, b) => {
+          const aS = STABLE_ATTRS.has(a.name) ? 0 : 1;
+          const bS = STABLE_ATTRS.has(b.name) ? 0 : 1;
+          return aS - bS;
+        });
+        return attrs;
+      };
 
-      if (isConsecutive && indices.length >= 2) {
-        const start = indices[0];
-        const end = indices[indices.length - 1];
-
-        // 使用范围选择器
-        if (start === end) {
-          return `${tag}:nth-child(${start})`;
-        } else if (start === 1 && end === allChildren.length) {
-          return tag; // 所有子元素
-        } else if (start === 1) {
-          return `${tag}:nth-child(-n+${end})`;
-        } else if (end === allChildren.length) {
-          return `${tag}:nth-child(n+${start})`;
-        } else {
-          return `${tag}:nth-child(n+${start}):nth-child(-n+${end})`;
+      const getPseudos = (node) => {
+        const parent = node.parentElement;
+        if (!parent) return [];
+        const pseudos = [];
+        const siblings = Array.from(parent.children);
+        const sameType = siblings.filter(c => c.tagName === node.tagName);
+        const idx = sameType.indexOf(node);
+        const allIdx = siblings.indexOf(node);
+        if (sameType.length > 1) {
+          if (idx === 0) pseudos.push(':first-of-type');
+          if (idx === sameType.length - 1) pseudos.push(':last-of-type');
+          if (idx > 0) pseudos.push(':nth-of-type(' + (idx + 1) + ')');
         }
+        if (siblings.length > 1) {
+          if (allIdx === 0) pseudos.push(':first-child');
+          if (allIdx === siblings.length - 1) pseudos.push(':last-child');
+          if (allIdx > 0) pseudos.push(':nth-child(' + (allIdx + 1) + ')');
+        }
+        if (node.children.length === 0 && node.textContent.trim() === '') pseudos.push(':empty');
+        try {
+          if (node.matches(':checked')) pseudos.push(':checked');
+          if (node.matches(':disabled')) pseudos.push(':disabled');
+        } catch (e) {}
+        return pseudos;
+      };
+
+      const ancestors = [];
+      let cur = element.parentElement;
+      while (cur && cur !== document.documentElement && ancestors.length < 6) {
+        ancestors.push({
+          tag: cur.tagName.toLowerCase(),
+          id: hasValidId(cur) ? cur.id : null,
+          classes: getClasses(cur).slice(0, 5),
+          attrs: getAttrs(cur).slice(0, 5),
+          pseudos: getPseudos(cur).slice(0, 3)
+        });
+        cur = cur.parentElement;
       }
 
-      // 检查是否是 first-child 和 last-child
-      const hasFirst = indices.includes(1);
-      const hasLast = indices.includes(allChildren.length);
+      const prevEl = element.previousElementSibling;
+      const nextEl = element.nextElementSibling;
 
-      if (hasFirst && hasLast && indices.length === 2) {
-        return `${tag}:is(:first-child, :last-child)`;
-      }
-
-      // 检查是否是奇偶位置
-      const allOdd = indices.every(i => i % 2 === 1);
-      const allEven = indices.every(i => i % 2 === 0);
-
-      if (allOdd && indices.length > 2) return `${tag}:nth-child(odd)`;
-      if (allEven && indices.length > 2) return `${tag}:nth-child(even)`;
-
-      return null;
+      return {
+        tag: element.tagName.toLowerCase(),
+        id: hasValidId(element) ? element.id : null,
+        classes: getClasses(element).slice(0, 8),
+        attrs: getAttrs(element).slice(0, 8),
+        pseudos: getPseudos(element),
+        ancestors,
+        prevSibling: prevEl ? { tag: prevEl.tagName.toLowerCase(), classes: getClasses(prevEl).slice(0, 3) } : null,
+        nextSibling: nextEl ? { tag: nextEl.tagName.toLowerCase(), classes: getClasses(nextEl).slice(0, 3) } : null
+      };
     }
 
     /**
-     * 尝试路径差异合并
-     * 分析各元素路径的差异，提取共同部分，用 :is() 合并差异部分
+     * 从特征对象生成单层复合选择器列表
      */
-    _tryPathMerge(elements, common) {
-      if (elements.length < 2) return null;
+    _compoundCandidates(feat, maxParts) {
+      const tag = feat.tag || '';
+      const results = [];
+      const yielded = new Set();
+      const add = (sel) => { if (sel && !yielded.has(sel)) { yielded.add(sel); results.push(sel); } };
+      const classes = (feat.classes || []).slice(0, 6);
+      const attrs = (feat.attrs || []).slice(0, 5);
+      const pseudos = (feat.pseudos || []).slice(0, 4);
 
-      const features = elements.map(el => this._extractElementFeatures(el));
-      const paths = features.map(f => f.path);
+      // === 1 part ===
+      if (tag) add(tag);
+      if (feat.id) add('#' + CSS.escape(feat.id));
+      for (const cls of classes) add('.' + CSS.escape(cls));
+      for (const attr of attrs) add('[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]');
+      for (const pseudo of pseudos) add(tag ? tag + pseudo : pseudo);
 
-      // 检查路径长度是否相同
-      const pathLengths = new Set(paths.map(p => p.length));
-      if (pathLengths.size !== 1) return null;
+      if (maxParts < 2) return results.sort((a, b) => a.length - b.length);
 
-      const len = paths[0].length;
-      const mergedPath = [];
+      // === 2 parts ===
+      if (tag) {
+        if (feat.id) add(tag + '#' + CSS.escape(feat.id));
+        for (const cls of classes) add(tag + '.' + CSS.escape(cls));
+        for (const attr of attrs) add(tag + '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]');
+        for (const pseudo of pseudos) add(tag + pseudo);
+      }
+      for (let i = 0; i < classes.length; i++) {
+        for (let j = i + 1; j < classes.length; j++) {
+          add('.' + CSS.escape(classes[i]) + '.' + CSS.escape(classes[j]));
+          if (tag) add(tag + '.' + CSS.escape(classes[i]) + '.' + CSS.escape(classes[j]));
+        }
+      }
+      for (const cls of classes) {
+        for (const attr of attrs) {
+          add('.' + CSS.escape(cls) + '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]');
+          if (tag) add(tag + '.' + CSS.escape(cls) + '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]');
+        }
+      }
+      for (const cls of classes) {
+        for (const pseudo of pseudos) {
+          add('.' + CSS.escape(cls) + pseudo);
+          if (tag) add(tag + '.' + CSS.escape(cls) + pseudo);
+        }
+      }
+      for (const attr of attrs) {
+        for (const pseudo of pseudos) {
+          add('[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]' + pseudo);
+          if (tag) add(tag + '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]' + pseudo);
+        }
+      }
 
-      for (let i = 0; i < len; i++) {
-        const parts = paths.map(p => p[i]);
-        const uniqueParts = [...new Set(parts)];
+      if (maxParts < 3) return results.sort((a, b) => a.length - b.length);
 
-        if (uniqueParts.length === 1) {
-          // 相同部分，直接使用
-          mergedPath.push(uniqueParts[0]);
-        } else if (uniqueParts.length <= 5) {
-          // 差异部分，尝试用 :is() 合并
-          // 移除伪类后检查是否相同
-          const baseParts = uniqueParts.map(p => p.replace(/:[a-z-]+\([^)]*\)|:[a-z-]+/gi, ''));
-          const uniqueBase = [...new Set(baseParts)];
-
-          if (uniqueBase.length === 1) {
-            // 基础选择器相同，只是伪类不同
-            mergedPath.push(`${uniqueBase[0]}:is(${uniqueParts.join(', ')})`);
-          } else {
-            // 基础选择器也不同，用 :is() 直接合并
-            mergedPath.push(`:is(${uniqueParts.join(', ')})`);
+      // === 3 parts ===
+      if (tag) {
+        for (let i = 0; i < classes.length; i++) {
+          for (let j = i + 1; j < classes.length; j++) {
+            add(tag + '.' + CSS.escape(classes[i]) + '.' + CSS.escape(classes[j]));
+            for (const attr of attrs.slice(0, 2)) {
+              add(tag + '.' + CSS.escape(classes[i]) + '.' + CSS.escape(classes[j]) + '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]');
+            }
           }
-        } else {
-          // 差异太大，不适合合并
-          return null;
+        }
+        for (const cls of classes) {
+          for (const attr of attrs) add(tag + '.' + CSS.escape(cls) + '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]');
+          for (const pseudo of pseudos) add(tag + '.' + CSS.escape(cls) + pseudo);
+        }
+        for (const attr of attrs) {
+          for (const pseudo of pseudos) add(tag + '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]' + pseudo);
+        }
+      }
+      for (let i = 0; i < Math.min(classes.length, 3); i++) {
+        for (let j = i + 1; j < Math.min(classes.length, 4); j++) {
+          for (const attr of attrs.slice(0, 2)) add('.' + CSS.escape(classes[i]) + '.' + CSS.escape(classes[j]) + '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]');
+          for (const pseudo of pseudos.slice(0, 2)) add('.' + CSS.escape(classes[i]) + '.' + CSS.escape(classes[j]) + pseudo);
         }
       }
 
-      return mergedPath.join(' > ');
+      if (maxParts < 4) return results.sort((a, b) => a.length - b.length);
+
+      // === 4 parts ===
+      if (tag) {
+        for (let i = 0; i < Math.min(classes.length, 3); i++) {
+          for (let j = i + 1; j < Math.min(classes.length, 4); j++) {
+            for (const attr of attrs.slice(0, 2)) add(tag + '.' + CSS.escape(classes[i]) + '.' + CSS.escape(classes[j]) + '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]');
+          }
+        }
+        for (const cls of classes.slice(0, 2)) {
+          for (const pseudo of pseudos.slice(0, 2)) {
+            for (const attr of attrs.slice(0, 2)) add(tag + '.' + CSS.escape(cls) + pseudo + '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]');
+          }
+        }
+      }
+
+      return results.sort((a, b) => a.length - b.length);
     }
+
+    /**
+     * 分阶段惰性生成所有候选选择器（Generator）
+     * Phase 0-2 单层复合，Phase 3 :not()/:is()，Phase 4 祖先/兄弟
+     * 自由交叉组合 + Phase 6 三级路径 + Phase 7 兜底
+     */
+    *generateCandidates(common, allFeatures, elements) {
+      const tag = common.tag || '';
+      const commonClasses = (common.classes || []).slice(0, 5);
+      const commonAttrs = (common.stableAttributes || common.attributes || []).slice(0, 5);
+
+      const commonFeat = {
+        tag,
+        id: null,
+        classes: commonClasses,
+        attrs: commonAttrs,
+        pseudos: [],
+        ancestors: allFeatures[0]?.ancestors || [],
+        prevSibling: null,
+        nextSibling: null
+      };
+
+      // ========== 片段池 ==========
+      const fragments = [];
+      const yielded = new Set();
+
+      // safeYield 不能用闭包+yield，改为内联模式
+      const tryYield = (sel) => {
+        if (sel && !yielded.has(sel)) { yielded.add(sel); return true; }
+        return false;
+      };
+
+      // ========== Phase 0-2: 单层复合选择器 ==========
+      const compoundAll = this._compoundCandidates(commonFeat, 4);
+      const targetParts = this._compoundCandidates(commonFeat, 2);
+      for (const sel of compoundAll) {
+        fragments.push({ type: 'target', sel });
+        if (tryYield(sel)) yield sel;
+      }
+      for (const sel of targetParts) {
+        if (!fragments.some(f => f.sel === sel)) fragments.push({ type: 'target', sel });
+      }
+
+      // ========== Phase 3: :not() 修饰符 ==========
+      if (elements.length >= 2) {
+        const parents = elements.map(el => el.parentElement);
+        const parentSet = new Set(parents);
+        if (parentSet.size === 1) {
+          const parent = parents[0];
+          const allChildren = Array.from(parent.children);
+          const elementSet = new Set(elements);
+          const notSelected = allChildren.filter(c => !elementSet.has(c));
+
+          if (notSelected.length > 0 && notSelected.length <= 5 && notSelected.length < elements.length) {
+            const sameType = elements.every(el => el.tagName.toLowerCase() === tag);
+            if (sameType && tag) {
+              const notIdx = notSelected.filter(c => c.tagName.toLowerCase() === tag)
+                .map(c => allChildren.indexOf(c) + 1).sort((a, b) => a - b);
+              if (notIdx.length > 0) {
+                const notNth = notIdx.length === 1
+                  ? ':not(:nth-child(' + notIdx[0] + '))'
+                  : notIdx.map(i => ':not(:nth-child(' + i + '))').join('');
+                fragments.push({ type: 'modifier', sel: notNth });
+                let s = tag + notNth; if (tryYield(s)) yield s;
+                if (commonClasses.length > 0) {
+                  s = tag + '.' + CSS.escape(commonClasses[0]) + notNth; if (tryYield(s)) yield s;
+                }
+              }
+            }
+            // :not(.class)
+            const selectedClassSet = new Set(commonClasses);
+            const notClasses = new Set();
+            for (const ns of notSelected) {
+              for (const cls of this._getValidClassesInline(ns)) {
+                if (!selectedClassSet.has(cls)) notClasses.add(cls);
+              }
+            }
+            if (notClasses.size > 0 && notClasses.size <= 3) {
+              const clsArr = [...notClasses];
+              const notCls = clsArr.length === 1
+                ? ':not(.' + CSS.escape(clsArr[0]) + ')'
+                : ':not(' + clsArr.map(c => '.' + CSS.escape(c)).join(', ') + ')';
+              fragments.push({ type: 'modifier', sel: notCls });
+              if (tag) { const s = tag + notCls; if (tryYield(s)) yield s; }
+            }
+          }
+        }
+      }
+
+      // ========== Phase 3b: :is() 修饰符 ==========
+      if (elements.length >= 2 && elements.length <= 10) {
+        const perEl = elements.map(el => this._compoundCandidates(this._decomposeFeatures(el), 2));
+        const flat = perEl.map(sels => sels[0]).filter(Boolean);
+        if (flat.length === elements.length) {
+          const isFull = ':is(' + flat.join(', ') + ')';
+          fragments.push({ type: 'modifier', sel: isFull });
+          let s; if (tag) { s = tag + isFull; if (tryYield(s)) yield s; }
+          s = isFull; if (tryYield(s)) yield s;
+        }
+      }
+
+      // ========== Phase 4: 祖先片段 ==========
+      for (let ai = 0; ai < (commonFeat.ancestors || []).length && ai < 3; ai++) {
+        const anc = commonFeat.ancestors[ai];
+        const ancSels = this._compoundCandidates(anc, 2);
+        for (const aSel of ancSels) {
+          fragments.push({ type: 'ancestor', sel: aSel });
+          for (const tSel of targetParts) {
+            let s = aSel + ' ' + tSel; if (tryYield(s)) yield s;
+            s = aSel + ' > ' + tSel; if (tryYield(s)) yield s;
+          }
+        }
+      }
+
+      // ========== Phase 4b: 兄弟片段 ==========
+      for (const feat of allFeatures) {
+        if (feat.prevSibling) {
+          const sibSels = this._compoundCandidates(feat.prevSibling, 2);
+          for (const sSel of sibSels) {
+            fragments.push({ type: 'sibling', sel: sSel });
+            for (const tSel of targetParts.slice(0, 5)) {
+              let s = sSel + ' + ' + tSel; if (tryYield(s)) yield s;
+              s = sSel + ' ~ ' + tSel; if (tryYield(s)) yield s;
+            }
+          }
+        }
+      }
+
+      // ========== 自由交叉组合阶段 ==========
+      const ancestorPool = fragments.filter(f => f.type === 'ancestor').map(f => f.sel);
+      const siblingPool = fragments.filter(f => f.type === 'sibling').map(f => f.sel);
+      const targetPool = fragments.filter(f => f.type === 'target').map(f => f.sel);
+      const modifierPool = fragments.filter(f => f.type === 'modifier').map(f => f.sel);
+
+      const targetVariants = [];
+      for (const tSel of targetPool.slice(0, 5)) {
+        targetVariants.push(tSel);
+        for (const mod of modifierPool) {
+          if (tSel === tag || tSel.startsWith(tag + '.')) targetVariants.push(tSel + mod);
+        }
+      }
+
+      const sibVariants = [...siblingPool.slice(0, 3)];
+      for (const sSel of siblingPool.slice(0, 3)) {
+        for (const mod of modifierPool.slice(0, 2)) sibVariants.push(sSel + mod);
+      }
+
+      const crossCombos = [];
+
+      // ancestor × targetVariants
+      for (const aSel of ancestorPool.slice(0, 5)) {
+        for (const tSel of targetVariants.slice(0, 5)) {
+          crossCombos.push(aSel + ' > ' + tSel, aSel + ' ' + tSel);
+        }
+      }
+      // sibling × targetVariants
+      for (const sSel of sibVariants.slice(0, 3)) {
+        for (const tSel of targetVariants.slice(0, 5)) {
+          crossCombos.push(sSel + ' + ' + tSel, sSel + ' ~ ' + tSel);
+        }
+      }
+      // ancestor × sibling × target
+      for (const aSel of ancestorPool.slice(0, 3)) {
+        for (const sSel of sibVariants.slice(0, 2)) {
+          for (const tSel of targetVariants.slice(0, 3)) {
+            crossCombos.push(aSel + ' > ' + sSel + ' + ' + tSel);
+            crossCombos.push(aSel + ' ' + sSel + ' ~ ' + tSel);
+            crossCombos.push(aSel + ' > ' + sSel + ' ~ ' + tSel);
+          }
+        }
+      }
+      // 双 ancestor × target
+      if (ancestorPool.length >= 2) {
+        for (const a1 of ancestorPool.slice(0, 3)) {
+          for (const a2 of ancestorPool.slice(0, 3)) {
+            if (a1 === a2) continue;
+            for (const tSel of targetVariants.slice(0, 3)) {
+              crossCombos.push(a1 + ' > ' + a2 + ' > ' + tSel, a1 + ' ' + a2 + ' ' + tSel);
+            }
+          }
+        }
+      }
+      // 双 ancestor × sibling × target
+      if (ancestorPool.length >= 2 && sibVariants.length > 0) {
+        for (const a1 of ancestorPool.slice(0, 2)) {
+          for (const a2 of ancestorPool.slice(0, 2)) {
+            if (a1 === a2) continue;
+            for (const sSel of sibVariants.slice(0, 2)) {
+              for (const tSel of targetPool.slice(0, 2)) {
+                crossCombos.push(a1 + ' ' + a2 + ' > ' + sSel + ' + ' + tSel);
+              }
+            }
+          }
+        }
+      }
+
+      // 去重 + 按长度排序
+      const uniqueCombos = [...new Set(crossCombos)].filter(s => !yielded.has(s));
+      uniqueCombos.sort((a, b) => a.length - b.length);
+      for (const sel of uniqueCombos) { if (tryYield(sel)) yield sel; }
+
+      // ========== Phase 6: 三级路径 ==========
+      for (let ai = 0; ai < (commonFeat.ancestors || []).length && ai < 3; ai++) {
+        const anc1 = commonFeat.ancestors[ai];
+        const anc1Sels = this._compoundCandidates(anc1, 2);
+        for (let aj = ai + 1; aj < Math.min(commonFeat.ancestors.length, ai + 3); aj++) {
+          const anc2 = commonFeat.ancestors[aj];
+          const anc2Sels = this._compoundCandidates(anc2, 2);
+          for (const s1 of anc1Sels.slice(0, 3)) {
+            for (const s2 of anc2Sels.slice(0, 3)) {
+              for (const tSel of targetParts.slice(0, 3)) {
+                let s = s1 + ' > ' + s2 + ' > ' + tSel; if (tryYield(s)) yield s;
+                s = s1 + ' ' + s2 + ' ' + tSel; if (tryYield(s)) yield s;
+              }
+            }
+          }
+        }
+      }
+
+      // ========== Phase 7: 绝对路径兜底 ==========
+      if (elements.length >= 2) {
+        const parents = elements.map(el => el.parentElement);
+        const parentSet = new Set(parents);
+        if (parentSet.size === 1 && tag) {
+          const parent = parents[0];
+          const allChildren = Array.from(parent.children);
+          const indices = elements.map(el => allChildren.indexOf(el) + 1).sort((a, b) => a - b);
+          const start = indices[0];
+          const end = indices[indices.length - 1];
+          const consecutive = indices.every((v, i) => i === 0 || v === indices[i - 1] + 1);
+          let s;
+          if (consecutive && start === 1 && end === allChildren.length) {
+            s = tag; if (tryYield(s)) yield s;
+          } else if (consecutive) {
+            if (start === 1) { s = tag + ':nth-child(-n+' + end + ')'; if (tryYield(s)) yield s; }
+            else if (end === allChildren.length) { s = tag + ':nth-child(n+' + start + ')'; if (tryYield(s)) yield s; }
+            else { s = tag + ':nth-child(n+' + start + '):nth-child(-n+' + end + ')'; if (tryYield(s)) yield s; }
+          }
+          if (indices.every(i => i % 2 === 1) && indices.length > 2) { s = tag + ':nth-child(odd)'; if (tryYield(s)) yield s; }
+          if (indices.every(i => i % 2 === 0) && indices.length > 2) { s = tag + ':nth-child(even)'; if (tryYield(s)) yield s; }
+        }
+      }
+      if (elements.length === 1) {
+        const el = elements[0];
+        const path = [];
+        let cur = el;
+        while (cur && cur !== document.documentElement) {
+          const p = cur.parentElement;
+          if (!p) break;
+          const idx = Array.from(p.children).indexOf(cur) + 1;
+          path.unshift(cur.tagName.toLowerCase() + ':nth-child(' + idx + ')');
+          cur = p;
+        }
+        if (path.length > 0) { const s = path.join(' > '); if (tryYield(s)) yield s; }
+      }
+    }
+
 
     /**
      * 验证选择器是否精确匹配所有目标元素（不多不少）
@@ -2524,7 +2751,7 @@
             <span style="color: #10b981;">重做</span>
           </div>
           <div style="display: flex; justify-content: space-between;">
-            <span style="color: #9ca3af;">Delete</span>
+            <span style="color: #9ca3af;">Delete / Space</span>
             <span style="color: #10b981;">清除所有选中</span>
           </div>
           <div style="display: flex; justify-content: space-between;">
