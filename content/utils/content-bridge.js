@@ -85,6 +85,24 @@
       return response;
     }
 
+    // 中继 widen-page 宽度更新到页面上下文
+    if (message.type === 'WIDEN_PAGE_WIDTH_UPDATE') {
+      window.dispatchEvent(new CustomEvent('yc-widen-page-update', {
+        detail: { width: message.width }
+      }));
+      if (sendResponse) sendResponse({ ok: true });
+      return { ok: true };
+    }
+
+    // 中继 widen-page 开关状态
+    if (message.type === 'WIDEN_PAGE_TOGGLE') {
+      window.dispatchEvent(new CustomEvent('yc-widen-page-toggle', {
+        detail: { enabled: message.enabled }
+      }));
+      if (sendResponse) sendResponse({ ok: true });
+      return { ok: true };
+    }
+
     return false; // 让其他处理器处理
   }
 

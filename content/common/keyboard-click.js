@@ -252,10 +252,10 @@ if (window.KeyboardClickLoaded) {
       e.preventDefault();
       e.stopPropagation();
 
-      // 模拟真实鼠标点击：先获取元素位置，再触发完整事件链
-      const rect = el.getBoundingClientRect();
-      const clientX = rect.left + rect.width / 2;
-      const clientY = rect.top + rect.height / 2;
+      // 使用鼠标实际位置（而非元素中心），确保点击精确位置
+      // 这对于进度条等需要精确点击的场景很重要
+      const clientX = this.mouseX;
+      const clientY = this.mouseY;
 
       // 1. mousedown
       el.dispatchEvent(new MouseEvent('mousedown', {

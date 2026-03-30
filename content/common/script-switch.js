@@ -17,7 +17,9 @@
     'text-collector': true,    // 文本收集器
     'keyboard-pagination': true, // 键盘翻页
     'keyboard-click': true,     // 键盘快捷点击
-    'panel-position-manager': true // 面板位置管理
+    'panel-position-manager': true, // 面板位置管理
+    'widen-page': false,           // 页面宽度扩展（默认关闭）
+    'tab-focus': true              // Tab激活时自动focus
   };
 
   // 缓存的开关状态
@@ -123,7 +125,9 @@
     'text-collector': '文本收集器',
     'keyboard-pagination': '键盘翻页',
     'keyboard-click': '键盘快捷点击',
-    'panel-position-manager': '面板位置管理'
+    'panel-position-manager': '面板位置管理',
+    'widen-page': '页面宽度扩展',
+    'tab-focus': 'Tab激活自动聚焦'
   };
 
   console.log('[ScriptSwitch] 脚本开关模块已加载');

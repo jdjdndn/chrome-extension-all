@@ -597,6 +597,26 @@
         </div>
       </div>
 
+      <div class="setting-item">
+        <div class="toggle-container">
+          <label for="script-widen-page">页面宽度扩展</label>
+          <input type="checkbox" id="script-widen-page" data-script="widen-page" />
+        </div>
+      </div>
+
+      <div class="setting-item" id="widen-page-width-setting" style="display: none; padding-left: 24px;">
+        <label for="widen-page-width" style="font-size: 12px;">宽度百分比: <span id="widen-page-width-value">80</span>%</label>
+        <input type="range" id="widen-page-width" min="50" max="100" value="80" step="5"
+               style="width: 100%; margin-top: 4px; accent-color: #007bff;" />
+      </div>
+
+      <div class="setting-item">
+        <div class="toggle-container">
+          <label for="script-tab-focus">Tab激活自动聚焦</label>
+          <input type="checkbox" id="script-tab-focus" data-script="tab-focus" />
+        </div>
+      </div>
+
       <div class="info-box" style="margin-top: 8px;">
         <small>开关修改后需要刷新页面才能生效</small>
       </div>

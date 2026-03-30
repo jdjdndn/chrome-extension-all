@@ -178,7 +178,9 @@ async function loadScriptSwitches() {
       'doc-generator': true,
       'text-collector': true,
       'keyboard-pagination': true,
-      'panel-position-manager': true
+      'panel-position-manager': true,
+      'widen-page': false,
+      'tab-focus': true
     };
 
     // 合并默认值和存储的值
@@ -215,8 +217,51 @@ scriptSwitchCheckboxes.forEach(checkbox => {
     const scriptName = checkbox.dataset.script;
     const enabled = checkbox.checked;
     saveScriptSwitch(scriptName, enabled);
+
+    // widen-page 开关联动宽度设置显示
+    if (scriptName === 'widen-page') {
+      const widthSetting = document.getElementById('widen-page-width-setting');
+      if (widthSetting) widthSetting.style.display = enabled ? 'block' : 'none';
+    }
   });
 });
+
+// 页面宽度百分比控制
+const widenPageWidthSlider = document.getElementById('widen-page-width');
+const widenPageWidthValue = document.getElementById('widen-page-width-value');
+const widenPageCheckbox = document.getElementById('script-widen-page');
+
+if (widenPageWidthSlider) {
+  // 加载保存的宽度值
+  chrome.storage.local.get('widenPageWidth', (result) => {
+    const width = result.widenPageWidth || 80;
+    widenPageWidthSlider.value = width;
+    if (widenPageWidthValue) widenPageWidthValue.textContent = width;
+
+    // 根据开关状态显示/隐藏宽度设置
+    const widthSetting = document.getElementById('widen-page-width-setting');
+    if (widthSetting && widenPageCheckbox) {
+      widthSetting.style.display = widenPageCheckbox.checked ? 'block' : 'none';
+    }
+  });
+
+  // 滑块变更时保存并实时通知页面
+  widenPageWidthSlider.addEventListener('input', () => {
+    const width = parseInt(widenPageWidthSlider.value, 10);
+    if (widenPageWidthValue) widenPageWidthValue.textContent = width;
+    chrome.storage.local.set({ widenPageWidth: width });
+
+    // 实时通知当前活动标签页更新宽度
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]?.id) {
+        chrome.tabs.sendMessage(tabs[0].id, {
+          type: 'WIDEN_PAGE_WIDTH_UPDATE',
+          width: width
+        }).catch(() => {});
+      }
+    });
+  });
+}
 
 
 // Load blocked domains
