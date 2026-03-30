@@ -88,6 +88,62 @@ const returnedVideosThisSession = new Set();
 // 用户导航方向跟踪 - 用于检测上滑返回操作
 let lastNavigationDirection = null;
 
+
+// ========== 连播控制 ==========
+function findAutoPlaySwitch() {
+  // 查找所有候选按钮，筛选可视区域内的
+  const buttons = document.querySelectorAll('button.xg-switch');
+  for (const btn of buttons) {
+    if (isElementInViewportAndVisible(btn)) {
+      return btn;
+    }
+  }
+  return null;
+}
+
+function isAutoPlayEnabled() {
+  const switchBtn = findAutoPlaySwitch();
+  return switchBtn && switchBtn.classList.contains('xg-switch-checked');
+}
+
+function clickSwitch(btn) {
+  if (!btn) return false;
+  const rect = btn.getBoundingClientRect();
+  const clientX = rect.left + rect.width / 2;
+  const clientY = rect.top + rect.height / 2;
+
+  // 模拟完整点击事件链
+  btn.dispatchEvent(new MouseEvent('mousedown', {
+    bubbles: true, cancelable: true,
+    clientX, clientY, button: 0, buttons: 1
+  }));
+  btn.dispatchEvent(new MouseEvent('mouseup', {
+    bubbles: true, cancelable: true,
+    clientX, clientY, button: 0, buttons: 0
+  }));
+  btn.dispatchEvent(new MouseEvent('click', {
+    bubbles: true, cancelable: true,
+    clientX, clientY, button: 0, buttons: 0
+  }));
+  return true;
+}
+
+function enableAutoPlay() {
+  const switchBtn = findAutoPlaySwitch();
+  if (switchBtn && !switchBtn.classList.contains('xg-switch-checked')) {
+    console.log('[连播] 当前未开启，点击开启连播', switchBtn);
+    clickSwitch(switchBtn);
+  }
+}
+
+function disableAutoPlay() {
+  const switchBtn = findAutoPlaySwitch();
+  if (switchBtn && switchBtn.classList.contains('xg-switch-checked')) {
+    console.log('[连播] 当前已开启，点击关闭连播', switchBtn);
+    clickSwitch(switchBtn);
+  }
+}
+
 // ========== 视频状态管理器 (WeakMap) ==========
 const VideoStateManager = {
   uuid: new WeakMap(),
@@ -652,6 +708,18 @@ function processCurrentVideo() {
     return;
   }
 
+  // 下滑方向时，开启连播（用户从上滑返回后下滑回来）
+  if (lastNavigationDirection === 'down') {
+    if (currentVideoId !== videoId) {
+      currentVideoId = videoId;
+      console.log(`[手动导航] 检测到下滑方向，视频 ${videoId.substring(0, 8)} 开启连播`);
+      setTimeout(() => enableAutoPlay(), 500);
+    }
+    // 重置方向，避免后续误判
+    lastNavigationDirection = null;
+    return;
+  }
+
   // 如果视频在本次会话中被用户返回过，跳过所有自动处理
   if (returnedVideosThisSession.has(videoId)) {
     if (currentVideoId !== videoId) {
@@ -679,6 +747,8 @@ function processCurrentVideo() {
 
       // 将该视频加入返回记录，本次会话不再自动处理
       returnedVideosThisSession.add(videoId);
+      // 下滑回到之前的视频，开启连播
+      setTimeout(() => enableAutoPlay(), 500);
       return;
     }
 
@@ -688,6 +758,8 @@ function processCurrentVideo() {
         console.log(`[手动导航] 检测到全新视频，清空返回记录 (${returnedVideosThisSession.size} 个)，恢复自动处理`);
         returnedVideosThisSession.clear();
       }
+      // 下滑到新视频时，自动开启连播
+      setTimeout(() => enableAutoPlay(), 500);
     }
 
     updateVideoHistory(videoId);
@@ -920,6 +992,7 @@ function init() {
     if (e.key === 'ArrowUp' || e.keyCode === 38) {
       console.log('[用户操作] 检测到键盘上滑，取消所有自动下滑检测');
       VideoChangeChecker.cancelAll();
+      disableAutoPlay();
     }
     // 用户手动下滑也取消检测（表示用户接管控制）
     if (e.key === 'ArrowDown' || e.keyCode === 40) {
@@ -955,6 +1028,7 @@ function init() {
         console.log(`[用户操作] 检测到触摸上滑 (deltaY=${deltaY.toFixed(1)}px, velocity=${velocity.toFixed(2)}px/ms)`);
         lastNavigationDirection = 'up';
         VideoChangeChecker.cancelAll();
+        disableAutoPlay();
       }
       // 下滑检测（用户主动操作）
       if (deltaY < -30 || (deltaY < -10 && velocity > 0.3)) {
@@ -986,6 +1060,7 @@ function init() {
         if (wheelDeltaY > 50) {
           console.log(`[用户操作] 检测到滚轮上滑 (累积=${wheelDeltaY.toFixed(1)}px)，取消所有自动下滑检测`);
           VideoChangeChecker.cancelAll();
+          disableAutoPlay();
         }
         wheelDeltaY = 0;
       }, 100);

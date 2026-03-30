@@ -1,12 +1,15 @@
 // 键盘快捷操作（devtools 面板）
-// Space: 点击 | C: 右击 | S(按住): 选文本
+// Space(短按): 点击 | Space(长按): 选文本 | X: 右击
 (function() {
   'use strict';
   let hoveredEl = null;
   let mouseX = 0, mouseY = 0;
-  let sHeld = false;
+  let spaceHeld = false;
+  let spaceDownTime = 0;
+  let spaceTimer = null;
   let selectAnchor = null;
   let selectTooltip = null;
+  const LONG_PRESS_THRESHOLD = 700;
 
   document.body.setAttribute('tabindex', '-1');
   document.body.style.outline = 'none';
@@ -16,7 +19,7 @@
   document.addEventListener('mousemove', (e) => {
     mouseX = e.clientX;
     mouseY = e.clientY;
-    if (sHeld) extendSelection(e.clientX, e.clientY);
+    if (spaceHeld) extendSelection(e.clientX, e.clientY);
   }, true);
 
   // 键盘
@@ -26,31 +29,91 @@
 
     switch (e.key) {
       case ' ':
-        if (sHeld) break;
-        doClick(e);
+        // 空格按下时禁用默认事件（防止页面滚动）
+        e.preventDefault();
+        e.stopPropagation();
+        if (!spaceHeld && !spaceTimer) {
+          spaceDownTime = Date.now();
+          // 设置长按定时器，超时后进入选择模式
+          spaceTimer = setTimeout(() => {
+            startTextSelection();
+            spaceTimer = null;
+          }, LONG_PRESS_THRESHOLD);
+        }
         break;
       case 'x': case 'X':
-        if (sHeld) break;
-        doRightClick(e);
-        break;
-      case 's': case 'S':
-        if (!e.repeat) onSDown(e);
+        if (!spaceHeld) doRightClick(e);
         break;
       case 'Escape':
-        if (sHeld) cancelSelect();
+        if (spaceHeld) cancelSelect();
         break;
     }
   }, true);
 
   window.addEventListener('keyup', (e) => {
-    if (e.key === 's' || e.key === 'S') onSUp();
+    if (e.key === ' ') onSpaceUp(e);
   }, true);
+
+  function onSpaceUp(e) {
+    // 清除长按定时器
+    if (spaceTimer) {
+      clearTimeout(spaceTimer);
+      spaceTimer = null;
+      // 定时器未触发 = 短按，执行点击
+      // 先清除之前的选择
+      window.getSelection().removeAllRanges();
+      doClick(e);
+      return;
+    }
+
+    if (spaceHeld) {
+      spaceHeld = false;
+      const text = window.getSelection().toString().trim();
+      if (text) {
+        navigator.clipboard.writeText(text).then(() => {
+          showHint('已复制 ' + text.length + ' 字');
+          setTimeout(hideHint, 1200);
+        }).catch(hideHint);
+      } else {
+        window.getSelection().removeAllRanges();
+        hideHint();
+      }
+      selectAnchor = null;
+    }
+  }
+
+  function startTextSelection() {
+    const anchor = rangeFromPoint(mouseX, mouseY);
+    if (!anchor) return; // 鼠标下没有文本，不进入选择模式
+
+    spaceHeld = true;
+    selectAnchor = anchor;
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(anchor.cloneRange());
+    showHint('Space:按住移动选文本');
+  }
 
   function doClick(e) {
     if (!hoveredEl || !document.body.contains(hoveredEl)) return;
     e.preventDefault(); e.stopPropagation();
-    if (typeof hoveredEl.click === 'function') hoveredEl.click();
-    else hoveredEl.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+    const rect = hoveredEl.getBoundingClientRect();
+    const clientX = rect.left + rect.width / 2;
+    const clientY = rect.top + rect.height / 2;
+
+    hoveredEl.dispatchEvent(new MouseEvent('mousedown', {
+      bubbles: true, cancelable: true,
+      clientX, clientY, button: 0, buttons: 1
+    }));
+    hoveredEl.dispatchEvent(new MouseEvent('mouseup', {
+      bubbles: true, cancelable: true,
+      clientX, clientY, button: 0, buttons: 0
+    }));
+    hoveredEl.dispatchEvent(new MouseEvent('click', {
+      bubbles: true, cancelable: true,
+      clientX, clientY, button: 0, buttons: 0
+    }));
   }
 
   function doRightClick(e) {
@@ -62,35 +125,6 @@
       clientX: r.left + r.width / 2, clientY: r.top + r.height / 2,
       button: 2, buttons: 2,
     }));
-  }
-
-  // S 文本选择
-  function onSDown(e) {
-    e.preventDefault(); e.stopPropagation();
-    sHeld = true;
-    const anchor = rangeFromPoint(mouseX, mouseY);
-    if (!anchor) { sHeld = false; return; }
-    selectAnchor = anchor;
-    const sel = window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(anchor.cloneRange());
-    showHint('S:按住移动选文本');
-  }
-
-  function onSUp() {
-    if (!sHeld) return;
-    sHeld = false;
-    const text = window.getSelection().toString().trim();
-    if (text) {
-      navigator.clipboard.writeText(text).then(() => {
-        showHint('已复制 ' + text.length + ' 字');
-        setTimeout(hideHint, 1200);
-      }).catch(hideHint);
-    } else {
-      window.getSelection().removeAllRanges();
-      hideHint();
-    }
-    selectAnchor = null;
   }
 
   function extendSelection(cx, cy) {
@@ -125,7 +159,7 @@
 
   function cancelSelect() {
     window.getSelection().removeAllRanges();
-    sHeld = false; selectAnchor = null; hideHint();
+    spaceHeld = false; selectAnchor = null; hideHint();
   }
 
   function showHint(text) {

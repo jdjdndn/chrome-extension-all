@@ -22,3 +22,5 @@ import '../common/text-collector.js';
 import '../common/keyboard-pagination.js';
 import '../common/keyboard-click.js';
 import '../common/lang-to-zh.js';
+import '../common/widen-page.js';
+import '../common/tab-focus.js';

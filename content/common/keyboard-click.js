@@ -1,9 +1,9 @@
 // 通用脚本：键盘快捷操作
 // @match *://*/*
 // 功能：
-//   Space  — 点击悬停元素
-//   C      — 右击悬停元素
-//   S(按住) — 从鼠标位置开始选文本，移动鼠标扩展，松开 S 确认复制
+//   Space(短按) — 点击悬停元素
+//   Space(长按) — 从鼠标位置开始选文本，移动鼠标扩展，松开确认复制
+//   X      — 右击悬停元素
 
 'use strict';
 
@@ -21,10 +21,14 @@ if (window.KeyboardClickLoaded) {
       // 鼠标精确坐标（用于文本选择）
       this.mouseX = 0;
       this.mouseY = 0;
-      // S 键文本选择
-      this.sHeld = false;
-      this.selectAnchor = null;  // Range：按住 S 时的起始位置
+      // 空格键文本选择
+      this.spaceHeld = false;
+      this.spaceDownTime = 0;
+      this.selectAnchor = null;  // Range：按住空格时的起始位置
       this.selectTooltip = null;
+      this.spaceTimer = null;  // 长按定时器
+      // 长按阈值（毫秒）
+      this.LONG_PRESS_THRESHOLD = 300;
 
       this._init();
     }
@@ -33,7 +37,7 @@ if (window.KeyboardClickLoaded) {
       this._bindMouse();
       this._bindKeyboard();
       this._startObserver();
-      console.log('[键盘操作] 已初始化 — Space:点击, C:右击, S(按住):选文本');
+      console.log('[键盘操作] 已初始化 — Space(短按):点击, Space(长按):选文本, X:右击');
     }
 
     // ========== 鼠标追踪 ==========
@@ -46,12 +50,12 @@ if (window.KeyboardClickLoaded) {
         if (!e.relatedTarget) this.hoveredEl = null;
       }, true);
 
-      // 追踪精确坐标（S 选择需要像素级定位）
+      // 追踪精确坐标（空格选择需要像素级定位）
       document.addEventListener('mousemove', (e) => {
         this.mouseX = e.clientX;
         this.mouseY = e.clientY;
-        // S 按住时实时扩展选择
-        if (this.sHeld) {
+        // 空格按住时实时扩展选择
+        if (this.spaceHeld) {
           this._extendSelectionTo(e.clientX, e.clientY);
         }
       }, true);
@@ -60,7 +64,7 @@ if (window.KeyboardClickLoaded) {
     // ========== 键盘 ==========
     _bindKeyboard() {
       document.addEventListener('keydown', (e) => {
-        // 组合键（Ctrl+S 保存、Ctrl+X 剪切等）不拦截
+        // 组合键（Ctrl+Space 等）不拦截
         if (this._isComboKey(e)) return;
 
         // 输入框聚焦时不拦截
@@ -68,28 +72,33 @@ if (window.KeyboardClickLoaded) {
 
         switch (e.key) {
           case ' ':
-            if (!this.sHeld) this._doClick(e);
+            // 空格按下时禁用默认事件（防止页面滚动）
+            e.preventDefault();
+            e.stopPropagation();
+            if (!this.spaceHeld && !this.spaceTimer) {
+              this.spaceDownTime = Date.now();
+              // 设置长按定时器，超时后进入选择模式
+              this.spaceTimer = setTimeout(() => {
+                this._startTextSelection();
+                this.spaceTimer = null;
+              }, this.LONG_PRESS_THRESHOLD);
+            }
             break;
 
           case 'x':
           case 'X':
-            if (!this.sHeld) this._doRightClick(e);
-            break;
-
-          case 's':
-          case 'S':
-            if (!e.repeat) this._onSDown(e);
+            if (!this.spaceHeld) this._doRightClick(e);
             break;
 
           case 'Escape':
-            if (this.sHeld) this._cancelSelect();
+            if (this.spaceHeld) this._cancelSelect();
             break;
         }
       }, true);
 
       document.addEventListener('keyup', (e) => {
-        if ((e.key === 's' || e.key === 'S') && !this._isComboKey(e)) {
-          this._onSUp(e);
+        if (e.key === ' ' && !this._isComboKey(e)) {
+          this._onSpaceUp(e);
         }
       }, true);
     }
@@ -127,46 +136,49 @@ if (window.KeyboardClickLoaded) {
       return e.ctrlKey || e.metaKey || e.altKey;
     }
 
-    // ========== Space 点击 ==========
-    _doClick(e) {
-      const el = this.hoveredEl;
-      if (!el || !document.body.contains(el)) return;
-      e.preventDefault();
-      e.stopPropagation();
-      if (typeof el.click === 'function') {
-        el.click();
-      } else {
-        el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    _onSpaceUp(e) {
+      // 清除长按定时器
+      if (this.spaceTimer) {
+        clearTimeout(this.spaceTimer);
+        this.spaceTimer = null;
+        // 定时器未触发 = 短按，执行点击
+        // 先清除之前的选择
+        window.getSelection().removeAllRanges();
+        this._doClick(e);
+        return;
+      }
+
+      if (this.spaceHeld) {
+        // 长按松开：复制选中文本
+        this.spaceHeld = false;
+        const sel = window.getSelection();
+        const text = sel.toString().trim();
+
+        if (text) {
+          navigator.clipboard.writeText(text).then(() => {
+            this._showHint(`已复制 ${text.length} 字`);
+            setTimeout(() => this._hideHint(), 1200);
+          }).catch(() => {
+            this._hideHint();
+          });
+        } else {
+          sel.removeAllRanges();
+          this._hideHint();
+        }
+
+        this.selectAnchor = null;
       }
     }
 
-    // ========== C 右击 ==========
-    _doRightClick(e) {
-      const el = this.hoveredEl;
-      if (!el || !document.body.contains(el)) return;
-      e.preventDefault();
-      e.stopPropagation();
-      const r = el.getBoundingClientRect();
-      el.dispatchEvent(new MouseEvent('contextmenu', {
-        bubbles: true, cancelable: true,
-        clientX: r.left + r.width / 2, clientY: r.top + r.height / 2,
-        button: 2, buttons: 2,
-      }));
-    }
-
-    // ========== S 文本选择（按住选） ==========
-    _onSDown(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      this.sHeld = true;
-
+    _startTextSelection() {
       // 用 caretRangeFromPoint 获取鼠标处的精确文本位置
       const anchor = this._rangeFromPoint(this.mouseX, this.mouseY);
       if (!anchor) {
-        // 鼠标下没有文本，取消
-        this.sHeld = false;
+        // 鼠标下没有文本，不进入选择模式
         return;
       }
+
+      this.spaceHeld = true;
       this.selectAnchor = anchor;
 
       // 初始选中（光标位置，零宽度）
@@ -174,29 +186,7 @@ if (window.KeyboardClickLoaded) {
       sel.removeAllRanges();
       sel.addRange(anchor.cloneRange());
 
-      this._showHint('S:按住移动选文本');
-    }
-
-    _onSUp(e) {
-      if (!this.sHeld) return;
-      this.sHeld = false;
-
-      const sel = window.getSelection();
-      const text = sel.toString().trim();
-
-      if (text) {
-        navigator.clipboard.writeText(text).then(() => {
-          this._showHint(`已复制 ${text.length} 字`);
-          setTimeout(() => this._hideHint(), 1200);
-        }).catch(() => {
-          this._hideHint();
-        });
-      } else {
-        sel.removeAllRanges();
-        this._hideHint();
-      }
-
-      this.selectAnchor = null;
+      this._showHint('Space:按住移动选文本');
     }
 
     _extendSelectionTo(clientX, clientY) {
@@ -250,9 +240,57 @@ if (window.KeyboardClickLoaded) {
 
     _cancelSelect() {
       window.getSelection().removeAllRanges();
-      this.sHeld = false;
+      this.spaceHeld = false;
       this.selectAnchor = null;
       this._hideHint();
+    }
+
+    // ========== Space 短按点击 ==========
+    _doClick(e) {
+      const el = this.hoveredEl;
+      if (!el || !document.body.contains(el)) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      // 模拟真实鼠标点击：先获取元素位置，再触发完整事件链
+      const rect = el.getBoundingClientRect();
+      const clientX = rect.left + rect.width / 2;
+      const clientY = rect.top + rect.height / 2;
+
+      // 1. mousedown
+      el.dispatchEvent(new MouseEvent('mousedown', {
+        bubbles: true, cancelable: true,
+        clientX, clientY,
+        button: 0, buttons: 1,
+      }));
+
+      // 2. mouseup
+      el.dispatchEvent(new MouseEvent('mouseup', {
+        bubbles: true, cancelable: true,
+        clientX, clientY,
+        button: 0, buttons: 0,
+      }));
+
+      // 3. click（带完整坐标信息）
+      el.dispatchEvent(new MouseEvent('click', {
+        bubbles: true, cancelable: true,
+        clientX, clientY,
+        button: 0, buttons: 0,
+      }));
+    }
+
+    // ========== X 右击 ==========
+    _doRightClick(e) {
+      const el = this.hoveredEl;
+      if (!el || !document.body.contains(el)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const r = el.getBoundingClientRect();
+      el.dispatchEvent(new MouseEvent('contextmenu', {
+        bubbles: true, cancelable: true,
+        clientX: r.left + r.width / 2, clientY: r.top + r.height / 2,
+        button: 2, buttons: 2,
+      }));
     }
 
     // ========== 提示 ==========
