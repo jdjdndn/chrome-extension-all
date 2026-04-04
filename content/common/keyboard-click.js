@@ -40,6 +40,24 @@ if (window.KeyboardClickLoaded) {
       console.log('[键盘操作] 已初始化 — Space(短按):点击, Space(长按):选文本, X:右击');
     }
 
+    // ========== 深度元素查找（穿透 Shadow DOM）==========
+    /**
+     * 递归穿透 shadow root，获取 (x, y) 坐标处最深层的元素。
+     * document.elementFromPoint 只返回 shadow host，不会深入 shadow root 内部。
+     */
+    _deepElementFromPoint(x, y) {
+      let el = document.elementFromPoint(x, y);
+      if (!el) return null;
+      // 递归穿透所有嵌套 shadow root
+      let maxDepth = 20; // 防止无限循环
+      while (el && el.shadowRoot && maxDepth-- > 0) {
+        const inner = el.shadowRoot.elementFromPoint(x, y);
+        if (!inner || inner === el) break;
+        el = inner;
+      }
+      return el;
+    }
+
     // ========== 鼠标追踪 ==========
     _bindMouse() {
       // 追踪悬停元素
@@ -245,10 +263,49 @@ if (window.KeyboardClickLoaded) {
       this._hideHint();
     }
 
+    // ========== 查找点击目标 ==========
+    /**
+     * 查找真正的点击目标：优先选择被覆盖层遮挡的媒体元素（video/audio）。
+     * 很多视频播放器在 video 上方覆盖透明 div，elementFromPoint 会返回覆盖层。
+     * 这里用 elementsFromPoint 检测是否有媒体元素被遮挡，仅在当前元素非交互元素时切换。
+     */
+    _findClickTarget(x, y) {
+      let el = this._deepElementFromPoint(x, y);
+      if (!el) return null;
+
+      // 已经是媒体元素，直接返回
+      if (el.tagName === 'VIDEO' || el.tagName === 'AUDIO') return el;
+
+      // 检查当前位置下方是否有媒体元素被遮挡
+      const all = document.elementsFromPoint(x, y);
+      for (const candidate of all) {
+        if (candidate.tagName === 'VIDEO' || candidate.tagName === 'AUDIO') {
+          // 只有当前元素不是交互元素（按钮/链接等）时，才切换到媒体元素
+          if (!this._isInteractiveElement(el)) {
+            el = candidate;
+          }
+          break;
+        }
+      }
+
+      return el;
+    }
+
+    /** 判断元素是否为交互元素（按钮/链接等），交互元素应保留原始点击目标 */
+    _isInteractiveElement(el) {
+      const tags = ['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA', 'LABEL'];
+      if (tags.includes(el.tagName)) return true;
+      if (el.isContentEditable) return true;
+      const role = el.getAttribute('role');
+      if (['button', 'link', 'tab', 'menuitem', 'checkbox', 'radio', 'switch'].includes(role)) return true;
+      return false;
+    }
+
     // ========== Space 短按点击 ==========
     _doClick(e) {
-      const el = this.hoveredEl;
-      if (!el || !document.body.contains(el)) return;
+      // 使用 _findClickTarget 查找真实点击目标（穿透覆盖层找到被遮挡的媒体元素）
+      const el = this._findClickTarget(this.mouseX, this.mouseY);
+      if (!el || !el.isConnected) return;
       e.preventDefault();
       e.stopPropagation();
 
@@ -281,8 +338,8 @@ if (window.KeyboardClickLoaded) {
 
     // ========== X 右击 ==========
     _doRightClick(e) {
-      const el = this.hoveredEl;
-      if (!el || !document.body.contains(el)) return;
+      const el = this._findClickTarget(this.mouseX, this.mouseY);
+      if (!el || !el.isConnected) return;
       e.preventDefault();
       e.stopPropagation();
       const r = el.getBoundingClientRect();

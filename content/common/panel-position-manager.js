@@ -59,6 +59,7 @@ if (!window.PanelPositionManager) {
     isCalculating: false,
     positionsFixed: false,
     pendingCalculate: null,
+    iconOnLeftSide: false,
 
     // ==================== 初始化 ====================
 
@@ -97,6 +98,34 @@ if (!window.PanelPositionManager) {
       }
     },
 
+    // ==================== 滚动条检测 ====================
+
+    // 检测页面垂直滚动条宽度
+    getScrollbarWidth() {
+      // 如果页面内容未超出视口高度，无滚动条
+      if (document.documentElement.scrollHeight <= window.innerHeight) {
+        return 0;
+      }
+
+      // 方法1：通过 document.documentElement 的 clientWidth vs innerWidth 差值
+      const rootScrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+      if (rootScrollbarWidth > 0) {
+        return rootScrollbarWidth;
+      }
+
+      // 方法2：创建临时元素测量
+      if (document.body) {
+        const outer = document.createElement('div');
+        outer.style.cssText = 'position:absolute;top:-9999px;width:100px;height:100px;overflow:scroll;';
+        document.body.appendChild(outer);
+        const scrollbarWidth = outer.offsetWidth - outer.clientWidth;
+        document.body.removeChild(outer);
+        return scrollbarWidth || 0;
+      }
+
+      return 0;
+    },
+
     // ==================== 统一计算位置 ====================
 
     calculatePositions() {
@@ -104,6 +133,9 @@ if (!window.PanelPositionManager) {
       const vh = window.innerHeight;
       const vw = window.innerWidth;
       const hasH = this.hasHTags();
+
+      // 检测滚动条宽度，偏移 icon 避免遮挡滚动条
+      const scrollbarWidth = this.getScrollbarWidth();
 
       // 动态计算 icon 间距
       const iconGap = this.calculateIconGap();
@@ -141,34 +173,68 @@ if (!window.PanelPositionManager) {
       const pageLayout = this.detectPageLayout();
 
       // 根据页面布局计算 icon 和 panel 位置
-      // icon 始终在右边缘，panel 在 icon 左侧
-      // 这样确保 panel 不会遮挡 icon
-      let iconRight = edgeMargin;
-      let panelRight = edgeMargin + iconWidth + panelAvoidGap;
+      const scrollbarAwareEdge = edgeMargin + scrollbarWidth;
+      let iconRight = edgeMargin + scrollbarWidth;
+      let iconOnLeftSide = false;
+      this.iconOnLeftSide = false; // 保存到实例供拖拽约束使用
+
+      // === Icon 布局感知 ===
+      // 检测右侧空白是否足够放置 icon，不够则移至左侧空白区域
+      if (pageLayout.mainElement) {
+        const rightSpaceUsable = pageLayout.rightSpace - scrollbarWidth;
+        if (rightSpaceUsable < iconWidth + edgeMargin) {
+          // 右侧空白不足以放置 icon（icon 会遮挡主内容）
+          if (pageLayout.leftSpace >= iconWidth + edgeMargin * 2) {
+            // 左侧空白足够，将 icon 放在左侧空白区域
+            iconOnLeftSide = true;
+            const iconLeftEdge = Math.max(edgeMargin, Math.floor((pageLayout.leftSpace - iconWidth) / 2));
+            iconRight = vw - iconLeftEdge - iconWidth;
+            console.log(`[位置管理器] 右侧空白不足(${Math.round(rightSpaceUsable)}px)，icon移至左侧: right=${Math.round(iconRight)}`);
+          } else {
+            console.log(`[位置管理器] 右侧空白不足(${Math.round(rightSpaceUsable)}px)，左侧也不足，icon保持默认位置`);
+          }
+        }
+      }
+
+      // 保存 icon 位置状态到实例（供拖拽约束使用）
+      this.iconOnLeftSide = iconOnLeftSide;
+
+      // === Panel 位置计算 ===
+      let panelRight = iconOnLeftSide ? scrollbarAwareEdge : iconRight + iconWidth + panelAvoidGap;
       let panelWidth = maxPanelWidth;
 
-      if (pageLayout.mainElement && pageLayout.rightSpace > edgeMargin) {
-        // 检测到主体区域，尝试优化 panel 位置
-        const minRequiredSpace = iconWidth + panelAvoidGap + minPanelWidth;
+      if (pageLayout.mainElement && pageLayout.rightSpace > scrollbarAwareEdge) {
         const rightSpace = pageLayout.rightSpace;
 
-        if (rightSpace >= minRequiredSpace) {
-          // 右侧空间足够放置 icon + panel
-          panelWidth = Math.min(maxPanelWidth, rightSpace - iconWidth - panelAvoidGap - edgeMargin);
-          panelRight = edgeMargin + iconWidth + panelAvoidGap;
-          console.log(`[位置管理器] 右侧空间足够: panelRight=${Math.round(panelRight)}, width=${Math.round(panelWidth)}`);
-        } else if (rightSpace >= iconWidth + panelAvoidGap + edgeMargin) {
-          // 右侧空间只能放 icon，panel 需要调整宽度或放左侧
-          if (pageLayout.leftSpace >= minPanelWidth + edgeMargin) {
-            // 左侧空间够，panel 放左侧
-            panelRight = window.innerWidth - pageLayout.leftSpace + edgeMargin;
-            panelWidth = Math.min(maxPanelWidth, pageLayout.leftSpace - edgeMargin * 2);
-            console.log(`[位置管理器] panel放左侧: panelRight=${Math.round(panelRight)}, width=${Math.round(panelWidth)}`);
-          } else {
-            // 左侧也不够，panel 调整宽度紧贴 icon
-            panelWidth = Math.max(minPanelWidth, rightSpace - iconWidth - panelAvoidGap - edgeMargin);
-            panelRight = edgeMargin + iconWidth + panelAvoidGap;
-            console.log(`[位置管理器] panel调整宽度: panelRight=${Math.round(panelRight)}, width=${Math.round(panelWidth)}`);
+        if (iconOnLeftSide) {
+          // icon 在左侧，panel 独立使用右侧空间
+          if (rightSpace >= minPanelWidth + scrollbarAwareEdge) {
+            panelWidth = Math.min(maxPanelWidth, rightSpace - scrollbarAwareEdge);
+            panelRight = scrollbarAwareEdge;
+            console.log(`[位置管理器] icon在左侧，panel独立定位: panelRight=${Math.round(panelRight)}, width=${Math.round(panelWidth)}`);
+          }
+        } else {
+          // icon 在右侧，原有逻辑
+          const minRequiredSpace = iconWidth + panelAvoidGap + minPanelWidth;
+
+          if (rightSpace >= minRequiredSpace) {
+            // 右侧空间足够放置 icon + panel
+            panelWidth = Math.min(maxPanelWidth, rightSpace - iconWidth - panelAvoidGap - scrollbarAwareEdge);
+            panelRight = scrollbarAwareEdge + iconWidth + panelAvoidGap;
+            console.log(`[位置管理器] 右侧空间足够: panelRight=${Math.round(panelRight)}, width=${Math.round(panelWidth)}`);
+          } else if (rightSpace >= iconWidth + panelAvoidGap + scrollbarAwareEdge) {
+            // 右侧空间只能放 icon，panel 需要调整宽度或放左侧
+            if (pageLayout.leftSpace >= minPanelWidth + edgeMargin) {
+              // 左侧空间够，panel 放左侧
+              panelRight = vw - pageLayout.leftSpace + edgeMargin;
+              panelWidth = Math.min(maxPanelWidth, pageLayout.leftSpace - edgeMargin * 2);
+              console.log(`[位置管理器] panel放左侧: panelRight=${Math.round(panelRight)}, width=${Math.round(panelWidth)}`);
+            } else {
+              // 左侧也不够，panel 调整宽度紧贴 icon
+              panelWidth = Math.max(minPanelWidth, rightSpace - iconWidth - panelAvoidGap - scrollbarAwareEdge);
+              panelRight = scrollbarAwareEdge + iconWidth + panelAvoidGap;
+              console.log(`[位置管理器] panel调整宽度: panelRight=${Math.round(panelRight)}, width=${Math.round(panelWidth)}`);
+            }
           }
         }
         // 如果右侧空间连 icon 都放不下，保持默认位置
@@ -854,7 +920,8 @@ if (!window.PanelPositionManager) {
       const vw = window.innerWidth;
       const vh = window.innerHeight;
       const { edgeMargin, iconWidth, panelAvoidGap } = this.config;
-      const minRight = edgeMargin + iconWidth + panelAvoidGap;
+      const scrollbarWidth = this.getScrollbarWidth();
+      const minRight = edgeMargin + scrollbarWidth + iconWidth + panelAvoidGap;
 
       // 排除自身
       const excludeElements = [c.iconEl, c.panelEl].filter(Boolean);
@@ -1169,7 +1236,8 @@ if (!window.PanelPositionManager) {
       const vw = window.innerWidth;
       const vh = window.innerHeight;
       const { edgeMargin, iconWidth, panelAvoidGap } = this.config;
-      const minRight = edgeMargin + iconWidth + panelAvoidGap;
+      const scrollbarWidth = this.getScrollbarWidth();
+      const minRight = edgeMargin + scrollbarWidth + iconWidth + panelAvoidGap;
 
       const excludeElements = [c.iconEl, c.panelEl].filter(Boolean);
 
@@ -1237,8 +1305,9 @@ if (!window.PanelPositionManager) {
         .map(c => c.panelEl)
         .filter(el => el && el.style.display !== 'none');
 
-      // 计算最小 right 值（不能遮挡 icon）
-      const minRight = edgeMargin + iconWidth + panelAvoidGap;
+      // 计算最小 right 值（不能遮挡 icon，需避开滚动条）
+      const scrollbarWidth = this.getScrollbarWidth();
+      const minRight = edgeMargin + scrollbarWidth + iconWidth + panelAvoidGap;
 
       // 先检查首选位置
       const preferredRect = {
@@ -1553,8 +1622,9 @@ if (!window.PanelPositionManager) {
       const { leftSpace, rightSpace, viewportWidth: vw } = layout;
       const { edgeMargin, minPanelWidth, iconWidth, panelAvoidGap } = this.config;
 
-      // 最小 right 值（不能遮挡 icon）
-      const minRight = iconRight + iconWidth + panelAvoidGap;
+      // 最小 right 值（不能遮挡 icon，需避开滚动条）
+      const scrollbarWidth = this.getScrollbarWidth();
+      const minRight = iconRight + iconWidth + panelAvoidGap + scrollbarWidth;
 
       // 尝试放在右侧空白
       if (rightSpace >= panelWidth + edgeMargin) {
@@ -1901,8 +1971,11 @@ if (!window.PanelPositionManager) {
       const vw = window.innerWidth;
       const { edgeMargin, iconWidth, panelAvoidGap } = this.config;
 
-      // 计算最小 right 值（不能遮挡 icon）
-      const minRight = edgeMargin + iconWidth + panelAvoidGap;
+      // icon 在左侧时，panel 不需要避开右侧 icon 区域
+      const scrollbarWidth = this.getScrollbarWidth();
+      const minRight = this.iconOnLeftSide
+        ? edgeMargin + scrollbarWidth
+        : edgeMargin + scrollbarWidth + iconWidth + panelAvoidGap;
       const maxRight = vw - width - edgeMargin;
       const constrainedRight = Math.max(minRight, Math.min(right, maxRight));
 

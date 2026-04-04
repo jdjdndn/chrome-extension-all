@@ -2,7 +2,6 @@
 // Space(短按): 点击 | Space(长按): 选文本 | X: 右击
 (function() {
   'use strict';
-  let hoveredEl = null;
   let mouseX = 0, mouseY = 0;
   let spaceHeld = false;
   let spaceDownTime = 0;
@@ -15,7 +14,6 @@
   document.body.style.outline = 'none';
 
   // 鼠标追踪
-  document.addEventListener('mouseover', (e) => { hoveredEl = e.target; }, true);
   document.addEventListener('mousemove', (e) => {
     mouseX = e.clientX;
     mouseY = e.clientY;
@@ -94,8 +92,50 @@
     showHint('Space:按住移动选文本');
   }
 
+  // 递归穿透 shadow root，获取坐标处最深层元素
+  function deepElementFromPoint(x, y) {
+    let el = document.elementFromPoint(x, y);
+    if (!el) return null;
+    let maxDepth = 20;
+    while (el && el.shadowRoot && maxDepth-- > 0) {
+      const inner = el.shadowRoot.elementFromPoint(x, y);
+      if (!inner || inner === el) break;
+      el = inner;
+    }
+    return el;
+  }
+
+  /** 查找真正的点击目标：优先选择被覆盖层遮挡的媒体元素 */
+  function findClickTarget(x, y) {
+    let el = deepElementFromPoint(x, y);
+    if (!el) return null;
+
+    if (el.tagName === 'VIDEO' || el.tagName === 'AUDIO') return el;
+
+    const all = document.elementsFromPoint(x, y);
+    for (const candidate of all) {
+      if (candidate.tagName === 'VIDEO' || candidate.tagName === 'AUDIO') {
+        if (!isInteractiveElement(el)) {
+          el = candidate;
+        }
+        break;
+      }
+    }
+    return el;
+  }
+
+  function isInteractiveElement(el) {
+    const tags = ['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA', 'LABEL'];
+    if (tags.includes(el.tagName)) return true;
+    if (el.isContentEditable) return true;
+    const role = el.getAttribute('role');
+    if (['button', 'link', 'tab', 'menuitem', 'checkbox', 'radio', 'switch'].includes(role)) return true;
+    return false;
+  }
+
   function doClick(e) {
-    if (!hoveredEl || !document.body.contains(hoveredEl)) return;
+    const el = findClickTarget(mouseX, mouseY);
+    if (!el || !el.isConnected) return;
     e.preventDefault(); e.stopPropagation();
 
     // 使用鼠标实际位置（而非元素中心），确保点击精确位置
@@ -103,25 +143,26 @@
     const clientX = mouseX;
     const clientY = mouseY;
 
-    hoveredEl.dispatchEvent(new MouseEvent('mousedown', {
+    el.dispatchEvent(new MouseEvent('mousedown', {
       bubbles: true, cancelable: true,
       clientX, clientY, button: 0, buttons: 1
     }));
-    hoveredEl.dispatchEvent(new MouseEvent('mouseup', {
+    el.dispatchEvent(new MouseEvent('mouseup', {
       bubbles: true, cancelable: true,
       clientX, clientY, button: 0, buttons: 0
     }));
-    hoveredEl.dispatchEvent(new MouseEvent('click', {
+    el.dispatchEvent(new MouseEvent('click', {
       bubbles: true, cancelable: true,
       clientX, clientY, button: 0, buttons: 0
     }));
   }
 
   function doRightClick(e) {
-    if (!hoveredEl || !document.body.contains(hoveredEl)) return;
+    const el = findClickTarget(mouseX, mouseY);
+    if (!el || !el.isConnected) return;
     e.preventDefault(); e.stopPropagation();
-    const r = hoveredEl.getBoundingClientRect();
-    hoveredEl.dispatchEvent(new MouseEvent('contextmenu', {
+    const r = el.getBoundingClientRect();
+    el.dispatchEvent(new MouseEvent('contextmenu', {
       bubbles: true, cancelable: true,
       clientX: r.left + r.width / 2, clientY: r.top + r.height / 2,
       button: 2, buttons: 2,
