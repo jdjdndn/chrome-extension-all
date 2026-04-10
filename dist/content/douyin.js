@@ -323,6 +323,9 @@ function debounceById(fn, delay = 400) {
   };
 }
 
+// 标记自动触发的键盘事件，防止与用户操作混淆
+let isAutoTriggered = false;
+
 const triggerKeyboardEvent = debounceById(function (eventType, eventData) {
   // 添加 bubbles 和 cancelable 确保事件能冒泡和被正常处理
   const event = new KeyboardEvent(eventType, {
@@ -331,8 +334,10 @@ const triggerKeyboardEvent = debounceById(function (eventType, eventData) {
     ...eventData
   });
   // 优先尝试派发到焦点元素，再冒泡到 document
+  isAutoTriggered = true;
   const target = document.activeElement || document.body;
   target.dispatchEvent(event);
+  isAutoTriggered = false;
 }, 400);
 
 function isManualNavigation(videoId) {
@@ -720,6 +725,9 @@ function processCurrentVideo() {
     return;
   }
 
+  // 重置方向（兜底：方向已设置但未被上述分支处理的情况）
+  lastNavigationDirection = null;
+
   // 如果视频在本次会话中被用户返回过，跳过所有自动处理
   if (returnedVideosThisSession.has(videoId)) {
     if (currentVideoId !== videoId) {
@@ -989,14 +997,18 @@ function init() {
 
   // 监听用户上滑操作，取消自动下滑检测
   document.addEventListener('keydown', (e) => {
+    // 跳过脚本自动触发的键盘事件，仅响应用户操作
+    if (isAutoTriggered) return;
     if (e.key === 'ArrowUp' || e.keyCode === 38) {
       console.log('[用户操作] 检测到键盘上滑，取消所有自动下滑检测');
+      lastNavigationDirection = 'up';
       VideoChangeChecker.cancelAll();
       disableAutoPlay();
     }
     // 用户手动下滑也取消检测（表示用户接管控制）
     if (e.key === 'ArrowDown' || e.keyCode === 40) {
       console.log('[用户操作] 检测到键盘下滑，取消自动下滑检测');
+      lastNavigationDirection = 'down';
       VideoChangeChecker.cancelAll();
     }
   });
@@ -1059,6 +1071,7 @@ function init() {
       wheelTimeout = setTimeout(() => {
         if (wheelDeltaY > 50) {
           console.log(`[用户操作] 检测到滚轮上滑 (累积=${wheelDeltaY.toFixed(1)}px)，取消所有自动下滑检测`);
+          lastNavigationDirection = 'up';
           VideoChangeChecker.cancelAll();
           disableAutoPlay();
         }
@@ -1072,6 +1085,7 @@ function init() {
       wheelTimeout = setTimeout(() => {
         if (wheelDeltaY < -50) {
           console.log(`[用户操作] 检测到滚轮下滑 (累积=${Math.abs(wheelDeltaY).toFixed(1)}px)，取消自动下滑检测`);
+          lastNavigationDirection = 'down';
           VideoChangeChecker.cancelAll();
         }
         wheelDeltaY = 0;

@@ -90,9 +90,10 @@ if (window.KeyboardClickLoaded) {
 
         switch (e.key) {
           case ' ':
-            // 空格按下时禁用默认事件（防止页面滚动）
+            // 空格按下时完全阻止事件传播和默认行为
+            // stopImmediatePropagation 阻止同元素其他 capture 监听器触发
             e.preventDefault();
-            e.stopPropagation();
+            e.stopImmediatePropagation();
             if (!this.spaceHeld && !this.spaceTimer) {
               this.spaceDownTime = Date.now();
               // 设置长按定时器，超时后进入选择模式
@@ -116,6 +117,9 @@ if (window.KeyboardClickLoaded) {
 
       document.addEventListener('keyup', (e) => {
         if (e.key === ' ' && !this._isComboKey(e)) {
+          // 阻止 keyup 的默认行为和传播，防止页面其他监听器二次处理空格键
+          e.preventDefault();
+          e.stopImmediatePropagation();
           this._onSpaceUp(e);
         }
       }, true);
@@ -278,8 +282,10 @@ if (window.KeyboardClickLoaded) {
 
       // 检查当前位置下方是否有媒体元素被遮挡
       const all = document.elementsFromPoint(x, y);
+      let foundMedia = false;
       for (const candidate of all) {
         if (candidate.tagName === 'VIDEO' || candidate.tagName === 'AUDIO') {
+          foundMedia = true;
           // 只有当前元素不是交互元素（按钮/链接等）时，才切换到媒体元素
           if (!this._isInteractiveElement(el)) {
             el = candidate;
@@ -288,7 +294,43 @@ if (window.KeyboardClickLoaded) {
         }
       }
 
+      // 兜底：elementsFromPoint 无法找到 pointer-events:none 或 shadow DOM 内的 video
+      if (!foundMedia && !this._isInteractiveElement(el)) {
+        const media = this._findMediaByRect(x, y);
+        if (media) el = media;
+      }
+
       return el;
+    }
+
+    /**
+     * 通过 bounding rect 查找坐标处的媒体元素（兜底方案）。
+     * 处理 video/audio 设置了 pointer-events:none 或位于 shadow DOM 内，
+     * 导致 elementsFromPoint 无法检测到的情况。
+     */
+    _findMediaByRect(x, y) {
+      const check = (video) => {
+        const rect = video.getBoundingClientRect();
+        return (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) ? video : null;
+      };
+
+      // 文档级 video/audio
+      for (const media of document.querySelectorAll('video, audio')) {
+        const found = check(media);
+        if (found) return found;
+      }
+
+      // shadow DOM 内的 video/audio
+      for (const host of document.querySelectorAll('*')) {
+        if (host.shadowRoot) {
+          for (const media of host.shadowRoot.querySelectorAll('video, audio')) {
+            const found = check(media);
+            if (found) return found;
+          }
+        }
+      }
+
+      return null;
     }
 
     /** 判断元素是否为交互元素（按钮/链接等），交互元素应保留原始点击目标 */

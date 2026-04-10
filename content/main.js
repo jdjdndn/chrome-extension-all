@@ -31,6 +31,11 @@
    */
   function loadScript(src) {
     return new Promise((resolve) => {
+      if (!chrome?.runtime?.getURL) {
+        console.warn('[Main] 非 Chrome 扩展环境，跳过加载:', src);
+        resolve();
+        return;
+      }
       const script = document.createElement('script');
       script.src = chrome.runtime.getURL(src);
       script.onload = () => {

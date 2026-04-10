@@ -1121,3 +1121,153 @@ function importFromBookmarks() {
 
 // 绑定导入按钮事件
 document.getElementById('importBookmarkBtn').addEventListener('click', importFromBookmarks);
+
+// ========== 空格点击 ==========
+// Space短按: 点击鼠标位置元素
+// Space长按: 从鼠标位置开始选文本，移动鼠标扩展，松开确认复制
+(function() {
+  let mouseX = 0, mouseY = 0;
+  let spaceDownTime = 0;
+  let spaceHeld = false;
+  let spaceTimer = null;
+  let selectAnchor = null;
+  let selectTooltip = null;
+  const LONG_PRESS_THRESHOLD = 300;
+
+  // 追踪鼠标坐标
+  document.addEventListener('mousemove', (e) => {
+    mouseX = e.clientX;
+    mouseY = e.clientY;
+    if (spaceHeld) extendSelectionTo(e.clientX, e.clientY);
+  }, true);
+
+  // 判断是否为输入框聚焦
+  function isInputFocused() {
+    const el = document.activeElement;
+    if (!el) return false;
+    const tag = el.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+    if (el.isContentEditable) return true;
+    if (tag === 'INPUT') {
+      const type = (el.type || '').toLowerCase();
+      const nonText = ['checkbox', 'radio', 'submit', 'button', 'reset', 'image', 'color', 'range', 'file'];
+      if (nonText.includes(type)) return false;
+    }
+    return false;
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== ' ') return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (isInputFocused()) return;
+
+    e.preventDefault();
+    e.stopImmediatePropagation();
+
+    if (!spaceHeld && !spaceTimer) {
+      spaceDownTime = Date.now();
+      spaceTimer = setTimeout(() => {
+        startTextSelection();
+        spaceTimer = null;
+      }, LONG_PRESS_THRESHOLD);
+    }
+  }, true);
+
+  document.addEventListener('keyup', (e) => {
+    if (e.key !== ' ') return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (isInputFocused()) return;
+
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    onSpaceUp();
+  }, true);
+
+  function onSpaceUp() {
+    if (spaceTimer) {
+      clearTimeout(spaceTimer);
+      spaceTimer = null;
+      window.getSelection().removeAllRanges();
+      doClick();
+      return;
+    }
+    if (spaceHeld) {
+      spaceHeld = false;
+      const sel = window.getSelection();
+      const text = sel.toString().trim();
+      if (text) {
+        navigator.clipboard.writeText(text).then(() => {
+          showHint('已复制 ' + text.length + ' 字');
+          setTimeout(hideHint, 1200);
+        }).catch(() => hideHint());
+      } else {
+        sel.removeAllRanges();
+        hideHint();
+      }
+      selectAnchor = null;
+    }
+  }
+
+  function doClick() {
+    const el = document.elementFromPoint(mouseX, mouseY);
+    if (!el) return;
+    el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, clientX: mouseX, clientY: mouseY, button: 0, buttons: 1 }));
+    el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, clientX: mouseX, clientY: mouseY, button: 0, buttons: 0 }));
+    el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: mouseX, clientY: mouseY, button: 0, buttons: 0 }));
+  }
+
+  function startTextSelection() {
+    const anchor = document.caretRangeFromPoint ? document.caretRangeFromPoint(mouseX, mouseY) : null;
+    if (!anchor) return;
+    spaceHeld = true;
+    selectAnchor = anchor;
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(anchor.cloneRange());
+    showHint('Space:按住移动选文本');
+  }
+
+  function extendSelectionTo(cx, cy) {
+    if (!selectAnchor) return;
+    const focus = document.caretRangeFromPoint ? document.caretRangeFromPoint(cx, cy) : null;
+    if (!focus) return;
+    try {
+      const range = document.createRange();
+      const cmp = selectAnchor.startContainer.compareDocumentPosition(focus.startContainer);
+      if (cmp & Node.DOCUMENT_POSITION_FOLLOWING || (!cmp && selectAnchor.startOffset < focus.startOffset)) {
+        range.setStart(selectAnchor.startContainer, selectAnchor.startOffset);
+        range.setEnd(focus.startContainer, focus.startOffset);
+      } else {
+        range.setStart(focus.startContainer, focus.startOffset);
+        range.setEnd(selectAnchor.startContainer, selectAnchor.startOffset);
+      }
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    } catch (_) {}
+  }
+
+  function showHint(text) {
+    hideHint();
+    const tip = document.createElement('div');
+    tip.textContent = text;
+    tip.style.cssText = 'position:fixed;bottom:12px;left:50%;transform:translateX(-50%);' +
+      'background:rgba(0,0,0,0.8);color:#fff;padding:4px 12px;border-radius:4px;' +
+      'font:12px monospace;z-index:2147483647;pointer-events:none;';
+    document.body.appendChild(tip);
+    selectTooltip = tip;
+  }
+
+  function hideHint() {
+    if (selectTooltip) { selectTooltip.remove(); selectTooltip = null; }
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && spaceHeld) {
+      window.getSelection().removeAllRanges();
+      spaceHeld = false;
+      selectAnchor = null;
+      hideHint();
+    }
+  }, true);
+})();

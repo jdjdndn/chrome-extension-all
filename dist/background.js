@@ -1045,16 +1045,14 @@ async function injectScriptsOnTabActivate(tabId) {
       return;
     }
 
-    // 检查是否在待注入列表中
-    if (pendingTabs[tabKey]) {
-      console.log(`[Background] Tab ${tabId} 激活，开始注入脚本`);
-      await injectAllScriptsForTab(tabId, tab.url);
+    // Tab 未注入过，尝试注入（不要求在 pendingTabs 中，覆盖启动时 URL 未就绪的情况）
+    console.log(`[Background] Tab ${tabId} 激活，开始注入脚本`);
+    await injectAllScriptsForTab(tabId, tab.url);
 
-      // 更新记录
-      injectedTabs[tabKey] = Date.now();
-      delete pendingTabs[tabKey];
-      await chrome.storage.local.set({ injectedTabs, pendingInjectionTabs: pendingTabs });
-    }
+    // 更新记录
+    injectedTabs[tabKey] = Date.now();
+    delete pendingTabs[tabKey];
+    await chrome.storage.local.set({ injectedTabs, pendingInjectionTabs: pendingTabs });
   } catch (error) {
     // tab 可能已关闭
     console.log(`[Background] Tab ${tabId} 注入失败:`, error.message);
@@ -1094,7 +1092,7 @@ async function injectAllScriptsForTab(tabId, tabUrl) {
       return;
     }
 
-    // 首先检查脚本是否已经注入过（检查 window.ExtensionAPI 是否存在）
+    // 检查基础脚本是否已注入（core-bundle.js 由 manifest.json 自动注入）
     const checkResult = await chrome.scripting.executeScript({
       target: { tabId },
       func: () => {
@@ -1102,12 +1100,7 @@ async function injectAllScriptsForTab(tabId, tabUrl) {
       }
     });
 
-    const alreadyInjected = checkResult && checkResult[0]?.result;
-
-    if (alreadyInjected) {
-      console.log(`[Background] 标签页 ${tabId} 脚本已存在，跳过注入`);
-      return;
-    }
+    const baseAlreadyInjected = checkResult && checkResult[0]?.result;
 
     const url = new URL(tabUrl);
     const hostname = url.hostname;
@@ -1137,16 +1130,25 @@ async function injectAllScriptsForTab(tabId, tabUrl) {
       'modelscope.cn': ['content/bundled/modelscope.bundle.js']
     };
 
-    // 收集需要注入的脚本
-    const scriptsToInject = [...baseScripts];
+    // 收集需要注入的脚本：基础脚本仅未注入时添加，域名脚本始终尝试注入
+    const scriptsToInject = [];
 
-    // 添加域名特定脚本
+    if (!baseAlreadyInjected) {
+      scriptsToInject.push(...baseScripts);
+    }
+
+    // 域名特定脚本始终尝试注入（各脚本有自己的防重复加载机制）
     for (const [domain, scripts] of Object.entries(domainScripts)) {
       if (hostname === domain || hostname.endsWith('.' + domain)) {
         scriptsToInject.push(...scripts);
         console.log(`[Background] 为 ${hostname} 添加域名脚本:`, scripts);
         break;
       }
+    }
+
+    if (scriptsToInject.length === 0) {
+      console.log(`[Background] 标签页 ${tabId} 脚本已存在且无域名脚本，跳过注入`);
+      return;
     }
 
     // 依次注入所有脚本
