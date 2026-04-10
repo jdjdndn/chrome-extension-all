@@ -1349,15 +1349,6 @@ async function deleteSelector(selector) {
   await renderHideSelectorsList();
 }
 
-/**
- * 转义 HTML
- */
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-
 // Add event listeners for hide elements
 if (hideElementsEnabledCheckbox) {
   hideElementsEnabledCheckbox.addEventListener('change', () => {

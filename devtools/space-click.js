@@ -161,10 +161,9 @@
     const el = findClickTarget(mouseX, mouseY);
     if (!el || !el.isConnected) return;
     e.preventDefault(); e.stopPropagation();
-    const r = el.getBoundingClientRect();
     el.dispatchEvent(new MouseEvent('contextmenu', {
       bubbles: true, cancelable: true,
-      clientX: r.left + r.width / 2, clientY: r.top + r.height / 2,
+      clientX: mouseX, clientY: mouseY,
       button: 2, buttons: 2,
     }));
   }

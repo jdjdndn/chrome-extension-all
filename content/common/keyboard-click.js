@@ -384,10 +384,9 @@ if (window.KeyboardClickLoaded) {
       if (!el || !el.isConnected) return;
       e.preventDefault();
       e.stopPropagation();
-      const r = el.getBoundingClientRect();
       el.dispatchEvent(new MouseEvent('contextmenu', {
         bubbles: true, cancelable: true,
-        clientX: r.left + r.width / 2, clientY: r.top + r.height / 2,
+        clientX: this.mouseX, clientY: this.mouseY,
         button: 2, buttons: 2,
       }));
     }
@@ -413,6 +412,7 @@ if (window.KeyboardClickLoaded) {
 
     // ========== DOM 变化 ==========
     _startObserver() {
+      if (typeof DOMUtils === 'undefined') return;
       this.observer = DOMUtils.createDebouncedObserver(() => {
         if (this.hoveredEl && !document.body.contains(this.hoveredEl)) {
           this.hoveredEl = null;

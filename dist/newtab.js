@@ -95,6 +95,17 @@ function initSettings() {
   loadHistory();
 }
 
+// ========== 工具函数 ==========
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function safeHostname(url) {
+  try { return new URL(url).hostname; } catch { return url; }
+}
+
 // ========== 历史记录相关 ==========
 const historyContainer = document.getElementById('historyContainer');
 
@@ -198,14 +209,14 @@ function renderHistory(domains) {
     <div class="history-domain">
       <div class="history-domain-header">
         <span class="history-domain-icon">${getDomainIcon(domain.domain)}</span>
-        <span class="history-domain-name">${domain.domain}</span>
+        <span class="history-domain-name">${escapeHtml(domain.domain)}</span>
         <span class="history-domain-count">${domain.urls.length}</span>
       </div>
       <div class="history-urls">
         ${domain.urls.map(urlItem => `
-          <a href="${urlItem.url}" class="history-url-item" title="${urlItem.title}">
+          <a href="${escapeHtml(urlItem.url)}" class="history-url-item" title="${escapeHtml(urlItem.title)}">
             <span class="history-url-icon">📄</span>
-            <span class="history-url-title">${urlItem.title}</span>
+            <span class="history-url-title">${escapeHtml(urlItem.title)}</span>
           </a>
         `).join('')}
       </div>
@@ -809,26 +820,26 @@ function renderLearnResources(categories) {
   }
 
   learnSection.innerHTML = categories.map(category => `
-    <div class="learn-category" data-id="${category.id}">
+    <div class="learn-category" data-id="${escapeHtml(category.id)}">
       <div class="learn-category-header">
         <div class="learn-category-title">
           <span class="learn-category-icon">${category.icon}</span>
-          <span>${category.name}</span>
+          <span>${escapeHtml(category.name)}</span>
         </div>
         <div class="learn-category-actions">
-          <button class="learn-category-btn" data-action="add-link" data-category="${category.id}">添加链接</button>
-          <button class="learn-category-btn delete" data-action="delete-category" data-category="${category.id}">删除分类</button>
+          <button class="learn-category-btn" data-action="add-link" data-category="${escapeHtml(category.id)}">添加链接</button>
+          <button class="learn-category-btn delete" data-action="delete-category" data-category="${escapeHtml(category.id)}">删除分类</button>
         </div>
       </div>
       <div class="learn-links-grid">
         ${category.links.map((link, index) => `
-          <a href="${link.url}" target="_blank" class="learn-link-item" data-category="${category.id}" data-index="${index}">
-            <img src="${link.favicon || getFaviconUrl(link.url)}" class="learn-link-favicon" alt="">
+          <a href="${escapeHtml(link.url)}" target="_blank" class="learn-link-item" data-category="${escapeHtml(category.id)}" data-index="${index}">
+            <img src="${escapeHtml(link.favicon || getFaviconUrl(link.url))}" class="learn-link-favicon" alt="">
             <div class="learn-link-info">
-              <div class="learn-link-name">${link.name}</div>
-              <div class="learn-link-url">${new URL(link.url).hostname}</div>
+              <div class="learn-link-name">${escapeHtml(link.name)}</div>
+              <div class="learn-link-url">${escapeHtml(safeHostname(link.url))}</div>
             </div>
-            <button class="learn-link-delete" data-action="delete-link" data-category="${category.id}" data-index="${index}">✕</button>
+            <button class="learn-link-delete" data-action="delete-link" data-category="${escapeHtml(category.id)}" data-index="${index}">✕</button>
           </a>
         `).join('')}
       </div>
