@@ -2117,6 +2117,35 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
+// ========== 暗黑模式 ==========
+document.addEventListener('DOMContentLoaded', async () => {
+  const themeToggle = document.getElementById('theme-toggle');
+  if (!themeToggle) return;
+
+  // 加载主题设置
+  const result = await chrome.storage.local.get('theme');
+  const savedTheme = result.theme || 'light';
+  applyTheme(savedTheme);
+
+  themeToggle.addEventListener('click', async () => {
+    const currentTheme = document.body.classList.contains('dark-mode') ? 'dark' : 'light';
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    applyTheme(newTheme);
+    await chrome.storage.local.set({ theme: newTheme });
+  });
+});
+
+function applyTheme(theme) {
+  const themeToggle = document.getElementById('theme-toggle');
+  if (theme === 'dark') {
+    document.body.classList.add('dark-mode');
+    if (themeToggle) themeToggle.textContent = '☀️';
+  } else {
+    document.body.classList.remove('dark-mode');
+    if (themeToggle) themeToggle.textContent = '🌙';
+  }
+}
+
 // ========== 导出/导入设置 ==========
 document.addEventListener('DOMContentLoaded', () => {
   const exportBtn = document.getElementById('export-settings-btn');

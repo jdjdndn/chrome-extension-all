@@ -19,7 +19,61 @@
           "Helvetica Neue", Arial, sans-serif;
         background: linear-gradient(135deg, #f5f7fa 0%, #f8f9fa 100%);
         color: #212529;
+        transition: background 0.3s, color 0.3s;
       }
+
+      /* 暗黑模式 */
+      body.dark-mode {
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        color: #e9ecef;
+      }
+
+      body.dark-mode h1 { color: #f8f9fa; }
+      body.dark-mode h2 { color: #dee2e6; }
+      body.dark-mode h3 { color: #ced4da; }
+      body.dark-mode .status.active {
+        background: linear-gradient(135deg, #1b4332 0%, #2d6a4f 100%);
+        color: #a7f3d0;
+        border-color: #40916c;
+      }
+      body.dark-mode .status.inactive {
+        background: linear-gradient(135deg, #4a1f1f 0%, #6b2c2c 100%);
+        color: #fca5a5;
+        border-color: #991b1b;
+      }
+      body.dark-mode .settings {
+        background: #1e2a3a;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      }
+      body.dark-mode .nav-btn {
+        background: #2d3748;
+        color: #a0aec0;
+        border-color: #4a5568;
+      }
+      body.dark-mode .nav-btn.active {
+        background: linear-gradient(135deg, #3182ce 0%, #2b6cb0 100%);
+        color: white;
+        border-color: #3182ce;
+      }
+      body.dark-mode input[type="text"],
+      body.dark-mode input[type="number"],
+      body.dark-mode select,
+      body.dark-mode textarea {
+        background: #2d3748;
+        border-color: #4a5568;
+        color: #e2e8f0;
+      }
+      body.dark-mode .domain-list { background: #2d3748; }
+      body.dark-mode .domain-list-item { background: #1a202c; }
+      body.dark-mode .domain-text { color: #a0aec0; }
+      body.dark-mode .selector-item { background: #2d3748; border-color: #4a5568; }
+      body.dark-mode .info-box {
+        background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
+        border-left-color: #3182ce;
+      }
+      body.dark-mode .info-box strong { color: #e2e8f0; }
+      body.dark-mode .info-box small { color: #a0aec0; }
+      body.dark-mode #local-server-status { background: #2d3748; }
 
       .header {
         margin-bottom: 16px;
@@ -437,6 +491,7 @@
   <body>
     <div class="header">
       <h1>My Extension</h1>
+      <button id="theme-toggle" style="position: absolute; top: 16px; right: 16px; padding: 4px 8px; font-size: 12px; background: transparent; border: 1px solid #dee2e6; border-radius: 4px; cursor: pointer; box-shadow: none;">🌙</button>
     </div>
 
     <div id="status" class="status inactive">Inactive</div>
