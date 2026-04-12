@@ -25,3 +25,12 @@ Thumbs.db
 *.swo
 
 .claude/
+
+# Chrome Web Store
+_metadata/
+
+# Claude-mem plugin
+.remember/
+
+# Crash dumps
+*.stackdump
