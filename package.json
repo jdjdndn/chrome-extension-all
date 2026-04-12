@@ -9,10 +9,19 @@
     "clean": "node scripts/watch-and-sync.js --clean",
     "build": "node scripts/watch-and-sync.js --clean",
     "sync": "node scripts/watch-and-sync.js --once",
-    "watch": "node scripts/watch-and-sync.js"
+    "watch": "node scripts/watch-and-sync.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "esbuild": "^0.27.4"
+    "@types/chrome": "^0.1.40",
+    "@vitest/coverage-v8": "^4.1.4",
+    "esbuild": "^0.27.4",
+    "jsdom": "^29.0.2",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.4"
   },
   "engines": {
     "node": ">=14.0.0"
