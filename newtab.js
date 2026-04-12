@@ -217,6 +217,82 @@ async function loadHistory() {
     console.error('加载历史记录失败:', error);
     historyContainer.innerHTML = '<div class="history-empty">加载历史记录失败</div>';
   }
+
+  // 加载书签
+  loadBookmarks();
+}
+
+// 加载书签
+async function loadBookmarks() {
+  const bookmarksContainer = document.getElementById('bookmarksContainer');
+  if (!bookmarksContainer) return;
+
+  try {
+    const tree = await chrome.bookmarks.getTree();
+    const bookmarks = flattenBookmarks(tree);
+
+    if (bookmarks.length === 0) {
+      bookmarksContainer.innerHTML = '<div class="history-empty">暂无书签</div>';
+      return;
+    }
+
+    // 按访问频率排序（使用最近添加的）
+    const recentBookmarks = bookmarks
+      .filter(b => b.url)
+      .sort((a, b) => (b.dateAdded || 0) - (a.dateAdded || 0))
+      .slice(0, 10);
+
+    // 按域名分组
+    const domainMap = new Map();
+    recentBookmarks.forEach(b => {
+      try {
+        const domain = new URL(b.url).hostname;
+        if (!domainMap.has(domain)) {
+          domainMap.set(domain, { domain, urls: [] });
+        }
+        domainMap.get(domain).urls.push({
+          url: b.url,
+          title: b.title || domain
+        });
+      } catch (e) {}
+    });
+
+    // 渲染书签
+    bookmarksContainer.innerHTML = Array.from(domainMap.values()).map(domain => `
+      <div class="history-domain">
+        <div class="history-domain-header">
+          <span class="history-domain-icon">${getDomainIcon(domain.domain)}</span>
+          <span class="history-domain-name">${escapeHtml(domain.domain)}</span>
+          <span class="history-domain-count">${domain.urls.length}</span>
+        </div>
+        <div class="history-urls">
+          ${domain.urls.map(urlItem => `
+            <a href="${escapeHtml(urlItem.url)}" class="history-url-item" title="${escapeHtml(urlItem.title)}">
+              <span class="history-url-icon">📄</span>
+              <span class="history-url-title">${escapeHtml(urlItem.title)}</span>
+            </a>
+          `).join('')}
+        </div>
+      </div>
+    `).join('');
+  } catch (error) {
+    console.error('加载书签失败:', error);
+    bookmarksContainer.innerHTML = '<div class="history-empty">加载书签失败</div>';
+  }
+}
+
+// 扁平化书签树
+function flattenBookmarks(nodes) {
+  const result = [];
+  for (const node of nodes) {
+    if (node.url) {
+      result.push(node);
+    }
+    if (node.children) {
+      result.push(...flattenBookmarks(node.children));
+    }
+  }
+  return result;
 }
 
 // 渲染历史记录
