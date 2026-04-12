@@ -130,14 +130,64 @@ function safeHostname(url) {
 // ========== 历史记录相关 ==========
 const historyContainer = document.getElementById('historyContainer');
 
-// 获取域名图标
+// 获取域名图标URL
 function getDomainIcon(domain) {
-  const icons = ['🌐', '🔗', '📌', '⭐', '🚀', '💡', '🎯', '📱', '💻', '🎨'];
+  // 使用Google的favicon服务获取真实图标
+  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=32`;
+}
+
+// 获取域名图标备用emoji
+function getDomainEmoji(domain) {
+  const domainEmojis = {
+    'google': '🔍',
+    'baidu': '🔎',
+    'github': '🐙',
+    'bilibili': '📺',
+    'youtube': '▶️',
+    'twitter': '🐦',
+    'x.com': '❌',
+    'facebook': '📘',
+    'weibo': '🔴',
+    'zhihu': '🧠',
+    'juejin': '💎',
+    'taobao': '🛒',
+    'jd': '🛍️',
+    'tmall': '🐱',
+    'douyin': '🎵',
+    'xiaohongshu': '📕',
+    'weixin': '💬',
+    'qq': '🐧',
+    'netflix': '🎬',
+    'spotify': '🎵',
+    'reddit': '🤖',
+    'linkedin': '💼',
+    'stackoverflow': '📚',
+    'medium': '📝',
+    'notion': '📓',
+    'figma': '🎨',
+    'dribbble': '🏀',
+    'behance': '🎨'
+  };
+
+  for (const [key, emoji] of Object.entries(domainEmojis)) {
+    if (domain.includes(key)) return emoji;
+  }
+
+  // 默认图标
+  const defaultIcons = ['🌐', '🔗', '📌', '⭐', '🚀', '💡', '🎯', '📱', '💻', '🎨'];
   let hash = 0;
   for (let i = 0; i < domain.length; i++) {
     hash = domain.charCodeAt(i) + ((hash << 5) - hash);
   }
-  return icons[Math.abs(hash) % icons.length];
+  return defaultIcons[Math.abs(hash) % defaultIcons.length];
+}
+
+// 创建图标元素
+function createDomainIcon(domain) {
+  const iconUrl = getDomainIcon(domain);
+  const fallbackEmoji = getDomainEmoji(domain);
+
+  return `<img src="${iconUrl}" alt="${escapeHtml(domain)}" style="width: 20px; height: 20px; border-radius: 4px; vertical-align: middle;" onerror="this.style.display='none';this.nextElementSibling.style.display='inline';"><span style="display: none;">${fallbackEmoji}</span>`;
 }
 
 // 获取页面标题
@@ -261,7 +311,7 @@ async function loadBookmarks() {
     bookmarksContainer.innerHTML = Array.from(domainMap.values()).map(domain => `
       <div class="history-domain">
         <div class="history-domain-header">
-          <span class="history-domain-icon">${getDomainIcon(domain.domain)}</span>
+          <span class="history-domain-icon">${createDomainIcon(domain.domain)}</span>
           <span class="history-domain-name">${escapeHtml(domain.domain)}</span>
           <span class="history-domain-count">${domain.urls.length}</span>
         </div>
@@ -305,7 +355,7 @@ function renderHistory(domains) {
   historyContainer.innerHTML = domains.map(domain => `
     <div class="history-domain">
       <div class="history-domain-header">
-        <span class="history-domain-icon">${getDomainIcon(domain.domain)}</span>
+        <span class="history-domain-icon">${createDomainIcon(domain.domain)}</span>
         <span class="history-domain-name">${escapeHtml(domain.domain)}</span>
         <span class="history-domain-count">${domain.urls.length}</span>
       </div>
