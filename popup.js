@@ -2217,6 +2217,41 @@ async function addNotification(message, type = 'info') {
   await chrome.storage.local.set({ notifications: notifications.slice(0, 20) });
 }
 
+// ========== 快速笔记 ==========
+document.addEventListener('DOMContentLoaded', async () => {
+  const noteArea = document.getElementById('quick-note');
+  const saveBtn = document.getElementById('save-note');
+  const clearBtn = document.getElementById('clear-note');
+
+  // 加载笔记
+  const result = await chrome.storage.local.get('quickNote');
+  if (noteArea && result.quickNote) {
+    noteArea.value = result.quickNote;
+  }
+
+  // 自动保存
+  if (noteArea) {
+    noteArea.addEventListener('input', async () => {
+      await chrome.storage.local.set({ quickNote: noteArea.value });
+    });
+  }
+
+  // 保存按钮
+  saveBtn?.addEventListener('click', async () => {
+    await chrome.storage.local.set({ quickNote: noteArea.value });
+    saveBtn.textContent = '已保存 ✓';
+    setTimeout(() => saveBtn.textContent = '保存', 1500);
+  });
+
+  // 清空按钮
+  clearBtn?.addEventListener('click', async () => {
+    if (confirm('确定要清空笔记吗？')) {
+      noteArea.value = '';
+      await chrome.storage.local.remove('quickNote');
+    }
+  });
+});
+
 // ========== 剪贴板历史 ==========
 document.addEventListener('DOMContentLoaded', async () => {
   const list = document.getElementById('clipboard-list');
