@@ -2117,6 +2117,86 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
+// ========== 规则模板库 ==========
+const RULE_TEMPLATES = {
+  ads: {
+    name: '广告拦截',
+    domains: [
+      'googlesyndication.com',
+      'doubleclick.net',
+      'googleadservices.com',
+      'ads.google.com',
+      'pagead2.googlesyndication.com'
+    ]
+  },
+  trackers: {
+    name: '隐私追踪',
+    domains: [
+      'google-analytics.com',
+      'googletagmanager.com',
+      'facebook.net/tr',
+      'connect.facebook.net',
+      'analytics.twitter.com'
+    ]
+  },
+  social: {
+    name: '社交组件',
+    domains: [
+      'platform.twitter.com/widgets',
+      'connect.facebook.net/zh_CN/sdk',
+      'assets.pinterest.com/js/pinit',
+      'platform.linkedin.com/in.js'
+    ]
+  },
+  'video-ads': {
+    name: '视频广告',
+    domains: [
+      'ads.youtube.com',
+      'googleads.g.doubleclick.net',
+      'static.doubleclick.net/instream/ad_status',
+      'pagead2.googlesyndication.com/pagead/ads'
+    ]
+  }
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+  const templateBtns = document.querySelectorAll('.template-btn');
+  templateBtns.forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const templateKey = btn.dataset.template;
+      const template = RULE_TEMPLATES[templateKey];
+      if (!template) return;
+
+      // 获取当前阻止域名
+      const result = await chrome.storage.sync.get('settings');
+      const settings = result.settings || {};
+      const currentBlocked = settings.blockedDomains || [];
+
+      // 合并模板域名
+      const newDomains = [...new Set([...currentBlocked, ...template.domains])];
+
+      // 保存
+      await chrome.storage.sync.set({
+        settings: { ...settings, blockedDomains: newDomains }
+      });
+
+      // 更新UI
+      const originalText = btn.textContent;
+      btn.textContent = '✓ 已添加';
+      btn.style.background = '#c8e6c9';
+      setTimeout(() => {
+        btn.textContent = originalText;
+        btn.style.background = '';
+      }, 1500);
+
+      // 刷新阻止域名列表
+      if (typeof loadBlockedDomains === 'function') {
+        loadBlockedDomains();
+      }
+    });
+  });
+});
+
 // ========== 暗黑模式 ==========
 document.addEventListener('DOMContentLoaded', async () => {
   const themeToggle = document.getElementById('theme-toggle');
