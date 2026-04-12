@@ -762,22 +762,22 @@ function loadQuickLinks() {
     const addBtn = document.getElementById('addLinkBtn');
     quickLinksContainer.innerHTML = '';
 
-    // 默认链接的 URL 集合
-    const defaultUrls = new Set(DEFAULT_LINKS.map(l => l.url));
-
     // 用于去重的 Set（记录已渲染的 URL）
     const renderedUrls = new Set();
 
     // 始终显示默认图标
     DEFAULT_LINKS.forEach(link => {
       if (!renderedUrls.has(link.url)) {
-        quickLinksContainer.appendChild(createQuickLink(link));
+        const el = createQuickLink(link);
+        el.dataset.isDefault = 'true'; // 标记为默认
+        quickLinksContainer.appendChild(el);
         renderedUrls.add(link.url);
       }
     });
 
     // 添加用户保存的图标（排除默认链接和重复）
     if (links && links.length > 0) {
+      const defaultUrls = new Set(DEFAULT_LINKS.map(l => l.url));
       links.forEach(link => {
         // 跳过默认链接和已渲染的 URL
         if (!defaultUrls.has(link.url) && !renderedUrls.has(link.url)) {
