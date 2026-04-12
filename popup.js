@@ -2203,6 +2203,68 @@ async function addNotification(message, type = 'info') {
   await chrome.storage.local.set({ notifications: notifications.slice(0, 20) });
 }
 
+// ========== 剪贴板历史 ==========
+document.addEventListener('DOMContentLoaded', async () => {
+  const list = document.getElementById('clipboard-list');
+  const clearBtn = document.getElementById('clear-clipboard');
+
+  await loadClipboardHistory();
+
+  if (clearBtn) {
+    clearBtn.addEventListener('click', async () => {
+      await chrome.storage.local.remove('clipboardHistory');
+      await loadClipboardHistory();
+    });
+  }
+});
+
+async function loadClipboardHistory() {
+  const list = document.getElementById('clipboard-list');
+  if (!list) return;
+
+  const result = await chrome.storage.local.get('clipboardHistory');
+  const history = result.clipboardHistory || [];
+
+  if (history.length === 0) {
+    list.innerHTML = '<div style="color: #999; text-align: center; padding: 20px;">暂无记录</div>';
+    return;
+  }
+
+  list.innerHTML = history.map((item, i) => `
+    <div class="clipboard-item" style="padding: 8px; margin-bottom: 4px; background: #f8f9fa; border-radius: 4px; cursor: pointer; overflow: hidden;" data-index="${i}">
+      <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(item.text.slice(0, 100))}</div>
+      <div style="font-size: 10px; color: #999; margin-top: 2px;">${new Date(item.time).toLocaleString('zh-CN')}</div>
+    </div>
+  `).join('');
+
+  // 点击复制
+  list.querySelectorAll('.clipboard-item').forEach(el => {
+    el.addEventListener('click', async () => {
+      const index = parseInt(el.dataset.index);
+      const text = history[index]?.text;
+      if (text) {
+        await navigator.clipboard.writeText(text);
+        el.style.background = '#d4edda';
+        setTimeout(() => el.style.background = '', 500);
+      }
+    });
+  });
+}
+
+// 记录剪贴板内容（供content script调用）
+async function recordClipboard(text) {
+  if (!text || text.length > 1000) return;
+
+  const result = await chrome.storage.local.get('clipboardHistory');
+  const history = result.clipboardHistory || [];
+
+  // 去重
+  if (history.some(h => h.text === text)) return;
+
+  history.unshift({ text, time: Date.now() });
+  await chrome.storage.local.set({ clipboardHistory: history.slice(0, 20) });
+}
+
 // ========== 番茄钟 ==========
 let pomodoroTimer = null;
 let pomodoroRemaining = 25 * 60;
