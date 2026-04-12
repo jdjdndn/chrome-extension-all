@@ -1,3 +1,39 @@
+// ========== 每日一言 ==========
+const QUOTES = [
+  { text: '生活不是等待暴风雨过去，而是学会在雨中跳舞。', author: '维维安·格林' },
+  { text: '成功不是终点，失败也不是终结，重要的是继续前进的勇气。', author: '丘吉尔' },
+  { text: '你今天的努力，是幸运的伏笔。当下的付出，是明日的花开。', author: '佚名' },
+  { text: '不要因为走得太远，而忘记为什么出发。', author: '纪伯伦' },
+  { text: '世界上只有一种真正的英雄主义，那就是认清生活的真相后依然热爱生活。', author: '罗曼·罗兰' },
+  { text: '把每一个黎明看作生命的开始，把每一个黄昏看作生命的小结。', author: '罗斯金' },
+  { text: '人生没有彩排，每一天都是现场直播。', author: '佚名' },
+  { text: '真正的强者，不是没有眼泪的人，而是含着眼泪奔跑的人。', author: '佚名' },
+  { text: '时间会证明一切，但你要先给时间一点时间。', author: '佚名' },
+  { text: '与其用泪水悔恨昨天，不如用汗水拼搏今天。', author: '佚名' },
+  { text: '梦想不会逃跑，逃跑的永远是自己。', author: '佚名' },
+  { text: '每一个不曾起舞的日子，都是对生命的辜负。', author: '尼采' },
+  { text: '生命中最难的阶段不是没有人懂你，而是你不懂你自己。', author: '尼采' },
+  { text: '你若盛开，清风自来。', author: '佚名' },
+  { text: '心之所向，素履以往。', author: '佚名' }
+];
+
+function loadDailyQuote() {
+  const quoteText = document.getElementById('quote-text');
+  const quoteAuthor = document.getElementById('quote-author');
+  if (!quoteText) return;
+
+  // 根据日期选择一言（每天固定）
+  const today = new Date();
+  const dayOfYear = Math.floor((today - new Date(today.getFullYear(), 0, 0)) / 86400000);
+  const quote = QUOTES[dayOfYear % QUOTES.length];
+
+  quoteText.textContent = `"${quote.text}"`;
+  quoteAuthor.textContent = `—— ${quote.author}`;
+}
+
+// 初始化
+loadDailyQuote();
+
 // ========== 设置相关 ==========
 const SETTINGS_KEY = 'newtabSettings';
 const DEFAULT_SETTINGS = {
