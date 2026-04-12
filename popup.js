@@ -2117,6 +2117,92 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
+// ========== 通知中心 ==========
+document.addEventListener('DOMContentLoaded', async () => {
+  const bellBtn = document.getElementById('notification-bell');
+  const panel = document.getElementById('notification-panel');
+  const closeBtn = document.getElementById('close-notifications');
+  const clearBtn = document.getElementById('clear-notifications');
+  const badge = document.getElementById('notification-badge');
+
+  // 加载通知
+  await loadNotifications();
+
+  if (bellBtn && panel) {
+    bellBtn.addEventListener('click', () => {
+      panel.style.display = 'block';
+      markNotificationsRead();
+    });
+  }
+
+  if (closeBtn && panel) {
+    closeBtn.addEventListener('click', () => panel.style.display = 'none');
+  }
+
+  if (panel) {
+    panel.addEventListener('click', (e) => {
+      if (e.target === panel) panel.style.display = 'none';
+    });
+  }
+
+  if (clearBtn) {
+    clearBtn.addEventListener('click', async () => {
+      await chrome.storage.local.remove('notifications');
+      await loadNotifications();
+    });
+  }
+});
+
+async function loadNotifications() {
+  const list = document.getElementById('notification-list');
+  const badge = document.getElementById('notification-badge');
+  if (!list) return;
+
+  const result = await chrome.storage.local.get('notifications');
+  const notifications = result.notifications || [];
+
+  if (notifications.length === 0) {
+    list.innerHTML = '<div style="color: #999; text-align: center; padding: 20px;">暂无通知</div>';
+    if (badge) badge.style.display = 'none';
+    return;
+  }
+
+  // 显示未读数量
+  const unreadCount = notifications.filter(n => !n.read).length;
+  if (badge) badge.style.display = unreadCount > 0 ? 'block' : 'none';
+
+  list.innerHTML = notifications.map((n, i) => `
+    <div style="padding: 8px; margin-bottom: 8px; background: ${n.read ? '#f8f9fa' : '#e3f2fd'}; border-radius: 6px; border-left: 3px solid ${n.type === 'success' ? '#28a745' : n.type === 'warning' ? '#ffc107' : '#007bff'};">
+      <div style="font-size: 12px; color: #666; margin-bottom: 4px;">${new Date(n.time).toLocaleString('zh-CN')}</div>
+      <div style="font-size: 13px;">${escapeHtml(n.message)}</div>
+    </div>
+  `).join('');
+}
+
+async function markNotificationsRead() {
+  const result = await chrome.storage.local.get('notifications');
+  const notifications = result.notifications || [];
+  notifications.forEach(n => n.read = true);
+  await chrome.storage.local.set({ notifications });
+
+  const badge = document.getElementById('notification-badge');
+  if (badge) badge.style.display = 'none';
+}
+
+// 添加通知（供其他模块调用）
+async function addNotification(message, type = 'info') {
+  const result = await chrome.storage.local.get('notifications');
+  const notifications = result.notifications || [];
+  notifications.unshift({
+    message,
+    type,
+    time: Date.now(),
+    read: false
+  });
+  // 最多保留20条
+  await chrome.storage.local.set({ notifications: notifications.slice(0, 20) });
+}
+
 // ========== 快捷键帮助面板 ==========
 document.addEventListener('DOMContentLoaded', () => {
   const helpBtn = document.getElementById('shortcuts-help');

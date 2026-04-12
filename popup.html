@@ -492,6 +492,7 @@
     <div class="header" style="position: relative;">
       <h1>My Extension</h1>
       <div style="position: absolute; top: 16px; right: 16px; display: flex; gap: 4px;">
+        <button id="notification-bell" title="通知" style="padding: 4px 8px; font-size: 12px; background: transparent; border: 1px solid #dee2e6; border-radius: 4px; cursor: pointer; box-shadow: none; position: relative;">🔔<span id="notification-badge" style="display: none; position: absolute; top: -2px; right: -2px; width: 8px; height: 8px; background: #dc3545; border-radius: 50%;"></span></button>
         <button id="shortcuts-help" title="快捷键帮助" style="padding: 4px 8px; font-size: 12px; background: transparent; border: 1px solid #dee2e6; border-radius: 4px; cursor: pointer; box-shadow: none;">⌨️</button>
         <button id="theme-toggle" style="padding: 4px 8px; font-size: 12px; background: transparent; border: 1px solid #dee2e6; border-radius: 4px; cursor: pointer; box-shadow: none;">🌙</button>
       </div>
@@ -529,6 +530,20 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- 通知面板 -->
+    <div id="notification-panel" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000;">
+      <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 12px; width: 280px; max-height: 80vh; overflow-y: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h3 style="margin: 0; font-size: 16px;">🔔 通知中心</h3>
+          <button id="close-notifications" style="padding: 4px 8px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; cursor: pointer; font-size: 12px;">✕</button>
+        </div>
+        <div id="notification-list" style="font-size: 13px;">
+          <div style="color: #999; text-align: center; padding: 20px;">暂无通知</div>
+        </div>
+        <button id="clear-notifications" style="width: 100%; margin-top: 12px; padding: 8px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; cursor: pointer; font-size: 12px;">清空所有通知</button>
       </div>
     </div>
 
