@@ -373,6 +373,8 @@ setInterval(updateTime, 1000);
 
 // ========== 搜索功能 ==========
 const searchInput = document.getElementById('searchInput');
+let searchHistoryTimeout = null;
+
 searchInput.addEventListener('keypress', (e) => {
   if (e.key === 'Enter') {
     const query = searchInput.value.trim();
@@ -393,6 +395,62 @@ searchInput.addEventListener('keypress', (e) => {
     }
   }
 });
+
+// 历史记录搜索功能
+searchInput.addEventListener('input', (e) => {
+  const query = searchInput.value.trim().toLowerCase();
+
+  // 防抖处理
+  clearTimeout(searchHistoryTimeout);
+  searchHistoryTimeout = setTimeout(() => {
+    if (query.length >= 2) {
+      searchHistory(query);
+    } else {
+      // 恢复正常历史记录显示
+      loadHistory();
+    }
+  }, 300);
+});
+
+// 搜索历史记录
+async function searchHistory(query) {
+  try {
+    const historyItems = await chrome.history.search({
+      text: query,
+      maxResults: 50,
+      startTime: Date.now() - 30 * 24 * 60 * 60 * 1000 // 最近30天
+    });
+
+    if (historyItems.length === 0) {
+      historyContainer.innerHTML = `<div class="history-empty">未找到包含 "${escapeHtml(query)}" 的记录</div>`;
+      return;
+    }
+
+    // 渲染搜索结果
+    const results = historyItems.slice(0, 20).map(item => ({
+      url: item.url,
+      title: getPageTitle(item.url, item.title),
+      lastVisitTime: item.lastVisitTime
+    }));
+
+    // 按域名分组
+    const domainMap = new Map();
+    results.forEach(item => {
+      try {
+        const domain = new URL(item.url).hostname;
+        if (!domainMap.has(domain)) {
+          domainMap.set(domain, { domain, urls: [] });
+        }
+        domainMap.get(domain).urls.push(item);
+      } catch (e) {}
+    });
+
+    renderHistory(Array.from(domainMap.values()));
+  } catch (error) {
+    console.error('搜索历史记录失败:', error);
+    historyContainer.innerHTML = '<div class="history-empty">搜索失败</div>';
+  }
+}
 
 // ========== 快捷方式管理 ==========
 const quickLinksContainer = document.getElementById('quickLinks');
