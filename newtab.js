@@ -64,14 +64,14 @@ async function loadWeather() {
 }
 
 function getWeatherIcon(code) {
-  if (code === 113) return '☀️'; // 晴天
-  if (code === 116) return '⛅'; // 部分多云
-  if (code === 119 || code === 122) return '☁️'; // 多云
-  if ([176, 263, 266, 293, 296, 299, 302, 305, 308, 311, 314, 317, 320, 353, 356, 359].includes(code)) return '🌧️'; // 雨
-  if ([179, 182, 185, 227, 230, 281, 284, 323, 326, 329, 332, 335, 338, 350, 362, 365, 368, 371, 374, 377].includes(code)) return '❄️'; // 雪
-  if ([200, 386, 389, 392, 395].includes(code)) return '⛈️'; // 雷暴
-  if ([143, 248, 260].includes(code)) return '🌫️'; // 雾
-  return '🌤️'; // 默认
+  if (code === 113) return '☀️';
+  if (code === 116) return '⛅';
+  if (code === 119 || code === 122) return '☁️';
+  if ([176, 263, 266, 293, 296, 299, 302, 305, 308, 311, 314, 317, 320, 353, 356, 359].includes(code)) return '🌧️';
+  if ([179, 182, 185, 227, 230, 281, 284, 323, 326, 329, 332, 335, 338, 350, 362, 365, 368, 371, 374, 377].includes(code)) return '❄️';
+  if ([200, 386, 389, 392, 395].includes(code)) return '⛈️';
+  if ([143, 248, 260].includes(code)) return '🌫️';
+  return '🌤️';
 }
 
 // ========== 设置相关 ==========
