@@ -2,7 +2,17 @@
 const SETTINGS_KEY = 'newtabSettings';
 const DEFAULT_SETTINGS = {
   columns: 6,
-  historyCount: 8
+  historyCount: 8,
+  searchEngine: 'baidu'
+};
+
+// 搜索引擎配置
+const SEARCH_ENGINES = {
+  baidu: { name: '百度', url: 'https://www.baidu.com/s?wd=' },
+  google: { name: 'Google', url: 'https://www.google.com/search?q=' },
+  bing: { name: 'Bing', url: 'https://www.bing.com/search?q=' },
+  duckduckgo: { name: 'DuckDuckGo', url: 'https://duckduckgo.com/?q=' },
+  sogou: { name: '搜狗', url: 'https://www.sogou.com/web?query=' }
 };
 
 // 获取设置
@@ -87,6 +97,17 @@ function initSettings() {
   columnsValue.textContent = settings.columns;
   historyCountRange.value = settings.historyCount;
   historyCountValue.textContent = settings.historyCount;
+
+  // 设置搜索引擎选择
+  const searchEngineSelect = document.getElementById('searchEngineSelect');
+  if (searchEngineSelect) {
+    searchEngineSelect.value = settings.searchEngine || 'baidu';
+    searchEngineSelect.addEventListener('change', (e) => {
+      const settings = getSettings();
+      settings.searchEngine = e.target.value;
+      saveSettings(settings);
+    });
+  }
 
   // 应用列数
   applyColumnsSetting(settings.columns);
@@ -364,8 +385,10 @@ searchInput.addEventListener('keypress', (e) => {
         }
         window.location.href = url;
       } else {
-        // 使用搜索引擎
-        window.location.href = `https://www.baidu.com/s?wd=${encodeURIComponent(query)}`;
+        // 使用用户选择的搜索引擎
+        const settings = getSettings();
+        const engine = SEARCH_ENGINES[settings.searchEngine] || SEARCH_ENGINES.baidu;
+        window.location.href = `${engine.url}${encodeURIComponent(query)}`;
       }
     }
   }
