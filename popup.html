@@ -500,6 +500,31 @@
 
     <div id="status" class="status inactive">Inactive</div>
 
+    <!-- 番茄钟 -->
+    <div class="settings" style="margin-top: 12px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h2 style="font-size: 16px; margin: 0;">🍅 番茄钟</h2>
+        <select id="pomodoro-duration" style="padding: 4px 8px; font-size: 12px; border-radius: 4px;">
+          <option value="25">25分钟</option>
+          <option value="15">15分钟</option>
+          <option value="45">45分钟</option>
+          <option value="60">60分钟</option>
+        </select>
+      </div>
+      <div id="pomodoro-display" style="text-align: center; padding: 20px; background: linear-gradient(135deg, #fff5f5 0%, #ffe4e4 100%); border-radius: 12px; margin-bottom: 12px;">
+        <div id="pomodoro-time" style="font-size: 48px; font-weight: 600; color: #c53030;">25:00</div>
+        <div id="pomodoro-status" style="font-size: 12px; color: #666; margin-top: 4px;">准备开始</div>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button id="pomodoro-start" style="flex: 1;">▶️ 开始</button>
+        <button id="pomodoro-pause" style="flex: 1; display: none;">⏸️ 暂停</button>
+        <button id="pomodoro-reset" style="flex: 1; background: #6c757d;">🔄 重置</button>
+      </div>
+      <div id="pomodoro-stats" style="margin-top: 12px; font-size: 12px; color: #666; text-align: center;">
+        今日完成: <span id="pomodoro-count">0</span> 个番茄
+      </div>
+    </div>
+
     <!-- 快捷键帮助面板 -->
     <div id="shortcuts-panel" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000;">
       <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 12px; width: 280px; max-height: 80vh; overflow-y: auto;">

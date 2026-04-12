@@ -2203,6 +2203,114 @@ async function addNotification(message, type = 'info') {
   await chrome.storage.local.set({ notifications: notifications.slice(0, 20) });
 }
 
+// ========== 番茄钟 ==========
+let pomodoroTimer = null;
+let pomodoroRemaining = 25 * 60;
+let pomodoroRunning = false;
+
+document.addEventListener('DOMContentLoaded', async () => {
+  const startBtn = document.getElementById('pomodoro-start');
+  const pauseBtn = document.getElementById('pomodoro-pause');
+  const resetBtn = document.getElementById('pomodoro-reset');
+  const durationSelect = document.getElementById('pomodoro-duration');
+  const timeDisplay = document.getElementById('pomodoro-time');
+  const statusDisplay = document.getElementById('pomodoro-status');
+  const countDisplay = document.getElementById('pomodoro-count');
+
+  // 加载今日完成数
+  const today = new Date().toISOString().split('T')[0];
+  const result = await chrome.storage.local.get('pomodoroStats');
+  const stats = result.pomodoroStats || {};
+  if (stats[today]) {
+    countDisplay.textContent = stats[today];
+  }
+
+  // 更新显示
+  function updateDisplay() {
+    const mins = Math.floor(pomodoroRemaining / 60);
+    const secs = pomodoroRemaining % 60;
+    timeDisplay.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
+
+  // 开始计时
+  startBtn?.addEventListener('click', () => {
+    if (pomodoroRunning) return;
+    pomodoroRunning = true;
+    startBtn.style.display = 'none';
+    pauseBtn.style.display = 'block';
+    statusDisplay.textContent = '专注中...';
+
+    pomodoroTimer = setInterval(() => {
+      pomodoroRemaining--;
+      updateDisplay();
+
+      if (pomodoroRemaining <= 0) {
+        clearInterval(pomodoroTimer);
+        pomodoroRunning = false;
+        startBtn.style.display = 'block';
+        pauseBtn.style.display = 'none';
+        statusDisplay.textContent = '完成！休息一下吧';
+
+        // 记录完成
+        incrementPomodoroCount();
+      }
+    }, 1000);
+  });
+
+  // 暂停
+  pauseBtn?.addEventListener('click', () => {
+    clearInterval(pomodoroTimer);
+    pomodoroRunning = false;
+    startBtn.style.display = 'block';
+    pauseBtn.style.display = 'none';
+    statusDisplay.textContent = '已暂停';
+  });
+
+  // 重置
+  resetBtn?.addEventListener('click', () => {
+    clearInterval(pomodoroTimer);
+    pomodoroRunning = false;
+    const duration = parseInt(durationSelect.value);
+    pomodoroRemaining = duration * 60;
+    updateDisplay();
+    startBtn.style.display = 'block';
+    pauseBtn.style.display = 'none';
+    statusDisplay.textContent = '准备开始';
+  });
+
+  // 时长选择
+  durationSelect?.addEventListener('change', () => {
+    if (!pomodoroRunning) {
+      const duration = parseInt(durationSelect.value);
+      pomodoroRemaining = duration * 60;
+      updateDisplay();
+    }
+  });
+
+  updateDisplay();
+});
+
+async function incrementPomodoroCount() {
+  const today = new Date().toISOString().split('T')[0];
+  const result = await chrome.storage.local.get('pomodoroStats');
+  const stats = result.pomodoroStats || {};
+  stats[today] = (stats[today] || 0) + 1;
+  await chrome.storage.local.set({ pomodoroStats: stats });
+
+  const countDisplay = document.getElementById('pomodoro-count');
+  if (countDisplay) countDisplay.textContent = stats[today];
+
+  // 发送通知
+  if (chrome.notifications) {
+    chrome.notifications.create({
+      type: 'basic',
+      iconUrl: 'icons/icon16.png',
+      title: '🍅 番茄钟完成',
+      message: '休息一下吧！'
+    });
+  }
+}
+
 // ========== 快捷键帮助面板 ==========
 document.addEventListener('DOMContentLoaded', () => {
   const helpBtn = document.getElementById('shortcuts-help');
