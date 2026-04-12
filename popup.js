@@ -48,7 +48,9 @@ const defaultSettings = {
   enabled: false,
   debugMode: false,
   blockedDomains: [],
-  blockedResponseDomains: []
+  blockedResponseDomains: [],
+  whitelistMode: false,
+  whitelist: []
 };
 
 // DOM Elements
@@ -79,6 +81,18 @@ async function loadSettings() {
   // Update UI
   updateStatus(settings.enabled);
   debugModeCheckbox.checked = settings.debugMode || false;
+
+  // 白名单模式
+  const whitelistCheckbox = document.getElementById('whitelist-mode');
+  if (whitelistCheckbox) {
+    whitelistCheckbox.checked = settings.whitelistMode || false;
+    whitelistCheckbox.addEventListener('change', async () => {
+      const result = await chrome.storage.sync.get('settings');
+      const currentSettings = result.settings || defaultSettings;
+      currentSettings.whitelistMode = whitelistCheckbox.checked;
+      await chrome.storage.sync.set({ settings: currentSettings });
+    });
+  }
 
   // Load AI settings
   loadAISettings(settings);
