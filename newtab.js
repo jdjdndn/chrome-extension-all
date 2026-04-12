@@ -33,6 +33,46 @@ function loadDailyQuote() {
 
 // 初始化
 loadDailyQuote();
+loadWeather();
+
+// ========== 天气显示 ==========
+async function loadWeather() {
+  const tempEl = document.getElementById('weather-temp');
+  const descEl = document.getElementById('weather-desc');
+  const iconEl = document.getElementById('weather-icon');
+  if (!tempEl) return;
+
+  try {
+    // 使用免费的天气API (wttr.in)
+    const response = await fetch('https://wttr.in/?format=j1');
+    if (!response.ok) throw new Error('Weather API failed');
+
+    const data = await response.json();
+    const current = data.current_condition[0];
+
+    tempEl.textContent = `${current.temp_C}°C`;
+    descEl.textContent = current.weatherDesc[0].value;
+
+    // 根据天气代码设置图标
+    const code = parseInt(current.weatherCode);
+    iconEl.textContent = getWeatherIcon(code);
+  } catch (error) {
+    console.error('加载天气失败:', error);
+    tempEl.textContent = '--°C';
+    descEl.textContent = '获取失败';
+  }
+}
+
+function getWeatherIcon(code) {
+  if (code === 113) return '☀️'; // 晴天
+  if (code === 116) return '⛅'; // 部分多云
+  if (code === 119 || code === 122) return '☁️'; // 多云
+  if ([176, 263, 266, 293, 296, 299, 302, 305, 308, 311, 314, 317, 320, 353, 356, 359].includes(code)) return '🌧️'; // 雨
+  if ([179, 182, 185, 227, 230, 281, 284, 323, 326, 329, 332, 335, 338, 350, 362, 365, 368, 371, 374, 377].includes(code)) return '❄️'; // 雪
+  if ([200, 386, 389, 392, 395].includes(code)) return '⛈️'; // 雷暴
+  if ([143, 248, 260].includes(code)) return '🌫️'; // 雾
+  return '🌤️'; // 默认
+}
 
 // ========== 设置相关 ==========
 const SETTINGS_KEY = 'newtabSettings';
