@@ -2117,6 +2117,33 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
+// ========== 快捷键帮助面板 ==========
+document.addEventListener('DOMContentLoaded', () => {
+  const helpBtn = document.getElementById('shortcuts-help');
+  const panel = document.getElementById('shortcuts-panel');
+  const closeBtn = document.getElementById('close-shortcuts');
+
+  if (helpBtn && panel) {
+    helpBtn.addEventListener('click', () => {
+      panel.style.display = 'block';
+    });
+  }
+
+  if (closeBtn && panel) {
+    closeBtn.addEventListener('click', () => {
+      panel.style.display = 'none';
+    });
+  }
+
+  if (panel) {
+    panel.addEventListener('click', (e) => {
+      if (e.target === panel) {
+        panel.style.display = 'none';
+      }
+    });
+  }
+});
+
 // ========== 规则模板库 ==========
 const RULE_TEMPLATES = {
   ads: {
