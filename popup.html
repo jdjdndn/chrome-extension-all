@@ -448,6 +448,68 @@
       <div style="display: flex; gap: 8px; margin-bottom: 12px;">
         <button id="nav-current" class="nav-btn active" style="flex: 1; padding: 8px; font-size: 12px;">当前页面</button>
         <button id="nav-global" class="nav-btn" style="flex: 1; padding: 8px; font-size: 12px;">全局设置</button>
+        <button id="nav-stats" class="nav-btn" style="flex: 1; padding: 8px; font-size: 12px;">数据统计</button>
+      </div>
+    </div>
+
+    <!-- Stats View (hidden by default) -->
+    <div id="stats-view" style="display: none;">
+      <div class="settings">
+        <h2 style="font-size: 16px; margin: 0 0 12px 0">📊 数据统计</h2>
+
+        <!-- 今日统计 -->
+        <div class="setting-item" style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); padding: 12px; border-radius: 8px; margin-bottom: 12px;">
+          <div style="font-size: 12px; color: #1565c0; margin-bottom: 8px; font-weight: 500;">今日数据</div>
+          <div style="display: flex; gap: 12px;">
+            <div style="flex: 1; text-align: center;">
+              <div id="today-blocked" style="font-size: 24px; font-weight: 600; color: #1976d2;">0</div>
+              <div style="font-size: 11px; color: #666;">拦截请求</div>
+            </div>
+            <div style="flex: 1; text-align: center;">
+              <div id="today-hidden" style="font-size: 24px; font-weight: 600; color: #388e3c;">0</div>
+              <div style="font-size: 11px; color: #666;">隐藏元素</div>
+            </div>
+            <div style="flex: 1; text-align: center;">
+              <div id="today-bytes" style="font-size: 24px; font-weight: 600; color: #f57c00;">0</div>
+              <div style="font-size: 11px; color: #666;">节省流量</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 累计统计 -->
+        <div class="setting-item" style="background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%); padding: 12px; border-radius: 8px; margin-bottom: 12px;">
+          <div style="font-size: 12px; color: #7b1fa2; margin-bottom: 8px; font-weight: 500;">累计数据</div>
+          <div style="display: flex; gap: 12px;">
+            <div style="flex: 1; text-align: center;">
+              <div id="total-blocked" style="font-size: 20px; font-weight: 600; color: #8e24aa;">0</div>
+              <div style="font-size: 11px; color: #666;">总拦截</div>
+            </div>
+            <div style="flex: 1; text-align: center;">
+              <div id="total-hidden" style="font-size: 20px; font-weight: 600; color: #4caf50;">0</div>
+              <div style="font-size: 11px; color: #666;">总隐藏</div>
+            </div>
+            <div style="flex: 1; text-align: center;">
+              <div id="total-bytes" style="font-size: 20px; font-weight: 600; color: #ff9800;">0</div>
+              <div style="font-size: 11px; color: #666;">总节省</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 域名排行 -->
+        <div class="setting-item">
+          <div class="label-with-action">
+            <label style="font-size: 13px; font-weight: 500;">域名排行 TOP 5</label>
+          </div>
+          <div id="domain-ranking" style="margin-top: 8px; font-size: 12px;">
+            <div style="color: #999; text-align: center; padding: 20px;">暂无数据</div>
+          </div>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div style="margin-top: 12px; display: flex; gap: 8px;">
+          <button id="refresh-stats" style="flex: 1;">刷新</button>
+          <button id="reset-stats" style="flex: 1; background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);">重置统计</button>
+        </div>
       </div>
     </div>
 
