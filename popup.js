@@ -1963,4 +1963,92 @@ if (selectorsEditor) {
 // 加载编辑器
 document.addEventListener('DOMContentLoaded', () => {
   loadSelectorsEditor();
+  initNavigation();
 });
+
+// ========== 导航切换 ==========
+function initNavigation() {
+  const navCurrent = document.getElementById('nav-current');
+  const navGlobal = document.getElementById('nav-global');
+  const currentSettings = document.getElementById('current-page-settings');
+  const globalSettings = document.getElementById('global-settings');
+
+  if (navCurrent && navGlobal && currentSettings && globalSettings) {
+    navCurrent.addEventListener('click', () => {
+      navCurrent.classList.add('active');
+      navGlobal.classList.remove('active');
+      currentSettings.style.display = 'block';
+      globalSettings.style.display = 'none';
+    });
+
+    navGlobal.addEventListener('click', () => {
+      navGlobal.classList.add('active');
+      navCurrent.classList.remove('active');
+      currentSettings.style.display = 'none';
+      globalSettings.style.display = 'block';
+      loadGlobalSettings();
+    });
+  }
+}
+
+// ========== 全局设置 ==========
+async function loadGlobalSettings() {
+  const domainSelect = document.getElementById('global-domain-select');
+  const keywordsEditor = document.getElementById('global-keywords-editor');
+  const keywordsTextarea = document.getElementById('global-keywords-textarea');
+
+  if (!domainSelect || !keywordsEditor || !keywordsTextarea) return;
+
+  domainSelect.addEventListener('change', async () => {
+    const domain = domainSelect.value;
+    if (!domain) {
+      keywordsEditor.style.display = 'none';
+      return;
+    }
+
+    keywordsEditor.style.display = 'block';
+
+    // 加载该域名的关键词
+    try {
+      const storageKey = `${domain}Keywords`;
+      const result = await chrome.storage.local.get(storageKey);
+      const keywords = result[storageKey] || [];
+      keywordsTextarea.value = Array.isArray(keywords) ? keywords.join('\n') : keywords;
+    } catch (error) {
+      console.error('[全局设置] 加载关键词失败:', error);
+      keywordsTextarea.value = '';
+    }
+  });
+
+  // 保存按钮
+  const saveBtn = document.getElementById('global-save-keywords-btn');
+  if (saveBtn) {
+    saveBtn.addEventListener('click', async () => {
+      const domain = domainSelect.value;
+      if (!domain) return;
+
+      const keywords = keywordsTextarea.value
+        .split('\n')
+        .map(k => k.trim())
+        .filter(k => k);
+
+      try {
+        const storageKey = `${domain}Keywords`;
+        await chrome.storage.local.set({ [storageKey]: keywords });
+
+        // 显示成功提示
+        const originalText = saveBtn.textContent;
+        saveBtn.textContent = '已保存 ✓';
+        saveBtn.style.background = '#28a745';
+        setTimeout(() => {
+          saveBtn.textContent = originalText;
+          saveBtn.style.background = '';
+        }, 1500);
+
+        console.log('[全局设置] 已保存关键词:', domain, keywords.length);
+      } catch (error) {
+        console.error('[全局设置] 保存关键词失败:', error);
+      }
+    });
+  }
+}

@@ -92,6 +92,24 @@
         transform: translateY(0);
       }
 
+      .nav-btn {
+        background: #f8f9fa;
+        color: #495057;
+        box-shadow: none;
+        border: 1px solid #dee2e6;
+      }
+
+      .nav-btn.active {
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+        color: white;
+        border-color: #007bff;
+        box-shadow: 0 2px 4px rgba(0, 123, 255, 0.2);
+      }
+
+      .nav-btn:hover:not(.active) {
+        background: #e9ecef;
+      }
+
       #toggle-btn {
         width: 100%;
         margin-top: 8px;
@@ -425,6 +443,17 @@
 
     <button id="toggle-btn">Enable Extension</button>
 
+    <!-- Global Settings Navigation -->
+    <div class="settings" style="margin-top: 12px;">
+      <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+        <button id="nav-current" class="nav-btn active" style="flex: 1; padding: 8px; font-size: 12px;">当前页面</button>
+        <button id="nav-global" class="nav-btn" style="flex: 1; padding: 8px; font-size: 12px;">全局设置</button>
+      </div>
+    </div>
+
+    <!-- Current Page Settings (default view) -->
+    <div id="current-page-settings">
+
     <!-- Douyin Script Control -->
     <div class="settings" style="margin-top: 12px; display: none;" id="douyin-keywords-section">
       <h2 style="font-size: 16px; margin: 0 0 12px 0">抖音脚本关键词</h2>
@@ -677,6 +706,36 @@
             • 来自这些域名的API响应会被拦截<br />
             • 页面将无法接收来自这些域名的数据
           </small>
+        </div>
+      </div>
+    </div>
+    </div><!-- End current-page-settings -->
+
+    <!-- Global Settings View (hidden by default) -->
+    <div id="global-settings" style="display: none;">
+      <div class="settings">
+        <h2 style="font-size: 16px; margin: 0 0 12px 0">全局关键词设置</h2>
+
+        <div class="setting-item">
+          <label for="global-domain-select">选择域名</label>
+          <select id="global-domain-select" style="width: 100%; padding: 8px; border-radius: 6px;">
+            <option value="">-- 选择域名 --</option>
+            <option value="douyin.com">抖音 (douyin.com)</option>
+            <option value="bilibili.com">B站 (bilibili.com)</option>
+            <option value="xiaohongshu.com">小红书 (xiaohongshu.com)</option>
+          </select>
+        </div>
+
+        <div id="global-keywords-editor" style="display: none; margin-top: 12px;">
+          <div class="setting-item">
+            <label for="global-keywords-textarea">不感兴趣关键词</label>
+            <textarea
+              id="global-keywords-textarea"
+              rows="8"
+              style="width: 100%; padding: 8px; border: 1px solid #dee2e6; border-radius: 6px; font-size: 12px; font-family: monospace; resize: vertical; background: #f8f9fa;"
+              placeholder="每行一个关键词"></textarea>
+          </div>
+          <button id="global-save-keywords-btn" style="width: 100%;">保存关键词</button>
         </div>
       </div>
     </div>
