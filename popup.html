@@ -800,6 +800,19 @@
           <button id="global-save-keywords-btn" style="width: 100%;">保存关键词</button>
         </div>
       </div>
+
+      <!-- 导出/导入设置 -->
+      <div class="settings" style="margin-top: 12px;">
+        <h2 style="font-size: 16px; margin: 0 0 12px 0">⚙️ 设置管理</h2>
+        <div style="display: flex; gap: 8px;">
+          <button id="export-settings-btn" style="flex: 1;">📤 导出设置</button>
+          <button id="import-settings-btn" style="flex: 1;">📥 导入设置</button>
+        </div>
+        <input type="file" id="import-file-input" accept=".json" style="display: none;">
+        <div class="info-box" style="margin-top: 8px;">
+          <small>导出设置可备份所有配置，导入可恢复配置</small>
+        </div>
+      </div>
     </div>
 
     <script src="popup.js"></script>

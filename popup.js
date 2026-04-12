@@ -2117,6 +2117,95 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
+// ========== 导出/导入设置 ==========
+document.addEventListener('DOMContentLoaded', () => {
+  const exportBtn = document.getElementById('export-settings-btn');
+  const importBtn = document.getElementById('import-settings-btn');
+  const importInput = document.getElementById('import-file-input');
+
+  if (exportBtn) {
+    exportBtn.addEventListener('click', exportSettings);
+  }
+
+  if (importBtn && importInput) {
+    importBtn.addEventListener('click', () => importInput.click());
+    importInput.addEventListener('change', importSettings);
+  }
+});
+
+async function exportSettings() {
+  try {
+    // 收集所有设置
+    const syncData = await chrome.storage.sync.get(null);
+    const localData = await chrome.storage.local.get(null);
+
+    // 排除统计数据（太大）
+    delete localData.extensionStats;
+
+    const exportData = {
+      version: '1.0.0',
+      exportTime: new Date().toISOString(),
+      sync: syncData,
+      local: localData
+    };
+
+    // 下载JSON文件
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `chrome-extension-settings-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    // 提示成功
+    alert('设置已导出成功！');
+  } catch (error) {
+    console.error('[导出设置] 失败:', error);
+    alert('导出失败: ' + error.message);
+  }
+}
+
+async function importSettings(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+
+    // 验证格式
+    if (!data.version || !data.sync || !data.local) {
+      throw new Error('无效的设置文件格式');
+    }
+
+    // 确认导入
+    if (!confirm('导入设置将覆盖当前所有设置，确定继续吗？')) {
+      return;
+    }
+
+    // 导入sync设置
+    if (Object.keys(data.sync).length > 0) {
+      await chrome.storage.sync.clear();
+      await chrome.storage.sync.set(data.sync);
+    }
+
+    // 导入local设置（保留统计数据）
+    const currentLocal = await chrome.storage.local.get('extensionStats');
+    await chrome.storage.local.clear();
+    await chrome.storage.local.set({ ...data.local, extensionStats: currentLocal.extensionStats });
+
+    alert('设置已导入成功！页面将刷新。');
+    location.reload();
+  } catch (error) {
+    console.error('[导入设置] 失败:', error);
+    alert('导入失败: ' + error.message);
+  } finally {
+    // 清空input，允许重复导入同一文件
+    event.target.value = '';
+  }
+}
+
 // ========== 全局设置 ==========
 async function loadGlobalSettings() {
   const domainSelect = document.getElementById('global-domain-select');
