@@ -1,13 +1,21 @@
 // Content script for weread.qq.com (微信阅读)
-// 依赖: content/utils/logger.js, storage.js, dom.js, messaging.js
+// 使用公共模块重构
 
 'use strict';
 
-if (!window.WereadScript) {
-  window.WereadScript = { isInitialized: false };
+import { createScriptGuard } from './utils/script-guard.js';
+import { createStyleInjector } from './utils/style-injector.js';
+
+// 防重复加载
+const guard = createScriptGuard('Weread');
+if (guard.check()) {
+  throw new Error('脚本已加载');
 }
 
 const STYLE_TAG_ID = 'weread-script-style';
+const styleInjector = createStyleInjector(STYLE_TAG_ID);
+const STORAGE_KEY = 'yc-weixin-read';
+
 let intervalId = null;
 
 const settings = {
@@ -16,10 +24,8 @@ const settings = {
   step: 30
 };
 
-const STORAGE_KEY = 'yc-weixin-read';
 const lastScrollYArr = [];
 
-// 样式注入
 const styles = `
 #floatBtn {
   position: fixed;
@@ -44,7 +50,7 @@ const styles = `
 `;
 
 function injectStyles() {
-  DOMUtils.upsertStyle(STYLE_TAG_ID, styles);
+  styleInjector.inject(styles);
 }
 
 function autoScroll() {
@@ -54,12 +60,10 @@ function autoScroll() {
   const currentScrollY = window.scrollY;
   lastScrollYArr.push(currentScrollY);
 
-  // 保留最近5次滚动位置
   if (lastScrollYArr.length > 5) {
     lastScrollYArr.shift();
   }
 
-  // 检测是否到达底部
   const isAtBottom = (window.innerHeight + window.scrollY) >= document.body.scrollHeight - 100;
 
   if (isAtBottom) {
@@ -115,20 +119,25 @@ function createFloatButton() {
 }
 
 async function loadSettings() {
-  const result = await StorageUtils.getLocal([STORAGE_KEY]);
-  if (result[STORAGE_KEY]) {
-    Object.assign(settings, result[STORAGE_KEY]);
+  try {
+    const result = await chrome.storage.local.get([STORAGE_KEY]);
+    if (result[STORAGE_KEY]) {
+      Object.assign(settings, result[STORAGE_KEY]);
+    }
+  } catch (error) {
+    console.warn('[微信阅读] 加载设置失败:', error);
   }
 }
 
 async function saveSettings() {
-  await StorageUtils.setLocal({ [STORAGE_KEY]: settings });
+  try {
+    await chrome.storage.local.set({ [STORAGE_KEY]: settings });
+  } catch (error) {
+    console.warn('[微信阅读] 保存设置失败:', error);
+  }
 }
 
 async function init() {
-  if (window.WereadScript.isInitialized) return;
-  window.WereadScript.isInitialized = true;
-
   injectStyles();
   await loadSettings();
   createFloatButton();
@@ -137,6 +146,7 @@ async function init() {
     startAutoScroll();
   }
 
+  guard.markInitialized();
   console.log('[微信阅读] 脚本已加载');
 }
 

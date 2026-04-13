@@ -1963,6 +1963,25 @@ async function handleMessage(message, sender, sendResponse) {
       sendResponse({ success: true });
       break;
 
+    // ========== 统计数据消息处理 ==========
+    case 'GET_STATS':
+      sendResponse({ success: true, stats: getStats() });
+      break;
+
+    case 'RESET_STATS':
+      resetStats();
+      sendResponse({ success: true });
+      break;
+
+    case 'RECORD_HIDDEN_ELEMENT':
+      if (message.domain && message.count) {
+        recordHiddenElement(message.domain, message.count);
+        sendResponse({ success: true });
+      } else {
+        sendResponse({ success: false, error: 'Missing domain or count' });
+      }
+      break;
+
     default:
       console.warn('Unknown message type:', message.type);
       sendResponse({ error: 'Unknown message type' });
@@ -2233,3 +2252,131 @@ function getDomainIcon(url) {
     return '🌐';
   }
 }
+
+// ========== 数据统计系统 ==========
+// 统计数据存储
+let statsData = {
+  totalBlocked: 0,           // 总拦截请求数
+  totalHidden: 0,            // 总隐藏元素数
+  estimatedBytesSaved: 0,    // 估算节省流量(字节)
+  domainStats: {},           // 按域名统计 { domain: { blocked, hidden, bytes } }
+  dailyStats: {},            // 按日期统计 { 'YYYY-MM-DD': { blocked, hidden, bytes } }
+  lastUpdated: Date.now()
+};
+
+// 从存储加载统计数据
+async function loadStatsData() {
+  try {
+    const result = await chrome.storage.local.get(['extensionStats']);
+    if (result.extensionStats) {
+      statsData = { ...statsData, ...result.extensionStats };
+    }
+  } catch (error) {
+    console.error('[Stats] 加载统计数据失败:', error);
+  }
+}
+
+// 保存统计数据
+async function saveStatsData() {
+  try {
+    statsData.lastUpdated = Date.now();
+    await chrome.storage.local.set({ extensionStats: statsData });
+  } catch (error) {
+    console.error('[Stats] 保存统计数据失败:', error);
+  }
+}
+
+// 获取今日日期字符串
+function getTodayKey() {
+  return new Date().toISOString().split('T')[0];
+}
+
+// 记录拦截请求
+function recordBlockedRequest(url, tabId) {
+  statsData.totalBlocked++;
+
+  // 估算流量 (平均每个请求约 10KB)
+  const estimatedBytes = 10240;
+  statsData.estimatedBytesSaved += estimatedBytes;
+
+  // 按日期统计
+  const today = getTodayKey();
+  if (!statsData.dailyStats[today]) {
+    statsData.dailyStats[today] = { blocked: 0, hidden: 0, bytes: 0 };
+  }
+  statsData.dailyStats[today].blocked++;
+  statsData.dailyStats[today].bytes += estimatedBytes;
+
+  // 获取域名
+  if (tabId) {
+    chrome.tabs.get(tabId, (tab) => {
+      if (tab?.url) {
+        try {
+          const domain = new URL(tab.url).hostname;
+          if (!statsData.domainStats[domain]) {
+            statsData.domainStats[domain] = { blocked: 0, hidden: 0, bytes: 0 };
+          }
+          statsData.domainStats[domain].blocked++;
+          statsData.domainStats[domain].bytes += estimatedBytes;
+        } catch (e) {}
+      }
+    });
+  }
+
+  // 异步保存
+  saveStatsData();
+}
+
+// 记录隐藏元素
+function recordHiddenElement(domain, count = 1) {
+  statsData.totalHidden += count;
+
+  const today = getTodayKey();
+  if (!statsData.dailyStats[today]) {
+    statsData.dailyStats[today] = { blocked: 0, hidden: 0, bytes: 0 };
+  }
+  statsData.dailyStats[today].hidden += count;
+
+  if (domain) {
+    if (!statsData.domainStats[domain]) {
+      statsData.domainStats[domain] = { blocked: 0, hidden: 0, bytes: 0 };
+    }
+    statsData.domainStats[domain].hidden += count;
+  }
+
+  saveStatsData();
+}
+
+// 获取统计数据
+function getStats() {
+  const today = getTodayKey();
+  return {
+    ...statsData,
+    today: statsData.dailyStats[today] || { blocked: 0, hidden: 0, bytes: 0 }
+  };
+}
+
+// 重置统计数据
+function resetStats() {
+  statsData = {
+    totalBlocked: 0,
+    totalHidden: 0,
+    estimatedBytesSaved: 0,
+    domainStats: {},
+    dailyStats: {},
+    lastUpdated: Date.now()
+  };
+  saveStatsData();
+}
+
+// 监听 declarativeNetRequest 拦截事件
+if (chrome.declarativeNetRequest?.onRuleMatchedDebug) {
+  chrome.declarativeNetRequest.onRuleMatchedDebug.addListener((info) => {
+    if (info.rule.id >= 1000 && info.rule.id < 2000) {
+      recordBlockedRequest(info.request.url, info.request.tabId);
+    }
+  });
+}
+
+// 初始化统计数据
+loadStatsData();

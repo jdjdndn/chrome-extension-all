@@ -1,8 +1,94 @@
+// ========== 每日一言 ==========
+const QUOTES = [
+  { text: '生活不是等待暴风雨过去，而是学会在雨中跳舞。', author: '维维安·格林' },
+  { text: '成功不是终点，失败也不是终结，重要的是继续前进的勇气。', author: '丘吉尔' },
+  { text: '你今天的努力，是幸运的伏笔。当下的付出，是明日的花开。', author: '佚名' },
+  { text: '不要因为走得太远，而忘记为什么出发。', author: '纪伯伦' },
+  { text: '世界上只有一种真正的英雄主义，那就是认清生活的真相后依然热爱生活。', author: '罗曼·罗兰' },
+  { text: '把每一个黎明看作生命的开始，把每一个黄昏看作生命的小结。', author: '罗斯金' },
+  { text: '人生没有彩排，每一天都是现场直播。', author: '佚名' },
+  { text: '真正的强者，不是没有眼泪的人，而是含着眼泪奔跑的人。', author: '佚名' },
+  { text: '时间会证明一切，但你要先给时间一点时间。', author: '佚名' },
+  { text: '与其用泪水悔恨昨天，不如用汗水拼搏今天。', author: '佚名' },
+  { text: '梦想不会逃跑，逃跑的永远是自己。', author: '佚名' },
+  { text: '每一个不曾起舞的日子，都是对生命的辜负。', author: '尼采' },
+  { text: '生命中最难的阶段不是没有人懂你，而是你不懂你自己。', author: '尼采' },
+  { text: '你若盛开，清风自来。', author: '佚名' },
+  { text: '心之所向，素履以往。', author: '佚名' }
+];
+
+function loadDailyQuote() {
+  const quoteText = document.getElementById('quote-text');
+  const quoteAuthor = document.getElementById('quote-author');
+  if (!quoteText) return;
+
+  // 根据日期选择一言（每天固定）
+  const today = new Date();
+  const dayOfYear = Math.floor((today - new Date(today.getFullYear(), 0, 0)) / 86400000);
+  const quote = QUOTES[dayOfYear % QUOTES.length];
+
+  quoteText.textContent = `"${quote.text}"`;
+  quoteAuthor.textContent = `—— ${quote.author}`;
+}
+
+// 初始化
+loadDailyQuote();
+loadWeather();
+
+// ========== 天气显示 ==========
+async function loadWeather() {
+  const tempEl = document.getElementById('weather-temp');
+  const descEl = document.getElementById('weather-desc');
+  const iconEl = document.getElementById('weather-icon');
+  if (!tempEl) return;
+
+  try {
+    // 使用免费的天气API (wttr.in)
+    const response = await fetch('https://wttr.in/?format=j1');
+    if (!response.ok) throw new Error('Weather API failed');
+
+    const data = await response.json();
+    const current = data.current_condition[0];
+
+    tempEl.textContent = `${current.temp_C}°C`;
+    descEl.textContent = current.weatherDesc[0].value;
+
+    // 根据天气代码设置图标
+    const code = parseInt(current.weatherCode);
+    iconEl.textContent = getWeatherIcon(code);
+  } catch (error) {
+    console.error('加载天气失败:', error);
+    tempEl.textContent = '--°C';
+    descEl.textContent = '获取失败';
+  }
+}
+
+function getWeatherIcon(code) {
+  if (code === 113) return '☀️';
+  if (code === 116) return '⛅';
+  if (code === 119 || code === 122) return '☁️';
+  if ([176, 263, 266, 293, 296, 299, 302, 305, 308, 311, 314, 317, 320, 353, 356, 359].includes(code)) return '🌧️';
+  if ([179, 182, 185, 227, 230, 281, 284, 323, 326, 329, 332, 335, 338, 350, 362, 365, 368, 371, 374, 377].includes(code)) return '❄️';
+  if ([200, 386, 389, 392, 395].includes(code)) return '⛈️';
+  if ([143, 248, 260].includes(code)) return '🌫️';
+  return '🌤️';
+}
+
 // ========== 设置相关 ==========
 const SETTINGS_KEY = 'newtabSettings';
 const DEFAULT_SETTINGS = {
   columns: 6,
-  historyCount: 8
+  historyCount: 8,
+  searchEngine: 'baidu'
+};
+
+// 搜索引擎配置
+const SEARCH_ENGINES = {
+  baidu: { name: '百度', url: 'https://www.baidu.com/s?wd=' },
+  google: { name: 'Google', url: 'https://www.google.com/search?q=' },
+  bing: { name: 'Bing', url: 'https://www.bing.com/search?q=' },
+  duckduckgo: { name: 'DuckDuckGo', url: 'https://duckduckgo.com/?q=' },
+  sogou: { name: '搜狗', url: 'https://www.sogou.com/web?query=' }
 };
 
 // 获取设置
@@ -88,6 +174,17 @@ function initSettings() {
   historyCountRange.value = settings.historyCount;
   historyCountValue.textContent = settings.historyCount;
 
+  // 设置搜索引擎选择
+  const searchEngineSelect = document.getElementById('searchEngineSelect');
+  if (searchEngineSelect) {
+    searchEngineSelect.value = settings.searchEngine || 'baidu';
+    searchEngineSelect.addEventListener('change', (e) => {
+      const settings = getSettings();
+      settings.searchEngine = e.target.value;
+      saveSettings(settings);
+    });
+  }
+
   // 应用列数
   applyColumnsSetting(settings.columns);
 
@@ -109,14 +206,64 @@ function safeHostname(url) {
 // ========== 历史记录相关 ==========
 const historyContainer = document.getElementById('historyContainer');
 
-// 获取域名图标
+// 获取域名图标URL
 function getDomainIcon(domain) {
-  const icons = ['🌐', '🔗', '📌', '⭐', '🚀', '💡', '🎯', '📱', '💻', '🎨'];
+  // 使用Google的favicon服务获取真实图标
+  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=32`;
+}
+
+// 获取域名图标备用emoji
+function getDomainEmoji(domain) {
+  const domainEmojis = {
+    'google': '🔍',
+    'baidu': '🔎',
+    'github': '🐙',
+    'bilibili': '📺',
+    'youtube': '▶️',
+    'twitter': '🐦',
+    'x.com': '❌',
+    'facebook': '📘',
+    'weibo': '🔴',
+    'zhihu': '🧠',
+    'juejin': '💎',
+    'taobao': '🛒',
+    'jd': '🛍️',
+    'tmall': '🐱',
+    'douyin': '🎵',
+    'xiaohongshu': '📕',
+    'weixin': '💬',
+    'qq': '🐧',
+    'netflix': '🎬',
+    'spotify': '🎵',
+    'reddit': '🤖',
+    'linkedin': '💼',
+    'stackoverflow': '📚',
+    'medium': '📝',
+    'notion': '📓',
+    'figma': '🎨',
+    'dribbble': '🏀',
+    'behance': '🎨'
+  };
+
+  for (const [key, emoji] of Object.entries(domainEmojis)) {
+    if (domain.includes(key)) return emoji;
+  }
+
+  // 默认图标
+  const defaultIcons = ['🌐', '🔗', '📌', '⭐', '🚀', '💡', '🎯', '📱', '💻', '🎨'];
   let hash = 0;
   for (let i = 0; i < domain.length; i++) {
     hash = domain.charCodeAt(i) + ((hash << 5) - hash);
   }
-  return icons[Math.abs(hash) % icons.length];
+  return defaultIcons[Math.abs(hash) % defaultIcons.length];
+}
+
+// 创建图标元素
+function createDomainIcon(domain) {
+  const iconUrl = getDomainIcon(domain);
+  const fallbackEmoji = getDomainEmoji(domain);
+
+  return `<img src="${iconUrl}" alt="${escapeHtml(domain)}" style="width: 20px; height: 20px; border-radius: 4px; vertical-align: middle;" onerror="this.style.display='none';this.nextElementSibling.style.display='inline';"><span style="display: none;">${fallbackEmoji}</span>`;
 }
 
 // 获取页面标题
@@ -196,6 +343,82 @@ async function loadHistory() {
     console.error('加载历史记录失败:', error);
     historyContainer.innerHTML = '<div class="history-empty">加载历史记录失败</div>';
   }
+
+  // 加载书签
+  loadBookmarks();
+}
+
+// 加载书签
+async function loadBookmarks() {
+  const bookmarksContainer = document.getElementById('bookmarksContainer');
+  if (!bookmarksContainer) return;
+
+  try {
+    const tree = await chrome.bookmarks.getTree();
+    const bookmarks = flattenBookmarks(tree);
+
+    if (bookmarks.length === 0) {
+      bookmarksContainer.innerHTML = '<div class="history-empty">暂无书签</div>';
+      return;
+    }
+
+    // 按访问频率排序（使用最近添加的）
+    const recentBookmarks = bookmarks
+      .filter(b => b.url)
+      .sort((a, b) => (b.dateAdded || 0) - (a.dateAdded || 0))
+      .slice(0, 10);
+
+    // 按域名分组
+    const domainMap = new Map();
+    recentBookmarks.forEach(b => {
+      try {
+        const domain = new URL(b.url).hostname;
+        if (!domainMap.has(domain)) {
+          domainMap.set(domain, { domain, urls: [] });
+        }
+        domainMap.get(domain).urls.push({
+          url: b.url,
+          title: b.title || domain
+        });
+      } catch (e) {}
+    });
+
+    // 渲染书签
+    bookmarksContainer.innerHTML = Array.from(domainMap.values()).map(domain => `
+      <div class="history-domain">
+        <div class="history-domain-header">
+          <span class="history-domain-icon">${createDomainIcon(domain.domain)}</span>
+          <span class="history-domain-name">${escapeHtml(domain.domain)}</span>
+          <span class="history-domain-count">${domain.urls.length}</span>
+        </div>
+        <div class="history-urls">
+          ${domain.urls.map(urlItem => `
+            <a href="${escapeHtml(urlItem.url)}" class="history-url-item" title="${escapeHtml(urlItem.title)}">
+              <span class="history-url-icon">📄</span>
+              <span class="history-url-title">${escapeHtml(urlItem.title)}</span>
+            </a>
+          `).join('')}
+        </div>
+      </div>
+    `).join('');
+  } catch (error) {
+    console.error('加载书签失败:', error);
+    bookmarksContainer.innerHTML = '<div class="history-empty">加载书签失败</div>';
+  }
+}
+
+// 扁平化书签树
+function flattenBookmarks(nodes) {
+  const result = [];
+  for (const node of nodes) {
+    if (node.url) {
+      result.push(node);
+    }
+    if (node.children) {
+      result.push(...flattenBookmarks(node.children));
+    }
+  }
+  return result;
 }
 
 // 渲染历史记录
@@ -208,7 +431,7 @@ function renderHistory(domains) {
   historyContainer.innerHTML = domains.map(domain => `
     <div class="history-domain">
       <div class="history-domain-header">
-        <span class="history-domain-icon">${getDomainIcon(domain.domain)}</span>
+        <span class="history-domain-icon">${createDomainIcon(domain.domain)}</span>
         <span class="history-domain-name">${escapeHtml(domain.domain)}</span>
         <span class="history-domain-count">${domain.urls.length}</span>
       </div>
@@ -352,6 +575,8 @@ setInterval(updateTime, 1000);
 
 // ========== 搜索功能 ==========
 const searchInput = document.getElementById('searchInput');
+let searchHistoryTimeout = null;
+
 searchInput.addEventListener('keypress', (e) => {
   if (e.key === 'Enter') {
     const query = searchInput.value.trim();
@@ -364,12 +589,70 @@ searchInput.addEventListener('keypress', (e) => {
         }
         window.location.href = url;
       } else {
-        // 使用搜索引擎
-        window.location.href = `https://www.baidu.com/s?wd=${encodeURIComponent(query)}`;
+        // 使用用户选择的搜索引擎
+        const settings = getSettings();
+        const engine = SEARCH_ENGINES[settings.searchEngine] || SEARCH_ENGINES.baidu;
+        window.location.href = `${engine.url}${encodeURIComponent(query)}`;
       }
     }
   }
 });
+
+// 历史记录搜索功能
+searchInput.addEventListener('input', (e) => {
+  const query = searchInput.value.trim().toLowerCase();
+
+  // 防抖处理
+  clearTimeout(searchHistoryTimeout);
+  searchHistoryTimeout = setTimeout(() => {
+    if (query.length >= 2) {
+      searchHistory(query);
+    } else {
+      // 恢复正常历史记录显示
+      loadHistory();
+    }
+  }, 300);
+});
+
+// 搜索历史记录
+async function searchHistory(query) {
+  try {
+    const historyItems = await chrome.history.search({
+      text: query,
+      maxResults: 50,
+      startTime: Date.now() - 30 * 24 * 60 * 60 * 1000 // 最近30天
+    });
+
+    if (historyItems.length === 0) {
+      historyContainer.innerHTML = `<div class="history-empty">未找到包含 "${escapeHtml(query)}" 的记录</div>`;
+      return;
+    }
+
+    // 渲染搜索结果
+    const results = historyItems.slice(0, 20).map(item => ({
+      url: item.url,
+      title: getPageTitle(item.url, item.title),
+      lastVisitTime: item.lastVisitTime
+    }));
+
+    // 按域名分组
+    const domainMap = new Map();
+    results.forEach(item => {
+      try {
+        const domain = new URL(item.url).hostname;
+        if (!domainMap.has(domain)) {
+          domainMap.set(domain, { domain, urls: [] });
+        }
+        domainMap.get(domain).urls.push(item);
+      } catch (e) {}
+    });
+
+    renderHistory(Array.from(domainMap.values()));
+  } catch (error) {
+    console.error('搜索历史记录失败:', error);
+    historyContainer.innerHTML = '<div class="history-empty">搜索失败</div>';
+  }
+}
 
 // ========== 快捷方式管理 ==========
 const quickLinksContainer = document.getElementById('quickLinks');
@@ -479,22 +762,22 @@ function loadQuickLinks() {
     const addBtn = document.getElementById('addLinkBtn');
     quickLinksContainer.innerHTML = '';
 
-    // 默认链接的 URL 集合
-    const defaultUrls = new Set(DEFAULT_LINKS.map(l => l.url));
-
     // 用于去重的 Set（记录已渲染的 URL）
     const renderedUrls = new Set();
 
     // 始终显示默认图标
     DEFAULT_LINKS.forEach(link => {
       if (!renderedUrls.has(link.url)) {
-        quickLinksContainer.appendChild(createQuickLink(link));
+        const el = createQuickLink(link);
+        el.dataset.isDefault = 'true'; // 标记为默认
+        quickLinksContainer.appendChild(el);
         renderedUrls.add(link.url);
       }
     });
 
     // 添加用户保存的图标（排除默认链接和重复）
     if (links && links.length > 0) {
+      const defaultUrls = new Set(DEFAULT_LINKS.map(l => l.url));
       links.forEach(link => {
         // 跳过默认链接和已渲染的 URL
         if (!defaultUrls.has(link.url) && !renderedUrls.has(link.url)) {

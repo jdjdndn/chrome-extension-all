@@ -1,13 +1,19 @@
 // Content script for pan.quark.cn (夸克网盘)
-// 依赖: content/utils/logger.js, storage.js, dom.js, messaging.js
+// 使用公共模块重构
 
 'use strict';
 
-if (!window.QuarkScript) {
-  window.QuarkScript = { isInitialized: false };
+import { createScriptGuard } from './utils/script-guard.js';
+import { createStyleInjector } from './utils/style-injector.js';
+
+// 防重复加载
+const guard = createScriptGuard('Quark');
+if (guard.check()) {
+  throw new Error('脚本已加载');
 }
 
 const STYLE_TAG_ID = 'quark-search-style';
+const styleInjector = createStyleInjector(STYLE_TAG_ID);
 
 const styles = `
 #kuake-search-container {
@@ -48,7 +54,7 @@ const styles = `
 `;
 
 function injectStyles() {
-  DOMUtils.upsertStyle(STYLE_TAG_ID, styles);
+  styleInjector.inject(styles);
 }
 
 function createSearchUI() {
@@ -100,12 +106,10 @@ function performSearch() {
 }
 
 function init() {
-  if (window.QuarkScript.isInitialized) return;
-  window.QuarkScript.isInitialized = true;
-
   injectStyles();
   createSearchUI();
 
+  guard.markInitialized();
   console.log('[夸克网盘] 搜索脚本已加载');
 }
 

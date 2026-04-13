@@ -48,7 +48,9 @@ const defaultSettings = {
   enabled: false,
   debugMode: false,
   blockedDomains: [],
-  blockedResponseDomains: []
+  blockedResponseDomains: [],
+  whitelistMode: false,
+  whitelist: []
 };
 
 // DOM Elements
@@ -79,6 +81,18 @@ async function loadSettings() {
   // Update UI
   updateStatus(settings.enabled);
   debugModeCheckbox.checked = settings.debugMode || false;
+
+  // 白名单模式
+  const whitelistCheckbox = document.getElementById('whitelist-mode');
+  if (whitelistCheckbox) {
+    whitelistCheckbox.checked = settings.whitelistMode || false;
+    whitelistCheckbox.addEventListener('change', async () => {
+      const result = await chrome.storage.sync.get('settings');
+      const currentSettings = result.settings || defaultSettings;
+      currentSettings.whitelistMode = whitelistCheckbox.checked;
+      await chrome.storage.sync.set({ settings: currentSettings });
+    });
+  }
 
   // Load AI settings
   loadAISettings(settings);
@@ -1963,4 +1977,734 @@ if (selectorsEditor) {
 // 加载编辑器
 document.addEventListener('DOMContentLoaded', () => {
   loadSelectorsEditor();
+  initNavigation();
 });
+
+// ========== 导航切换 ==========
+function initNavigation() {
+  const navCurrent = document.getElementById('nav-current');
+  const navGlobal = document.getElementById('nav-global');
+  const navStats = document.getElementById('nav-stats');
+  const currentSettings = document.getElementById('current-page-settings');
+  const globalSettings = document.getElementById('global-settings');
+  const statsView = document.getElementById('stats-view');
+
+  function showView(view) {
+    // 隐藏所有视图
+    currentSettings.style.display = 'none';
+    globalSettings.style.display = 'none';
+    if (statsView) statsView.style.display = 'none';
+    // 移除所有active
+    navCurrent.classList.remove('active');
+    navGlobal.classList.remove('active');
+    if (navStats) navStats.classList.remove('active');
+    // 显示目标视图
+    if (view === 'current') {
+      currentSettings.style.display = 'block';
+      navCurrent.classList.add('active');
+    } else if (view === 'global') {
+      globalSettings.style.display = 'block';
+      navGlobal.classList.add('active');
+      loadGlobalSettings();
+    } else if (view === 'stats' && statsView) {
+      statsView.style.display = 'block';
+      navStats.classList.add('active');
+      loadStatsData();
+    }
+  }
+
+  if (navCurrent && navGlobal && currentSettings && globalSettings) {
+    navCurrent.addEventListener('click', () => showView('current'));
+    navGlobal.addEventListener('click', () => showView('global'));
+    if (navStats) {
+      navStats.addEventListener('click', () => showView('stats'));
+    }
+  }
+}
+
+// ========== 统计面板 ==========
+async function loadStatsData() {
+  try {
+    const response = await chrome.runtime.sendMessage({ type: 'GET_STATS' });
+    if (response?.success && response.stats) {
+      renderStats(response.stats);
+    }
+  } catch (error) {
+    console.error('[Stats] 加载统计数据失败:', error);
+  }
+}
+
+function renderStats(stats) {
+  // 今日数据
+  const todayBlocked = document.getElementById('today-blocked');
+  const todayHidden = document.getElementById('today-hidden');
+  const todayBytes = document.getElementById('today-bytes');
+
+  if (todayBlocked) todayBlocked.textContent = formatNumber(stats.today?.blocked || 0);
+  if (todayHidden) todayHidden.textContent = formatNumber(stats.today?.hidden || 0);
+  if (todayBytes) todayBytes.textContent = formatBytes(stats.today?.bytes || 0);
+
+  // 累计数据
+  const totalBlocked = document.getElementById('total-blocked');
+  const totalHidden = document.getElementById('total-hidden');
+  const totalBytes = document.getElementById('total-bytes');
+
+  if (totalBlocked) totalBlocked.textContent = formatNumber(stats.totalBlocked || 0);
+  if (totalHidden) totalHidden.textContent = formatNumber(stats.totalHidden || 0);
+  if (totalBytes) totalBytes.textContent = formatBytes(stats.estimatedBytesSaved || 0);
+
+  // 域名排行
+  renderDomainRanking(stats.domainStats || {});
+}
+
+function renderDomainRanking(domainStats) {
+  const container = document.getElementById('domain-ranking');
+  if (!container) return;
+
+  const entries = Object.entries(domainStats)
+    .map(([domain, data]) => ({
+      domain,
+      total: (data.blocked || 0) + (data.hidden || 0)
+    }))
+    .filter(e => e.total > 0)
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 5);
+
+  if (entries.length === 0) {
+    container.innerHTML = '<div style="color: #999; text-align: center; padding: 20px;">暂无数据</div>';
+    return;
+  }
+
+  const maxTotal = entries[0].total;
+  container.innerHTML = entries.map((e, i) => {
+    const percent = Math.round((e.total / maxTotal) * 100);
+    return `
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+        <span style="width: 16px; color: #666; font-size: 11px;">${i + 1}.</span>
+        <div style="flex: 1;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+            <span style="font-size: 11px; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 150px;">${escapeHtml(e.domain)}</span>
+            <span style="font-size: 11px; color: #666;">${e.total}</span>
+          </div>
+          <div style="height: 4px; background: #e9ecef; border-radius: 2px; overflow: hidden;">
+            <div style="height: 100%; width: ${percent}%; background: linear-gradient(90deg, #007bff, #0056b3); border-radius: 2px;"></div>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function formatNumber(num) {
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+  return String(num);
+}
+
+function formatBytes(bytes) {
+  if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(1) + 'GB';
+  if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + 'MB';
+  if (bytes >= 1024) return (bytes / 1024).toFixed(1) + 'KB';
+  return bytes + 'B';
+}
+
+// 统计面板事件绑定
+document.addEventListener('DOMContentLoaded', () => {
+  const refreshBtn = document.getElementById('refresh-stats');
+  const resetBtn = document.getElementById('reset-stats');
+
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', loadStatsData);
+  }
+
+  if (resetBtn) {
+    resetBtn.addEventListener('click', async () => {
+      if (confirm('确定要重置所有统计数据吗？此操作不可恢复。')) {
+        try {
+          await chrome.runtime.sendMessage({ type: 'RESET_STATS' });
+          loadStatsData();
+        } catch (error) {
+          console.error('[Stats] 重置失败:', error);
+        }
+      }
+    });
+  }
+});
+
+// ========== 通知中心 ==========
+document.addEventListener('DOMContentLoaded', async () => {
+  const bellBtn = document.getElementById('notification-bell');
+  const panel = document.getElementById('notification-panel');
+  const closeBtn = document.getElementById('close-notifications');
+  const clearBtn = document.getElementById('clear-notifications');
+  const badge = document.getElementById('notification-badge');
+
+  // 加载通知
+  await loadNotifications();
+
+  if (bellBtn && panel) {
+    bellBtn.addEventListener('click', () => {
+      panel.style.display = 'block';
+      markNotificationsRead();
+    });
+  }
+
+  if (closeBtn && panel) {
+    closeBtn.addEventListener('click', () => panel.style.display = 'none');
+  }
+
+  if (panel) {
+    panel.addEventListener('click', (e) => {
+      if (e.target === panel) panel.style.display = 'none';
+    });
+  }
+
+  if (clearBtn) {
+    clearBtn.addEventListener('click', async () => {
+      await chrome.storage.local.remove('notifications');
+      await loadNotifications();
+    });
+  }
+});
+
+async function loadNotifications() {
+  const list = document.getElementById('notification-list');
+  const badge = document.getElementById('notification-badge');
+  if (!list) return;
+
+  const result = await chrome.storage.local.get('notifications');
+  const notifications = result.notifications || [];
+
+  if (notifications.length === 0) {
+    list.innerHTML = '<div style="color: #999; text-align: center; padding: 20px;">暂无通知</div>';
+    if (badge) badge.style.display = 'none';
+    return;
+  }
+
+  // 显示未读数量
+  const unreadCount = notifications.filter(n => !n.read).length;
+  if (badge) badge.style.display = unreadCount > 0 ? 'block' : 'none';
+
+  list.innerHTML = notifications.map((n, i) => `
+    <div style="padding: 8px; margin-bottom: 8px; background: ${n.read ? '#f8f9fa' : '#e3f2fd'}; border-radius: 6px; border-left: 3px solid ${n.type === 'success' ? '#28a745' : n.type === 'warning' ? '#ffc107' : '#007bff'};">
+      <div style="font-size: 12px; color: #666; margin-bottom: 4px;">${new Date(n.time).toLocaleString('zh-CN')}</div>
+      <div style="font-size: 13px;">${escapeHtml(n.message)}</div>
+    </div>
+  `).join('');
+}
+
+async function markNotificationsRead() {
+  const result = await chrome.storage.local.get('notifications');
+  const notifications = result.notifications || [];
+  notifications.forEach(n => n.read = true);
+  await chrome.storage.local.set({ notifications });
+
+  const badge = document.getElementById('notification-badge');
+  if (badge) badge.style.display = 'none';
+}
+
+// 添加通知（供其他模块调用）
+async function addNotification(message, type = 'info') {
+  const result = await chrome.storage.local.get('notifications');
+  const notifications = result.notifications || [];
+  notifications.unshift({
+    message,
+    type,
+    time: Date.now(),
+    read: false
+  });
+  // 最多保留20条
+  await chrome.storage.local.set({ notifications: notifications.slice(0, 20) });
+}
+
+// ========== 快速笔记 ==========
+document.addEventListener('DOMContentLoaded', async () => {
+  const noteArea = document.getElementById('quick-note');
+  const saveBtn = document.getElementById('save-note');
+  const clearBtn = document.getElementById('clear-note');
+
+  // 加载笔记
+  const result = await chrome.storage.local.get('quickNote');
+  if (noteArea && result.quickNote) {
+    noteArea.value = result.quickNote;
+  }
+
+  // 自动保存
+  if (noteArea) {
+    noteArea.addEventListener('input', async () => {
+      await chrome.storage.local.set({ quickNote: noteArea.value });
+    });
+  }
+
+  // 保存按钮
+  saveBtn?.addEventListener('click', async () => {
+    await chrome.storage.local.set({ quickNote: noteArea.value });
+    saveBtn.textContent = '已保存 ✓';
+    setTimeout(() => saveBtn.textContent = '保存', 1500);
+  });
+
+  // 清空按钮
+  clearBtn?.addEventListener('click', async () => {
+    if (confirm('确定要清空笔记吗？')) {
+      noteArea.value = '';
+      await chrome.storage.local.remove('quickNote');
+    }
+  });
+});
+
+// ========== 剪贴板历史 ==========
+document.addEventListener('DOMContentLoaded', async () => {
+  const list = document.getElementById('clipboard-list');
+  const clearBtn = document.getElementById('clear-clipboard');
+
+  await loadClipboardHistory();
+
+  if (clearBtn) {
+    clearBtn.addEventListener('click', async () => {
+      await chrome.storage.local.remove('clipboardHistory');
+      await loadClipboardHistory();
+    });
+  }
+});
+
+async function loadClipboardHistory() {
+  const list = document.getElementById('clipboard-list');
+  if (!list) return;
+
+  const result = await chrome.storage.local.get('clipboardHistory');
+  const history = result.clipboardHistory || [];
+
+  if (history.length === 0) {
+    list.innerHTML = '<div style="color: #999; text-align: center; padding: 20px;">暂无记录</div>';
+    return;
+  }
+
+  list.innerHTML = history.map((item, i) => `
+    <div class="clipboard-item" style="padding: 8px; margin-bottom: 4px; background: #f8f9fa; border-radius: 4px; cursor: pointer; overflow: hidden;" data-index="${i}">
+      <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(item.text.slice(0, 100))}</div>
+      <div style="font-size: 10px; color: #999; margin-top: 2px;">${new Date(item.time).toLocaleString('zh-CN')}</div>
+    </div>
+  `).join('');
+
+  // 点击复制
+  list.querySelectorAll('.clipboard-item').forEach(el => {
+    el.addEventListener('click', async () => {
+      const index = parseInt(el.dataset.index);
+      const text = history[index]?.text;
+      if (text) {
+        await navigator.clipboard.writeText(text);
+        el.style.background = '#d4edda';
+        setTimeout(() => el.style.background = '', 500);
+      }
+    });
+  });
+}
+
+// 记录剪贴板内容（供content script调用）
+async function recordClipboard(text) {
+  if (!text || text.length > 1000) return;
+
+  const result = await chrome.storage.local.get('clipboardHistory');
+  const history = result.clipboardHistory || [];
+
+  // 去重
+  if (history.some(h => h.text === text)) return;
+
+  history.unshift({ text, time: Date.now() });
+  await chrome.storage.local.set({ clipboardHistory: history.slice(0, 20) });
+}
+
+// ========== 番茄钟 ==========
+let pomodoroTimer = null;
+let pomodoroRemaining = 25 * 60;
+let pomodoroRunning = false;
+
+document.addEventListener('DOMContentLoaded', async () => {
+  const startBtn = document.getElementById('pomodoro-start');
+  const pauseBtn = document.getElementById('pomodoro-pause');
+  const resetBtn = document.getElementById('pomodoro-reset');
+  const durationSelect = document.getElementById('pomodoro-duration');
+  const timeDisplay = document.getElementById('pomodoro-time');
+  const statusDisplay = document.getElementById('pomodoro-status');
+  const countDisplay = document.getElementById('pomodoro-count');
+
+  // 加载今日完成数
+  const today = new Date().toISOString().split('T')[0];
+  const result = await chrome.storage.local.get('pomodoroStats');
+  const stats = result.pomodoroStats || {};
+  if (stats[today]) {
+    countDisplay.textContent = stats[today];
+  }
+
+  // 更新显示
+  function updateDisplay() {
+    const mins = Math.floor(pomodoroRemaining / 60);
+    const secs = pomodoroRemaining % 60;
+    timeDisplay.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
+
+  // 开始计时
+  startBtn?.addEventListener('click', () => {
+    if (pomodoroRunning) return;
+    pomodoroRunning = true;
+    startBtn.style.display = 'none';
+    pauseBtn.style.display = 'block';
+    statusDisplay.textContent = '专注中...';
+
+    pomodoroTimer = setInterval(() => {
+      pomodoroRemaining--;
+      updateDisplay();
+
+      if (pomodoroRemaining <= 0) {
+        clearInterval(pomodoroTimer);
+        pomodoroRunning = false;
+        startBtn.style.display = 'block';
+        pauseBtn.style.display = 'none';
+        statusDisplay.textContent = '完成！休息一下吧';
+
+        // 记录完成
+        incrementPomodoroCount();
+      }
+    }, 1000);
+  });
+
+  // 暂停
+  pauseBtn?.addEventListener('click', () => {
+    clearInterval(pomodoroTimer);
+    pomodoroRunning = false;
+    startBtn.style.display = 'block';
+    pauseBtn.style.display = 'none';
+    statusDisplay.textContent = '已暂停';
+  });
+
+  // 重置
+  resetBtn?.addEventListener('click', () => {
+    clearInterval(pomodoroTimer);
+    pomodoroRunning = false;
+    const duration = parseInt(durationSelect.value);
+    pomodoroRemaining = duration * 60;
+    updateDisplay();
+    startBtn.style.display = 'block';
+    pauseBtn.style.display = 'none';
+    statusDisplay.textContent = '准备开始';
+  });
+
+  // 时长选择
+  durationSelect?.addEventListener('change', () => {
+    if (!pomodoroRunning) {
+      const duration = parseInt(durationSelect.value);
+      pomodoroRemaining = duration * 60;
+      updateDisplay();
+    }
+  });
+
+  updateDisplay();
+});
+
+async function incrementPomodoroCount() {
+  const today = new Date().toISOString().split('T')[0];
+  const result = await chrome.storage.local.get('pomodoroStats');
+  const stats = result.pomodoroStats || {};
+  stats[today] = (stats[today] || 0) + 1;
+  await chrome.storage.local.set({ pomodoroStats: stats });
+
+  const countDisplay = document.getElementById('pomodoro-count');
+  if (countDisplay) countDisplay.textContent = stats[today];
+
+  // 发送通知
+  if (chrome.notifications) {
+    chrome.notifications.create({
+      type: 'basic',
+      iconUrl: 'icons/icon16.png',
+      title: '🍅 番茄钟完成',
+      message: '休息一下吧！'
+    });
+  }
+}
+
+// ========== 快捷键帮助面板 ==========
+document.addEventListener('DOMContentLoaded', () => {
+  const helpBtn = document.getElementById('shortcuts-help');
+  const panel = document.getElementById('shortcuts-panel');
+  const closeBtn = document.getElementById('close-shortcuts');
+
+  if (helpBtn && panel) {
+    helpBtn.addEventListener('click', () => {
+      panel.style.display = 'block';
+    });
+  }
+
+  if (closeBtn && panel) {
+    closeBtn.addEventListener('click', () => {
+      panel.style.display = 'none';
+    });
+  }
+
+  if (panel) {
+    panel.addEventListener('click', (e) => {
+      if (e.target === panel) {
+        panel.style.display = 'none';
+      }
+    });
+  }
+});
+
+// ========== 规则模板库 ==========
+const RULE_TEMPLATES = {
+  ads: {
+    name: '广告拦截',
+    domains: [
+      'googlesyndication.com',
+      'doubleclick.net',
+      'googleadservices.com',
+      'ads.google.com',
+      'pagead2.googlesyndication.com'
+    ]
+  },
+  trackers: {
+    name: '隐私追踪',
+    domains: [
+      'google-analytics.com',
+      'googletagmanager.com',
+      'facebook.net/tr',
+      'connect.facebook.net',
+      'analytics.twitter.com'
+    ]
+  },
+  social: {
+    name: '社交组件',
+    domains: [
+      'platform.twitter.com/widgets',
+      'connect.facebook.net/zh_CN/sdk',
+      'assets.pinterest.com/js/pinit',
+      'platform.linkedin.com/in.js'
+    ]
+  },
+  'video-ads': {
+    name: '视频广告',
+    domains: [
+      'ads.youtube.com',
+      'googleads.g.doubleclick.net',
+      'static.doubleclick.net/instream/ad_status',
+      'pagead2.googlesyndication.com/pagead/ads'
+    ]
+  }
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+  const templateBtns = document.querySelectorAll('.template-btn');
+  templateBtns.forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const templateKey = btn.dataset.template;
+      const template = RULE_TEMPLATES[templateKey];
+      if (!template) return;
+
+      // 获取当前阻止域名
+      const result = await chrome.storage.sync.get('settings');
+      const settings = result.settings || {};
+      const currentBlocked = settings.blockedDomains || [];
+
+      // 合并模板域名
+      const newDomains = [...new Set([...currentBlocked, ...template.domains])];
+
+      // 保存
+      await chrome.storage.sync.set({
+        settings: { ...settings, blockedDomains: newDomains }
+      });
+
+      // 更新UI
+      const originalText = btn.textContent;
+      btn.textContent = '✓ 已添加';
+      btn.style.background = '#c8e6c9';
+      setTimeout(() => {
+        btn.textContent = originalText;
+        btn.style.background = '';
+      }, 1500);
+
+      // 刷新阻止域名列表
+      if (typeof loadBlockedDomains === 'function') {
+        loadBlockedDomains();
+      }
+    });
+  });
+});
+
+// ========== 暗黑模式 ==========
+document.addEventListener('DOMContentLoaded', async () => {
+  const themeToggle = document.getElementById('theme-toggle');
+  if (!themeToggle) return;
+
+  // 加载主题设置
+  const result = await chrome.storage.local.get('theme');
+  const savedTheme = result.theme || 'light';
+  applyTheme(savedTheme);
+
+  themeToggle.addEventListener('click', async () => {
+    const currentTheme = document.body.classList.contains('dark-mode') ? 'dark' : 'light';
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    applyTheme(newTheme);
+    await chrome.storage.local.set({ theme: newTheme });
+  });
+});
+
+function applyTheme(theme) {
+  const themeToggle = document.getElementById('theme-toggle');
+  if (theme === 'dark') {
+    document.body.classList.add('dark-mode');
+    if (themeToggle) themeToggle.textContent = '☀️';
+  } else {
+    document.body.classList.remove('dark-mode');
+    if (themeToggle) themeToggle.textContent = '🌙';
+  }
+}
+
+// ========== 导出/导入设置 ==========
+document.addEventListener('DOMContentLoaded', () => {
+  const exportBtn = document.getElementById('export-settings-btn');
+  const importBtn = document.getElementById('import-settings-btn');
+  const importInput = document.getElementById('import-file-input');
+
+  if (exportBtn) {
+    exportBtn.addEventListener('click', exportSettings);
+  }
+
+  if (importBtn && importInput) {
+    importBtn.addEventListener('click', () => importInput.click());
+    importInput.addEventListener('change', importSettings);
+  }
+});
+
+async function exportSettings() {
+  try {
+    // 收集所有设置
+    const syncData = await chrome.storage.sync.get(null);
+    const localData = await chrome.storage.local.get(null);
+
+    // 排除统计数据（太大）
+    delete localData.extensionStats;
+
+    const exportData = {
+      version: '1.0.0',
+      exportTime: new Date().toISOString(),
+      sync: syncData,
+      local: localData
+    };
+
+    // 下载JSON文件
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `chrome-extension-settings-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    // 提示成功
+    alert('设置已导出成功！');
+  } catch (error) {
+    console.error('[导出设置] 失败:', error);
+    alert('导出失败: ' + error.message);
+  }
+}
+
+async function importSettings(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+
+    // 验证格式
+    if (!data.version || !data.sync || !data.local) {
+      throw new Error('无效的设置文件格式');
+    }
+
+    // 确认导入
+    if (!confirm('导入设置将覆盖当前所有设置，确定继续吗？')) {
+      return;
+    }
+
+    // 导入sync设置
+    if (Object.keys(data.sync).length > 0) {
+      await chrome.storage.sync.clear();
+      await chrome.storage.sync.set(data.sync);
+    }
+
+    // 导入local设置（保留统计数据）
+    const currentLocal = await chrome.storage.local.get('extensionStats');
+    await chrome.storage.local.clear();
+    await chrome.storage.local.set({ ...data.local, extensionStats: currentLocal.extensionStats });
+
+    alert('设置已导入成功！页面将刷新。');
+    location.reload();
+  } catch (error) {
+    console.error('[导入设置] 失败:', error);
+    alert('导入失败: ' + error.message);
+  } finally {
+    // 清空input，允许重复导入同一文件
+    event.target.value = '';
+  }
+}
+
+// ========== 全局设置 ==========
+async function loadGlobalSettings() {
+  const domainSelect = document.getElementById('global-domain-select');
+  const keywordsEditor = document.getElementById('global-keywords-editor');
+  const keywordsTextarea = document.getElementById('global-keywords-textarea');
+
+  if (!domainSelect || !keywordsEditor || !keywordsTextarea) return;
+
+  domainSelect.addEventListener('change', async () => {
+    const domain = domainSelect.value;
+    if (!domain) {
+      keywordsEditor.style.display = 'none';
+      return;
+    }
+
+    keywordsEditor.style.display = 'block';
+
+    // 加载该域名的关键词
+    try {
+      const storageKey = `${domain}Keywords`;
+      const result = await chrome.storage.local.get(storageKey);
+      const keywords = result[storageKey] || [];
+      keywordsTextarea.value = Array.isArray(keywords) ? keywords.join('\n') : keywords;
+    } catch (error) {
+      console.error('[全局设置] 加载关键词失败:', error);
+      keywordsTextarea.value = '';
+    }
+  });
+
+  // 保存按钮
+  const saveBtn = document.getElementById('global-save-keywords-btn');
+  if (saveBtn) {
+    saveBtn.addEventListener('click', async () => {
+      const domain = domainSelect.value;
+      if (!domain) return;
+
+      const keywords = keywordsTextarea.value
+        .split('\n')
+        .map(k => k.trim())
+        .filter(k => k);
+
+      try {
+        const storageKey = `${domain}Keywords`;
+        await chrome.storage.local.set({ [storageKey]: keywords });
+
+        // 显示成功提示
+        const originalText = saveBtn.textContent;
+        saveBtn.textContent = '已保存 ✓';
+        saveBtn.style.background = '#28a745';
+        setTimeout(() => {
+          saveBtn.textContent = originalText;
+          saveBtn.style.background = '';
+        }, 1500);
+
+        console.log('[全局设置] 已保存关键词:', domain, keywords.length);
+      } catch (error) {
+        console.error('[全局设置] 保存关键词失败:', error);
+      }
+    });
+  }
+}

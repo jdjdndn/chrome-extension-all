@@ -1,16 +1,20 @@
 // Content script for pornhub.com
-// 依赖: content/utils/logger.js, storage.js, dom.js, messaging.js
+// 使用公共模块重构
 
 'use strict';
 
-// ========== 全局命名空间 ==========
-if (!window.PornScript) {
-  window.PornScript = { isInitialized: false };
+import { createScriptGuard } from './utils/script-guard.js';
+import { createStyleInjector } from './utils/style-injector.js';
+
+// 防重复加载
+const guard = createScriptGuard('Porn');
+if (guard.check()) {
+  throw new Error('脚本已加载');
 }
 
 // ========== 配置 ==========
 const STYLE_TAG_ID = 'porn-content-hide-style';
-let styleElement = null;
+const styleInjector = createStyleInjector(STYLE_TAG_ID);
 let currentSelectors = [];
 
 const DEFAULT_HIDE_SELECTORS = [
@@ -24,19 +28,47 @@ const DEFAULT_HIDE_SELECTORS = [
 
 const BLOCKED_DOMAINS = [];
 
+// ========== 安全检查 ==========
+function getDOMUtils() {
+  if (typeof DOMUtils === 'undefined') {
+    console.error('[Pornhub脚本] DOMUtils 未加载');
+    return null;
+  }
+  return DOMUtils;
+}
+
+function getStorageUtils() {
+  if (typeof StorageUtils === 'undefined') {
+    console.error('[Pornhub脚本] StorageUtils 未加载');
+    return null;
+  }
+  return StorageUtils;
+}
+
+function getMessagingUtils() {
+  if (typeof MessagingUtils === 'undefined') {
+    console.error('[Pornhub脚本] MessagingUtils 未加载');
+    return null;
+  }
+  return MessagingUtils;
+}
+
 // ========== 工具函数 ==========
 // 使用 DOMUtils.findOneInViewport 替代本地实现
 function findOne(selector) {
-  return DOMUtils.findOneInViewport(selector, { checkVisibility: true, checkDimensions: true });
+  const utils = getDOMUtils();
+  if (!utils) return null;
+  return utils.findOneInViewport(selector, { checkVisibility: true, checkDimensions: true });
 }
 
 // ========== 隐藏元素 ==========
 function updateHideElements(selectors) {
-  DOMUtils.removeStyle(STYLE_TAG_ID);
+  styleInjector.remove();
   currentSelectors = selectors?.length > 0 ? selectors : [];
 
   if (currentSelectors.length > 0) {
-    DOMUtils.applyHideStyle(STYLE_TAG_ID, currentSelectors);
+    const hideCSS = currentSelectors.map(sel => `${sel} { display: none !important; }`).join('\n');
+    styleInjector.inject(hideCSS);
     console.log('[Pornhub脚本] 已隐藏元素:', currentSelectors);
   }
 }
@@ -56,13 +88,17 @@ function clickOver18Button() {
 
 function cleanup() {
   console.log('[Pornhub脚本] 清理状态...');
-  DOMUtils.removeStyle(STYLE_TAG_ID);
-  window.PornScript.isInitialized = false;
+  styleInjector.remove();
+  guard.reset();
 }
 
 // ========== 存储 ==========
 async function loadDomainHideSettings() {
-  const domain = DOMUtils.getCurrentDomain();
+  const domUtils = getDOMUtils();
+  if (!domUtils) return;
+
+  const domain = domUtils.getCurrentDomain();
+  if (!domain) return;
 
   // 尝试从本地服务器加载选择器
   let serverSelectors = [];
@@ -87,8 +123,16 @@ async function loadDomainHideSettings() {
   }
 
   // 从存储获取用户选择器
-  const settings = await StorageUtils.getDomainSettings('hideElementsSettings', domain);
-  const userSelectors = settings?.selectors || [];
+  const storageUtils = getStorageUtils();
+  let userSelectors = [];
+  if (storageUtils) {
+    try {
+      const settings = await storageUtils.getDomainSettings('hideElementsSettings', domain);
+      userSelectors = settings?.selectors || [];
+    } catch (error) {
+      console.warn('[Pornhub脚本] 加载用户设置失败:', error);
+    }
+  }
 
   // 合并：默认 + 本地服务器 + 用户添加
   const mergedSelectors = [...new Set([...DEFAULT_HIDE_SELECTORS, ...serverSelectors, ...userSelectors])];
@@ -99,8 +143,15 @@ async function loadDomainHideSettings() {
 
 // ========== 初始化 ==========
 async function registerBlockedDomains() {
-  const result = await MessagingUtils.registerBlockedDomains('pornhub.com', BLOCKED_DOMAINS);
-  if (result?.success) console.log('[Pornhub脚本] 已向 background 注册 blockedDomains');
+  const messagingUtils = getMessagingUtils();
+  if (!messagingUtils) return;
+
+  try {
+    const result = await messagingUtils.registerBlockedDomains('pornhub.com', BLOCKED_DOMAINS);
+    if (result?.success) console.log('[Pornhub脚本] 已向 background 注册 blockedDomains');
+  } catch (error) {
+    console.warn('[Pornhub脚本] 注册域名失败:', error);
+  }
 }
 
 // ========== 链接点击处理 ==========
@@ -122,12 +173,6 @@ function handleLinkClick(event) {
 
 // ========== 初始化 ==========
 function init() {
-  if (window.PornScript.isInitialized) {
-    console.log('[Pornhub脚本] 已经初始化，跳过重复初始化');
-    return;
-  }
-  window.PornScript.isInitialized = true;
-
   // 异步加载设置，错误时使用默认值
   loadDomainHideSettings().catch(err => console.error('[Pornhub脚本] 加载设置失败:', err));
   registerBlockedDomains().catch(err => console.error('[Pornhub脚本] 注册域名失败:', err));
@@ -142,44 +187,19 @@ function init() {
   }
 
   // 标记 content script 已就绪
-  if (window.ContentBridge) {
+  if (typeof ContentBridge !== 'undefined') {
     ContentBridge.markReady();
   }
+
+  guard.markInitialized();
+  console.log('[Pornhub脚本] 脚本已加载');
 }
 
 // ========== 导出配置 ==========
-window.PornScriptConfig = {
-  DEFAULT_HIDE_SELECTORS,
-  BLOCKED_DOMAINS
-};
+// 配置通过消息处理器提供，不再直接导出到window
 
-// ========== 消息处理 ==========
-MessagingUtils.createMessageHandler('porn_message_handler', {
-  'TOGGLE_EXTENSION': (message) => {
-    console.log('[Pornhub脚本] 扩展状态:', message.enabled ? '启用' : '禁用');
-    return { success: true };
-  },
-
-  'UPDATE_KEYWORDS': (message) => {
-    console.log('[Pornhub脚本] 关键词更新:', message.keywords);
-    return { success: true, message: '关键词已更新' };
-  },
-
-  'GET_DEFAULT_HIDE_SELECTORS': () => ({ success: true, selectors: DEFAULT_HIDE_SELECTORS }),
-  'GET_CURRENT_HIDE_SELECTORS': () => ({ success: true, selectors: currentSelectors }),
-
-  'UPDATE_HIDE_ELEMENTS': (message) => {
-    const { enabled, selectors } = message;
-    if (enabled && selectors?.length > 0) {
-      updateHideElements(selectors);
-      console.log('[Pornhub脚本] 隐藏元素已更新:', selectors);
-    } else {
-      DOMUtils.removeStyle(STYLE_TAG_ID);
-      console.log('[Pornhub脚本] 隐藏元素已禁用');
-    }
-    return { success: true };
-  }
-});
+// ========== 消息处理设置 ==========
+setupMessageHandler();
 
 // ========== 启动 ==========
 if (document.readyState === 'loading') {

@@ -891,11 +891,36 @@
           <span class="setting-range-value" id="historyCountValue">8</span>
         </div>
       </div>
+      <div class="setting-item">
+        <label class="setting-label">搜索引擎</label>
+        <select class="setting-input" id="searchEngineSelect">
+          <option value="baidu">百度</option>
+          <option value="google">Google</option>
+          <option value="bing">Bing</option>
+          <option value="duckduckgo">DuckDuckGo</option>
+          <option value="sogou">搜狗</option>
+        </select>
+      </div>
     </div>
   </div>
 
   <div class="time-display" id="time">00:00</div>
   <div class="date-display" id="date">星期一</div>
+
+  <!-- 天气显示 -->
+  <div id="weather-widget" style="text-align: center; margin: 10px 0; padding: 8px 16px; background: rgba(255,255,255,0.1); border-radius: 12px; display: inline-flex; align-items: center; gap: 8px;">
+    <span id="weather-icon" style="font-size: 24px;">🌤️</span>
+    <div>
+      <span id="weather-temp" style="font-size: 16px; font-weight: 600; color: #fff;">--°C</span>
+      <span id="weather-desc" style="font-size: 11px; color: rgba(255,255,255,0.7); margin-left: 8px;">加载中...</span>
+    </div>
+  </div>
+
+  <!-- 每日一言 -->
+  <div id="daily-quote" style="text-align: center; margin: 8px 0 20px 0; padding: 12px 20px; max-width: 600px; background: rgba(255,255,255,0.08); border-radius: 8px;">
+    <div id="quote-text" style="font-size: 14px; color: rgba(255,255,255,0.9); line-height: 1.5; margin-bottom: 4px;">加载中...</div>
+    <div id="quote-author" style="font-size: 11px; color: rgba(255,255,255,0.5);"></div>
+  </div>
 
   <div class="container">
     <div class="header">
@@ -933,6 +958,14 @@
       <div class="history-section" id="historySection">
         <div class="history-title">🕐 最近访问</div>
         <div class="history-container" id="historyContainer">
+          <div class="history-empty">加载中...</div>
+        </div>
+      </div>
+
+      <!-- 书签快捷访问 -->
+      <div class="history-section" id="bookmarksSection" style="margin-top: 20px;">
+        <div class="history-title">📌 常用书签</div>
+        <div class="history-container" id="bookmarksContainer">
           <div class="history-empty">加载中...</div>
         </div>
       </div>

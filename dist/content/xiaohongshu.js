@@ -1,14 +1,23 @@
 // Content script for xiaohongshu.com (小红书)
-// 依赖: content/utils/logger.js, storage.js, dom.js, messaging.js
+// 使用公共模块重构
 
 'use strict';
 
-if (!window.XiaohongshuScript) {
-  window.XiaohongshuScript = { isInitialized: false };
+import { createScriptGuard } from './utils/script-guard.js';
+import { createStyleInjector } from './utils/style-injector.js';
+
+// 防重复加载
+const guard = createScriptGuard('Xiaohongshu');
+if (guard.check()) {
+  throw new Error('脚本已加载');
 }
 
 const STYLE_TAG_ID = 'xiaohongshu-style';
+const styleInjector = createStyleInjector(STYLE_TAG_ID);
+
 let currentAutoPlay = false;
+let observer = null;
+let intervalId = null;
 
 const styles = `
 .yc-xhs-btn {
@@ -30,14 +39,13 @@ const styles = `
 `;
 
 function injectStyles() {
-  DOMUtils.upsertStyle(STYLE_TAG_ID, styles);
+  styleInjector.inject(styles);
 }
 
 function createControlButtons() {
   const videoContainer = document.querySelector('[class*="video-container"], [class*="player"]');
   if (!videoContainer) return;
 
-  // 检查是否已创建按钮
   if (document.querySelector('.yc-xhs-btn')) return;
 
   const prevBtn = document.createElement('div');
@@ -101,9 +109,6 @@ function mainLoop() {
 }
 
 function init() {
-  if (window.XiaohongshuScript.isInitialized) return;
-
-  // 确保 document.body 存在
   if (!document.body) {
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', init);
@@ -113,34 +118,28 @@ function init() {
     return;
   }
 
-  window.XiaohongshuScript.isInitialized = true;
-
   injectStyles();
 
-  // 监听 DOM 变化
-  const observer = new MutationObserver(mainLoop);
+  observer = new MutationObserver(mainLoop);
   observer.observe(document.body, { childList: true, subtree: true });
 
-  // 存储 observer 和 interval 以便清理
-  window.XiaohongshuScript.observer = observer;
-  window.XiaohongshuScript.intervalId = setInterval(mainLoop, 1000);
+  intervalId = setInterval(mainLoop, 1000);
 
+  guard.markInitialized();
   console.log('[小红书] 自动播放脚本已加载');
 }
 
-// 清理函数
 function cleanup() {
-  if (window.XiaohongshuScript?.observer) {
-    window.XiaohongshuScript.observer.disconnect();
-    window.XiaohongshuScript.observer = null;
+  if (observer) {
+    observer.disconnect();
+    observer = null;
   }
-  if (window.XiaohongshuScript?.intervalId) {
-    clearInterval(window.XiaohongshuScript.intervalId);
-    window.XiaohongshuScript.intervalId = null;
+  if (intervalId) {
+    clearInterval(intervalId);
+    intervalId = null;
   }
 }
 
-// 页面卸载时清理
 window.addEventListener('beforeunload', cleanup);
 
 if (document.readyState === 'loading') {
