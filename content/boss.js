@@ -1,13 +1,19 @@
 // Content script for zhipin.com (BOSS直聘)
-// 依赖: content/utils/logger.js, storage.js, dom.js, messaging.js
+// 使用公共模块重构
 
 'use strict';
 
-if (!window.BossScript) {
-  window.BossScript = { isInitialized: false };
+import { createScriptGuard } from './utils/script-guard.js';
+import { createStyleInjector } from './utils/style-injector.js';
+
+// 防重复加载
+const guard = createScriptGuard('Boss');
+if (guard.check()) {
+  throw new Error('脚本已加载');
 }
 
 const STYLE_TAG_ID = 'boss-style';
+const styleInjector = createStyleInjector(STYLE_TAG_ID);
 
 const styles = `
 .boss-job-update {
@@ -102,24 +108,12 @@ function processJobList() {
 }
 
 function injectStyles() {
-  // 添加防御性检查
-  if (typeof DOMUtils === 'undefined' || !DOMUtils.upsertStyle) {
-    console.warn('[boss] DOMUtils 未加载，手动添加样式');
-    const style = document.getElementById(STYLE_TAG_ID);
-    if (!style) {
-      const newStyle = document.createElement('style');
-      newStyle.id = STYLE_TAG_ID;
-      newStyle.textContent = styles;
-      document.head.appendChild(newStyle);
-    }
-  } else {
-    DOMUtils.upsertStyle(STYLE_TAG_ID, styles);
-  }
+  styleInjector.inject(styles);
 }
 
-function init() {
-  if (window.BossScript.isInitialized) return;
+let observer = null;
 
+function init() {
   // 确保 document.body 存在
   if (!document.body) {
     if (document.readyState === 'loading') {
@@ -130,25 +124,21 @@ function init() {
     return;
   }
 
-  window.BossScript.isInitialized = true;
-
   injectStyles();
 
   // 监听 DOM 变化（使用节流版本）
-  const observer = new MutationObserver(throttledProcessJobList);
+  observer = new MutationObserver(throttledProcessJobList);
   observer.observe(document.body, { childList: true, subtree: true });
 
-  // 存储 observer 以便清理
-  window.BossScript.observer = observer;
-
+  guard.markInitialized();
   console.log('[BOSS直聘] 信息透出脚本已加载');
 }
 
 // 清理函数
 function cleanup() {
-  if (window.BossScript?.observer) {
-    window.BossScript.observer.disconnect();
-    window.BossScript.observer = null;
+  if (observer) {
+    observer.disconnect();
+    observer = null;
   }
 }
 

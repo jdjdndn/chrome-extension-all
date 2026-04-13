@@ -1,12 +1,17 @@
 // Content script for ymmfa.com (工控人家园)
-// 依赖: content/utils/logger.js, storage.js, dom.js, messaging.js
+// 使用公共模块重构
 
 'use strict';
 
-if (!window.GongkongScript) {
-  window.GongkongScript = { isInitialized: false };
+import { createScriptGuard } from './utils/script-guard.js';
+
+// 防重复加载
+const guard = createScriptGuard('Gongkong');
+if (guard.check()) {
+  throw new Error('脚本已加载');
 }
 
+let observer = null;
 let lastExecutionTime = 0;
 const DELAY = 500;
 
@@ -30,8 +35,6 @@ function autoFillInput() {
 }
 
 function init() {
-  if (window.GongkongScript.isInitialized) return;
-
   // 确保 document.body 存在
   if (!document.body) {
     if (document.readyState === 'loading') {
@@ -42,26 +45,22 @@ function init() {
     return;
   }
 
-  window.GongkongScript.isInitialized = true;
-
   // 监听 DOM 变化
-  const observer = new MutationObserver(autoFillInput);
+  observer = new MutationObserver(autoFillInput);
   observer.observe(document.body, { childList: true, subtree: true, attributes: true });
-
-  // 存储 observer 以便清理
-  window.GongkongScript.observer = observer;
 
   // 初始执行
   autoFillInput();
 
+  guard.markInitialized();
   console.log('[工控人家园] 自动填充脚本已加载');
 }
 
 // 清理函数
 function cleanup() {
-  if (window.GongkongScript?.observer) {
-    window.GongkongScript.observer.disconnect();
-    window.GongkongScript.observer = null;
+  if (observer) {
+    observer.disconnect();
+    observer = null;
   }
 }
 

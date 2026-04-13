@@ -1,12 +1,17 @@
 // Content script for pan.baidu.com (百度网盘)
-// 依赖: content/utils/logger.js, storage.js, dom.js, messaging.js
+// 使用公共模块重构
 
 'use strict';
 
-if (!window.BaiduPanScript) {
-  window.BaiduPanScript = { isInitialized: false };
+import { createScriptGuard } from './utils/script-guard.js';
+
+// 防重复加载
+const guard = createScriptGuard('BaiduPan');
+if (guard.check()) {
+  throw new Error('脚本已加载');
 }
 
+let observer = null;
 let lastExecutionTime = 0;
 const DELAY = 500;
 
@@ -24,8 +29,6 @@ function autoSubmitPassword() {
 }
 
 function init() {
-  if (window.BaiduPanScript.isInitialized) return;
-
   // 确保 document.body 存在
   if (!document.body) {
     if (document.readyState === 'loading') {
@@ -36,26 +39,22 @@ function init() {
     return;
   }
 
-  window.BaiduPanScript.isInitialized = true;
-
   // 监听 DOM 变化
-  const observer = new MutationObserver(autoSubmitPassword);
+  observer = new MutationObserver(autoSubmitPassword);
   observer.observe(document.body, { childList: true, subtree: true, attributes: true });
-
-  // 存储 observer 以便清理
-  window.BaiduPanScript.observer = observer;
 
   // 初始检查
   autoSubmitPassword();
 
+  guard.markInitialized();
   console.log('[百度网盘] 自动提交脚本已加载');
 }
 
 // 清理函数
 function cleanup() {
-  if (window.BaiduPanScript?.observer) {
-    window.BaiduPanScript.observer.disconnect();
-    window.BaiduPanScript.observer = null;
+  if (observer) {
+    observer.disconnect();
+    observer = null;
   }
 }
 

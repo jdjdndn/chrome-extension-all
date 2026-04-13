@@ -1,10 +1,14 @@
 // Content script for 18comic.vip (美丽新世界)
-// 依赖: content/utils/logger.js, storage.js, dom.js, messaging.js
+// 使用公共模块重构
 
 'use strict';
 
-if (!window.Comic18Script) {
-  window.Comic18Script = { isInitialized: false };
+import { createScriptGuard } from './utils/script-guard.js';
+
+// 防重复加载
+const guard = createScriptGuard('Comic18');
+if (guard.check()) {
+  throw new Error('脚本已加载');
 }
 
 function handleClick(event) {
@@ -24,11 +28,9 @@ function handleClick(event) {
 }
 
 function init() {
-  if (window.Comic18Script.isInitialized) return;
-  window.Comic18Script.isInitialized = true;
-
   document.addEventListener('click', handleClick, true);
 
+  guard.markInitialized();
   console.log('[18comic] 脚本已加载');
 }
 
