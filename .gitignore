@@ -34,3 +34,9 @@ _metadata/
 
 # Crash dumps
 *.stackdump
+
+# Test coverage
+coverage/
+
+# Test temp files
+test-*.html
