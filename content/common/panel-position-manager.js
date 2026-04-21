@@ -12,10 +12,14 @@
 
 'use strict';
 
+// 使用 Logger 模块
+import { createLogger } from '../utils/logger.js';
+const logger = createLogger('位置管理器');
+
 if (!window.PanelPositionManager) {
   // 检查开关
   if (window.getScriptSwitch && !window.getScriptSwitch('panel-position-manager')) {
-    console.log('[面板位置管理器] 已禁用');
+    logger.debug('已禁用');
   } else {
     window.PanelPositionManager = {
     STORAGE_KEY: 'yc-panel-position-manager-v33',
@@ -95,7 +99,7 @@ if (!window.PanelPositionManager) {
         this.startOcclusionCheck();
       }
 
-      console.log('[位置管理器] v33 已加载（垂直布局 + 全方位遮挡检测 + 智能避让）');
+      logger.debug(' v33 已加载（垂直布局 + 全方位遮挡检测 + 智能避让）');
     },
 
     // 启动遮挡检测定时器
@@ -124,7 +128,7 @@ if (!window.PanelPositionManager) {
 
       // 如果有严重遮挡，尝试调整位置
       if (report.criticalCount > 0 || report.highCount > 0) {
-        console.log('[位置管理器] 检测到遮挡，尝试调整位置');
+        logger.debug(' 检测到遮挡，尝试调整位置');
         this.adjustPositionsForOcclusions(report);
       }
     },
@@ -232,9 +236,9 @@ if (!window.PanelPositionManager) {
             iconOnLeftSide = true;
             const iconLeftEdge = Math.max(edgeMargin, Math.floor((pageLayout.leftSpace - iconWidth) / 2));
             iconRight = vw - iconLeftEdge - iconWidth;
-            console.log(`[位置管理器] 右侧空白不足(${Math.round(rightSpaceUsable)}px)，icon移至左侧: right=${Math.round(iconRight)}`);
+            logger.debug(` 右侧空白不足(${Math.round(rightSpaceUsable)}px)，icon移至左侧: right=${Math.round(iconRight)}`);
           } else {
-            console.log(`[位置管理器] 右侧空白不足(${Math.round(rightSpaceUsable)}px)，左侧也不足，icon保持默认位置`);
+            logger.debug(` 右侧空白不足(${Math.round(rightSpaceUsable)}px)，左侧也不足，icon保持默认位置`);
           }
         }
       }
@@ -253,7 +257,7 @@ if (!window.PanelPositionManager) {
           c._iconOnLeftSide = bestPos.onLeftSide;
 
           if (bestPos.clickableCount > 0) {
-            console.log(`[位置管理器] ${c.id} icon避让${bestPos.clickableCount}个可点击元素`);
+            logger.debug(` ${c.id} icon避让${bestPos.clickableCount}个可点击元素`);
           }
         } else {
           c._iconTop = iconTop;
@@ -280,7 +284,7 @@ if (!window.PanelPositionManager) {
           if (rightSpace >= minPanelWidth + scrollbarAwareEdge) {
             panelWidth = Math.min(maxPanelWidth, rightSpace - scrollbarAwareEdge);
             panelRight = scrollbarAwareEdge;
-            console.log(`[位置管理器] icon在左侧，panel独立定位: panelRight=${Math.round(panelRight)}, width=${Math.round(panelWidth)}`);
+            logger.debug(` icon在左侧，panel独立定位: panelRight=${Math.round(panelRight)}, width=${Math.round(panelWidth)}`);
           }
         } else {
           // icon 在右侧，原有逻辑
@@ -290,19 +294,19 @@ if (!window.PanelPositionManager) {
             // 右侧空间足够放置 icon + panel
             panelWidth = Math.min(maxPanelWidth, rightSpace - iconWidth - panelAvoidGap - scrollbarAwareEdge);
             panelRight = scrollbarAwareEdge + iconWidth + panelAvoidGap;
-            console.log(`[位置管理器] 右侧空间足够: panelRight=${Math.round(panelRight)}, width=${Math.round(panelWidth)}`);
+            logger.debug(` 右侧空间足够: panelRight=${Math.round(panelRight)}, width=${Math.round(panelWidth)}`);
           } else if (rightSpace >= iconWidth + panelAvoidGap + scrollbarAwareEdge) {
             // 右侧空间只能放 icon，panel 需要调整宽度或放左侧
             if (pageLayout.leftSpace >= minPanelWidth + edgeMargin) {
               // 左侧空间够，panel 放左侧
               panelRight = vw - pageLayout.leftSpace + edgeMargin;
               panelWidth = Math.min(maxPanelWidth, pageLayout.leftSpace - edgeMargin * 2);
-              console.log(`[位置管理器] panel放左侧: panelRight=${Math.round(panelRight)}, width=${Math.round(panelWidth)}`);
+              logger.debug(` panel放左侧: panelRight=${Math.round(panelRight)}, width=${Math.round(panelWidth)}`);
             } else {
               // 左侧也不够，panel 调整宽度紧贴 icon
               panelWidth = Math.max(minPanelWidth, rightSpace - iconWidth - panelAvoidGap - scrollbarAwareEdge);
               panelRight = scrollbarAwareEdge + iconWidth + panelAvoidGap;
-              console.log(`[位置管理器] panel调整宽度: panelRight=${Math.round(panelRight)}, width=${Math.round(panelWidth)}`);
+              logger.debug(` panel调整宽度: panelRight=${Math.round(panelRight)}, width=${Math.round(panelWidth)}`);
             }
           }
         }
@@ -409,7 +413,7 @@ if (!window.PanelPositionManager) {
                     (bestSeverityScore === currentSeverityScore && bestPos.overlapRatio < currentSeverity.overlapRatio)) {
                   finalRight = bestPos.right;
                   finalTop = bestPos.top;
-                  console.log(`[位置管理器] ${c.id} panel位置优化: (${pos.right}, ${pos.top}) -> (${finalRight}, ${finalTop}), severity: ${currentSeverity.severity} -> ${bestPos.severity}`);
+                  logger.debug(` ${c.id} panel位置优化: (${pos.right}, ${pos.top}) -> (${finalRight}, ${finalTop}), severity: ${currentSeverity.severity} -> ${bestPos.severity}`);
                 }
               }
 
@@ -449,7 +453,7 @@ if (!window.PanelPositionManager) {
       this.positionsFixed = true;
       this.isPositionReady = true;
 
-      console.log('[位置管理器] 位置已计算:', {
+      logger.debug(' 位置已计算:', {
         expandedCount: expandedPanels.length,
         availableHeight,
         panelHeights,
@@ -528,7 +532,7 @@ if (!window.PanelPositionManager) {
           );
 
           if (overlap.hasOverlap) {
-            console.log(`[位置管理器] 检测到重叠: ${panel1.id} 和 ${panel2.id}`);
+            logger.debug(` 检测到重叠: ${panel1.id} 和 ${panel2.id}`);
 
             // 决定调整哪个面板：
             // 1. 用户自定义位置的面板优先级更高，不调整
@@ -565,18 +569,18 @@ if (!window.PanelPositionManager) {
             // 优先放在下方
             if (newTopBelow + posToAdjust.height <= vh - edgeMargin) {
               posToAdjust.top = newTopBelow;
-              console.log(`[位置管理器] 调整 ${panelToAdjust.id} 到下方: top=${newTopBelow}`);
+              logger.debug(` 调整 ${panelToAdjust.id} 到下方: top=${newTopBelow}`);
             } else if (newTopAbove >= edgeMargin) {
               // 如果下方放不下，尝试放在上方
               posToAdjust.top = newTopAbove;
-              console.log(`[位置管理器] 调整 ${panelToAdjust.id} 到上方: top=${newTopAbove}`);
+              logger.debug(` 调整 ${panelToAdjust.id} 到上方: top=${newTopAbove}`);
             } else {
               // 都放不下，尝试向左移动
               const newRight = otherPos.right + posToAdjust.width + panelGap;
               const maxRight = vw - posToAdjust.width - edgeMargin;
               if (newRight <= maxRight) {
                 posToAdjust.right = newRight;
-                console.log(`[位置管理器] 调整 ${panelToAdjust.id} 到左侧: right=${newRight}`);
+                logger.debug(` 调整 ${panelToAdjust.id} 到左侧: right=${newRight}`);
               }
             }
           }
@@ -1385,7 +1389,7 @@ if (!window.PanelPositionManager) {
         pageFixedElements: this.detectPageFixedElementOcclusions()
       };
 
-      console.log('[位置管理器] 遮挡检测报告:', report);
+      logger.debug(' 遮挡检测报告:', report);
       return report;
     },
 
@@ -1441,7 +1445,7 @@ if (!window.PanelPositionManager) {
 
           // 找到完全空白的位置
           if (overlapRatio <= overlapThreshold) {
-            console.log(`[位置管理器] 找到空白位置: right=${right}, top=${top}, overlap=${overlapRatio}`);
+            logger.debug(` 找到空白位置: right=${right}, top=${top}, overlap=${overlapRatio}`);
             return { right, top };
           }
 
@@ -1454,7 +1458,7 @@ if (!window.PanelPositionManager) {
         }
       }
 
-      console.log(`[位置管理器] 使用最佳位置: right=${bestPosition.right}, top=${bestPosition.top}, overlap=${bestPosition.overlapRatio}`);
+      logger.debug(` 使用最佳位置: right=${bestPosition.right}, top=${bestPosition.top}, overlap=${bestPosition.overlapRatio}`);
       return { right: bestPosition.right, top: bestPosition.top };
     },
 
@@ -1529,7 +1533,7 @@ if (!window.PanelPositionManager) {
       const leftSpace = rect.left;  // 左侧空白
       const rightSpace = vw - rect.right;  // 右侧空白
 
-      console.log(`[位置管理器] 页面布局检测:`, {
+      logger.debug(` 页面布局检测:`, {
         element: mainElement.tagName + (mainElement.className ? '.' + mainElement.className.split(' ')[0] : ''),
         leftSpace: Math.round(leftSpace),
         rightSpace: Math.round(rightSpace),
@@ -1617,7 +1621,7 @@ if (!window.PanelPositionManager) {
       }
 
       if (maxHeaderBottom > 0) {
-        console.log(`[位置管理器] 检测到固定 header，高度: ${Math.round(maxHeaderBottom)}px`);
+        logger.debug(` 检测到固定 header，高度: ${Math.round(maxHeaderBottom)}px`);
       }
 
       return maxHeaderBottom;
@@ -1909,12 +1913,12 @@ if (!window.PanelPositionManager) {
       const { id, priority = 0, iconEl, panelEl, requiresHTags = false } = options;
 
       if (!id || !panelEl) {
-        console.warn('[位置管理器] 注册失败: 缺少 id 或 panelEl');
+        logger.warn('注册失败: 缺少 id 或 panelEl');
         return;
       }
 
       if (this.components.find(c => c.id === id)) {
-        console.warn(`[位置管理器] ${id} 已注册`);
+        logger.warn(`${id} 已注册`);
         return;
       }
 
@@ -1932,7 +1936,7 @@ if (!window.PanelPositionManager) {
       });
 
       this.components.sort((a, b) => a.priority - b.priority);
-      console.log(`[位置管理器] 注册: ${id}, priority=${priority}, requiresHTags=${requiresHTags}`);
+      logger.debug((`注册: ${id}, priority=${priority}, requiresHTags=${requiresHTags}`);
       this.scheduleCalculate();
     },
 
@@ -1966,7 +1970,7 @@ if (!window.PanelPositionManager) {
       this.positionsFixed = false;
       this.scheduleCalculate();
 
-      console.log(`[位置管理器] 展开: ${id}`);
+      logger.debug(` 展开: ${id}`);
     },
 
     collapsePanel(id) {
@@ -1980,7 +1984,7 @@ if (!window.PanelPositionManager) {
       this.positionsFixed = false;
       this.scheduleCalculate();
 
-      console.log(`[位置管理器] 折叠: ${id}`);
+      logger.debug(` 折叠: ${id}`);
     },
 
     expandAll() {
@@ -2056,7 +2060,7 @@ if (!window.PanelPositionManager) {
         this.positionsFixed = false;
         this.scheduleCalculate();
 
-        console.log(`[位置管理器] 拖拽结束: ${id}, 位置已保存，将自动调整其他面板`);
+        logger.debug(` 拖拽结束: ${id}, 位置已保存，将自动调整其他面板`);
       }
     },
 
@@ -2087,7 +2091,7 @@ if (!window.PanelPositionManager) {
       try {
         // 检查 localStorage 是否可用（沙盒 iframe 中不可用）
         if (typeof localStorage === 'undefined' || localStorage === null) {
-          console.warn('[位置管理器] localStorage 不可用，跳过保存');
+          logger.warn('localStorage 不可用，跳过保存');
           return;
         }
         localStorage.setItem(this.STORAGE_KEY, JSON.stringify({
@@ -2098,9 +2102,9 @@ if (!window.PanelPositionManager) {
       } catch (e) {
         // SecurityError: 沙盒环境或跨域限制
         if (e.name === 'SecurityError' || e.code === 18) {
-          console.warn('[位置管理器] 沙盒环境，无法使用 localStorage');
+          logger.warn('沙盒环境，无法使用 localStorage');
         } else {
-          console.warn('[位置管理器] 保存失败:', e.message || e);
+          logger.warn('保存失败:', e.message || e);
         }
       }
     },
@@ -2109,7 +2113,7 @@ if (!window.PanelPositionManager) {
       try {
         // 检查 localStorage 是否可用
         if (typeof localStorage === 'undefined' || localStorage === null) {
-          console.warn('[位置管理器] localStorage 不可用，使用默认值');
+          logger.warn('localStorage 不可用，使用默认值');
           return;
         }
         const saved = localStorage.getItem(this.STORAGE_KEY);
@@ -2122,9 +2126,9 @@ if (!window.PanelPositionManager) {
       } catch (e) {
         // SecurityError: 沙盒环境或跨域限制
         if (e.name === 'SecurityError' || e.code === 18) {
-          console.warn('[位置管理器] 沙盒环境，无法使用 localStorage');
+          logger.warn('沙盒环境，无法使用 localStorage');
         } else {
-          console.warn('[位置管理器] 加载失败:', e.message || e);
+          logger.warn('加载失败:', e.message || e);
         }
       }
     },
@@ -2355,7 +2359,7 @@ if (!window.PanelPositionManager) {
 
       // 如果首选位置有遮挡，记录日志
       if (preferredScore.severity !== 'none') {
-        console.log(`[位置管理器] panel首选位置有遮挡: severity=${preferredScore.severity}, ratio=${(preferredScore.overlapRatio * 100).toFixed(1)}%, elements=${preferredScore.elementCount}`);
+        logger.debug(` panel首选位置有遮挡: severity=${preferredScore.severity}, ratio=${(preferredScore.overlapRatio * 100).toFixed(1)}%, elements=${preferredScore.elementCount}`);
       }
 
       // 2. 搜索其他位置
@@ -2452,7 +2456,7 @@ if (!window.PanelPositionManager) {
                 height: this.config.iconHeight
               });
 
-              console.log(`[位置管理器] 调整 ${c.id} icon位置: top=${bestPos.top}, right=${bestPos.right}`);
+              logger.debug(` 调整 ${c.id} icon位置: top=${bestPos.top}, right=${bestPos.right}`);
             }
           }
         }
@@ -2481,7 +2485,7 @@ if (!window.PanelPositionManager) {
                 height: panelBounds.height
               });
 
-              console.log(`[位置管理器] 调整 ${c.id} panel位置: top=${bestPos.top}, right=${bestPos.right}`);
+              logger.debug(` 调整 ${c.id} panel位置: top=${bestPos.top}, right=${bestPos.right}`);
             }
           }
         }
@@ -2492,7 +2496,7 @@ if (!window.PanelPositionManager) {
      * 手动触发位置优化
      */
     optimizePositions() {
-      console.log('[位置管理器] 手动触发位置优化');
+      logger.debug(' 手动触发位置优化');
       this.positionsFixed = false;
       this.scheduleCalculate();
 
@@ -2508,24 +2512,24 @@ if (!window.PanelPositionManager) {
      */
     getOcclusionReport() {
       const report = this.checkAllOcclusions();
-      console.log('=== 遮挡检测报告 ===');
-      console.log(`总遮挡数: ${report.totalOcclusions}`);
-      console.log(`严重遮挡: ${report.criticalCount}`);
-      console.log(`高度遮挡: ${report.highCount}`);
+      logger.info('=== 遮挡检测报告 ===');
+      logger.info(`总遮挡数: ${report.totalOcclusions}`);
+      logger.info(`严重遮挡: ${report.criticalCount}`);
+      logger.info(`高度遮挡: ${report.highCount}`);
 
       for (const comp of report.components) {
         if (comp.hasOcclusion) {
-          console.log(`\n组件: ${comp.id}`);
-          console.log(`  严重程度: ${comp.severity}`);
+          logger.info(`\n组件: ${comp.id}`);
+          logger.info(`  严重程度: ${comp.severity}`);
           if (comp.icon) {
-            console.log(`  icon遮挡: ${comp.icon.overlapRatio * 100}%`);
+            logger.info(`  icon遮挡: ${comp.icon.overlapRatio * 100}%`);
           }
           if (comp.panel) {
-            console.log(`  panel遮挡: ${comp.panel.overlapRatio * 100}%`);
+            logger.info(`  panel遮挡: ${comp.panel.overlapRatio * 100}%`);
           }
         }
       }
-      console.log('===================');
+      logger.info('===================');
       return report;
     },
 
@@ -2546,7 +2550,7 @@ if (!window.PanelPositionManager) {
         count++;
       });
 
-      console.log(`[位置管理器] 高亮了 ${count} 个可点击元素`);
+      logger.debug(` 高亮了 ${count} 个可点击元素`);
       return count;
     },
 
@@ -2562,7 +2566,7 @@ if (!window.PanelPositionManager) {
         el.style.outlineOffset = '';
       });
 
-      console.log('[位置管理器] 已清除高亮');
+      logger.debug(' 已清除高亮');
     }
   };
 
