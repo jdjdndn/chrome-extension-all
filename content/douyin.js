@@ -1,7 +1,7 @@
 /**
  * 抖音自动化脚本
  * 功能：自动展开评论、跳过广告、跳过AI视频、不感兴趣关键词过滤
- * 依赖: EventBus, MessagingUtils, DOMUtils
+ * 依赖: EventBus, MessagingUtils, DOMUtils, LoggerUtils
  *
  * 使用 ScriptLoader 进行依赖管理
  */
@@ -9,14 +9,17 @@
 (function () {
   'use strict';
 
-  // ========== 调试日志控制 ==========
-  const DEBUG = false; // 生产环境设为 false
-  const log = DEBUG ? console.log.bind(console, '[抖音]') : () => {};
-  const warn = console.warn.bind(console, '[抖音]');
+  // ========== 日志控制 ==========
+  const logger = window.LoggerUtils?.createLogger?.('抖音') || {
+    debug: () => {},
+    info: () => {},
+    warn: console.warn.bind(console, '[抖音]'),
+    error: console.error.bind(console, '[抖音]')
+  };
 
   // ========== 防止重复加载 ==========
   if (window.DouyinScript && window.DouyinScript.isInitialized) {
-    log('已加载，跳过重复初始化');
+    logger.debug('已加载，跳过重复初始化');
     return;
   }
   if (!window.DouyinScript) {
@@ -25,13 +28,13 @@
 
   // ========== 主初始化函数（由 ScriptLoader 调用）==========
   function initDouyinScript() {
-    log(' 依赖已就绪，开始初始化');
+    logger.debug(' 依赖已就绪，开始初始化');
     init();
   }
 
   // ========== 降级初始化函数（兼容旧环境）==========
   function initDouyinScriptLegacy() {
-    log(' ScriptLoader 未加载，直接初始化');
+    logger.debug(' ScriptLoader 未加载，直接初始化');
     init();
   }
 
@@ -42,7 +45,7 @@
   const DEFAULT_HIDE_SELECTORS = ['.qmhaloYp:nth-child(n):not(:nth-child(2)):not(:nth-child(5))',
     '.ooIf2jbM', '._e7lJDCC', '#island_076c3', '.ai-note-container', '.cursorPointer+*', 'xg-right-grid>xg-icon:not([class*="automatic-continuous"]):not([class*="xgplayer-volume"])', '.danmakuContainer', '#douyin-header-menuCt>div>pace-island>div>*:not(:last-child)'
   ];
-  log(' DEFAULT_HIDE_SELECTORS 已定义，数量:', DEFAULT_HIDE_SELECTORS.length);
+  logger.debug(' DEFAULT_HIDE_SELECTORS 已定义，数量:', DEFAULT_HIDE_SELECTORS.length);
 
   const BLOCKED_DOMAINS = [
     'mcs.zijieapi.com/list',
@@ -136,7 +139,7 @@ function clickSwitch(btn) {
 function enableAutoPlay() {
   const switchBtn = findAutoPlaySwitch();
   if (switchBtn && !switchBtn.classList.contains('xg-switch-checked')) {
-    log('[连播] 当前未开启，点击开启连播', switchBtn);
+    logger.debug('[连播] 当前未开启，点击开启连播', switchBtn);
     clickSwitch(switchBtn);
   }
 }
@@ -144,7 +147,7 @@ function enableAutoPlay() {
 function disableAutoPlay() {
   const switchBtn = findAutoPlaySwitch();
   if (switchBtn && switchBtn.classList.contains('xg-switch-checked')) {
-    log('[连播] 当前已开启，点击关闭连播', switchBtn);
+    logger.debug('[连播] 当前已开启，点击关闭连播', switchBtn);
     clickSwitch(switchBtn);
   }
 }
@@ -188,7 +191,7 @@ const TimerManager = {
     this.timers.forEach(id => clearInterval(id));
     this.timers = [];
     this.isRunning = false;
-    log('[定时器管理] 所有定时器已清除');
+    logger.debug('[定时器管理] 所有定时器已清除');
   },
   start() {
     if (this.isRunning) return;
@@ -223,7 +226,7 @@ const VideoChangeChecker = {
       }
 
       if (checkCount >= MAX_CHECKS) {
-        log(`[二次检测] 视频${checkCount}次检查未切换，强制再次下滑`);
+        logger.debug(`[二次检测] 视频${checkCount}次检查未切换，强制再次下滑`);
         this.cancel(expectedVideoId);
         if (canExecuteAction('skip_video_retry', THROTTLE_CONFIG.SKIP_VIDEO)) {
           triggerKeyboardEvent("skip_video_retry", "keydown", { keyCode: 40, key: "ArrowDown", code: "ArrowDown" });
@@ -231,7 +234,7 @@ const VideoChangeChecker = {
         }
         return;
       }
-      log(`[二次检测] 第${checkCount}次检查，视频未切换，等待...`);
+      logger.debug(`[二次检测] 第${checkCount}次检查，视频未切换，等待...`);
     };
 
     const timerId = setTimeout(() => {
@@ -257,7 +260,7 @@ const VideoChangeChecker = {
       if (check.timeoutId) clearTimeout(check.timeoutId);
     });
     this.activeChecks.clear();
-    log(`[二次检测] 所有检测任务已取消`);
+    logger.debug(`[二次检测] 所有检测任务已取消`);
   }
 };
 
@@ -292,7 +295,7 @@ function getStableVideoId(videoBody) {
 // 使用 DOMUtils.findOneInViewport 替代本地实现
 function findOne(selector) {
   if (typeof DOMUtils === 'undefined') {
-    console.warn('[抖音脚本] DOMUtils 未就绪，findOne 返回 null');
+    logger.warn('[抖音脚本] DOMUtils 未就绪，findOne 返回 null');
     return null;
   }
   return DOMUtils.findOneInViewport(selector, { checkVisibility: true, checkDimensions: true });
@@ -300,7 +303,7 @@ function findOne(selector) {
 
 function findPath(pathStr) {
   if (typeof DOMUtils === 'undefined') {
-    console.warn('[抖音脚本] DOMUtils 未就绪，findPath 返回 undefined');
+    logger.warn('[抖音脚本] DOMUtils 未就绪，findPath 返回 undefined');
     return undefined;
   }
   return DOMUtils.findAllInViewport('path', { checkVisibility: true, checkDimensions: true })
@@ -360,7 +363,7 @@ function clearProcessedVideo(videoId) {
   if (!videoId) return;
   const keysToDelete = [...processedVideos].filter(key => key.endsWith(`_${videoId}`));
   keysToDelete.forEach(key => processedVideos.delete(key));
-  if (keysToDelete.length > 0) log(`[清理] 移除已离开视频的处理记录`);
+  if (keysToDelete.length > 0) logger.debug(`[清理] 移除已离开视频的处理记录`);
 }
 
 // ========== 核心功能 ==========
@@ -370,7 +373,7 @@ function clickNextButton() {
   // 首选：播放器切换按钮
   const nextBtn = findOne('div.xgplayer-playswitch-next');
   if (nextBtn && isElementInViewportAndVisible(nextBtn)) {
-    log('[导航] 点击 xgplayer-playswitch-next 按钮');
+    logger.debug('[导航] 点击 xgplayer-playswitch-next 按钮');
     // 尝试多种触发方式
     nextBtn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
     nextBtn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
@@ -380,14 +383,14 @@ function clickNextButton() {
   // 备选1：data-e2e 按钮
   const nextBtn2 = findOne('[data-e2e="video-switch-next-arrow"]');
   if (nextBtn2 && isElementInViewportAndVisible(nextBtn2)) {
-    log('[导航] 点击 data-e2e 下一个按钮');
+    logger.debug('[导航] 点击 data-e2e 下一个按钮');
     nextBtn2.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
     nextBtn2.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
     nextBtn2.click();
     return true;
   }
   // 备选2：键盘下箭头
-  log('[导航] 使用键盘下箭头');
+  logger.debug('[导航] 使用键盘下箭头');
   triggerKeyboardEvent("skip_video", "keydown", { keyCode: 40, key: "ArrowDown", code: "ArrowDown" });
   return false;
 }
@@ -397,7 +400,7 @@ function clickPrevButton() {
   // 首选：播放器切换按钮
   const prevBtn = findOne('div.xgplayer-playswitch-prev');
   if (prevBtn && isElementInViewportAndVisible(prevBtn)) {
-    log('[导航] 点击 xgplayer-playswitch-prev 按钮');
+    logger.debug('[导航] 点击 xgplayer-playswitch-prev 按钮');
     prevBtn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
     prevBtn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
     prevBtn.click();
@@ -406,14 +409,14 @@ function clickPrevButton() {
   // 备选1：data-e2e 按钮
   const prevBtn2 = findOne('[data-e2e="video-switch-prev-arrow"]');
   if (prevBtn2 && isElementInViewportAndVisible(prevBtn2)) {
-    log('[导航] 点击 data-e2e 上一个按钮');
+    logger.debug('[导航] 点击 data-e2e 上一个按钮');
     prevBtn2.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
     prevBtn2.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
     prevBtn2.click();
     return true;
   }
   // 备选2：键盘上箭头
-  log('[导航] 使用键盘上箭头');
+  logger.debug('[导航] 使用键盘上箭头');
   triggerKeyboardEvent("prev_video", "keydown", { keyCode: 38, key: "ArrowUp", code: "ArrowUp" });
   return false;
 }
@@ -429,7 +432,7 @@ function clickCommentButton() {
       if (prevSibling && prevSibling.firstElementChild) {
         const commentBtn = prevSibling.firstElementChild;
         if (isElementInViewportAndVisible(commentBtn)) {
-          log('[评论区] 通过收藏按钮定位，点击评论按钮');
+          logger.debug('[评论区] 通过收藏按钮定位，点击评论按钮');
           commentBtn.click();
           return checkCommentOpened();
         }
@@ -448,14 +451,14 @@ function clickCommentButton() {
       .filter(svg => isElementInViewportAndVisible(svg));
 
     if (svgs.length === 1) {
-      log(`[评论区] 选择器 "${selector}" 精确匹配1个，点击`);
+      logger.debug(`[评论区] 选择器 "${selector}" 精确匹配1个，点击`);
       svgs[0].click();
       return checkCommentOpened();
     }
   }
 
   // 方法3: 键盘x
-  log('[评论区] 使用键盘x');
+  logger.debug('[评论区] 使用键盘x');
   triggerKeyboardEvent("autoOpenComment", "keydown", { keyCode: 88, key: "x", code: "KeyX" });
   return false;
 }
@@ -464,9 +467,9 @@ function checkCommentOpened() {
   setTimeout(() => {
     const panel = findOne('#videoSideCard') || findOne('[class*="comment"]');
     if (panel && panel.offsetWidth > 0) {
-      log('[评论区] 已成功打开');
+      logger.debug('[评论区] 已成功打开');
     } else {
-      log('[评论区] 点击未成功，尝试键盘x');
+      logger.debug('[评论区] 点击未成功，尝试键盘x');
       triggerKeyboardEvent("autoOpenComment", "keydown", { keyCode: 88, key: "x", code: "KeyX" });
     }
   }, 300);
@@ -477,7 +480,7 @@ function skipToNextVideo(reason) {
   if (!canExecuteAction('skip_video', THROTTLE_CONFIG.SKIP_VIDEO)) return;
   const currentVideoBody = findOne('.playerContainer');
   const currentId = currentVideoBody ? getStableVideoId(currentVideoBody) : null;
-  log(`[自动下滑] 原因: ${reason}`);
+  logger.debug(`[自动下滑] 原因: ${reason}`);
 
   // 优先点击按钮，备选键盘
   clickNextButton();
@@ -498,7 +501,7 @@ function detectAdSvg() {
 function skipAD(videoBody) {
   if (videoBody && VideoStateManager.isSkipAd(videoBody)) return;
   if (detectAdSvg()) {
-    log('[广告检测] 检测到广告标识');
+    logger.debug('[广告检测] 检测到广告标识');
     if (videoBody) VideoStateManager.setSkipAd(videoBody, true);
     triggerKeyboardEvent("skipAD_mark", "keydown", { keyCode: 82, key: "r", code: "KeyR" });
     setTimeout(() => skipToNextVideo('广告视频'), 200);
@@ -511,7 +514,7 @@ function detectAIContent(videoBody) {
   if (processedVideos.has(`skip_ai_${videoId}`)) return false;
   const safetyBar = findOne('.safetyBar');
   if (safetyBar?.innerText.includes('AI')) {
-    log('[AI检测] safetyBar.innerText:', safetyBar.innerText);
+    logger.debug('[AI检测] safetyBar.innerText:', safetyBar.innerText);
     return true;
   }
   return false;
@@ -521,7 +524,7 @@ function skipAi(videoBody) {
   const videoId = getStableVideoId(videoBody);
   const skipKey = `skip_ai_${videoId}`;
   if (detectAIContent(videoBody)) {
-    log('[AI检测] 检测到AI相关内容');
+    logger.debug('[AI检测] 检测到AI相关内容');
     processedVideos.add(skipKey);
     skipToNextVideo('AI生成内容');
   }
@@ -549,7 +552,7 @@ function checkNotInterestedKeywords(videoBody) {
   for (const tag of tagList) {
     for (const keyword of NOT_INTERESTED_KEYWORDS) {
       if (tag.includes(keyword)) {
-        log(`[不感兴趣检测] 标签匹配: "${tag}" 包含 "${keyword}"`);
+        logger.debug(`[不感兴趣检测] 标签匹配: "${tag}" 包含 "${keyword}"`);
         return keyword;
       }
     }
@@ -564,7 +567,7 @@ function handleNotInterested(videoBody) {
 
   const matchedKeyword = checkNotInterestedKeywords(videoBody);
   if (matchedKeyword) {
-    log(`[不感兴趣] 匹配到关键词: "${matchedKeyword}"，准备下滑`);
+    logger.debug(`[不感兴趣] 匹配到关键词: "${matchedKeyword}"，准备下滑`);
     processedVideos.add(skipKey);
     skipToNextVideo(`不感兴趣: ${matchedKeyword}`);
   }
@@ -586,7 +589,7 @@ function detectAndSkipLive() {
   if (VideoStateManager.isLiveHandled(livePlayer)) return true; // 已处理过
 
   if (isLiveStream(livePlayer)) {
-    log('[直播检测] 检测到直播，准备跳过');
+    logger.debug('[直播检测] 检测到直播，准备跳过');
     VideoStateManager.setLiveHandled(livePlayer, true);
 
     // 确保执行下滑
@@ -613,7 +616,7 @@ function autoStar() {
   if (hasNoStar()) {
     for (const tag of tagList) {
       if (AUTO_FOLLOW_KEYWORDS.some(keyword => tag.includes(keyword))) {
-        log('[自动关注] 匹配到关键词:', tag);
+        logger.debug('[自动关注] 匹配到关键词:', tag);
         if (canExecuteAction('auto_follow', THROTTLE_CONFIG.FOLLOW)) {
           triggerKeyboardEvent("autoStar", "keydown", { keyCode: 71, key: "g", code: "KeyG" });
         }
@@ -641,7 +644,7 @@ function autoOpenComment(videoBody) {
 
   // 方法2: 触发键盘事件 'x' 打开评论区
   triggerKeyboardEvent("autoOpenComment", "keydown", { keyCode: 88, key: "x", code: "KeyX" });
-  log('[评论区] 触发键盘事件 x');
+  logger.debug('[评论区] 触发键盘事件 x');
 }
 
 // ========== 评论区时间跳转 ==========
@@ -678,15 +681,15 @@ function setupCommentClickListener(container) {
     const currentTime = timeToSeconds(match);
     const video = findOne('video');
     if (video && video.duration >= currentTime) {
-      log(`[时间跳转] 点击时间: ${match} (${currentTime}秒)`);
+      logger.debug(`[时间跳转] 点击时间: ${match} (${currentTime}秒)`);
       video.currentTime = currentTime;
     }
   });
-  log('[时间跳转] 评论区时间跳转功能已启用');
+  logger.debug('[时间跳转] 评论区时间跳转功能已启用');
 }
 
 function setVideoTime() {
-  log('[时间跳转] 评论区监听已注册');
+  logger.debug('[时间跳转] 评论区监听已注册');
   return () => setInterval(() => {
     const commentBody = findOne('#videoSideCard');
     if (commentBody && !VideoStateManager.hasCommentListener(commentBody)) {
@@ -713,7 +716,7 @@ function processCurrentVideo() {
   if (lastNavigationDirection === 'up') {
     if (currentVideoId !== videoId) {
       currentVideoId = videoId;
-      log(`[手动导航] 检测到上滑方向，视频 ${videoId.substring(0, 8)} 跳过自动处理`);
+      logger.debug(`[手动导航] 检测到上滑方向，视频 ${videoId.substring(0, 8)} 跳过自动处理`);
     }
     return;
   }
@@ -722,7 +725,7 @@ function processCurrentVideo() {
   if (lastNavigationDirection === 'down') {
     if (currentVideoId !== videoId) {
       currentVideoId = videoId;
-      log(`[手动导航] 检测到下滑方向，视频 ${videoId.substring(0, 8)} 开启连播`);
+      logger.debug(`[手动导航] 检测到下滑方向，视频 ${videoId.substring(0, 8)} 开启连播`);
       setTimeout(() => enableAutoPlay(), 500);
     }
     // 重置方向，避免后续误判
@@ -737,7 +740,7 @@ function processCurrentVideo() {
   if (returnedVideosThisSession.has(videoId)) {
     if (currentVideoId !== videoId) {
       currentVideoId = videoId;
-      log(`[手动导航] 视频 ${videoId.substring(0, 8)} 已被返回过，跳过自动处理`);
+      logger.debug(`[手动导航] 视频 ${videoId.substring(0, 8)} 已被返回过，跳过自动处理`);
     }
     return;
   }
@@ -749,11 +752,11 @@ function processCurrentVideo() {
 
   // 视频切换处理
   if (currentVideoId !== null && currentVideoId !== videoId) {
-    log(` 视频切换: ${currentVideoId.substring(0, 8)} -> ${videoId.substring(0, 8)}`);
+    logger.debug(` 视频切换: ${currentVideoId.substring(0, 8)} -> ${videoId.substring(0, 8)}`);
 
     // 检测手动上滑返回
     if (isGoingBack) {
-      log(`[手动导航] 检测到上滑返回 (历史位置: ${videoHistory.indexOf(videoId)}/${videoHistory.length - 1})，记录该视频`);
+      logger.debug(`[手动导航] 检测到上滑返回 (历史位置: ${videoHistory.indexOf(videoId)}/${videoHistory.length - 1})，记录该视频`);
       VideoChangeChecker.cancelAll();
       currentVideoId = videoId;
       updateVideoHistory(videoId);
@@ -768,7 +771,7 @@ function processCurrentVideo() {
     // 用户下滑到新视频（不在历史中），清空返回记录，恢复自动处理
     if (!videoHistory.includes(videoId)) {
       if (returnedVideosThisSession.size > 0) {
-        log(`[手动导航] 检测到全新视频，清空返回记录 (${returnedVideosThisSession.size} 个)，恢复自动处理`);
+        logger.debug(`[手动导航] 检测到全新视频，清空返回记录 (${returnedVideosThisSession.size} 个)，恢复自动处理`);
         returnedVideosThisSession.clear();
       }
       // 下滑到新视频时，自动开启连播
@@ -795,7 +798,7 @@ function processCurrentVideo() {
   if (isAI) {
     processedVideos.add(aiSkipKey);
     // 如果已经在 processedVideos 中，说明之前看过并跳过过，继续跳过
-    log('[AI检测] 检测到AI相关内容，跳过');
+    logger.debug('[AI检测] 检测到AI相关内容，跳过');
     skipToNextVideo('AI生成内容');
     return;
   }
@@ -804,20 +807,20 @@ function processCurrentVideo() {
   const matchedKeyword = checkNotInterestedKeywords(videoBody);
   if (matchedKeyword) {
     processedVideos.add(notInterestedKey);
-    log(`[不感兴趣] 匹配到关键词: "${matchedKeyword}"，跳过`);
+    logger.debug(`[不感兴趣] 匹配到关键词: "${matchedKeyword}"，跳过`);
     skipToNextVideo(`不感兴趣: ${matchedKeyword}`);
     return;
   }
 
   // ========== 第三步：检查历史标记（用于已滑过的视频） ==========
   if (processedVideos.has(aiSkipKey)) {
-    log(`[视频追踪] 已标记为AI视频，跳过: ${videoId.substring(0, 8)}`);
+    logger.debug(`[视频追踪] 已标记为AI视频，跳过: ${videoId.substring(0, 8)}`);
     skipToNextVideo('AI视频(已标记)');
     return;
   }
 
   if (processedVideos.has(notInterestedKey)) {
-    log(`[视频追踪] 已标记为不感兴趣，跳过: ${videoId.substring(0, 8)}`);
+    logger.debug(`[视频追踪] 已标记为不感兴趣，跳过: ${videoId.substring(0, 8)}`);
     skipToNextVideo('不感兴趣(已标记)');
     return;
   }
@@ -841,33 +844,33 @@ function cleanupOldVideoRecords() {
 
   if (keysToDelete.length > 0) {
     keysToDelete.forEach(key => processedVideos.delete(key));
-    log(`[清理] 移除了 ${keysToDelete.length} 条过期视频记录`);
+    logger.debug(`[清理] 移除了 ${keysToDelete.length} 条过期视频记录`);
   }
 }
 
 function loopFunc(fn) {
-  log(' 视频容器监听已注册（心跳模式）');
+  logger.debug(' 视频容器监听已注册（心跳模式）');
   TimerManager.register(() => setInterval(fn, 1000));
-  TimerManager.register(() => setInterval(() => log(` 状态运行中`), 30000));
+  TimerManager.register(() => setInterval(() => logger.debug(` 状态运行中`), 30000));
 }
 
 // ========== 隐藏元素 ==========
 function updateHideElements(selectors) {
   if (typeof DOMUtils === 'undefined') {
-    console.warn('[抖音脚本] DOMUtils 未就绪，跳过隐藏元素更新');
+    logger.warn('[抖音脚本] DOMUtils 未就绪，跳过隐藏元素更新');
     return;
   }
   DOMUtils.removeStyle(STYLE_TAG_ID);
   currentSelectors = selectors?.length > 0 ? selectors : [];
   if (currentSelectors.length > 0) {
     DOMUtils.applyHideStyle(STYLE_TAG_ID, currentSelectors);
-    log(' 已隐藏元素:', currentSelectors);
+    logger.debug(' 已隐藏元素:', currentSelectors);
   }
 }
 
 async function loadDomainHideSettings() {
   if (typeof DOMUtils === 'undefined') {
-    console.warn('[抖音脚本] DOMUtils 未就绪，跳过加载隐藏设置');
+    logger.warn('[抖音脚本] DOMUtils 未就绪，跳过加载隐藏设置');
     return;
   }
   const domain = DOMUtils.getCurrentDomain();
@@ -877,11 +880,11 @@ async function loadDomainHideSettings() {
     // 合并默认选择器和用户选择器
     const mergedSelectors = [...new Set([...DEFAULT_HIDE_SELECTORS, ...(settings.selectors || [])])];
     updateHideElements(mergedSelectors);
-    log(' 已加载隐藏设置，合并后:', mergedSelectors.length, '个选择器');
+    logger.debug(' 已加载隐藏设置，合并后:', mergedSelectors.length, '个选择器');
   } else {
     // 使用默认选择器
     updateHideElements(DEFAULT_HIDE_SELECTORS);
-    log(' 使用默认选择器:', DEFAULT_HIDE_SELECTORS.length, '个');
+    logger.debug(' 使用默认选择器:', DEFAULT_HIDE_SELECTORS.length, '个');
   }
 }
 
@@ -894,17 +897,17 @@ async function registerBlockedDomains() {
   if (window.ScriptLoader) {
     const ready = await ScriptLoader.waitFor(['MessagingUtils'], TIMEOUT);
     if (!ready) {
-      console.warn('[抖音脚本] MessagingUtils 等待超时，跳过注册域名（这是正常的，不影响功能）');
+      logger.warn('[抖音脚本] MessagingUtils 等待超时，跳过注册域名（这是正常的，不影响功能）');
       return;
     }
   } else if (!window.MessagingUtils || typeof window.MessagingUtils.isExtensionContextValid !== 'function') {
-    console.warn('[抖音脚本] MessagingUtils 未就绪，跳过注册域名（这是正常的，不影响功能）');
+    logger.warn('[抖音脚本] MessagingUtils 未就绪，跳过注册域名（这是正常的，不影响功能）');
     return;
   }
 
   // 检查扩展上下文是否有效
   if (!MessagingUtils.isExtensionContextValid()) {
-    console.warn('[抖音脚本] 扩展上下文已失效，跳过注册域名');
+    logger.warn('[抖音脚本] 扩展上下文已失效，跳过注册域名');
     return;
   }
 
@@ -918,10 +921,10 @@ async function registerBlockedDomains() {
     ]);
 
     if (result?.success) {
-      log(' 已向 background 注册 blockedDomains');
+      logger.debug(' 已向 background 注册 blockedDomains');
     } else {
       // 静默处理，不显示错误日志
-      // log(' 注册域名结果:', result);
+      // logger.debug(' 注册域名结果:', result);
     }
   } catch (err) {
     // 静默处理错误，不影响主流程，不显示警告
@@ -942,18 +945,18 @@ function injectCustomStyles() {
 
 // ========== 主初始化函数（由 ScriptLoader 调用）==========
 function init() {
-  log(' init 函数被调用');
+  logger.debug(' init 函数被调用');
   if (window.DouyinScript.isInitialized) {
-    log(' 已经初始化，跳过重复初始化');
+    logger.debug(' 已经初始化，跳过重复初始化');
     return;
   }
   window.DouyinScript.isInitialized = true;
-  log(' 脚本初始化完成');
+  logger.debug(' 脚本初始化完成');
 
   injectCustomStyles();
   // 异步加载设置，错误时使用默认值
-  loadDomainHideSettings().catch(err => console.error('[抖音脚本] 加载设置失败:', err));
-  registerBlockedDomains().catch(err => console.error('[抖音脚本] 注册域名失败:', err));
+  loadDomainHideSettings().catch(err => logger.error('加载设置失败:', err));
+  registerBlockedDomains().catch(err => logger.error('注册域名失败:', err));
   TimerManager.register(setVideoTime());
   loopFunc(processCurrentVideo);
   TimerManager.start();
@@ -965,17 +968,17 @@ function init() {
     const livePlayer = document.querySelector('.douyin-player');
 
     if (videoBody || livePlayer) {
-      log(' 检测到视频/直播容器，开始处理');
+      logger.debug(' 检测到视频/直播容器，开始处理');
       processCurrentVideo();
     } else {
       // 使用 MutationObserver 等待容器出现
-      log(' 等待视频/直播容器出现...');
+      logger.debug(' 等待视频/直播容器出现...');
       let timeoutId = null;
       const observer = new MutationObserver((mutations, obs) => {
         const hasVideo = document.querySelector('.playerContainer');
         const hasLive = document.querySelector('.douyin-player');
         if (hasVideo || hasLive) {
-          log(' 视频/直播容器已出现，开始处理');
+          logger.debug(' 视频/直播容器已出现，开始处理');
           obs.disconnect();
           if (timeoutId) clearTimeout(timeoutId);
           processCurrentVideo();
@@ -988,7 +991,7 @@ function init() {
       // 10秒后超时停止观察（定时器会持续处理，这里只是停止观察）
       timeoutId = setTimeout(() => {
         observer.disconnect();
-        log(' 等待容器超时，依赖定时器继续处理');
+        logger.debug(' 等待容器超时，依赖定时器继续处理');
       }, 10000);
     }
   };
@@ -1005,14 +1008,14 @@ function init() {
     // 跳过脚本自动触发的键盘事件，仅响应用户操作
     if (isAutoTriggered) return;
     if (e.key === 'ArrowUp' || e.keyCode === 38) {
-      log('[用户操作] 检测到键盘上滑，取消所有自动下滑检测');
+      logger.debug('[用户操作] 检测到键盘上滑，取消所有自动下滑检测');
       lastNavigationDirection = 'up';
       VideoChangeChecker.cancelAll();
       disableAutoPlay();
     }
     // 用户手动下滑也取消检测（表示用户接管控制）
     if (e.key === 'ArrowDown' || e.keyCode === 40) {
-      log('[用户操作] 检测到键盘下滑，取消自动下滑检测');
+      logger.debug('[用户操作] 检测到键盘下滑，取消自动下滑检测');
       lastNavigationDirection = 'down';
       VideoChangeChecker.cancelAll();
     }
@@ -1042,14 +1045,14 @@ function init() {
       const velocity = deltaTime > 0 ? Math.abs(deltaY) / deltaTime : 0; // px/ms
       // 上滑检测（deltaY > 0 表示手指向上滑动，页面向下滚动）
       if (deltaY > 30 || (deltaY > 10 && velocity > 0.3)) {
-        log(`[用户操作] 检测到触摸上滑 (deltaY=${deltaY.toFixed(1)}px, velocity=${velocity.toFixed(2)}px/ms)`);
+        logger.debug(`[用户操作] 检测到触摸上滑 (deltaY=${deltaY.toFixed(1)}px, velocity=${velocity.toFixed(2)}px/ms)`);
         lastNavigationDirection = 'up';
         VideoChangeChecker.cancelAll();
         disableAutoPlay();
       }
       // 下滑检测（用户主动操作）
       if (deltaY < -30 || (deltaY < -10 && velocity > 0.3)) {
-        log(`[用户操作] 检测到触摸下滑 (deltaY=${deltaY.toFixed(1)}px)`);
+        logger.debug(`[用户操作] 检测到触摸下滑 (deltaY=${deltaY.toFixed(1)}px)`);
         lastNavigationDirection = 'down';
         VideoChangeChecker.cancelAll();
       }
@@ -1075,7 +1078,7 @@ function init() {
       if (wheelTimeout) clearTimeout(wheelTimeout);
       wheelTimeout = setTimeout(() => {
         if (wheelDeltaY > 50) {
-          log(`[用户操作] 检测到滚轮上滑 (累积=${wheelDeltaY.toFixed(1)}px)，取消所有自动下滑检测`);
+          logger.debug(`[用户操作] 检测到滚轮上滑 (累积=${wheelDeltaY.toFixed(1)}px)，取消所有自动下滑检测`);
           lastNavigationDirection = 'up';
           VideoChangeChecker.cancelAll();
           disableAutoPlay();
@@ -1089,7 +1092,7 @@ function init() {
       if (wheelTimeout) clearTimeout(wheelTimeout);
       wheelTimeout = setTimeout(() => {
         if (wheelDeltaY < -50) {
-          log(`[用户操作] 检测到滚轮下滑 (累积=${Math.abs(wheelDeltaY).toFixed(1)}px)，取消自动下滑检测`);
+          logger.debug(`[用户操作] 检测到滚轮下滑 (累积=${Math.abs(wheelDeltaY).toFixed(1)}px)，取消自动下滑检测`);
           lastNavigationDirection = 'down';
           VideoChangeChecker.cancelAll();
         }
@@ -1145,7 +1148,7 @@ MessagingUtils.createMessageHandler('douyin_message_handler', {
     if (keywords.NOT_INTERESTED_KEYWORDS) {
       NOT_INTERESTED_KEYWORDS.length = 0;
       NOT_INTERESTED_KEYWORDS.push(...[...new Set(keywords.NOT_INTERESTED_KEYWORDS)]);
-      log(' 不感兴趣关键词已更新:', NOT_INTERESTED_KEYWORDS);
+      logger.debug(' 不感兴趣关键词已更新:', NOT_INTERESTED_KEYWORDS);
       const videoBody = findOne('.playerContainer');
       if (videoBody) {
         processedVideos.delete(`not_interested_${getStableVideoId(videoBody)}`);
@@ -1155,28 +1158,28 @@ MessagingUtils.createMessageHandler('douyin_message_handler', {
     if (keywords.AUTO_FOLLOW_KEYWORDS) {
       AUTO_FOLLOW_KEYWORDS.length = 0;
       AUTO_FOLLOW_KEYWORDS.push(...[...new Set(keywords.AUTO_FOLLOW_KEYWORDS)]);
-      log(' 自动关注关键词已更新:', AUTO_FOLLOW_KEYWORDS);
+      logger.debug(' 自动关注关键词已更新:', AUTO_FOLLOW_KEYWORDS);
     }
     return { success: true, message: '关键词已更新' };
   },
 
   'TOGGLE_EXTENSION': (message) => {
-    log(' 扩展状态:', message.enabled ? '启用' : '禁用');
+    logger.debug(' 扩展状态:', message.enabled ? '启用' : '禁用');
     return { success: true };
   },
 
   'GET_DEFAULT_HIDE_SELECTORS': () => {
-    log(' === GET_DEFAULT_HIDE_SELECTORS 消息接收 ===');
-    log(' DEFAULT_HIDE_SELECTORS 类型:', typeof DEFAULT_HIDE_SELECTORS);
-    log(' DEFAULT_HIDE_SELECTORS 值:', DEFAULT_HIDE_SELECTORS);
-    log(' DEFAULT_HIDE_SELECTORS 长度:', DEFAULT_HIDE_SELECTORS ? DEFAULT_HIDE_SELECTORS.length : 'N/A');
+    logger.debug(' === GET_DEFAULT_HIDE_SELECTORS 消息接收 ===');
+    logger.debug(' DEFAULT_HIDE_SELECTORS 类型:', typeof DEFAULT_HIDE_SELECTORS);
+    logger.debug(' DEFAULT_HIDE_SELECTORS 值:', DEFAULT_HIDE_SELECTORS);
+    logger.debug(' DEFAULT_HIDE_SELECTORS 长度:', DEFAULT_HIDE_SELECTORS ? DEFAULT_HIDE_SELECTORS.length : 'N/A');
     const result = { success: true, selectors: DEFAULT_HIDE_SELECTORS || [] };
-    log(' 返回结果:', result);
+    logger.debug(' 返回结果:', result);
     return result;
   },
   'GET_CURRENT_HIDE_SELECTORS': () => {
-    log(' === GET_CURRENT_HIDE_SELECTORS 消息接收 ===');
-    log(' currentSelectors:', currentSelectors);
+    logger.debug(' === GET_CURRENT_HIDE_SELECTORS 消息接收 ===');
+    logger.debug(' currentSelectors:', currentSelectors);
     return { success: true, selectors: currentSelectors || [] };
   },
 
