@@ -58,5 +58,9 @@ import '../core/lazy-init-manager.js';
 // 11. Base classes
 import '../base/SiteScript.js';
 
-// 12. Main entry
+// 12. 通用功能模块
+import '../common/script-switch.js';
+import '../common/list-link-split-view.js';
+
+// 13. Main entry
 import '../main.js';

@@ -500,12 +500,15 @@
     onMessage(callback) {
       if (!isChromeExtension) return;
       chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+        console.log('[EventBus Transport] 收到消息:', msg?.type, msg);
         const result = callback(msg, sender);
+        console.log('[EventBus Transport] 处理结果:', result);
         if (result instanceof Promise) {
           result.then(sendResponse);
           return true;
         }
         if (result !== undefined) { sendResponse(result); return true; }
+        console.log('[EventBus Transport] 非 EventBus 消息，返回 false');
         return false;
       });
     }

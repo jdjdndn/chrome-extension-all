@@ -125,6 +125,9 @@
 
   // 注册原生消息监听（兼容性）
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    // 调试：记录所有收到的消息
+    console.log('[ContentBridge] 收到消息:', message?.type);
+
     // 如果是 EventBus 消息，交给 EventBus 处理
     if (message.__eventbus__ && isEventBusReady()) {
       // EventBus 会自动处理

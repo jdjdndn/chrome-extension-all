@@ -467,6 +467,54 @@
         transform: none;
       }
 
+      /* Tab Navigation */
+      .tab-btn {
+        flex: 1;
+        padding: 8px 4px;
+        font-size: 11px;
+        background: transparent;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        color: #495057;
+        transition: all 0.2s ease;
+        font-weight: 500;
+      }
+
+      .tab-btn:hover {
+        background: rgba(255, 255, 255, 0.5);
+      }
+
+      .tab-btn.active {
+        background: white;
+        color: #007bff;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      body.dark-mode .tab-btn {
+        color: #a0aec0;
+      }
+
+      body.dark-mode .tab-btn.active {
+        background: #2d3748;
+        color: #63b3ed;
+      }
+
+      /* Tab Panel */
+      .tab-panel {
+        display: none;
+        animation: fadeIn 0.2s ease;
+      }
+
+      .tab-panel.active {
+        display: block;
+      }
+
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(5px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
       /* Info box */
       .info-box {
         background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
@@ -500,34 +548,34 @@
 
     <div id="status" class="status inactive">Inactive</div>
 
-    <!-- 番茄钟 -->
+    <!-- Tab Navigation -->
     <div class="settings" style="margin-top: 12px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-        <h2 style="font-size: 16px; margin: 0;">🍅 番茄钟</h2>
-        <select id="pomodoro-duration" style="padding: 4px 8px; font-size: 12px; border-radius: 4px;">
-          <option value="25">25分钟</option>
-          <option value="15">15分钟</option>
-          <option value="45">45分钟</option>
-          <option value="60">60分钟</option>
-        </select>
-      </div>
-      <div id="pomodoro-display" style="text-align: center; padding: 20px; background: linear-gradient(135deg, #fff5f5 0%, #ffe4e4 100%); border-radius: 12px; margin-bottom: 12px;">
-        <div id="pomodoro-time" style="font-size: 48px; font-weight: 600; color: #c53030;">25:00</div>
-        <div id="pomodoro-status" style="font-size: 12px; color: #666; margin-top: 4px;">准备开始</div>
-      </div>
-      <div style="display: flex; gap: 8px;">
-        <button id="pomodoro-start" style="flex: 1;">▶️ 开始</button>
-        <button id="pomodoro-pause" style="flex: 1; display: none;">⏸️ 暂停</button>
-        <button id="pomodoro-reset" style="flex: 1; background: #6c757d;">🔄 重置</button>
-      </div>
-      <div id="pomodoro-stats" style="margin-top: 12px; font-size: 12px; color: #666; text-align: center;">
-        今日完成: <span id="pomodoro-count">0</span> 个番茄
+      <div id="tab-navigation" style="display: flex; gap: 4px; background: #e9ecef; padding: 4px; border-radius: 8px;">
+        <button id="tab-home" class="tab-btn active" data-tab="home">🏠 首页</button>
+        <button id="tab-page" class="tab-btn" data-tab="page">📄 页面</button>
+        <button id="tab-global" class="tab-btn" data-tab="global">⚙️ 全局</button>
+        <button id="tab-stats" class="tab-btn" data-tab="stats">📊 统计</button>
       </div>
     </div>
+
+    <!-- Tab Content Container -->
+    <div id="tab-content">
+    <!-- ========== 首页Tab ========== -->
+    <div id="home-tab" class="tab-panel active">
+    <button id="toggle-btn" style="margin-bottom: 12px;">Enable Extension</button>
 
     <!-- 剪贴板历史 -->
     <div class="settings" style="margin-top: 12px;">
       <h2 style="font-size: 16px; margin: 0 0 12px 0">📋 剪贴板历史</h2>
+      <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+        <input type="text" id="clipboard-search" placeholder="搜索剪贴板..." style="flex: 1; padding: 6px; font-size: 12px; border: 1px solid #dee2e6; border-radius: 4px;">
+        <select id="clipboard-filter" style="padding: 6px; font-size: 12px; border-radius: 4px;">
+          <option value="all">全部</option>
+          <option value="text">文本</option>
+          <option value="url">链接</option>
+          <option value="code">代码</option>
+        </select>
+      </div>
       <div id="clipboard-list" style="max-height: 150px; overflow-y: auto; font-size: 12px;">
         <div style="color: #999; text-align: center; padding: 20px;">暂无记录</div>
       </div>
@@ -543,127 +591,10 @@
         <button id="clear-note" style="flex: 1; background: #6c757d;">清空</button>
       </div>
     </div>
+    </div><!-- End home-tab -->
 
-    <!-- 快捷键帮助面板 -->
-    <div id="shortcuts-panel" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000;">
-      <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 12px; width: 280px; max-height: 80vh; overflow-y: auto;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-          <h3 style="margin: 0; font-size: 16px;">⌨️ 快捷键说明</h3>
-          <button id="close-shortcuts" style="padding: 4px 8px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; cursor: pointer; font-size: 12px;">✕</button>
-        </div>
-        <div style="font-size: 13px; line-height: 1.8;">
-          <div style="margin-bottom: 12px;">
-            <div style="font-weight: 500; color: #495057; margin-bottom: 4px;">页面操作</div>
-            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #f0f0f0;">
-              <span>Space (短按)</span><span style="color: #666;">点击元素</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #f0f0f0;">
-              <span>Space (长按)</span><span style="color: #666;">选择文本</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #f0f0f0;">
-              <span>X</span><span style="color: #666;">右击元素</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #f0f0f0;">
-              <span>← →</span><span style="color: #666;">翻页</span>
-            </div>
-          </div>
-          <div style="margin-bottom: 12px;">
-            <div style="font-weight: 500; color: #495057; margin-bottom: 4px;">Popup操作</div>
-            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #f0f0f0;">
-              <span>ESC</span><span style="color: #666;">关闭抽屉</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 通知面板 -->
-    <div id="notification-panel" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000;">
-      <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 12px; width: 280px; max-height: 80vh; overflow-y: auto;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-          <h3 style="margin: 0; font-size: 16px;">🔔 通知中心</h3>
-          <button id="close-notifications" style="padding: 4px 8px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; cursor: pointer; font-size: 12px;">✕</button>
-        </div>
-        <div id="notification-list" style="font-size: 13px;">
-          <div style="color: #999; text-align: center; padding: 20px;">暂无通知</div>
-        </div>
-        <button id="clear-notifications" style="width: 100%; margin-top: 12px; padding: 8px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; cursor: pointer; font-size: 12px;">清空所有通知</button>
-      </div>
-    </div>
-
-    <button id="toggle-btn">Enable Extension</button>
-
-    <!-- Global Settings Navigation -->
-    <div class="settings" style="margin-top: 12px;">
-      <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-        <button id="nav-current" class="nav-btn active" style="flex: 1; padding: 8px; font-size: 12px;">当前页面</button>
-        <button id="nav-global" class="nav-btn" style="flex: 1; padding: 8px; font-size: 12px;">全局设置</button>
-        <button id="nav-stats" class="nav-btn" style="flex: 1; padding: 8px; font-size: 12px;">数据统计</button>
-      </div>
-    </div>
-
-    <!-- Stats View (hidden by default) -->
-    <div id="stats-view" style="display: none;">
-      <div class="settings">
-        <h2 style="font-size: 16px; margin: 0 0 12px 0">📊 数据统计</h2>
-
-        <!-- 今日统计 -->
-        <div class="setting-item" style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); padding: 12px; border-radius: 8px; margin-bottom: 12px;">
-          <div style="font-size: 12px; color: #1565c0; margin-bottom: 8px; font-weight: 500;">今日数据</div>
-          <div style="display: flex; gap: 12px;">
-            <div style="flex: 1; text-align: center;">
-              <div id="today-blocked" style="font-size: 24px; font-weight: 600; color: #1976d2;">0</div>
-              <div style="font-size: 11px; color: #666;">拦截请求</div>
-            </div>
-            <div style="flex: 1; text-align: center;">
-              <div id="today-hidden" style="font-size: 24px; font-weight: 600; color: #388e3c;">0</div>
-              <div style="font-size: 11px; color: #666;">隐藏元素</div>
-            </div>
-            <div style="flex: 1; text-align: center;">
-              <div id="today-bytes" style="font-size: 24px; font-weight: 600; color: #f57c00;">0</div>
-              <div style="font-size: 11px; color: #666;">节省流量</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 累计统计 -->
-        <div class="setting-item" style="background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%); padding: 12px; border-radius: 8px; margin-bottom: 12px;">
-          <div style="font-size: 12px; color: #7b1fa2; margin-bottom: 8px; font-weight: 500;">累计数据</div>
-          <div style="display: flex; gap: 12px;">
-            <div style="flex: 1; text-align: center;">
-              <div id="total-blocked" style="font-size: 20px; font-weight: 600; color: #8e24aa;">0</div>
-              <div style="font-size: 11px; color: #666;">总拦截</div>
-            </div>
-            <div style="flex: 1; text-align: center;">
-              <div id="total-hidden" style="font-size: 20px; font-weight: 600; color: #4caf50;">0</div>
-              <div style="font-size: 11px; color: #666;">总隐藏</div>
-            </div>
-            <div style="flex: 1; text-align: center;">
-              <div id="total-bytes" style="font-size: 20px; font-weight: 600; color: #ff9800;">0</div>
-              <div style="font-size: 11px; color: #666;">总节省</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 域名排行 -->
-        <div class="setting-item">
-          <div class="label-with-action">
-            <label style="font-size: 13px; font-weight: 500;">域名排行 TOP 5</label>
-          </div>
-          <div id="domain-ranking" style="margin-top: 8px; font-size: 12px;">
-            <div style="color: #999; text-align: center; padding: 20px;">暂无数据</div>
-          </div>
-        </div>
-
-        <!-- 操作按钮 -->
-        <div style="margin-top: 12px; display: flex; gap: 8px;">
-          <button id="refresh-stats" style="flex: 1;">刷新</button>
-          <button id="reset-stats" style="flex: 1; background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);">重置统计</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Current Page Settings (default view) -->
+    <!-- ========== 页面Tab ========== -->
+    <div id="page-tab" class="tab-panel">
     <div id="current-page-settings">
 
     <!-- Douyin Script Control -->
@@ -931,9 +862,12 @@
       </div>
     </div>
     </div><!-- End current-page-settings -->
+    </div><!-- End page-tab -->
 
+    <!-- ========== 全局Tab ========== -->
+    <div id="global-tab" class="tab-panel">
     <!-- Global Settings View (hidden by default) -->
-    <div id="global-settings" style="display: none;">
+    <div id="global-settings">
       <div class="settings">
         <h2 style="font-size: 16px; margin: 0 0 12px 0">全局关键词设置</h2>
 
@@ -948,15 +882,38 @@
         </div>
 
         <div id="global-keywords-editor" style="display: none; margin-top: 12px;">
+          <!-- 关键词分类 -->
+          <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+            <button class="keyword-category-btn active" data-category="notInterested" style="flex: 1; padding: 6px; font-size: 11px; border: 1px solid #dee2e6; border-radius: 4px; cursor: pointer; background: #007bff; color: white;">不感兴趣</button>
+            <button class="keyword-category-btn" data-category="highlighted" style="flex: 1; padding: 6px; font-size: 11px; border: 1px solid #dee2e6; border-radius: 4px; cursor: pointer;">高亮</button>
+            <button class="keyword-category-btn" data-category="blocked" style="flex: 1; padding: 6px; font-size: 11px; border: 1px solid #dee2e6; border-radius: 4px; cursor: pointer;">屏蔽</button>
+          </div>
+
+          <!-- 关键词统计 -->
+          <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 11px; color: #666;">
+            <span>关键词数量: <span id="keyword-count">0</span></span>
+            <span>匹配次数: <span id="keyword-match-count">0</span></span>
+          </div>
+
           <div class="setting-item">
-            <label for="global-keywords-textarea">不感兴趣关键词</label>
+            <label for="global-keywords-textarea">关键词列表</label>
             <textarea
               id="global-keywords-textarea"
               rows="8"
               style="width: 100%; padding: 8px; border: 1px solid #dee2e6; border-radius: 6px; font-size: 12px; font-family: monospace; resize: vertical; background: #f8f9fa;"
               placeholder="每行一个关键词"></textarea>
           </div>
-          <button id="global-save-keywords-btn" style="width: 100%;">保存关键词</button>
+
+          <!-- 批量导入 -->
+          <div style="margin-top: 12px;">
+            <div style="display: flex; gap: 8px;">
+              <input type="file" id="keywords-import-file" accept=".txt,.json" style="display: none;">
+              <button id="import-keywords-btn" style="flex: 1; padding: 6px; font-size: 11px; background: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer;">📥 导入文件</button>
+              <button id="export-keywords-btn" style="flex: 1; padding: 6px; font-size: 11px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">📤 导出</button>
+            </div>
+          </div>
+
+          <button id="global-save-keywords-btn" style="width: 100%; margin-top: 12px;">保存关键词</button>
         </div>
       </div>
 
@@ -979,15 +936,155 @@
         <div class="setting-item">
           <label style="font-size: 13px;">快速添加常用规则</label>
           <div id="template-list" style="margin-top: 8px;">
-            <button class="template-btn" data-template="ads" style="margin: 4px; padding: 6px 12px; font-size: 11px; background: #e3f2fd; border: 1px solid #90caf9; border-radius: 4px; cursor: pointer;">🚫 广告拦截</button>
-            <button class="template-btn" data-template="trackers" style="margin: 4px; padding: 6px 12px; font-size: 11px; background: #fff3e0; border: 1px solid #ffcc80; border-radius: 4px; cursor: pointer;">🔍 隐私追踪</button>
-            <button class="template-btn" data-template="social" style="margin: 4px; padding: 6px 12px; font-size: 11px; background: #f3e5f5; border: 1px solid #ce93d8; border-radius: 4px; cursor: pointer;">💬 社交组件</button>
-            <button class="template-btn" data-template="video-ads" style="margin: 4px; padding: 6px 12px; font-size: 11px; background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 4px; cursor: pointer;">🎬 视频广告</button>
+            <!-- 基础模板 -->
+            <div style="margin-bottom: 8px;">
+              <div style="font-size: 11px; color: #666; margin-bottom: 4px;">基础模板</div>
+              <button class="template-btn" data-template="ads" style="margin: 4px; padding: 6px 12px; font-size: 11px; background: #e3f2fd; border: 1px solid #90caf9; border-radius: 4px; cursor: pointer;">🚫 广告拦截</button>
+              <button class="template-btn" data-template="trackers" style="margin: 4px; padding: 6px 12px; font-size: 11px; background: #fff3e0; border: 1px solid #ffcc80; border-radius: 4px; cursor: pointer;">🔍 隐私追踪</button>
+              <button class="template-btn" data-template="social" style="margin: 4px; padding: 6px 12px; font-size: 11px; background: #f3e5f5; border: 1px solid #ce93d8; border-radius: 4px; cursor: pointer;">💬 社交组件</button>
+              <button class="template-btn" data-template="video-ads" style="margin: 4px; padding: 6px 12px; font-size: 11px; background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 4px; cursor: pointer;">🎬 视频广告</button>
+            </div>
+            <!-- 扩展模板 -->
+            <div>
+              <div style="font-size: 11px; color: #666; margin-bottom: 4px;">扩展模板</div>
+              <button class="template-btn" data-template="video-sites" style="margin: 4px; padding: 6px 12px; font-size: 11px; background: #fce4ec; border: 1px solid #f48fb1; border-radius: 4px; cursor: pointer;">📺 视频网站</button>
+              <button class="template-btn" data-template="social-media" style="margin: 4px; padding: 6px 12px; font-size: 11px; background: #e0f2f1; border: 1px solid #80cbc4; border-radius: 4px; cursor: pointer;">📱 社交媒体</button>
+              <button class="template-btn" data-template="shopping" style="margin: 4px; padding: 6px 12px; font-size: 11px; background: #fff8e1; border: 1px solid #ffe082; border-radius: 4px; cursor: pointer;">🛒 购物网站</button>
+              <button class="template-btn" data-template="news-sites" style="margin: 4px; padding: 6px 12px; font-size: 11px; background: #ede7f6; border: 1px solid #b39ddb; border-radius: 4px; cursor: pointer;">📰 新闻网站</button>
+            </div>
+          </div>
+        </div>
+        <!-- 自定义模板 -->
+        <div class="setting-item" style="margin-top: 12px;">
+          <label style="font-size: 13px;">自定义模板</label>
+          <div style="display: flex; gap: 8px; margin-top: 8px;">
+            <input type="text" id="custom-template-name" placeholder="模板名称" style="flex: 1; padding: 6px; font-size: 12px;">
+            <button id="save-custom-template-btn" style="padding: 6px 12px; font-size: 12px;">保存当前规则</button>
+          </div>
+          <div id="custom-templates-list" style="margin-top: 8px;"></div>
+        </div>
+      </div>
+    </div><!-- End global-settings -->
+    </div><!-- End global-tab -->
+
+    <!-- ========== 统计Tab ========== -->
+    <div id="stats-tab" class="tab-panel">
+    <div id="stats-view">
+      <div class="settings">
+        <h2 style="font-size: 16px; margin: 0 0 12px 0">📊 数据统计</h2>
+
+        <!-- 今日统计 -->
+        <div class="setting-item" style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); padding: 12px; border-radius: 8px; margin-bottom: 12px;">
+          <div style="font-size: 12px; color: #1565c0; margin-bottom: 8px; font-weight: 500;">今日数据</div>
+          <div style="display: flex; gap: 12px;">
+            <div style="flex: 1; text-align: center;">
+              <div id="today-blocked" style="font-size: 24px; font-weight: 600; color: #1976d2;">0</div>
+              <div style="font-size: 11px; color: #666;">拦截请求</div>
+            </div>
+            <div style="flex: 1; text-align: center;">
+              <div id="today-hidden" style="font-size: 24px; font-weight: 600; color: #388e3c;">0</div>
+              <div style="font-size: 11px; color: #666;">隐藏元素</div>
+            </div>
+            <div style="flex: 1; text-align: center;">
+              <div id="today-bytes" style="font-size: 24px; font-weight: 600; color: #f57c00;">0</div>
+              <div style="font-size: 11px; color: #666;">节省流量</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 累计统计 -->
+        <div class="setting-item" style="background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%); padding: 12px; border-radius: 8px; margin-bottom: 12px;">
+          <div style="font-size: 12px; color: #7b1fa2; margin-bottom: 8px; font-weight: 500;">累计数据</div>
+          <div style="display: flex; gap: 12px;">
+            <div style="flex: 1; text-align: center;">
+              <div id="total-blocked" style="font-size: 20px; font-weight: 600; color: #8e24aa;">0</div>
+              <div style="font-size: 11px; color: #666;">总拦截</div>
+            </div>
+            <div style="flex: 1; text-align: center;">
+              <div id="total-hidden" style="font-size: 20px; font-weight: 600; color: #4caf50;">0</div>
+              <div style="font-size: 11px; color: #666;">总隐藏</div>
+            </div>
+            <div style="flex: 1; text-align: center;">
+              <div id="total-bytes" style="font-size: 20px; font-weight: 600; color: #ff9800;">0</div>
+              <div style="font-size: 11px; color: #666;">总节省</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 趋势图表 -->
+        <div class="setting-item" style="margin-bottom: 12px;">
+          <div class="label-with-action">
+            <label style="font-size: 13px; font-weight: 500;">📈 近7天趋势</label>
+          </div>
+          <canvas id="stats-chart" style="width: 100%; height: 100px; margin-top: 8px;"></canvas>
+        </div>
+
+        <!-- 域名排行 -->
+        <div class="setting-item">
+          <div class="label-with-action">
+            <label style="font-size: 13px; font-weight: 500;">域名排行 TOP 5</label>
+          </div>
+          <div id="domain-ranking" style="margin-top: 8px; font-size: 12px;">
+            <div style="color: #999; text-align: center; padding: 20px;">暂无数据</div>
+          </div>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div style="margin-top: 12px; display: flex; gap: 8px;">
+          <button id="refresh-stats" style="flex: 1;">刷新</button>
+          <button id="export-stats-csv" style="flex: 1; background: #17a2b8;">导出CSV</button>
+          <button id="reset-stats" style="flex: 1; background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);">重置</button>
+        </div>
+      </div>
+    </div><!-- End stats-view -->
+    </div><!-- End stats-tab -->
+    </div><!-- End tab-content -->
+
+    <!-- 快捷键帮助面板 -->
+    <div id="shortcuts-panel" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000;">
+      <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 12px; width: 280px; max-height: 80vh; overflow-y: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h3 style="margin: 0; font-size: 16px;">⌨️ 快捷键说明</h3>
+          <button id="close-shortcuts" style="padding: 4px 8px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; cursor: pointer; font-size: 12px;">✕</button>
+        </div>
+        <div style="font-size: 13px; line-height: 1.8;">
+          <div style="margin-bottom: 12px;">
+            <div style="font-weight: 500; color: #495057; margin-bottom: 4px;">页面操作</div>
+            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #f0f0f0;">
+              <span>Space (短按)</span><span style="color: #666;">点击元素</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #f0f0f0;">
+              <span>Space (长按)</span><span style="color: #666;">选择文本</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #f0f0f0;">
+              <span>X</span><span style="color: #666;">右击元素</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #f0f0f0;">
+              <span>← →</span><span style="color: #666;">翻页</span>
+            </div>
+          </div>
+          <div style="margin-bottom: 12px;">
+            <div style="font-weight: 500; color: #495057; margin-bottom: 4px;">Popup操作</div>
+            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #f0f0f0;">
+              <span>ESC</span><span style="color: #666;">关闭抽屉</span>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
-    <script src="popup.js"></script>
+    <!-- 通知面板 -->
+    <div id="notification-panel" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000;">
+      <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 12px; width: 280px; max-height: 80vh; overflow-y: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h3 style="margin: 0; font-size: 16px;">🔔 通知中心</h3>
+          <button id="close-notifications" style="padding: 4px 8px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; cursor: pointer; font-size: 12px;">✕</button>
+        </div>
+        <div id="notification-list" style="font-size: 13px;">
+          <div style="color: #999; text-align: center; padding: 20px;">暂无通知</div>
+        </div>
+        <button id="clear-notifications" style="width: 100%; margin-top: 12px; padding: 8px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; cursor: pointer; font-size: 12px;">清空所有通知</button>
+      </div>
+    </div>
   </body>
 </html>

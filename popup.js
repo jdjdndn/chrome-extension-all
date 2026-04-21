@@ -1980,46 +1980,62 @@ document.addEventListener('DOMContentLoaded', () => {
   initNavigation();
 });
 
-// ========== 导航切换 ==========
+// ========== Tab切换 ==========
 function initNavigation() {
-  const navCurrent = document.getElementById('nav-current');
-  const navGlobal = document.getElementById('nav-global');
-  const navStats = document.getElementById('nav-stats');
-  const currentSettings = document.getElementById('current-page-settings');
-  const globalSettings = document.getElementById('global-settings');
-  const statsView = document.getElementById('stats-view');
+  const tabBtns = document.querySelectorAll('.tab-btn');
+  const tabPanels = document.querySelectorAll('.tab-panel');
 
-  function showView(view) {
-    // 隐藏所有视图
-    currentSettings.style.display = 'none';
-    globalSettings.style.display = 'none';
-    if (statsView) statsView.style.display = 'none';
-    // 移除所有active
-    navCurrent.classList.remove('active');
-    navGlobal.classList.remove('active');
-    if (navStats) navStats.classList.remove('active');
-    // 显示目标视图
-    if (view === 'current') {
-      currentSettings.style.display = 'block';
-      navCurrent.classList.add('active');
-    } else if (view === 'global') {
-      globalSettings.style.display = 'block';
-      navGlobal.classList.add('active');
+  console.log('[Tab] tabBtns:', tabBtns.length);
+  console.log('[Tab] tabPanels:', tabPanels.length);
+
+  if (tabBtns.length === 0) {
+    console.error('[Tab] No tab buttons found!');
+    return;
+  }
+
+  function showTab(tabName) {
+    // 隐藏所有面板
+    tabPanels.forEach(panel => panel.classList.remove('active'));
+    // 移除所有按钮active
+    tabBtns.forEach(btn => btn.classList.remove('active'));
+
+    // 显示目标面板
+    const targetPanel = document.getElementById(`${tabName}-tab`);
+    const targetBtn = document.querySelector(`[data-tab="${tabName}"]`);
+
+    if (targetPanel) {
+      targetPanel.classList.add('active');
+    }
+    if (targetBtn) {
+      targetBtn.classList.add('active');
+    }
+
+    // 加载对应数据
+    if (tabName === 'global') {
       loadGlobalSettings();
-    } else if (view === 'stats' && statsView) {
-      statsView.style.display = 'block';
-      navStats.classList.add('active');
+    } else if (tabName === 'stats') {
       loadStatsData();
+      drawStatsChart();
+    } else if (tabName === 'home') {
+      loadClipboardHistory();
+    } else if (tabName === 'page') {
+      loadBlockedDomains();
+      loadHideElementsSettings();
     }
   }
 
-  if (navCurrent && navGlobal && currentSettings && globalSettings) {
-    navCurrent.addEventListener('click', () => showView('current'));
-    navGlobal.addEventListener('click', () => showView('global'));
-    if (navStats) {
-      navStats.addEventListener('click', () => showView('stats'));
-    }
-  }
+  // 为每个Tab按钮添加点击事件
+  tabBtns.forEach(btn => {
+    console.log('[Tab] Adding click listener to:', btn.dataset.tab);
+    btn.addEventListener('click', (e) => {
+      console.log('[Tab] Clicked:', btn.dataset.tab);
+      const tabName = btn.dataset.tab;
+      showTab(tabName);
+    });
+  });
+
+  // 初始加载首页数据
+  showTab('home');
 }
 
 // ========== 统计面板 ==========
@@ -2112,9 +2128,13 @@ function formatBytes(bytes) {
 document.addEventListener('DOMContentLoaded', () => {
   const refreshBtn = document.getElementById('refresh-stats');
   const resetBtn = document.getElementById('reset-stats');
+  const exportCsvBtn = document.getElementById('export-stats-csv');
 
   if (refreshBtn) {
-    refreshBtn.addEventListener('click', loadStatsData);
+    refreshBtn.addEventListener('click', () => {
+      loadStatsData();
+      drawStatsChart();
+    });
   }
 
   if (resetBtn) {
@@ -2123,15 +2143,112 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
           await chrome.runtime.sendMessage({ type: 'RESET_STATS' });
           loadStatsData();
+          drawStatsChart();
         } catch (error) {
           console.error('[Stats] 重置失败:', error);
         }
       }
     });
   }
+
+  if (exportCsvBtn) {
+    exportCsvBtn.addEventListener('click', exportStatsToCSV);
+  }
 });
 
-// ========== 通知中心 ==========
+// ========== 统计图表绘制 ==========
+function drawStatsChart() {
+  const canvas = document.getElementById('stats-chart');
+  if (!canvas) return;
+
+  const ctx = canvas.getContext('2d');
+  const width = canvas.offsetWidth;
+  const height = canvas.offsetHeight;
+
+  // 设置canvas实际尺寸
+  canvas.width = width * 2;
+  canvas.height = height * 2;
+  ctx.scale(2, 2);
+
+  // 清空画布
+  ctx.clearRect(0, 0, width, height);
+
+  // 模拟7天数据（实际应从存储加载）
+  const days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+  const data = [120, 150, 80, 200, 180, 90, 140]; // 示例数据
+
+  const maxVal = Math.max(...data, 1);
+  const padding = 30;
+  const chartWidth = width - padding * 2;
+  const chartHeight = height - padding * 2;
+  const barWidth = chartWidth / days.length - 10;
+
+  // 绘制背景网格
+  ctx.strokeStyle = '#e9ecef';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = padding + (chartHeight / 4) * i;
+    ctx.beginPath();
+    ctx.moveTo(padding, y);
+    ctx.lineTo(width - padding, y);
+    ctx.stroke();
+  }
+
+  // 绘制柱状图
+  const gradient = ctx.createLinearGradient(0, height, 0, 0);
+  gradient.addColorStop(0, '#007bff');
+  gradient.addColorStop(1, '#0056b3');
+
+  data.forEach((val, i) => {
+    const barHeight = (val / maxVal) * chartHeight;
+    const x = padding + i * (chartWidth / days.length) + 5;
+    const y = height - padding - barHeight;
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(x, y, barWidth, barHeight);
+
+    // 绘制标签
+    ctx.fillStyle = '#666';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(days[i], x + barWidth / 2, height - 10);
+  });
+}
+
+// ========== 导出统计CSV ==========
+async function exportStatsToCSV() {
+  try {
+    const response = await chrome.runtime.sendMessage({ type: 'GET_STATS' });
+    if (!response?.stats) {
+      alert('暂无数据可导出');
+      return;
+    }
+
+    const stats = response.stats;
+    let csv = '日期,拦截请求,隐藏元素,节省流量\n';
+
+    // 添加今日数据
+    const today = new Date().toISOString().split('T')[0];
+    csv += `${today},${stats.today?.blocked || 0},${stats.today?.hidden || 0},${stats.today?.bytes || 0}\n`;
+
+    // 添加累计数据
+    csv += `累计,${stats.totalBlocked || 0},${stats.totalHidden || 0},${stats.estimatedBytesSaved || 0}\n`;
+
+    // 下载CSV
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `extension-stats-${today}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error('[导出CSV] 失败:', error);
+    alert('导出失败: ' + error.message);
+  }
+}
+
+// ========== 通知中心 ==========\n
 document.addEventListener('DOMContentLoaded', async () => {
   const bellBtn = document.getElementById('notification-bell');
   const panel = document.getElementById('notification-panel');
@@ -2252,39 +2369,115 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 });
 
-// ========== 剪贴板历史 ==========
+// ========== 剪贴板历史（增强版） ==========
 document.addEventListener('DOMContentLoaded', async () => {
   const list = document.getElementById('clipboard-list');
   const clearBtn = document.getElementById('clear-clipboard');
+
+  // 添加搜索框
+  if (list && !document.getElementById('clipboard-search')) {
+    const searchContainer = document.createElement('div');
+    searchContainer.innerHTML = `
+      <input type="text" id="clipboard-search" placeholder="搜索剪贴板历史..."
+        style="width: 100%; padding: 6px 8px; margin-bottom: 8px; border: 1px solid #dee2e6; border-radius: 4px; font-size: 12px;">
+      <div id="clipboard-filters" style="display: flex; gap: 4px; margin-bottom: 8px;">
+        <button class="clipboard-filter active" data-filter="all" style="padding: 4px 8px; font-size: 11px; border: 1px solid #dee2e6; border-radius: 4px; cursor: pointer; background: #007bff; color: white;">全部</button>
+        <button class="clipboard-filter" data-filter="url" style="padding: 4px 8px; font-size: 11px; border: 1px solid #dee2e6; border-radius: 4px; cursor: pointer;">URL</button>
+        <button class="clipboard-filter" data-filter="code" style="padding: 4px 8px; font-size: 11px; border: 1px solid #dee2e6; border-radius: 4px; cursor: pointer;">代码</button>
+        <button class="clipboard-filter" data-filter="text" style="padding: 4px 8px; font-size: 11px; border: 1px solid #dee2e6; border-radius: 4px; cursor: pointer;">文本</button>
+      </div>
+    `;
+    list.parentNode.insertBefore(searchContainer, list);
+
+    // 搜索事件
+    const searchInput = document.getElementById('clipboard-search');
+    searchInput?.addEventListener('input', () => {
+      loadClipboardHistory(searchInput.value, currentClipboardFilter);
+    });
+
+    // 筛选事件
+    document.querySelectorAll('.clipboard-filter').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.clipboard-filter').forEach(b => {
+          b.classList.remove('active');
+          b.style.background = '';
+          b.style.color = '';
+        });
+        btn.classList.add('active');
+        btn.style.background = '#007bff';
+        btn.style.color = 'white';
+        currentClipboardFilter = btn.dataset.filter;
+        loadClipboardHistory(document.getElementById('clipboard-search')?.value || '', currentClipboardFilter);
+      });
+    });
+  }
 
   await loadClipboardHistory();
 
   if (clearBtn) {
     clearBtn.addEventListener('click', async () => {
-      await chrome.storage.local.remove('clipboardHistory');
-      await loadClipboardHistory();
+      if (confirm('确定要清空所有剪贴板历史吗？')) {
+        await chrome.storage.local.remove('clipboardHistory');
+        await loadClipboardHistory();
+      }
     });
   }
 });
 
-async function loadClipboardHistory() {
+let currentClipboardFilter = 'all';
+
+async function loadClipboardHistory(searchQuery = '', filter = 'all') {
   const list = document.getElementById('clipboard-list');
   if (!list) return;
 
   const result = await chrome.storage.local.get('clipboardHistory');
-  const history = result.clipboardHistory || [];
+  let history = result.clipboardHistory || [];
+
+  // 分类检测
+  const categorize = (text) => {
+    if (/^https?:\/\//i.test(text)) return 'url';
+    if (/[\{\}\[\]\(\);=>]/.test(text) && text.includes('\n')) return 'code';
+    return 'text';
+  };
+
+  // 筛选
+  if (filter !== 'all') {
+    history = history.filter(item => categorize(item.text) === filter);
+  }
+
+  // 搜索
+  if (searchQuery) {
+    const query = searchQuery.toLowerCase();
+    history = history.filter(item => item.text.toLowerCase().includes(query));
+  }
 
   if (history.length === 0) {
     list.innerHTML = '<div style="color: #999; text-align: center; padding: 20px;">暂无记录</div>';
     return;
   }
 
-  list.innerHTML = history.map((item, i) => `
-    <div class="clipboard-item" style="padding: 8px; margin-bottom: 4px; background: #f8f9fa; border-radius: 4px; cursor: pointer; overflow: hidden;" data-index="${i}">
-      <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(item.text.slice(0, 100))}</div>
-      <div style="font-size: 10px; color: #999; margin-top: 2px;">${new Date(item.time).toLocaleString('zh-CN')}</div>
-    </div>
-  `).join('');
+  list.innerHTML = history.map((item, i) => {
+    const category = categorize(item.text);
+    const categoryColor = category === 'url' ? '#17a2b8' : category === 'code' ? '#28a745' : '#6c757d';
+    const categoryLabel = category === 'url' ? 'URL' : category === 'code' ? '代码' : '文本';
+
+    // 高亮搜索词
+    let displayText = escapeHtml(item.text.slice(0, 100));
+    if (searchQuery) {
+      const regex = new RegExp(`(${escapeRegex(searchQuery)})`, 'gi');
+      displayText = displayText.replace(regex, '<mark style="background: #fff3cd; padding: 0 2px;">$1</mark>');
+    }
+
+    return `
+      <div class="clipboard-item" style="padding: 8px; margin-bottom: 4px; background: #f8f9fa; border-radius: 4px; cursor: pointer; overflow: hidden; position: relative;" data-index="${i}">
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${displayText}</div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+          <span style="font-size: 10px; color: #999;">${new Date(item.time).toLocaleString('zh-CN')}</span>
+          <span style="font-size: 10px; padding: 2px 6px; background: ${categoryColor}; color: white; border-radius: 3px;">${categoryLabel}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
 
   // 点击复制
   list.querySelectorAll('.clipboard-item').forEach(el => {
@@ -2300,6 +2493,10 @@ async function loadClipboardHistory() {
   });
 }
 
+function escapeRegex(string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // 记录剪贴板内容（供content script调用）
 async function recordClipboard(text) {
   if (!text || text.length > 1000) return;
@@ -2312,114 +2509,6 @@ async function recordClipboard(text) {
 
   history.unshift({ text, time: Date.now() });
   await chrome.storage.local.set({ clipboardHistory: history.slice(0, 20) });
-}
-
-// ========== 番茄钟 ==========
-let pomodoroTimer = null;
-let pomodoroRemaining = 25 * 60;
-let pomodoroRunning = false;
-
-document.addEventListener('DOMContentLoaded', async () => {
-  const startBtn = document.getElementById('pomodoro-start');
-  const pauseBtn = document.getElementById('pomodoro-pause');
-  const resetBtn = document.getElementById('pomodoro-reset');
-  const durationSelect = document.getElementById('pomodoro-duration');
-  const timeDisplay = document.getElementById('pomodoro-time');
-  const statusDisplay = document.getElementById('pomodoro-status');
-  const countDisplay = document.getElementById('pomodoro-count');
-
-  // 加载今日完成数
-  const today = new Date().toISOString().split('T')[0];
-  const result = await chrome.storage.local.get('pomodoroStats');
-  const stats = result.pomodoroStats || {};
-  if (stats[today]) {
-    countDisplay.textContent = stats[today];
-  }
-
-  // 更新显示
-  function updateDisplay() {
-    const mins = Math.floor(pomodoroRemaining / 60);
-    const secs = pomodoroRemaining % 60;
-    timeDisplay.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  }
-
-  // 开始计时
-  startBtn?.addEventListener('click', () => {
-    if (pomodoroRunning) return;
-    pomodoroRunning = true;
-    startBtn.style.display = 'none';
-    pauseBtn.style.display = 'block';
-    statusDisplay.textContent = '专注中...';
-
-    pomodoroTimer = setInterval(() => {
-      pomodoroRemaining--;
-      updateDisplay();
-
-      if (pomodoroRemaining <= 0) {
-        clearInterval(pomodoroTimer);
-        pomodoroRunning = false;
-        startBtn.style.display = 'block';
-        pauseBtn.style.display = 'none';
-        statusDisplay.textContent = '完成！休息一下吧';
-
-        // 记录完成
-        incrementPomodoroCount();
-      }
-    }, 1000);
-  });
-
-  // 暂停
-  pauseBtn?.addEventListener('click', () => {
-    clearInterval(pomodoroTimer);
-    pomodoroRunning = false;
-    startBtn.style.display = 'block';
-    pauseBtn.style.display = 'none';
-    statusDisplay.textContent = '已暂停';
-  });
-
-  // 重置
-  resetBtn?.addEventListener('click', () => {
-    clearInterval(pomodoroTimer);
-    pomodoroRunning = false;
-    const duration = parseInt(durationSelect.value);
-    pomodoroRemaining = duration * 60;
-    updateDisplay();
-    startBtn.style.display = 'block';
-    pauseBtn.style.display = 'none';
-    statusDisplay.textContent = '准备开始';
-  });
-
-  // 时长选择
-  durationSelect?.addEventListener('change', () => {
-    if (!pomodoroRunning) {
-      const duration = parseInt(durationSelect.value);
-      pomodoroRemaining = duration * 60;
-      updateDisplay();
-    }
-  });
-
-  updateDisplay();
-});
-
-async function incrementPomodoroCount() {
-  const today = new Date().toISOString().split('T')[0];
-  const result = await chrome.storage.local.get('pomodoroStats');
-  const stats = result.pomodoroStats || {};
-  stats[today] = (stats[today] || 0) + 1;
-  await chrome.storage.local.set({ pomodoroStats: stats });
-
-  const countDisplay = document.getElementById('pomodoro-count');
-  if (countDisplay) countDisplay.textContent = stats[today];
-
-  // 发送通知
-  if (chrome.notifications) {
-    chrome.notifications.create({
-      type: 'basic',
-      iconUrl: 'icons/icon16.png',
-      title: '🍅 番茄钟完成',
-      message: '休息一下吧！'
-    });
-  }
 }
 
 // ========== 快捷键帮助面板 ==========
@@ -2488,8 +2577,67 @@ const RULE_TEMPLATES = {
       'static.doubleclick.net/instream/ad_status',
       'pagead2.googlesyndication.com/pagead/ads'
     ]
+  },
+  // 扩展模板
+  'video-sites': {
+    name: '视频网站',
+    domains: [
+      'api.bilibili.com/x/ad',
+      'api.bilibili.com/x/web-show/res/loc',
+      'awp.taobao.com',
+      'mmstat.com',
+      'atm.youku.com'
+    ]
+  },
+  'social-media': {
+    name: '社交媒体',
+    domains: [
+      'weibo.com/ajax/statuses/hotsearch',
+      'zhihu.com/commercial',
+      'xiaohongshu.com/api/sns/v1/note/',
+      'tieba.baidu.com/tb/tml/ad'
+    ]
+  },
+  'shopping': {
+    name: '购物网站',
+    domains: [
+      'alicdn.com',
+      'tanx.com',
+      'mmstat.com',
+      'atm.youku.com',
+      'cm.ipinyou.com',
+      'ad.toutiao.com'
+    ]
+  },
+  'news-sites': {
+    name: '新闻网站',
+    domains: [
+      'cpro.baidu.com',
+      'pos.baidu.com',
+      'eclick.baidu.com',
+      'hm.baidu.com',
+      'tanx.com/m/ad'
+    ]
   }
 };
+
+// 保存自定义模板
+async function saveCustomTemplate(name, domains) {
+  const result = await chrome.storage.local.get('customTemplates');
+  const customTemplates = result.customTemplates || {};
+  customTemplates[name] = {
+    name,
+    domains,
+    createdAt: Date.now()
+  };
+  await chrome.storage.local.set({ customTemplates });
+}
+
+// 加载自定义模板
+async function loadCustomTemplates() {
+  const result = await chrome.storage.local.get('customTemplates');
+  return result.customTemplates || {};
+}
 
 document.addEventListener('DOMContentLoaded', () => {
   const templateBtns = document.querySelectorAll('.template-btn');
@@ -2648,12 +2796,31 @@ async function importSettings(event) {
 }
 
 // ========== 全局设置 ==========
+let currentKeywordCategory = 'notInterested';
+
 async function loadGlobalSettings() {
   const domainSelect = document.getElementById('global-domain-select');
   const keywordsEditor = document.getElementById('global-keywords-editor');
   const keywordsTextarea = document.getElementById('global-keywords-textarea');
 
   if (!domainSelect || !keywordsEditor || !keywordsTextarea) return;
+
+  // 关键词分类切换
+  document.querySelectorAll('.keyword-category-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      document.querySelectorAll('.keyword-category-btn').forEach(b => {
+        b.classList.remove('active');
+        b.style.background = '';
+        b.style.color = '';
+      });
+      btn.classList.add('active');
+      btn.style.background = '#007bff';
+      btn.style.color = 'white';
+
+      currentKeywordCategory = btn.dataset.category;
+      await loadKeywordsForCategory();
+    });
+  });
 
   domainSelect.addEventListener('change', async () => {
     const domain = domainSelect.value;
@@ -2663,18 +2830,67 @@ async function loadGlobalSettings() {
     }
 
     keywordsEditor.style.display = 'block';
-
-    // 加载该域名的关键词
-    try {
-      const storageKey = `${domain}Keywords`;
-      const result = await chrome.storage.local.get(storageKey);
-      const keywords = result[storageKey] || [];
-      keywordsTextarea.value = Array.isArray(keywords) ? keywords.join('\n') : keywords;
-    } catch (error) {
-      console.error('[全局设置] 加载关键词失败:', error);
-      keywordsTextarea.value = '';
-    }
+    await loadKeywordsForCategory();
   });
+
+  // 导入关键词
+  const importKeywordsBtn = document.getElementById('import-keywords-btn');
+  const keywordsImportFile = document.getElementById('keywords-import-file');
+
+  if (importKeywordsBtn && keywordsImportFile) {
+    importKeywordsBtn.addEventListener('click', () => keywordsImportFile.click());
+    keywordsImportFile.addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      try {
+        const text = await file.text();
+        let keywords = [];
+
+        if (file.name.endsWith('.json')) {
+          const data = JSON.parse(text);
+          keywords = Array.isArray(data) ? data : (data.keywords || []);
+        } else {
+          keywords = text.split('\n').map(k => k.trim()).filter(k => k);
+        }
+
+        // 合并现有关键词
+        const existingKeywords = keywordsTextarea.value.split('\n').map(k => k.trim()).filter(k => k);
+        const merged = [...new Set([...existingKeywords, ...keywords])];
+        keywordsTextarea.value = merged.join('\n');
+
+        const countEl = document.getElementById('keyword-count');
+        if (countEl) countEl.textContent = merged.length;
+
+        alert(`成功导入 ${keywords.length} 个关键词`);
+      } catch (error) {
+        alert('导入失败: ' + error.message);
+      }
+      e.target.value = '';
+    });
+  }
+
+  // 导出关键词
+  const exportKeywordsBtn = document.getElementById('export-keywords-btn');
+  if (exportKeywordsBtn) {
+    exportKeywordsBtn.addEventListener('click', () => {
+      const keywords = keywordsTextarea.value.split('\n').map(k => k.trim()).filter(k => k);
+      const data = {
+        category: currentKeywordCategory,
+        domain: domainSelect.value,
+        keywords,
+        exportTime: new Date().toISOString()
+      };
+
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `keywords-${currentKeywordCategory}-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  }
 
   // 保存按钮
   const saveBtn = document.getElementById('global-save-keywords-btn');
@@ -2689,8 +2905,13 @@ async function loadGlobalSettings() {
         .filter(k => k);
 
       try {
+        // 保存到KeywordManager格式
         const storageKey = `${domain}Keywords`;
-        await chrome.storage.local.set({ [storageKey]: keywords });
+        const existingResult = await chrome.storage.local.get(storageKey);
+        const existingKeywords = existingResult[storageKey] || {};
+
+        existingKeywords[currentKeywordCategory] = keywords;
+        await chrome.storage.local.set({ [storageKey]: existingKeywords });
 
         // 显示成功提示
         const originalText = saveBtn.textContent;
@@ -2701,10 +2922,32 @@ async function loadGlobalSettings() {
           saveBtn.style.background = '';
         }, 1500);
 
-        console.log('[全局设置] 已保存关键词:', domain, keywords.length);
+        console.log('[全局设置] 已保存关键词:', domain, currentKeywordCategory, keywords.length);
       } catch (error) {
         console.error('[全局设置] 保存关键词失败:', error);
       }
     });
+  }
+}
+
+async function loadKeywordsForCategory() {
+  const domainSelect = document.getElementById('global-domain-select');
+  const keywordsTextarea = document.getElementById('global-keywords-textarea');
+  const countEl = document.getElementById('keyword-count');
+
+  const domain = domainSelect?.value;
+  if (!domain || !keywordsTextarea) return;
+
+  try {
+    const storageKey = `${domain}Keywords`;
+    const result = await chrome.storage.local.get(storageKey);
+    const allKeywords = result[storageKey] || {};
+    const keywords = allKeywords[currentKeywordCategory] || [];
+
+    keywordsTextarea.value = keywords.join('\n');
+    if (countEl) countEl.textContent = keywords.length;
+  } catch (error) {
+    console.error('[全局设置] 加载关键词失败:', error);
+    keywordsTextarea.value = '';
   }
 }

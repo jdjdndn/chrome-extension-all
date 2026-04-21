@@ -19,7 +19,8 @@
     'keyboard-click': true,     // 键盘快捷点击
     'panel-position-manager': true, // 面板位置管理
     'widen-page': false,           // 页面宽度扩展（默认关闭）
-    'tab-focus': true              // Tab激活时自动focus
+    'tab-focus': true,             // Tab激活时自动focus
+    'list-link-split-view': true   // 列表链接拆分视图
   };
 
   // 缓存的开关状态
@@ -127,7 +128,8 @@
     'keyboard-click': '键盘快捷点击',
     'panel-position-manager': '面板位置管理',
     'widen-page': '页面宽度扩展',
-    'tab-focus': 'Tab激活自动聚焦'
+    'tab-focus': 'Tab激活自动聚焦',
+    'list-link-split-view': '列表链接拆分视图'
   };
 
   console.log('[ScriptSwitch] 脚本开关模块已加载');

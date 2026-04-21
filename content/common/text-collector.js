@@ -307,9 +307,10 @@ if (window.TextCollectorLoaded) {
 
         .yc-panel-body {
           flex: 1;
-          overflow-y: overlay;
+          overflow-y: auto;
+          overflow-x: hidden;
           padding: 12px;
-          min-height: 150px;
+          min-height: 0;
           scrollbar-width: thin;
           scrollbar-color: #c1c1c1 transparent;
         }

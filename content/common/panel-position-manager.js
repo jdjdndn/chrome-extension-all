@@ -1,4 +1,4 @@
-// 面板位置管理器 v32
+// 面板位置管理器 v33
 // 功能：
 // 1. icon 松散排列在可视区右侧，不重叠
 // 2. 展开单个 panel 时独占 90% 空白可视区
@@ -8,6 +8,7 @@
 // 6. 位置信息记录到元素 data 属性，支持碰撞检测
 // 7. 内容遮挡检测：检测 icon/panel 是否遮挡页面内容
 // 8. 页面元素遮挡检测：检测页面上其他绝对定位元素的遮挡问题
+// 9. 智能避让：自动检测可点击元素，调整icon/panel位置避免遮挡
 
 'use strict';
 
@@ -17,7 +18,7 @@ if (!window.PanelPositionManager) {
     console.log('[面板位置管理器] 已禁用');
   } else {
     window.PanelPositionManager = {
-    STORAGE_KEY: 'yc-panel-position-manager-v32',
+    STORAGE_KEY: 'yc-panel-position-manager-v33',
 
     config: {
       iconWidth: 50,
@@ -49,6 +50,22 @@ if (!window.PanelPositionManager) {
       ignoredTags: ['HTML', 'BODY', 'HEAD'],
       // panel 最小重叠阈值（像素）
       minOverlapThreshold: 50,
+      // 智能避让配置
+      enableSmartAvoidance: true,     // 启用智能避让
+      clickableSelectors: [
+        'a', 'button', 'input', 'select', 'textarea',
+        '[role="button"]', '[role="link"]', '[role="checkbox"]',
+        '[onclick]', '[data-action]', '[data-href]',
+        '.btn', '.button', '.clickable', '.clickable-item',
+        '[tabindex]:not([tabindex="-1"])'
+      ],
+      // 遮挡检测间隔（毫秒）
+      occlusionCheckInterval: 2000,
+      // 允许遮挡的比例阈值（超过此比例则认为遮挡严重）
+      occlusionRatioThreshold: 0.3,
+      // icon位置搜索配置
+      iconPositionSearchSteps: 10,    // 搜索步数
+      iconPositionSearchStepY: 50,    // Y轴搜索步长
     },
 
     components: [],
@@ -60,6 +77,8 @@ if (!window.PanelPositionManager) {
     positionsFixed: false,
     pendingCalculate: null,
     iconOnLeftSide: false,
+    _occlusionCheckTimer: null,  // 遮挡检测定时器
+    _lastOcclusionReport: null,  // 上次遮挡报告
 
     // ==================== 初始化 ====================
 
@@ -71,7 +90,43 @@ if (!window.PanelPositionManager) {
         this._resizeTimer = setTimeout(() => this.scheduleCalculate(), 200);
       });
 
-      console.log('[位置管理器] v32 已加载（垂直布局 + 全方位遮挡检测）');
+      // 启动智能避让定时检测
+      if (this.config.enableSmartAvoidance) {
+        this.startOcclusionCheck();
+      }
+
+      console.log('[位置管理器] v33 已加载（垂直布局 + 全方位遮挡检测 + 智能避让）');
+    },
+
+    // 启动遮挡检测定时器
+    startOcclusionCheck() {
+      if (this._occlusionCheckTimer) return;
+
+      this._occlusionCheckTimer = setInterval(() => {
+        this.checkAndAdjustOcclusions();
+      }, this.config.occlusionCheckInterval);
+    },
+
+    // 停止遮挡检测定时器
+    stopOcclusionCheck() {
+      if (this._occlusionCheckTimer) {
+        clearInterval(this._occlusionCheckTimer);
+        this._occlusionCheckTimer = null;
+      }
+    },
+
+    // 检测并调整遮挡
+    checkAndAdjustOcclusions() {
+      if (!this.isPositionReady || this.isCalculating) return;
+
+      const report = this.checkAllOcclusions();
+      this._lastOcclusionReport = report;
+
+      // 如果有严重遮挡，尝试调整位置
+      if (report.criticalCount > 0 || report.highCount > 0) {
+        console.log('[位置管理器] 检测到遮挡，尝试调整位置');
+        this.adjustPositionsForOcclusions(report);
+      }
     },
 
     // ==================== 核心调度 ====================
@@ -156,19 +211,7 @@ if (!window.PanelPositionManager) {
       const headerHeight = this.detectFixedHeaderHeight();
       const startTop = Math.max(edgeMargin, headerHeight + edgeMargin);
 
-      // 第二步：计算 icon 位置（松散排列在右侧，避开 header）
-      let iconTop = startTop;
-      for (const c of visibleComponents) {
-        c._iconTop = iconTop;
-        iconTop += iconHeight + iconGap;
-      }
-
-      // 第三步：识别展开的面板
-      const expandedPanels = visibleComponents.filter(c => {
-        return !this.collapsedStates[c.id] && c.panelEl;
-      });
-
-      // 第四步：检测页面布局，计算面板可用空间
+      // 检测页面布局，计算面板可用空间
       const availableHeight = (vh - edgeMargin * 2) * spaceUsageRatio;
       const pageLayout = this.detectPageLayout();
 
@@ -198,6 +241,32 @@ if (!window.PanelPositionManager) {
 
       // 保存 icon 位置状态到实例（供拖拽约束使用）
       this.iconOnLeftSide = iconOnLeftSide;
+
+      // 第二步：计算 icon 位置（松散排列在右侧，避开 header + 智能避让）
+      let iconTop = startTop;
+      for (const c of visibleComponents) {
+        // 使用智能避让寻找最佳位置
+        if (this.config.enableSmartAvoidance) {
+          const bestPos = this.findBestIconPosition(iconTop, iconRight);
+          c._iconTop = bestPos.top;
+          c._iconRight = bestPos.right;
+          c._iconOnLeftSide = bestPos.onLeftSide;
+
+          if (bestPos.clickableCount > 0) {
+            console.log(`[位置管理器] ${c.id} icon避让${bestPos.clickableCount}个可点击元素`);
+          }
+        } else {
+          c._iconTop = iconTop;
+          c._iconRight = iconRight;
+          c._iconOnLeftSide = false;
+        }
+        iconTop += iconHeight + iconGap;
+      }
+
+      // 第三步：识别展开的面板
+      const expandedPanels = visibleComponents.filter(c => {
+        return !this.collapsedStates[c.id] && c.panelEl;
+      });
 
       // === Panel 位置计算 ===
       let panelRight = iconOnLeftSide ? scrollbarAwareEdge : iconRight + iconWidth + panelAvoidGap;
@@ -287,11 +356,12 @@ if (!window.PanelPositionManager) {
         const isCollapsed = this.collapsedStates[c.id];
         c._fixedPosition = { top: c._iconTop };
 
-        // 应用 icon 位置（使用布局检测结果）
+        // 应用 icon 位置（使用智能避让计算的位置）
         if (c.iconEl) {
+          const iconRightToUse = c._iconRight !== undefined ? c._iconRight : iconRight;
           c.iconEl.style.cssText = `
             position: fixed;
-            right: ${iconRight}px;
+            right: ${iconRightToUse}px;
             top: ${c._iconTop}px;
             left: auto;
             bottom: auto;
@@ -302,14 +372,14 @@ if (!window.PanelPositionManager) {
 
           // 记录 icon 位置信息到元素上，用于碰撞检测
           this.recordElementBounds(c.iconEl, 'icon', c.id, {
-            right: iconRight,
+            right: iconRightToUse,
             top: c._iconTop,
             width: iconWidth,
             height: iconHeight
           });
         }
 
-        // 应用 panel 位置
+        // 应用 panel 位置（使用智能避让）
         if (c.panelEl) {
           if (isCollapsed) {
             c.panelEl.style.display = 'none';
@@ -318,9 +388,34 @@ if (!window.PanelPositionManager) {
           } else {
             const pos = panelPositions.get(c.id);
             if (pos) {
+              // 智能避让：寻找最佳panel位置
+              let finalRight = pos.right;
+              let finalTop = pos.top;
+
+              if (this.config.enableSmartAvoidance && !pos.isUserCustomized) {
+                const panelWidth = pos.width;
+                const panelHeight = pos.height;
+                const bestPos = this.findBestPanelPosition(
+                  c.panelEl, pos.right, pos.top, panelWidth, panelHeight
+                );
+
+                // 只要找到更好的位置就使用（severity更低或overlapRatio更小）
+                const currentSeverity = this.evaluatePanelPosition(pos.right, pos.top, panelWidth, panelHeight, [c.panelEl]);
+                const severityOrder = { none: 0, low: 1, medium: 2, high: 3, critical: 4 };
+                const currentSeverityScore = severityOrder[currentSeverity.severity] || 0;
+                const bestSeverityScore = severityOrder[bestPos.severity] || 0;
+
+                if (bestSeverityScore < currentSeverityScore ||
+                    (bestSeverityScore === currentSeverityScore && bestPos.overlapRatio < currentSeverity.overlapRatio)) {
+                  finalRight = bestPos.right;
+                  finalTop = bestPos.top;
+                  console.log(`[位置管理器] ${c.id} panel位置优化: (${pos.right}, ${pos.top}) -> (${finalRight}, ${finalTop}), severity: ${currentSeverity.severity} -> ${bestPos.severity}`);
+                }
+              }
+
               c.panelEl.style.position = 'fixed';
-              c.panelEl.style.right = `${pos.right}px`;
-              c.panelEl.style.top = `${pos.top}px`;
+              c.panelEl.style.right = `${finalRight}px`;
+              c.panelEl.style.top = `${finalTop}px`;
               c.panelEl.style.left = 'auto';
               c.panelEl.style.bottom = 'auto';
               c.panelEl.style.zIndex = `${zIndexBase + zIndexPanel}`;
@@ -331,8 +426,8 @@ if (!window.PanelPositionManager) {
 
               // 记录 panel 位置信息到元素上，用于碰撞检测
               this.recordElementBounds(c.panelEl, 'panel', c.id, {
-                right: pos.right,
-                top: pos.top,
+                right: finalRight,
+                top: finalTop,
                 width: pos.width,
                 height: pos.height
               });
@@ -881,7 +976,7 @@ if (!window.PanelPositionManager) {
         return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
       }
 
-      return `[${tag}]`;
+      return `[${el.tagName}]`;
     },
 
     // 检测所有组件的遮挡情况
@@ -2055,7 +2150,7 @@ if (!window.PanelPositionManager) {
       const heights = this.calculatePanelHeights(expandedPanels, availableHeight);
 
       return {
-        version: 'v32',
+        version: 'v33',
         components: this.components.map(c => ({
           id: c.id,
           priority: c.priority,
@@ -2068,8 +2163,406 @@ if (!window.PanelPositionManager) {
         panelHeights: heights,
         spaceUsageRatio,
         positionsFixed: this.positionsFixed,
-        userPanelPositions: this.userPanelPositions
+        userPanelPositions: this.userPanelPositions,
+        lastOcclusionReport: this._lastOcclusionReport
       };
+    },
+
+    // ==================== 智能避让功能 ====================
+
+    /**
+     * 检测区域内的可点击元素
+     * @param {Object} bounds - { x, y, width, height } 或 { right, top, width, height }
+     * @returns {Array} 被遮挡的可点击元素列表
+     */
+    detectClickableElementsInArea(bounds) {
+      const vw = window.innerWidth;
+      const { width, height } = bounds;
+      const x = bounds.x !== undefined ? bounds.x : vw - bounds.right - width;
+      const y = bounds.y !== undefined ? bounds.y : bounds.top;
+
+      const clickableElements = [];
+      const selector = this.config.clickableSelectors.join(', ');
+
+      try {
+        const elements = document.querySelectorAll(selector);
+
+        for (const el of elements) {
+          // 跳过隐藏元素
+          if (this.isHiddenElement(el)) continue;
+
+          // 跳过我们自己的组件
+          if (el.closest('[id^="yc-"]')) continue;
+
+          const rect = el.getBoundingClientRect();
+
+          // 检测是否与目标区域重叠
+          if (rect.left < x + width && rect.right > x &&
+              rect.top < y + height && rect.bottom > y) {
+            clickableElements.push({
+              element: el,
+              tagName: el.tagName,
+              text: this.getElementPreview(el, 30),
+              rect: {
+                left: rect.left,
+                top: rect.top,
+                width: rect.width,
+                height: rect.height
+              }
+            });
+          }
+        }
+      } catch (e) {
+        // 忽略选择器错误
+      }
+
+      return clickableElements;
+    },
+
+    /**
+     * 为icon寻找最佳位置（避开可点击元素）
+     * @param {number} preferredTop - 首选的top位置
+     * @param {number} preferredRight - 首选的right位置
+     * @returns {Object} 最佳位置 { top, right, score }
+     */
+    findBestIconPosition(preferredTop, preferredRight) {
+      const vh = window.innerHeight;
+      const vw = window.innerWidth;
+      const { iconWidth, iconHeight, edgeMargin, iconPositionSearchSteps, iconPositionSearchStepY } = this.config;
+      const scrollbarWidth = this.getScrollbarWidth();
+
+      // 候选位置列表
+      const candidates = [];
+
+      // 1. 检测首选位置
+      const preferredClickable = this.detectClickableElementsInArea({
+        right: preferredRight,
+        top: preferredTop,
+        width: iconWidth,
+        height: iconHeight
+      });
+
+      candidates.push({
+        top: preferredTop,
+        right: preferredRight,
+        score: preferredClickable.length === 0 ? 100 : 100 - preferredClickable.length * 20,
+        clickableCount: preferredClickable.length,
+        clickableElements: preferredClickable
+      });
+
+      // 2. 搜索其他位置（向上或向下移动）
+      for (let i = 1; i <= iconPositionSearchSteps; i++) {
+        // 向下搜索
+        const topDown = preferredTop + i * iconPositionSearchStepY;
+        if (topDown + iconHeight <= vh - edgeMargin) {
+          const clickableDown = this.detectClickableElementsInArea({
+            right: preferredRight,
+            top: topDown,
+            width: iconWidth,
+            height: iconHeight
+          });
+          candidates.push({
+            top: topDown,
+            right: preferredRight,
+            score: clickableDown.length === 0 ? 100 - i : 100 - i - clickableDown.length * 20,
+            clickableCount: clickableDown.length,
+            clickableElements: clickableDown
+          });
+        }
+
+        // 向上搜索
+        const topUp = preferredTop - i * iconPositionSearchStepY;
+        if (topUp >= edgeMargin) {
+          const clickableUp = this.detectClickableElementsInArea({
+            right: preferredRight,
+            top: topUp,
+            width: iconWidth,
+            height: iconHeight
+          });
+          candidates.push({
+            top: topUp,
+            right: preferredRight,
+            score: clickableUp.length === 0 ? 100 - i : 100 - i - clickableUp.length * 20,
+            clickableCount: clickableUp.length,
+            clickableElements: clickableUp
+          });
+        }
+      }
+
+      // 3. 如果右侧所有位置都有遮挡，尝试左侧
+      const leftRight = edgeMargin + scrollbarWidth;
+      for (let i = 0; i <= iconPositionSearchSteps; i++) {
+        const top = preferredTop + i * iconPositionSearchStepY;
+        if (top + iconHeight <= vh - edgeMargin) {
+          const clickableLeft = this.detectClickableElementsInArea({
+            right: leftRight,
+            top: top,
+            width: iconWidth,
+            height: iconHeight
+          });
+          candidates.push({
+            top: top,
+            right: leftRight,
+            score: clickableLeft.length === 0 ? 90 - i : 90 - i - clickableLeft.length * 20,
+            clickableCount: clickableLeft.length,
+            clickableElements: clickableLeft,
+            onLeftSide: true
+          });
+        }
+      }
+
+      // 4. 排序并返回最佳位置
+      candidates.sort((a, b) => b.score - a.score);
+
+      const best = candidates[0];
+      return {
+        top: best.top,
+        right: best.right,
+        score: best.score,
+        clickableCount: best.clickableCount,
+        onLeftSide: best.onLeftSide || false
+      };
+    },
+
+    /**
+     * 为panel寻找最佳位置（避开重要内容）
+     * @param {Object} panelEl - panel元素
+     * @param {number} preferredRight - 首选的right位置
+     * @param {number} preferredTop - 首选的top位置
+     * @param {number} width - panel宽度
+     * @param {number} height - panel高度
+     * @returns {Object} 最佳位置 { right, top, score }
+     */
+    findBestPanelPosition(panelEl, preferredRight, preferredTop, width, height) {
+      const vh = window.innerHeight;
+      const vw = window.innerWidth;
+      const { edgeMargin, searchStepX, searchStepY, maxSearchAttempts, iconWidth, panelAvoidGap } = this.config;
+      const scrollbarWidth = this.getScrollbarWidth();
+
+      // 排除自身
+      const excludeElements = [panelEl];
+
+      // 候选位置列表
+      const candidates = [];
+
+      // 1. 评估首选位置
+      const preferredScore = this.evaluatePanelPosition(preferredRight, preferredTop, width, height, excludeElements);
+      candidates.push({
+        right: preferredRight,
+        top: preferredTop,
+        ...preferredScore
+      });
+
+      // 如果首选位置有遮挡，记录日志
+      if (preferredScore.severity !== 'none') {
+        console.log(`[位置管理器] panel首选位置有遮挡: severity=${preferredScore.severity}, ratio=${(preferredScore.overlapRatio * 100).toFixed(1)}%, elements=${preferredScore.elementCount}`);
+      }
+
+      // 2. 搜索其他位置
+      let attempts = 0;
+
+      // 向左搜索（right增大）
+      for (let right = preferredRight + searchStepX; right <= vw - width - edgeMargin && attempts < maxSearchAttempts; right += searchStepX) {
+        const score = this.evaluatePanelPosition(right, preferredTop, width, height, excludeElements);
+        candidates.push({ right, top: preferredTop, ...score });
+        attempts++;
+      }
+
+      // 向上搜索
+      for (let top = preferredTop - searchStepY; top >= edgeMargin && attempts < maxSearchAttempts; top -= searchStepY) {
+        const score = this.evaluatePanelPosition(preferredRight, top, width, height, excludeElements);
+        candidates.push({ right: preferredRight, top, ...score });
+        attempts++;
+      }
+
+      // 向下搜索
+      for (let top = preferredTop + searchStepY; top <= vh - height - edgeMargin && attempts < maxSearchAttempts; top += searchStepY) {
+        const score = this.evaluatePanelPosition(preferredRight, top, width, height, excludeElements);
+        candidates.push({ right: preferredRight, top, ...score });
+        attempts++;
+      }
+
+      // 3. 排序：优先选择遮挡最少的
+      candidates.sort((a, b) => {
+        // 先按严重程度排序
+        const severityOrder = { none: 0, low: 1, medium: 2, high: 3, critical: 4 };
+        const severityDiff = severityOrder[a.severity] - severityOrder[b.severity];
+        if (severityDiff !== 0) return severityDiff;
+        // 再按重叠比例排序
+        return a.overlapRatio - b.overlapRatio;
+      });
+
+      return candidates[0];
+    },
+
+    /**
+     * 评估panel位置质量
+     */
+    evaluatePanelPosition(right, top, width, height, excludeElements) {
+      const vw = window.innerWidth;
+      const x = vw - right - width;
+
+      const result = this.sampleOccludedElements(x, top, width, height, excludeElements);
+
+      // 计算严重程度
+      let severity = 'none';
+      if (result.elements.length > 0) {
+        const hasCritical = result.elements.some(el => el.importance === 'critical');
+        const hasHigh = result.elements.some(el => el.importance === 'high');
+        const hasMedium = result.elements.some(el => el.importance === 'medium');
+        severity = hasCritical ? 'critical' : hasHigh ? 'high' : hasMedium ? 'medium' : 'low';
+      }
+
+      return {
+        overlapRatio: result.ratio,
+        elementCount: result.elements.length,
+        severity,
+        elements: result.elements
+      };
+    },
+
+    /**
+     * 根据遮挡报告调整位置
+     * @param {Object} report - 遮挡检测报告
+     */
+    adjustPositionsForOcclusions(report) {
+      for (const compReport of report.components) {
+        if (!compReport.hasOcclusion) continue;
+
+        const c = this.components.find(c => c.id === compReport.id);
+        if (!c) continue;
+
+        // 如果是用户自定义位置，不自动调整
+        if (c.userCustomizedPanel) continue;
+
+        // 调整icon位置
+        if (compReport.icon && compReport.icon.hasOcclusion) {
+          const iconBounds = this.getElementBounds(c.iconEl);
+          if (iconBounds) {
+            const bestPos = this.findBestIconPosition(iconBounds.top, iconBounds.right);
+            if (bestPos.score > 50) {  // 只在找到更好位置时调整
+              c.iconEl.style.top = `${bestPos.top}px`;
+              c.iconEl.style.right = `${bestPos.right}px`;
+
+              // 更新记录
+              this.recordElementBounds(c.iconEl, 'icon', c.id, {
+                right: bestPos.right,
+                top: bestPos.top,
+                width: this.config.iconWidth,
+                height: this.config.iconHeight
+              });
+
+              console.log(`[位置管理器] 调整 ${c.id} icon位置: top=${bestPos.top}, right=${bestPos.right}`);
+            }
+          }
+        }
+
+        // 调整panel位置（仅展开时）
+        if (compReport.panel && compReport.panel.hasOcclusion && !this.collapsedStates[c.id]) {
+          const panelBounds = this.getElementBounds(c.panelEl);
+          if (panelBounds) {
+            const bestPos = this.findBestPanelPosition(
+              c.panelEl,
+              panelBounds.right,
+              panelBounds.top,
+              panelBounds.width,
+              panelBounds.height
+            );
+
+            if (bestPos.severity !== 'critical' && bestPos.overlapRatio < compReport.panel.overlapRatio) {
+              c.panelEl.style.right = `${bestPos.right}px`;
+              c.panelEl.style.top = `${bestPos.top}px`;
+
+              // 更新记录
+              this.recordElementBounds(c.panelEl, 'panel', c.id, {
+                right: bestPos.right,
+                top: bestPos.top,
+                width: panelBounds.width,
+                height: panelBounds.height
+              });
+
+              console.log(`[位置管理器] 调整 ${c.id} panel位置: top=${bestPos.top}, right=${bestPos.right}`);
+            }
+          }
+        }
+      }
+    },
+
+    /**
+     * 手动触发位置优化
+     */
+    optimizePositions() {
+      console.log('[位置管理器] 手动触发位置优化');
+      this.positionsFixed = false;
+      this.scheduleCalculate();
+
+      // 同时检测遮挡
+      const report = this.checkAllOcclusions();
+      if (report.totalOcclusions > 0) {
+        this.adjustPositionsForOcclusions(report);
+      }
+    },
+
+    /**
+     * 获取遮挡报告（供控制台调试）
+     */
+    getOcclusionReport() {
+      const report = this.checkAllOcclusions();
+      console.log('=== 遮挡检测报告 ===');
+      console.log(`总遮挡数: ${report.totalOcclusions}`);
+      console.log(`严重遮挡: ${report.criticalCount}`);
+      console.log(`高度遮挡: ${report.highCount}`);
+
+      for (const comp of report.components) {
+        if (comp.hasOcclusion) {
+          console.log(`\n组件: ${comp.id}`);
+          console.log(`  严重程度: ${comp.severity}`);
+          if (comp.icon) {
+            console.log(`  icon遮挡: ${comp.icon.overlapRatio * 100}%`);
+          }
+          if (comp.panel) {
+            console.log(`  panel遮挡: ${comp.panel.overlapRatio * 100}%`);
+          }
+        }
+      }
+      console.log('===================');
+      return report;
+    },
+
+    /**
+     * 高亮显示可点击元素（调试用）
+     */
+    highlightClickableElements() {
+      const selector = this.config.clickableSelectors.join(', ');
+      const elements = document.querySelectorAll(selector);
+      let count = 0;
+
+      elements.forEach(el => {
+        if (this.isHiddenElement(el)) return;
+        if (el.closest('[id^="yc-"]')) return;
+
+        el.style.outline = '2px dashed red';
+        el.style.outlineOffset = '2px';
+        count++;
+      });
+
+      console.log(`[位置管理器] 高亮了 ${count} 个可点击元素`);
+      return count;
+    },
+
+    /**
+     * 清除高亮
+     */
+    clearHighlight() {
+      const selector = this.config.clickableSelectors.join(', ');
+      const elements = document.querySelectorAll(selector);
+
+      elements.forEach(el => {
+        el.style.outline = '';
+        el.style.outlineOffset = '';
+      });
+
+      console.log('[位置管理器] 已清除高亮');
     }
   };
 

@@ -70,6 +70,11 @@ registerL4InitCallbacks();
 // ========== Inject Page Context Script ==========
 // Inject the script into the page context to intercept XHR/Fetch at page level
 function injectPageScript() {
+  // 环境检查
+  if (!chrome?.runtime?.getURL) {
+    console.warn('[Content] 非 Chrome 扩展环境，跳过注入');
+    return;
+  }
   // Check if already injected to avoid duplicate injection
   if (window._injectScriptInjected) return;
   window._injectScriptInjected = true;
@@ -268,7 +273,7 @@ console.log('[Content] 隐藏元素功能已注册为懒初始化');
 // Expose API
 window.ExtensionAPI = {
   isEnabled: () => settings.enabled,
-  getVersion: () => chrome.runtime.getManifest().version,
+  getVersion: () => chrome?.runtime?.getManifest?.()?.version || 'unknown',
 };
 
 // Initialize
