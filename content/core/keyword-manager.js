@@ -268,7 +268,7 @@
      * 检查文本是否匹配关键词
      */
     match(text, options = {}) {
-      const { site, types, includeGlobal = true } = options;
+      const { site, types, includeGlobal = true, notify = false } = options;
       const normalizedText = this._normalize(text);
       const matchedKeywords = [];
 
@@ -303,7 +303,44 @@
         }
       }
 
+      // 触发通知
+      if (notify && matchedKeywords.length > 0) {
+        this._triggerNotification(matchedKeywords, text);
+      }
+
       return matchedKeywords;
+    },
+
+    /**
+     * 触发关键词匹配通知
+     */
+    async _triggerNotification(matchedKeywords, text) {
+      try {
+        const keywordList = matchedKeywords.map(m => m.keyword).join(', ');
+        const message = `匹配到 ${matchedKeywords.length} 个关键词: ${keywordList}`;
+
+        // 使用 MessagingUtils 发送通知
+        if (typeof MessagingUtils !== 'undefined' && MessagingUtils.sendToBackground) {
+          await MessagingUtils.sendToBackground({
+            type: 'ADD_NOTIFICATION',
+            notification: {
+              type: 'keyword_match',
+              title: '关键词匹配',
+              message,
+              timestamp: Date.now(),
+              data: {
+                keywords: matchedKeywords,
+                textPreview: text.slice(0, 100)
+              }
+            }
+          });
+        }
+      } catch (error) {
+        // 静默失败，不影响主流程
+        if (!error.message?.includes('Extension context invalidated')) {
+          console.warn('[KeywordManager] 通知发送失败:', error.message);
+        }
+      }
     },
 
     // ========== 导入导出 ==========

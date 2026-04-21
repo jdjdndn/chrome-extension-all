@@ -2054,6 +2054,96 @@ async function handleMessage(message, sender, sendResponse) {
       }
       break;
 
+    // ========== 剪贴板历史记录 ==========
+    case 'RECORD_CLIPBOARD':
+      if (message.text) {
+        // 存储剪贴板历史
+        const result = await chrome.storage.local.get('clipboardHistory');
+        const history = result.clipboardHistory || [];
+
+        // 添加新记录（避免重复）
+        const newEntry = {
+          text: message.text,
+          timestamp: message.timestamp || Date.now(),
+          url: message.url || ''
+        };
+
+        // 检查是否与最近一条重复
+        if (history.length > 0 && history[0].text === message.text) {
+          sendResponse({ success: true, duplicate: true });
+          break;
+        }
+
+        // 添加到开头，限制历史数量
+        history.unshift(newEntry);
+        if (history.length > 100) {
+          history.pop();
+        }
+
+        await chrome.storage.local.set({ clipboardHistory: history });
+        console.log('[Background] 剪贴板已记录, 当前历史数:', history.length);
+        sendResponse({ success: true, count: history.length });
+      } else {
+        sendResponse({ success: false, error: 'Missing text' });
+      }
+      break;
+
+    case 'GET_CLIPBOARD_HISTORY':
+      {
+        const result = await chrome.storage.local.get('clipboardHistory');
+        sendResponse({ success: true, history: result.clipboardHistory || [] });
+      }
+      break;
+
+    case 'CLEAR_CLIPBOARD_HISTORY':
+      await chrome.storage.local.set({ clipboardHistory: [] });
+      sendResponse({ success: true });
+      break;
+
+    // ========== 通知管理 ==========
+    case 'ADD_NOTIFICATION':
+      if (message.message) {
+        const result = await chrome.storage.local.get('notifications');
+        const notifications = result.notifications || [];
+        notifications.unshift({
+          message: message.message,
+          type: message.type || 'info',
+          time: Date.now(),
+          read: false
+        });
+        // 最多保留20条
+        await chrome.storage.local.set({ notifications: notifications.slice(0, 20) });
+        console.log('[Background] 通知已添加:', message.message);
+        sendResponse({ success: true });
+      } else {
+        sendResponse({ success: false, error: 'Missing message' });
+      }
+      break;
+
+    case 'GET_NOTIFICATIONS':
+      {
+        const result = await chrome.storage.local.get('notifications');
+        sendResponse({ success: true, notifications: result.notifications || [] });
+      }
+      break;
+
+    case 'MARK_NOTIFICATION_READ':
+      {
+        const result = await chrome.storage.local.get('notifications');
+        const notifications = result.notifications || [];
+        if (notifications[message.index]) {
+          notifications[message.index].read = true;
+          await chrome.storage.local.set({ notifications });
+        }
+        sendResponse({ success: true });
+      }
+      break;
+
+    case 'CLEAR_NOTIFICATIONS':
+      await chrome.storage.local.set({ notifications: [] });
+      sendResponse({ success: true });
+      break;
+
     default:
       console.warn('Unknown message type:', message.type);
       sendResponse({ error: 'Unknown message type' });

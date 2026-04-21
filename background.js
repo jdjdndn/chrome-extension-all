@@ -2100,6 +2100,50 @@ async function handleMessage(message, sender, sendResponse) {
       sendResponse({ success: true });
       break;
 
+    // ========== 通知管理 ==========
+    case 'ADD_NOTIFICATION':
+      if (message.message) {
+        const result = await chrome.storage.local.get('notifications');
+        const notifications = result.notifications || [];
+        notifications.unshift({
+          message: message.message,
+          type: message.type || 'info',
+          time: Date.now(),
+          read: false
+        });
+        // 最多保留20条
+        await chrome.storage.local.set({ notifications: notifications.slice(0, 20) });
+        console.log('[Background] 通知已添加:', message.message);
+        sendResponse({ success: true });
+      } else {
+        sendResponse({ success: false, error: 'Missing message' });
+      }
+      break;
+
+    case 'GET_NOTIFICATIONS':
+      {
+        const result = await chrome.storage.local.get('notifications');
+        sendResponse({ success: true, notifications: result.notifications || [] });
+      }
+      break;
+
+    case 'MARK_NOTIFICATION_READ':
+      {
+        const result = await chrome.storage.local.get('notifications');
+        const notifications = result.notifications || [];
+        if (notifications[message.index]) {
+          notifications[message.index].read = true;
+          await chrome.storage.local.set({ notifications });
+        }
+        sendResponse({ success: true });
+      }
+      break;
+
+    case 'CLEAR_NOTIFICATIONS':
+      await chrome.storage.local.set({ notifications: [] });
+      sendResponse({ success: true });
+      break;
+
     default:
       console.warn('Unknown message type:', message.type);
       sendResponse({ error: 'Unknown message type' });
