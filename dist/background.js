@@ -667,13 +667,18 @@ function setupEventListeners() {
 
   // Listen for messages from other extension components
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    // 调试：记录所有收到的消息（带时间戳和来源）
+    console.log('[Background] 收到消息:', message?.type, message, 'sender:', sender?.tab?.url || 'unknown');
+
     // 如果是 EventBus 消息，让 EventBus 处理器处理
     if (message && message.__eventbus__) {
+      console.log('[Background] 这是 EventBus 消息，跳过');
       // EventBus 已经在 Transport.onMessage 中注册了监听器
       // 这里只需要返回 false，让其他监听器有机会处理
       return false;
     }
 
+    console.log('[Background] 非 EventBus 消息，交给 handleMessage 处理');
     // 非 EventBus 消息，使用原有的 handleMessage
     handleMessage(message, sender, sendResponse);
     return true; // Keep message channel open for async responses
@@ -1029,27 +1034,57 @@ async function markTabsForLazyInjection() {
 // 在 tab 激活时注入脚本
 async function injectScriptsOnTabActivate(tabId) {
   try {
-    const result = await chrome.storage.local.get(['injectedTabs', 'pendingInjectionTabs']);
-    const injectedTabs = result.injectedTabs || {};
-    const pendingTabs = result.pendingInjectionTabs || {};
-    const tabKey = String(tabId);
-
-    // 如果已经注入过，跳过
-    if (injectedTabs[tabKey]) {
-      return;
-    }
-
     // 获取 tab 信息
     const tab = await chrome.tabs.get(tabId);
     if (!tab || !tab.url || !tab.url.startsWith('http')) {
       return;
     }
 
-    // Tab 未注入过，尝试注入（不要求在 pendingTabs 中，覆盖启动时 URL 未就绪的情况）
-    console.log(`[Background] Tab ${tabId} 激活，开始注入脚本`);
+    // 排除受保护页面
+    const protectedPatterns = [
+      'chrome.google.com/webstore',
+      'chromewebstore.google.com'
+    ];
+    const isProtected = protectedPatterns.some(pattern => tab.url?.includes(pattern));
+    if (isProtected) {
+      return;
+    }
+
+    // 检查错误页面
+    if (tab.url.startsWith('chrome-error://') || tab.url === 'about:blank') {
+      return;
+    }
+
+    // 实际检查页面中脚本是否已注入（而非仅依赖 storage 记录）
+    // 这解决了浏览器重启后 storage 记录存在但脚本实际未注入的问题
+    try {
+      const checkResult = await chrome.scripting.executeScript({
+        target: { tabId },
+        func: () => typeof window.ExtensionAPI !== 'undefined'
+      });
+
+      if (checkResult && checkResult[0]?.result) {
+        // 脚本已注入，更新记录并跳过
+        const result = await chrome.storage.local.get(['injectedTabs']);
+        const injectedTabs = result.injectedTabs || {};
+        injectedTabs[String(tabId)] = Date.now();
+        await chrome.storage.local.set({ injectedTabs });
+        return;
+      }
+    } catch (checkError) {
+      // 无法检查（可能是错误页面），跳过
+      return;
+    }
+
+    // 脚本未注入，执行注入
+    console.log(`[Background] Tab ${tabId} 激活，检测到脚本未注入，开始注入`);
     await injectAllScriptsForTab(tabId, tab.url);
 
     // 更新记录
+    const result = await chrome.storage.local.get(['injectedTabs', 'pendingInjectionTabs']);
+    const injectedTabs = result.injectedTabs || {};
+    const pendingTabs = result.pendingInjectionTabs || {};
+    const tabKey = String(tabId);
     injectedTabs[tabKey] = Date.now();
     delete pendingTabs[tabKey];
     await chrome.storage.local.set({ injectedTabs, pendingInjectionTabs: pendingTabs });
@@ -1963,6 +1998,43 @@ async function handleMessage(message, sender, sendResponse) {
       sendResponse({ success: true });
       break;
 
+    // 在侧边栏/拆分视图中打开链接
+    case 'OPEN_IN_SIDE_PANEL':
+      console.log('[Background] 收到 OPEN_IN_SIDE_PANEL:', message.url);
+      (async () => {
+        try {
+          // 获取当前窗口信息
+          const currentWindow = await chrome.windows.getCurrent();
+          const screenWidth = currentWindow.width || 1920;
+          const screenHeight = currentWindow.height || 1080;
+          const left = currentWindow.left || 0;
+          const top = currentWindow.top || 0;
+
+          // 创建侧边窗口（模拟拆分视图效果）
+          // 宽度约为屏幕的 30%，最小 400px
+          const panelWidth = Math.max(400, Math.floor(screenWidth * 0.3));
+
+          await chrome.windows.create({
+            url: message.url,
+            type: 'popup',
+            width: panelWidth,
+            height: screenHeight,
+            left: left + screenWidth - panelWidth,
+            top: top,
+            focused: true
+          });
+
+          console.log('[Background] 已在侧边窗口打开:', message.url);
+          sendResponse({ success: true, method: 'sideWindow' });
+        } catch (error) {
+          console.error('[Background] OPEN_IN_SIDE_PANEL 失败:', error);
+          // 出错时回退到新标签页
+          chrome.tabs.create({ url: message.url });
+          sendResponse({ success: true, method: 'newTab' });
+        }
+      })();
+      return true; // 保持消息通道开放
+
     // ========== 统计数据消息处理 ==========
     case 'GET_STATS':
       sendResponse({ success: true, stats: getStats() });
@@ -2165,6 +2237,7 @@ self.addEventListener('activate', () => {
 // });
 
 // Initialize when service worker starts
+console.log('[Background] 脚本开始执行，准备初始化...');
 initialize();
 
 // ========== 添加到新标签页功能 ==========

@@ -244,6 +244,7 @@ function getElementInfo() {
         }
 
         // Generate CSS selector (ensure exact match)
+        // 支持 DEFAULT_HIDE_SELECTORS 的高级模式
         function generateSelector(targetElement) {
           if (!targetElement) return '';
           if (targetElement === document.body) return 'body';
@@ -255,35 +256,48 @@ function getElementInfo() {
           const getClasses = (node) => {
             if (!node.className || typeof node.className !== 'string') return [];
             return node.className.trim().split(' ').filter(c => {
-              if (!c || /^[0-9]/.test(c) || /^(css-|styled|sc-|js-)/.test(c)) return false;
-              return /^[a-zA-Z_-][a-zA-Z0-9_-]*$/.test(c);
+              if (!c || /^[0-9]/.test(c)) return false;
+              // 过滤动态生成的 class
+              if (/^(css-|styled-|sc-|js-|_|__|Mui|jss|css_|_|ng-|React|react|vue-|v-)/.test(c)) return false;
+              if (c.length > 40) return false;
+              return /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(c);
             });
           };
 
+          // 高优先级测试属性
+          const TEST_ATTRS = ['data-testid', 'data-test', 'data-cy', 'data-test-id', 'data-qa', 'data-automation-id'];
+
+          // 稳定属性
+          const STABLE_ATTRS = ['type', 'role', 'data-type', 'data-role', 'data-kind', 'data-variant', 'data-size', 'data-id', 'name', 'disabled', 'readonly', 'required', 'checked'];
+
           const getUsefulAttributes = (node) => {
             if (!node.attributes) return [];
-            // 排除：样式属性、事件属性、内容属性（每个元素都不同的）
-            const skipAttrs = [
-              // 事件属性
-              'onclick', 'onchange', 'onsubmit', 'oninput', 'onfocus', 'onblur',
-              // 基础属性
-              'id', 'class', 'style',
-              // 内容属性（每个元素不同）
-              'title', 'alt', 'aria-label', 'aria-describedby', 'aria-labelledby',
-              'placeholder', 'value', 'name', 'href', 'src', 'data-tooltip',
-              // 状态/交互属性（不稳定）
-              'tabindex', 'role', 'disabled', 'type'
-            ];
+            const skipAttrs = ['onclick', 'onchange', 'onsubmit', 'oninput', 'onfocus', 'onblur', 'id', 'class', 'style', 'title', 'alt', 'aria-label', 'aria-describedby', 'aria-labelledby', 'placeholder', 'value', 'name', 'href', 'src', 'data-tooltip', 'tabindex'];
             const attrs = [];
             for (const attr of node.attributes) {
               if (skipAttrs.includes(attr.name.toLowerCase())) continue;
-              if (!attr.value || attr.value.length > 50 || /^\\d+$/.test(attr.value)) continue;
+              if (!attr.value || attr.value.length > 80 || /^\\d+$/.test(attr.value)) continue;
               attrs.push({ name: attr.name, value: attr.value });
             }
+            // 按优先级排序：测试属性 > 稳定属性 > 其他
+            attrs.sort((a, b) => {
+              const aIsTest = TEST_ATTRS.includes(a.name) ? 0 : 1;
+              const bIsTest = TEST_ATTRS.includes(b.name) ? 0 : 1;
+              if (aIsTest !== bIsTest) return aIsTest - bIsTest;
+              const aIsStable = STABLE_ATTRS.includes(a.name) ? 0 : 1;
+              const bIsStable = STABLE_ATTRS.includes(b.name) ? 0 : 1;
+              return aIsStable - bIsStable;
+            });
             return attrs;
           };
 
-          // Get nth-of-type index (among same tag siblings)
+          const getNthChild = (node) => {
+            const parent = node.parentElement;
+            if (!parent) return 0;
+            const siblings = Array.from(parent.children);
+            return siblings.length > 1 ? siblings.indexOf(node) + 1 : 0;
+          };
+
           const getNthOfType = (node) => {
             const parent = node.parentElement;
             if (!parent) return 0;
@@ -300,52 +314,427 @@ function getElementInfo() {
             return found.length === 1 && found[0] === target;
           };
 
-          // === Strategy 1: ID ===
-          if (hasValidId(targetElement)) {
-            const sel = '#' + CSS.escape(targetElement.id);
-            if (isExactMatch(sel, targetElement)) return sel;
-          }
-
-          // === Strategy 2: Single class ===
           const tag = targetElement.tagName.toLowerCase();
           const classes = getClasses(targetElement);
-          for (const cls of classes) {
-            const sel = '.' + CSS.escape(cls);
-            if (isExactMatch(sel, targetElement)) return sel;
-            const tagCls = tag + '.' + CSS.escape(cls);
-            if (isExactMatch(tagCls, targetElement)) return tagCls;
-          }
-
-          // === Strategy 3: Attribute selector ===
           const attrs = getUsefulAttributes(targetElement);
-          for (const attr of attrs) {
-            const sel = '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]';
-            if (isExactMatch(sel, targetElement)) return sel;
-            const tagAttr = tag + '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]';
-            if (isExactMatch(tagAttr, targetElement)) return tagAttr;
+          const nthChild = getNthChild(targetElement);
+          const nthOfType = getNthOfType(targetElement);
+
+          // === 收集所有候选选择器 ===
+          const candidates = [];
+
+          // === Level 1: 最简单的选择器 ===
+
+          // 1.1 测试属性（最高优先级）
+          for (const testAttr of TEST_ATTRS) {
+            const attr = attrs.find(a => a.name === testAttr);
+            if (attr) {
+              candidates.push('[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]');
+              candidates.push(tag + '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]');
+            }
           }
 
-          // === Strategy 4: class + attr combination ===
+          // 1.2 ID
+          if (hasValidId(targetElement)) {
+            candidates.push('#' + CSS.escape(targetElement.id));
+          }
+
+          // 1.3 role 属性
+          const roleAttr = attrs.find(a => a.name === 'role');
+          if (roleAttr) {
+            candidates.push(tag + '[role="' + CSS.escape(roleAttr.value) + '"]');
+          }
+
+          // 1.4 单个 class
+          for (const cls of classes) {
+            candidates.push('.' + CSS.escape(cls));
+            candidates.push(tag + '.' + CSS.escape(cls));
+          }
+
+          // 1.5 其他属性
+          for (const attr of attrs.slice(0, 3)) {
+            if (!TEST_ATTRS.includes(attr.name) && attr.name !== 'role') {
+              candidates.push('[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]');
+              candidates.push(tag + '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]');
+            }
+          }
+
+          // 测试 Level 1
+          for (const sel of candidates) {
+            if (isExactMatch(sel, targetElement)) return sel;
+          }
+
+          // === Level 2: 双 class 组合 ===
+          if (classes.length >= 2) {
+            const sel = tag + '.' + classes.slice(0, 2).map(c => CSS.escape(c)).join('.');
+            if (isExactMatch(sel, targetElement)) return sel;
+            // 尝试不带 tag
+            const sel2 = '.' + classes.slice(0, 2).map(c => CSS.escape(c)).join('.');
+            if (isExactMatch(sel2, targetElement)) return sel2;
+          }
+
+          // === Level 3: class + 属性组合 ===
           if (classes.length > 0 && attrs.length > 0) {
-            for (const cls of classes) {
-              for (const attr of attrs) {
+            for (const cls of classes.slice(0, 2)) {
+              for (const attr of attrs.slice(0, 2)) {
                 const sel = tag + '.' + CSS.escape(cls) + '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]';
                 if (isExactMatch(sel, targetElement)) return sel;
               }
             }
           }
 
-          // === Strategy 5: Multiple classes ===
-          if (classes.length >= 2) {
-            const sel = tag + '.' + classes.map(c => CSS.escape(c)).join('.');
+          // === Level 4: 多 class 组合（3个） ===
+          if (classes.length >= 3) {
+            const sel = tag + '.' + classes.slice(0, 3).map(c => CSS.escape(c)).join('.');
             if (isExactMatch(sel, targetElement)) return sel;
           }
 
-          // === Strategy 6: Build full path ===
+          // === Level 5: 结构伪类 ===
+          const parent = targetElement.parentElement;
+          if (parent) {
+            const siblings = Array.from(parent.children);
+            const sameTypeSiblings = siblings.filter(c => c.tagName === targetElement.tagName);
+
+            // :first-child
+            if (targetElement === siblings[0]) {
+              const sel = tag + ':first-child';
+              if (isExactMatch(sel, targetElement)) return sel;
+              if (classes.length > 0) {
+                const sel2 = tag + '.' + CSS.escape(classes[0]) + ':first-child';
+                if (isExactMatch(sel2, targetElement)) return sel2;
+              }
+            }
+
+            // :last-child
+            if (targetElement === siblings[siblings.length - 1]) {
+              const sel = tag + ':last-child';
+              if (isExactMatch(sel, targetElement)) return sel;
+              if (classes.length > 0) {
+                const sel2 = tag + '.' + CSS.escape(classes[0]) + ':last-child';
+                if (isExactMatch(sel2, targetElement)) return sel2;
+              }
+            }
+
+            // :only-child
+            if (siblings.length === 1) {
+              const sel = tag + ':only-child';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+
+            // :first-of-type
+            if (targetElement === sameTypeSiblings[0] && sameTypeSiblings.length > 1) {
+              const sel = tag + ':first-of-type';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+
+            // :last-of-type
+            if (targetElement === sameTypeSiblings[sameTypeSiblings.length - 1] && sameTypeSiblings.length > 1) {
+              const sel = tag + ':last-of-type';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+
+            // :only-of-type
+            if (sameTypeSiblings.length === 1) {
+              const sel = tag + ':only-of-type';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+
+            // :nth-child
+            if (nthChild > 0) {
+              const sel = tag + ':nth-child(' + nthChild + ')';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+
+            // :nth-of-type
+            if (nthOfType > 0) {
+              const sel = tag + ':nth-of-type(' + nthOfType + ')';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+
+            // class + nth-of-type
+            if (classes.length > 0 && nthOfType > 0) {
+              const sel = tag + '.' + CSS.escape(classes[0]) + ':nth-of-type(' + nthOfType + ')';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+
+            // class + nth-child
+            if (classes.length > 0 && nthChild > 0) {
+              const sel = tag + '.' + CSS.escape(classes[0]) + ':nth-child(' + nthChild + ')';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+          }
+
+          // === Level 6: 兄弟选择器 ===
+          const prevSibling = targetElement.previousElementSibling;
+          const nextSibling = targetElement.nextElementSibling;
+
+          if (prevSibling) {
+            // 尝试用前一个兄弟 + 兄弟选择器
+            const prevTag = prevSibling.tagName.toLowerCase();
+            const prevClasses = getClasses(prevSibling);
+
+            // prev + target
+            const sel1 = prevTag + ' + ' + tag;
+            if (isExactMatch(sel1, targetElement)) return sel1;
+
+            // prev.class + target
+            if (prevClasses.length > 0) {
+              const sel2 = prevTag + '.' + CSS.escape(prevClasses[0]) + ' + ' + tag;
+              if (isExactMatch(sel2, targetElement)) return sel2;
+            }
+
+            // prev + target.class
+            if (classes.length > 0) {
+              const sel3 = prevTag + ' + ' + tag + '.' + CSS.escape(classes[0]);
+              if (isExactMatch(sel3, targetElement)) return sel3;
+            }
+
+            // prev.class + target.class
+            if (prevClasses.length > 0 && classes.length > 0) {
+              const sel4 = prevTag + '.' + CSS.escape(prevClasses[0]) + ' + ' + tag + '.' + CSS.escape(classes[0]);
+              if (isExactMatch(sel4, targetElement)) return sel4;
+            }
+          }
+
+          // === Level 7: 属性包含选择器 ===
+          for (const cls of classes.slice(0, 3)) {
+            // 尝试不同长度的子串
+            for (let len = Math.min(cls.length, 8); len >= 3; len--) {
+              for (let start = 0; start <= cls.length - len; start++) {
+                const substr = cls.substring(start, start + len);
+                const sel = tag + '[class*="' + substr + '"]';
+                if (isExactMatch(sel, targetElement)) return sel;
+              }
+            }
+          }
+
+          // === Level 8: 属性前缀/后缀选择器 ===
+          for (const cls of classes.slice(0, 2)) {
+            // 前缀
+            for (let len = Math.min(cls.length, 8); len >= 3; len--) {
+              const prefix = cls.substring(0, len);
+              const sel = tag + '[class^="' + prefix + '"]';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+            // 后缀
+            for (let len = Math.min(cls.length, 8); len >= 3; len--) {
+              const suffix = cls.substring(cls.length - len);
+              const sel = tag + '[class$="' + suffix + '"]';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+          }
+
+          // === Level 9: :empty 空元素检查 ===
+          if (targetElement.children.length === 0 && targetElement.textContent.trim() === '') {
+            const sel = tag + ':empty';
+            if (isExactMatch(sel, targetElement)) return sel;
+            if (classes.length > 0) {
+              const sel2 = tag + '.' + CSS.escape(classes[0]) + ':empty';
+              if (isExactMatch(sel2, targetElement)) return sel2;
+            }
+          }
+
+          // === Level 10: 状态伪类 ===
+          try {
+            if (targetElement.matches(':checked')) {
+              const sel = tag + ':checked';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+            if (targetElement.matches(':disabled')) {
+              const sel = tag + ':disabled';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+            if (targetElement.matches(':enabled')) {
+              const sel = tag + ':enabled';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+            if (targetElement.matches(':required')) {
+              const sel = tag + ':required';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+            if (targetElement.matches(':optional')) {
+              const sel = tag + ':optional';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+            if (targetElement.matches(':read-only')) {
+              const sel = tag + ':read-only';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+            if (targetElement.matches(':placeholder-shown')) {
+              const sel = tag + ':placeholder-shown';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+            if (targetElement.matches(':valid')) {
+              const sel = tag + ':valid';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+            if (targetElement.matches(':invalid')) {
+              const sel = tag + ':invalid';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+            if (targetElement.matches(':in-range')) {
+              const sel = tag + ':in-range';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+            if (targetElement.matches(':out-of-range')) {
+              const sel = tag + ':out-of-range';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+            if (targetElement.matches(':default')) {
+              const sel = tag + ':default';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+            if (targetElement.matches(':indeterminate')) {
+              const sel = tag + ':indeterminate';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+          } catch (e) {}
+
+          // === Level 11: :not() 排除模式 ===
+          if (parent) {
+            const siblings = Array.from(parent.children);
+            const sameTypeSiblings = siblings.filter(c => c.tagName === targetElement.tagName);
+
+            // 如果目标元素是大多数同类元素中的一个，尝试排除少数
+            if (sameTypeSiblings.length > 1) {
+              const targetIndex = sameTypeSiblings.indexOf(targetElement);
+
+              // 尝试排除第一个
+              if (targetIndex !== 0) {
+                const sel = tag + ':not(:first-of-type)';
+                if (isExactMatch(sel, targetElement)) return sel;
+              }
+
+              // 尝试排除最后一个
+              if (targetIndex !== sameTypeSiblings.length - 1) {
+                const sel = tag + ':not(:last-of-type)';
+                if (isExactMatch(sel, targetElement)) return sel;
+              }
+
+              // 尝试排除特定位置
+              const excludeIndices = [];
+              for (let i = 0; i < sameTypeSiblings.length; i++) {
+                if (i !== targetIndex && sameTypeSiblings[i] !== targetElement) {
+                  excludeIndices.push(i + 1);
+                }
+              }
+
+              if (excludeIndices.length === 1) {
+                const sel = tag + ':not(:nth-of-type(' + excludeIndices[0] + '))';
+                if (isExactMatch(sel, targetElement)) return sel;
+              }
+            }
+
+            // 尝试排除特定 class
+            const siblingClasses = new Set();
+            for (const sib of sameTypeSiblings) {
+              if (sib !== targetElement) {
+                for (const c of getClasses(sib)) {
+                  if (!classes.includes(c)) {
+                    siblingClasses.add(c);
+                  }
+                }
+              }
+            }
+
+            if (siblingClasses.size > 0 && siblingClasses.size <= 2) {
+              for (const excludeCls of siblingClasses) {
+                const sel = tag + ':not(.' + CSS.escape(excludeCls) + ')';
+                if (isExactMatch(sel, targetElement)) return sel;
+              }
+            }
+          }
+
+          // === Level 12: :has() 包含选择器 ===
+          if (targetElement.children.length > 0) {
+            const firstChild = targetElement.firstElementChild;
+            if (firstChild) {
+              const childTag = firstChild.tagName.toLowerCase();
+              const childClasses = getClasses(firstChild);
+
+              // :has(child)
+              const sel1 = tag + ':has(' + childTag + ')';
+              if (isExactMatch(sel1, targetElement)) return sel1;
+
+              // :has(> child)
+              const sel2 = tag + ':has(> ' + childTag + ')';
+              if (isExactMatch(sel2, targetElement)) return sel2;
+
+              // :has(> .class)
+              if (childClasses.length > 0) {
+                const sel3 = tag + ':has(> .' + CSS.escape(childClasses[0]) + ')';
+                if (isExactMatch(sel3, targetElement)) return sel3;
+              }
+            }
+
+            // :has(> *) - 有子元素
+            const sel4 = tag + ':has(>)';
+            if (isExactMatch(sel4, targetElement)) return sel4;
+          }
+
+          // === Level 13: :lang() 语言选择器 ===
+          const lang = targetElement.getAttribute('lang');
+          if (lang) {
+            const sel = tag + '[lang="' + CSS.escape(lang) + '"]';
+            if (isExactMatch(sel, targetElement)) return sel;
+            const sel2 = tag + ':lang(' + lang + ')';
+            if (isExactMatch(sel2, targetElement)) return sel2;
+          }
+
+          // === Level 14: :dir() 方向选择器 ===
+          const dir = targetElement.getAttribute('dir');
+          if (dir) {
+            const sel = tag + '[dir="' + CSS.escape(dir) + '"]';
+            if (isExactMatch(sel, targetElement)) return sel;
+            const sel2 = tag + ':dir(' + dir + ')';
+            if (isExactMatch(sel2, targetElement)) return sel2;
+          }
+
+          // === Level 15: 属性词匹配 [attr~=value] ===
+          for (const cls of classes) {
+            const sel = tag + '[class~="' + cls + '"]';
+            if (isExactMatch(sel, targetElement)) return sel;
+          }
+
+          // === Level 16: :nth-last-child 倒数选择器 ===
+          if (parent) {
+            const siblings = Array.from(parent.children);
+            const reverseIndex = siblings.length - siblings.indexOf(targetElement);
+
+            if (reverseIndex === 1) {
+              const sel = tag + ':nth-last-child(1)';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+
+            if (reverseIndex <= 3) {
+              const sel = tag + ':nth-last-child(-n+' + reverseIndex + ')';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+          }
+
+          // === Level 17: 通用兄弟选择器 ~ ===
+          if (prevSibling) {
+            const prevTag = prevSibling.tagName.toLowerCase();
+            const prevClasses = getClasses(prevSibling);
+
+            // prev ~ target (任意后续兄弟)
+            const sel1 = prevTag + ' ~ ' + tag;
+            if (isExactMatch(sel1, targetElement)) return sel1;
+
+            // prev.class ~ target
+            if (prevClasses.length > 0) {
+              const sel2 = prevTag + '.' + CSS.escape(prevClasses[0]) + ' ~ ' + tag;
+              if (isExactMatch(sel2, targetElement)) return sel2;
+            }
+          }
+
+          // === Level 18: 构建路径 ===
           const path = [];
           let cur = targetElement;
+          let depth = 0;
+          const maxDepth = 8;
 
-          while (cur) {
+          while (cur && depth < maxDepth) {
             if (hasValidId(cur)) {
               path.unshift('#' + CSS.escape(cur.id));
               break;
@@ -356,7 +745,7 @@ function getElementInfo() {
             const nth = getNthOfType(cur);
             const curAttrs = cur === targetElement ? attrs : getUsefulAttributes(cur);
 
-            // Priority: class > attr > nth-of-type > tag
+            // 优先级：class > attr > nth-of-type > tag
             if (c.length > 0) {
               path.unshift(t + '.' + CSS.escape(c[0]));
             } else if (curAttrs.length > 0) {
@@ -369,26 +758,30 @@ function getElementInfo() {
 
             if (cur === document.documentElement) break;
             cur = cur.parentElement;
+            depth++;
           }
 
-          // Verify and extend if needed
           let selector = path.join(' > ');
-          while (!isExactMatch(selector, targetElement)) {
-            if (path[0] === 'html') {
-              const lastPart = path[path.length - 1];
-              if (attrs.length > 0 && !lastPart.includes('[')) {
-                path[path.length - 1] = lastPart + '[' + CSS.escape(attrs[0].name) + '="' + CSS.escape(attrs[0].value) + '"]';
-              } else if (classes.length > 0 && !lastPart.includes('.')) {
-                path[path.length - 1] = lastPart + '.' + CSS.escape(classes[0]);
-              } else {
-                break;
-              }
-            }
-            selector = path.join(' > ');
-            if (isExactMatch(selector, targetElement)) break;
-            break;
+          if (isExactMatch(selector, targetElement)) return selector;
+
+          // 尝试增强路径
+          const lastPart = path[path.length - 1];
+          if (classes.length > 1 && !lastPart.includes(':nth')) {
+            const enhancedPath = [...path];
+            enhancedPath[enhancedPath.length - 1] = tag + '.' + classes.slice(0, 2).map(c => CSS.escape(c)).join('.');
+            const enhancedSel = enhancedPath.join(' > ');
+            if (isExactMatch(enhancedSel, targetElement)) return enhancedSel;
           }
 
+          // === Level 19: 路径压缩 ===
+          // 尝试用后代选择器替代子选择器
+          if (path.length >= 3) {
+            const compressedPath = [path[0], path[path.length - 1]];
+            const compressedSel = compressedPath.join(' ');
+            if (isExactMatch(compressedSel, targetElement)) return compressedSel;
+          }
+
+          // === Level 20: 最终回退 ===
           return selector;
         }
 
@@ -585,6 +978,7 @@ function getComputedStyles() {
         }
 
         // Generate CSS selector (ensure exact match)
+        // 支持 DEFAULT_HIDE_SELECTORS 的高级模式
         function generateSelector(targetElement) {
           if (!targetElement) return '';
           if (targetElement === document.body) return 'body';
@@ -596,30 +990,46 @@ function getComputedStyles() {
           const getClasses = (node) => {
             if (!node.className || typeof node.className !== 'string') return [];
             return node.className.trim().split(' ').filter(c => {
-              if (!c || /^[0-9]/.test(c) || /^(css-|styled|sc-|js-)/.test(c)) return false;
-              return /^[a-zA-Z_-][a-zA-Z0-9_-]*$/.test(c);
+              if (!c || /^[0-9]/.test(c)) return false;
+              if (/^(css-|styled-|sc-|js-|_|__|Mui|jss|css_|_|ng-|React|react|vue-|v-)/.test(c)) return false;
+              if (c.length > 40) return false;
+              return /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(c);
             });
           };
 
+          // 高优先级测试属性
+          const TEST_ATTRS = ['data-testid', 'data-test', 'data-cy', 'data-test-id', 'data-qa', 'data-automation-id'];
+
+          // 稳定属性
+          const STABLE_ATTRS = ['type', 'role', 'data-type', 'data-role', 'data-kind', 'data-variant', 'data-size', 'data-id', 'name', 'disabled', 'readonly', 'required', 'checked'];
+
           const getUsefulAttributes = (node) => {
             if (!node.attributes) return [];
-            // 排除：样式属性、内容属性（每个元素都不同的）、状态属性
-            const skipAttrs = [
-              'id', 'class', 'style',
-              'title', 'alt', 'aria-label', 'aria-describedby', 'aria-labelledby',
-              'placeholder', 'value', 'name', 'href', 'src', 'data-tooltip',
-              'tabindex', 'role', 'disabled', 'type'
-            ];
+            const skipAttrs = ['id', 'class', 'style', 'title', 'alt', 'aria-label', 'aria-describedby', 'aria-labelledby', 'placeholder', 'value', 'name', 'href', 'src', 'data-tooltip', 'tabindex'];
             const attrs = [];
             for (const attr of node.attributes) {
               if (skipAttrs.includes(attr.name.toLowerCase())) continue;
-              if (!attr.value || attr.value.length > 50 || /^\\d+$/.test(attr.value)) continue;
+              if (!attr.value || attr.value.length > 80 || /^\\d+$/.test(attr.value)) continue;
               attrs.push({ name: attr.name, value: attr.value });
             }
+            attrs.sort((a, b) => {
+              const aIsTest = TEST_ATTRS.includes(a.name) ? 0 : 1;
+              const bIsTest = TEST_ATTRS.includes(b.name) ? 0 : 1;
+              if (aIsTest !== bIsTest) return aIsTest - bIsTest;
+              const aIsStable = STABLE_ATTRS.includes(a.name) ? 0 : 1;
+              const bIsStable = STABLE_ATTRS.includes(b.name) ? 0 : 1;
+              return aIsStable - bIsStable;
+            });
             return attrs;
           };
 
-          // Get nth-of-type index (among same tag siblings)
+          const getNthChild = (node) => {
+            const parent = node.parentElement;
+            if (!parent) return 0;
+            const siblings = Array.from(parent.children);
+            return siblings.length > 1 ? siblings.indexOf(node) + 1 : 0;
+          };
+
           const getNthOfType = (node) => {
             const parent = node.parentElement;
             if (!parent) return 0;
@@ -636,52 +1046,427 @@ function getComputedStyles() {
             return found.length === 1 && found[0] === target;
           };
 
-          // === Strategy 1: ID ===
-          if (hasValidId(targetElement)) {
-            const sel = '#' + CSS.escape(targetElement.id);
-            if (isExactMatch(sel, targetElement)) return sel;
-          }
-
-          // === Strategy 2: Single class ===
           const tag = targetElement.tagName.toLowerCase();
           const classes = getClasses(targetElement);
-          for (const cls of classes) {
-            const sel = '.' + CSS.escape(cls);
-            if (isExactMatch(sel, targetElement)) return sel;
-            const tagCls = tag + '.' + CSS.escape(cls);
-            if (isExactMatch(tagCls, targetElement)) return tagCls;
-          }
-
-          // === Strategy 3: Attribute selector ===
           const attrs = getUsefulAttributes(targetElement);
-          for (const attr of attrs) {
-            const sel = '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]';
-            if (isExactMatch(sel, targetElement)) return sel;
-            const tagAttr = tag + '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]';
-            if (isExactMatch(tagAttr, targetElement)) return tagAttr;
+          const nthChild = getNthChild(targetElement);
+          const nthOfType = getNthOfType(targetElement);
+
+          // === 收集所有候选选择器 ===
+          const candidates = [];
+
+          // === Level 1: 最简单的选择器 ===
+
+          // 1.1 测试属性（最高优先级）
+          for (const testAttr of TEST_ATTRS) {
+            const attr = attrs.find(a => a.name === testAttr);
+            if (attr) {
+              candidates.push('[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]');
+              candidates.push(tag + '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]');
+            }
           }
 
-          // === Strategy 4: class + attr combination ===
+          // 1.2 ID
+          if (hasValidId(targetElement)) {
+            candidates.push('#' + CSS.escape(targetElement.id));
+          }
+
+          // 1.3 role 属性
+          const roleAttr = attrs.find(a => a.name === 'role');
+          if (roleAttr) {
+            candidates.push(tag + '[role="' + CSS.escape(roleAttr.value) + '"]');
+          }
+
+          // 1.4 单个 class
+          for (const cls of classes) {
+            candidates.push('.' + CSS.escape(cls));
+            candidates.push(tag + '.' + CSS.escape(cls));
+          }
+
+          // 1.5 其他属性
+          for (const attr of attrs.slice(0, 3)) {
+            if (!TEST_ATTRS.includes(attr.name) && attr.name !== 'role') {
+              candidates.push('[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]');
+              candidates.push(tag + '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]');
+            }
+          }
+
+          // 测试 Level 1
+          for (const sel of candidates) {
+            if (isExactMatch(sel, targetElement)) return sel;
+          }
+
+          // === Level 2: 双 class 组合 ===
+          if (classes.length >= 2) {
+            const sel = tag + '.' + classes.slice(0, 2).map(c => CSS.escape(c)).join('.');
+            if (isExactMatch(sel, targetElement)) return sel;
+            // 尝试不带 tag
+            const sel2 = '.' + classes.slice(0, 2).map(c => CSS.escape(c)).join('.');
+            if (isExactMatch(sel2, targetElement)) return sel2;
+          }
+
+          // === Level 3: class + 属性组合 ===
           if (classes.length > 0 && attrs.length > 0) {
-            for (const cls of classes) {
-              for (const attr of attrs) {
+            for (const cls of classes.slice(0, 2)) {
+              for (const attr of attrs.slice(0, 2)) {
                 const sel = tag + '.' + CSS.escape(cls) + '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]';
                 if (isExactMatch(sel, targetElement)) return sel;
               }
             }
           }
 
-          // === Strategy 5: Multiple classes ===
-          if (classes.length >= 2) {
-            const sel = tag + '.' + classes.map(c => CSS.escape(c)).join('.');
+          // === Level 4: 多 class 组合（3个） ===
+          if (classes.length >= 3) {
+            const sel = tag + '.' + classes.slice(0, 3).map(c => CSS.escape(c)).join('.');
             if (isExactMatch(sel, targetElement)) return sel;
           }
 
-          // === Strategy 6: Build full path ===
+          // === Level 5: 结构伪类 ===
+          const parent = targetElement.parentElement;
+          if (parent) {
+            const siblings = Array.from(parent.children);
+            const sameTypeSiblings = siblings.filter(c => c.tagName === targetElement.tagName);
+
+            // :first-child
+            if (targetElement === siblings[0]) {
+              const sel = tag + ':first-child';
+              if (isExactMatch(sel, targetElement)) return sel;
+              if (classes.length > 0) {
+                const sel2 = tag + '.' + CSS.escape(classes[0]) + ':first-child';
+                if (isExactMatch(sel2, targetElement)) return sel2;
+              }
+            }
+
+            // :last-child
+            if (targetElement === siblings[siblings.length - 1]) {
+              const sel = tag + ':last-child';
+              if (isExactMatch(sel, targetElement)) return sel;
+              if (classes.length > 0) {
+                const sel2 = tag + '.' + CSS.escape(classes[0]) + ':last-child';
+                if (isExactMatch(sel2, targetElement)) return sel2;
+              }
+            }
+
+            // :only-child
+            if (siblings.length === 1) {
+              const sel = tag + ':only-child';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+
+            // :first-of-type
+            if (targetElement === sameTypeSiblings[0] && sameTypeSiblings.length > 1) {
+              const sel = tag + ':first-of-type';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+
+            // :last-of-type
+            if (targetElement === sameTypeSiblings[sameTypeSiblings.length - 1] && sameTypeSiblings.length > 1) {
+              const sel = tag + ':last-of-type';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+
+            // :only-of-type
+            if (sameTypeSiblings.length === 1) {
+              const sel = tag + ':only-of-type';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+
+            // :nth-child
+            if (nthChild > 0) {
+              const sel = tag + ':nth-child(' + nthChild + ')';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+
+            // :nth-of-type
+            if (nthOfType > 0) {
+              const sel = tag + ':nth-of-type(' + nthOfType + ')';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+
+            // class + nth-of-type
+            if (classes.length > 0 && nthOfType > 0) {
+              const sel = tag + '.' + CSS.escape(classes[0]) + ':nth-of-type(' + nthOfType + ')';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+
+            // class + nth-child
+            if (classes.length > 0 && nthChild > 0) {
+              const sel = tag + '.' + CSS.escape(classes[0]) + ':nth-child(' + nthChild + ')';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+          }
+
+          // === Level 6: 兄弟选择器 ===
+          const prevSibling = targetElement.previousElementSibling;
+          const nextSibling = targetElement.nextElementSibling;
+
+          if (prevSibling) {
+            // 尝试用前一个兄弟 + 兄弟选择器
+            const prevTag = prevSibling.tagName.toLowerCase();
+            const prevClasses = getClasses(prevSibling);
+
+            // prev + target
+            const sel1 = prevTag + ' + ' + tag;
+            if (isExactMatch(sel1, targetElement)) return sel1;
+
+            // prev.class + target
+            if (prevClasses.length > 0) {
+              const sel2 = prevTag + '.' + CSS.escape(prevClasses[0]) + ' + ' + tag;
+              if (isExactMatch(sel2, targetElement)) return sel2;
+            }
+
+            // prev + target.class
+            if (classes.length > 0) {
+              const sel3 = prevTag + ' + ' + tag + '.' + CSS.escape(classes[0]);
+              if (isExactMatch(sel3, targetElement)) return sel3;
+            }
+
+            // prev.class + target.class
+            if (prevClasses.length > 0 && classes.length > 0) {
+              const sel4 = prevTag + '.' + CSS.escape(prevClasses[0]) + ' + ' + tag + '.' + CSS.escape(classes[0]);
+              if (isExactMatch(sel4, targetElement)) return sel4;
+            }
+          }
+
+          // === Level 7: 属性包含选择器 ===
+          for (const cls of classes.slice(0, 3)) {
+            // 尝试不同长度的子串
+            for (let len = Math.min(cls.length, 8); len >= 3; len--) {
+              for (let start = 0; start <= cls.length - len; start++) {
+                const substr = cls.substring(start, start + len);
+                const sel = tag + '[class*="' + substr + '"]';
+                if (isExactMatch(sel, targetElement)) return sel;
+              }
+            }
+          }
+
+          // === Level 8: 属性前缀/后缀选择器 ===
+          for (const cls of classes.slice(0, 2)) {
+            // 前缀
+            for (let len = Math.min(cls.length, 8); len >= 3; len--) {
+              const prefix = cls.substring(0, len);
+              const sel = tag + '[class^="' + prefix + '"]';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+            // 后缀
+            for (let len = Math.min(cls.length, 8); len >= 3; len--) {
+              const suffix = cls.substring(cls.length - len);
+              const sel = tag + '[class$="' + suffix + '"]';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+          }
+
+          // === Level 9: :empty 空元素检查 ===
+          if (targetElement.children.length === 0 && targetElement.textContent.trim() === '') {
+            const sel = tag + ':empty';
+            if (isExactMatch(sel, targetElement)) return sel;
+            if (classes.length > 0) {
+              const sel2 = tag + '.' + CSS.escape(classes[0]) + ':empty';
+              if (isExactMatch(sel2, targetElement)) return sel2;
+            }
+          }
+
+          // === Level 10: 状态伪类 ===
+          try {
+            if (targetElement.matches(':checked')) {
+              const sel = tag + ':checked';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+            if (targetElement.matches(':disabled')) {
+              const sel = tag + ':disabled';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+            if (targetElement.matches(':enabled')) {
+              const sel = tag + ':enabled';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+            if (targetElement.matches(':required')) {
+              const sel = tag + ':required';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+            if (targetElement.matches(':optional')) {
+              const sel = tag + ':optional';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+            if (targetElement.matches(':read-only')) {
+              const sel = tag + ':read-only';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+            if (targetElement.matches(':placeholder-shown')) {
+              const sel = tag + ':placeholder-shown';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+            if (targetElement.matches(':valid')) {
+              const sel = tag + ':valid';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+            if (targetElement.matches(':invalid')) {
+              const sel = tag + ':invalid';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+            if (targetElement.matches(':in-range')) {
+              const sel = tag + ':in-range';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+            if (targetElement.matches(':out-of-range')) {
+              const sel = tag + ':out-of-range';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+            if (targetElement.matches(':default')) {
+              const sel = tag + ':default';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+            if (targetElement.matches(':indeterminate')) {
+              const sel = tag + ':indeterminate';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+          } catch (e) {}
+
+          // === Level 11: :not() 排除模式 ===
+          if (parent) {
+            const siblings = Array.from(parent.children);
+            const sameTypeSiblings = siblings.filter(c => c.tagName === targetElement.tagName);
+
+            // 如果目标元素是大多数同类元素中的一个，尝试排除少数
+            if (sameTypeSiblings.length > 1) {
+              const targetIndex = sameTypeSiblings.indexOf(targetElement);
+
+              // 尝试排除第一个
+              if (targetIndex !== 0) {
+                const sel = tag + ':not(:first-of-type)';
+                if (isExactMatch(sel, targetElement)) return sel;
+              }
+
+              // 尝试排除最后一个
+              if (targetIndex !== sameTypeSiblings.length - 1) {
+                const sel = tag + ':not(:last-of-type)';
+                if (isExactMatch(sel, targetElement)) return sel;
+              }
+
+              // 尝试排除特定位置
+              const excludeIndices = [];
+              for (let i = 0; i < sameTypeSiblings.length; i++) {
+                if (i !== targetIndex && sameTypeSiblings[i] !== targetElement) {
+                  excludeIndices.push(i + 1);
+                }
+              }
+
+              if (excludeIndices.length === 1) {
+                const sel = tag + ':not(:nth-of-type(' + excludeIndices[0] + '))';
+                if (isExactMatch(sel, targetElement)) return sel;
+              }
+            }
+
+            // 尝试排除特定 class
+            const siblingClasses = new Set();
+            for (const sib of sameTypeSiblings) {
+              if (sib !== targetElement) {
+                for (const c of getClasses(sib)) {
+                  if (!classes.includes(c)) {
+                    siblingClasses.add(c);
+                  }
+                }
+              }
+            }
+
+            if (siblingClasses.size > 0 && siblingClasses.size <= 2) {
+              for (const excludeCls of siblingClasses) {
+                const sel = tag + ':not(.' + CSS.escape(excludeCls) + ')';
+                if (isExactMatch(sel, targetElement)) return sel;
+              }
+            }
+          }
+
+          // === Level 12: :has() 包含选择器 ===
+          if (targetElement.children.length > 0) {
+            const firstChild = targetElement.firstElementChild;
+            if (firstChild) {
+              const childTag = firstChild.tagName.toLowerCase();
+              const childClasses = getClasses(firstChild);
+
+              // :has(child)
+              const sel1 = tag + ':has(' + childTag + ')';
+              if (isExactMatch(sel1, targetElement)) return sel1;
+
+              // :has(> child)
+              const sel2 = tag + ':has(> ' + childTag + ')';
+              if (isExactMatch(sel2, targetElement)) return sel2;
+
+              // :has(> .class)
+              if (childClasses.length > 0) {
+                const sel3 = tag + ':has(> .' + CSS.escape(childClasses[0]) + ')';
+                if (isExactMatch(sel3, targetElement)) return sel3;
+              }
+            }
+
+            // :has(> *) - 有子元素
+            const sel4 = tag + ':has(>)';
+            if (isExactMatch(sel4, targetElement)) return sel4;
+          }
+
+          // === Level 13: :lang() 语言选择器 ===
+          const lang = targetElement.getAttribute('lang');
+          if (lang) {
+            const sel = tag + '[lang="' + CSS.escape(lang) + '"]';
+            if (isExactMatch(sel, targetElement)) return sel;
+            const sel2 = tag + ':lang(' + lang + ')';
+            if (isExactMatch(sel2, targetElement)) return sel2;
+          }
+
+          // === Level 14: :dir() 方向选择器 ===
+          const dir = targetElement.getAttribute('dir');
+          if (dir) {
+            const sel = tag + '[dir="' + CSS.escape(dir) + '"]';
+            if (isExactMatch(sel, targetElement)) return sel;
+            const sel2 = tag + ':dir(' + dir + ')';
+            if (isExactMatch(sel2, targetElement)) return sel2;
+          }
+
+          // === Level 15: 属性词匹配 [attr~=value] ===
+          for (const cls of classes) {
+            const sel = tag + '[class~="' + cls + '"]';
+            if (isExactMatch(sel, targetElement)) return sel;
+          }
+
+          // === Level 16: :nth-last-child 倒数选择器 ===
+          if (parent) {
+            const siblings = Array.from(parent.children);
+            const reverseIndex = siblings.length - siblings.indexOf(targetElement);
+
+            if (reverseIndex === 1) {
+              const sel = tag + ':nth-last-child(1)';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+
+            if (reverseIndex <= 3) {
+              const sel = tag + ':nth-last-child(-n+' + reverseIndex + ')';
+              if (isExactMatch(sel, targetElement)) return sel;
+            }
+          }
+
+          // === Level 17: 通用兄弟选择器 ~ ===
+          if (prevSibling) {
+            const prevTag = prevSibling.tagName.toLowerCase();
+            const prevClasses = getClasses(prevSibling);
+
+            // prev ~ target (任意后续兄弟)
+            const sel1 = prevTag + ' ~ ' + tag;
+            if (isExactMatch(sel1, targetElement)) return sel1;
+
+            // prev.class ~ target
+            if (prevClasses.length > 0) {
+              const sel2 = prevTag + '.' + CSS.escape(prevClasses[0]) + ' ~ ' + tag;
+              if (isExactMatch(sel2, targetElement)) return sel2;
+            }
+          }
+
+          // === Level 18: 构建路径 ===
           const path = [];
           let cur = targetElement;
+          let depth = 0;
+          const maxDepth = 8;
 
-          while (cur) {
+          while (cur && depth < maxDepth) {
             if (hasValidId(cur)) {
               path.unshift('#' + CSS.escape(cur.id));
               break;
@@ -692,6 +1477,7 @@ function getComputedStyles() {
             const nth = getNthOfType(cur);
             const curAttrs = cur === targetElement ? attrs : getUsefulAttributes(cur);
 
+            // 优先级：class > attr > nth-of-type > tag
             if (c.length > 0) {
               path.unshift(t + '.' + CSS.escape(c[0]));
             } else if (curAttrs.length > 0) {
@@ -704,25 +1490,30 @@ function getComputedStyles() {
 
             if (cur === document.documentElement) break;
             cur = cur.parentElement;
+            depth++;
           }
 
           let selector = path.join(' > ');
-          while (!isExactMatch(selector, targetElement)) {
-            if (path[0] === 'html') {
-              const lastPart = path[path.length - 1];
-              if (attrs.length > 0 && !lastPart.includes('[')) {
-                path[path.length - 1] = lastPart + '[' + CSS.escape(attrs[0].name) + '="' + CSS.escape(attrs[0].value) + '"]';
-              } else if (classes.length > 0 && !lastPart.includes('.')) {
-                path[path.length - 1] = lastPart + '.' + CSS.escape(classes[0]);
-              } else {
-                break;
-              }
-            }
-            selector = path.join(' > ');
-            if (isExactMatch(selector, targetElement)) break;
-            break;
+          if (isExactMatch(selector, targetElement)) return selector;
+
+          // 尝试增强路径
+          const lastPart = path[path.length - 1];
+          if (classes.length > 1 && !lastPart.includes(':nth')) {
+            const enhancedPath = [...path];
+            enhancedPath[enhancedPath.length - 1] = tag + '.' + classes.slice(0, 2).map(c => CSS.escape(c)).join('.');
+            const enhancedSel = enhancedPath.join(' > ');
+            if (isExactMatch(enhancedSel, targetElement)) return enhancedSel;
           }
 
+          // === Level 19: 路径压缩 ===
+          // 尝试用后代选择器替代子选择器
+          if (path.length >= 3) {
+            const compressedPath = [path[0], path[path.length - 1]];
+            const compressedSel = compressedPath.join(' ');
+            if (isExactMatch(compressedSel, targetElement)) return compressedSel;
+          }
+
+          // === Level 20: 最终回退 ===
           return selector;
         }
 
@@ -2458,19 +3249,37 @@ if (optimizeMergedBtn) {
 }
 
 /**
- * 生成合并选择器
+ * 生成合并选择器（高级模式）
+ * 支持 DEFAULT_HIDE_SELECTORS 的高级模式：
+ * - :nth-child(n):not(:nth-child(X)) 选择所有但排除特定位置
+ * - [class*="xxx"] 属性包含选择器
+ * - +* 兄弟选择器（任意元素）
+ * - 多层 :not() 链
+ * - :has() 选择器
+ * - 共同祖先 + 后代选择器
+ * - 结构伪类 :first-child, :last-child, :nth-of-type
+ * - 属性前缀/后缀/包含选择器
+ * - 复杂 :not() 组合
  */
 function generateMergedSelector() {
   if (selectedElements.length === 0) return null;
   if (selectedElements.length === 1) return selectedElements[0].selector;
 
-  // 提取所有选择器
   const selectors = selectedElements.map(el => el.selector);
+  const startTime = Date.now();
+  const MAX_TIME = 5000; // 最多 5 秒
 
-  // 尝试找共同父级
+  // 收集所有候选选择器，按优先级排序
+  const candidates = [];
+
+  // === 策略 1: 共同 class 合并（最快） ===
+  const classMerged = tryClassMerge(selectors);
+  if (classMerged) {
+    candidates.push({ selector: classMerged, priority: 100, strategy: 'class' });
+  }
+
+  // === 策略 2: 共同前缀合并 ===
   const parts = selectors.map(s => s.split(/\s*>\s*/));
-
-  // 找最长公共前缀
   let commonPrefix = [];
   const minLen = Math.min(...parts.map(p => p.length));
 
@@ -2483,25 +3292,1927 @@ function generateMergedSelector() {
     }
   }
 
-  // 如果有共同前缀，构建优化后的选择器
   if (commonPrefix.length > 0) {
-    // 获取剩余部分
     const remainders = parts.map(p => p.slice(commonPrefix.length).join(' > ')).filter(r => r);
 
     if (remainders.length === 0) {
-      return commonPrefix.join(' > ');
-    }
+      candidates.push({ selector: commonPrefix.join(' > '), priority: 95, strategy: 'prefix' });
+    } else {
+      // 尝试各种高级合并模式
+      const advancedMerged = tryAdvancedMerge(remainders, commonPrefix);
+      if (advancedMerged) candidates.push({ selector: advancedMerged, priority: 90, strategy: 'advanced' });
 
-    // 如果剩余部分较短，用 :is() 合并
-    if (remainders.length <= 5 && remainders.every(r => r.length < 50)) {
-      const prefix = commonPrefix.join(' > ');
-      const suffix = remainders.map(r => `:is(${r})`).join(' > ');
-      return prefix + ' > ' + suffix;
+      const notMerged = tryNotMergeForRemainders(remainders, commonPrefix);
+      if (notMerged) candidates.push({ selector: notMerged, priority: 88, strategy: 'not-nth' });
+
+      const attrMerged = tryAttrContainsMerge(remainders, commonPrefix);
+      if (attrMerged) candidates.push({ selector: attrMerged, priority: 85, strategy: 'attr-contains' });
+
+      const structuralMerged = tryStructuralMerge(remainders, commonPrefix);
+      if (structuralMerged) candidates.push({ selector: structuralMerged, priority: 82, strategy: 'structural' });
+
+      const complexNotMerged = tryComplexNotMerge(remainders, commonPrefix);
+      if (complexNotMerged) candidates.push({ selector: complexNotMerged, priority: 80, strategy: 'complex-not' });
+
+      // :is() 合并
+      if (remainders.length <= 5 && remainders.every(r => r.length < 50)) {
+        const prefix = commonPrefix.join(' > ');
+        const suffix = ':is(' + remainders.join(', ') + ')';
+        candidates.push({ selector: prefix + ' > ' + suffix, priority: 75, strategy: 'is' });
+      }
     }
+  }
+
+  // === 策略 3: :not() 排除模式 ===
+  const notMerged = tryNotMerge(selectors);
+  if (notMerged) candidates.push({ selector: notMerged, priority: 85, strategy: 'not' });
+
+  // === 策略 4: 兄弟选择器模式 ===
+  const siblingMerged = trySiblingMerge(selectors);
+  if (siblingMerged) candidates.push({ selector: siblingMerged, priority: 80, strategy: 'sibling' });
+
+  // === 策略 5: :has() 选择器模式 ===
+  if (Date.now() - startTime < MAX_TIME) {
+    const hasMerged = tryHasMerge(selectors);
+    if (hasMerged) candidates.push({ selector: hasMerged, priority: 78, strategy: 'has' });
+  }
+
+  // === 策略 6: 共同祖先 + 后代选择器 ===
+  if (Date.now() - startTime < MAX_TIME) {
+    const ancestorMerged = tryAncestorMerge(selectors);
+    if (ancestorMerged) candidates.push({ selector: ancestorMerged, priority: 75, strategy: 'ancestor' });
+  }
+
+  // === 策略 7: 属性包含选择器 ===
+  if (Date.now() - startTime < MAX_TIME) {
+    const attrMerged = tryAttrContainsMergeGlobal(selectors);
+    if (attrMerged) candidates.push({ selector: attrMerged, priority: 72, strategy: 'attr-global' });
+  }
+
+  // === 策略 8: 结构伪类模式 ===
+  if (Date.now() - startTime < MAX_TIME) {
+    const structMerged = tryStructuralPseudoMerge(selectors);
+    if (structMerged) candidates.push({ selector: structMerged, priority: 70, strategy: 'pseudo' });
+  }
+
+  // === 策略 9: 属性前缀/后缀模式 ===
+  if (Date.now() - startTime < MAX_TIME) {
+    const prefixSuffixMerged = tryAttrPrefixSuffixMerge(selectors);
+    if (prefixSuffixMerged) candidates.push({ selector: prefixSuffixMerged, priority: 68, strategy: 'attr-prefix-suffix' });
+  }
+
+  // === 策略 10: 嵌套 :not():is() 组合 ===
+  if (Date.now() - startTime < MAX_TIME) {
+    const nestedMerged = tryNestedPseudoMerge(selectors);
+    if (nestedMerged) candidates.push({ selector: nestedMerged, priority: 65, strategy: 'nested-pseudo' });
+  }
+
+  // === 策略 11: 共同属性模式 ===
+  if (Date.now() - startTime < MAX_TIME) {
+    const attrValueMerged = tryCommonAttrMerge(selectors);
+    if (attrValueMerged) candidates.push({ selector: attrValueMerged, priority: 62, strategy: 'common-attr' });
+  }
+
+  // === 策略 12: 路径优化 ===
+  if (Date.now() - startTime < MAX_TIME) {
+    const pathOptimized = tryPathOptimization(selectors);
+    if (pathOptimized) candidates.push({ selector: pathOptimized, priority: 60, strategy: 'path-opt' });
+  }
+
+  // === 策略 13: 模糊匹配模式 ===
+  if (Date.now() - startTime < MAX_TIME) {
+    const fuzzyMerged = tryFuzzyMerge(selectors);
+    if (fuzzyMerged) candidates.push({ selector: fuzzyMerged, priority: 55, strategy: 'fuzzy' });
+  }
+
+  // === 策略 14: :where() 低优先级合并 ===
+  if (Date.now() - startTime < MAX_TIME) {
+    const whereMerged = tryWhereMerge(selectors);
+    if (whereMerged) candidates.push({ selector: whereMerged, priority: 58, strategy: 'where' });
+  }
+
+  // === 策略 15: 倒数选择器 :nth-last-child ===
+  if (Date.now() - startTime < MAX_TIME) {
+    const nthLastMerged = tryNthLastMerge(selectors);
+    if (nthLastMerged) candidates.push({ selector: nthLastMerged, priority: 72, strategy: 'nth-last' });
+  }
+
+  // === 策略 16: :empty 空元素选择器 ===
+  if (Date.now() - startTime < MAX_TIME) {
+    const emptyMerged = tryEmptyMerge(selectors);
+    if (emptyMerged) candidates.push({ selector: emptyMerged, priority: 70, strategy: 'empty' });
+  }
+
+  // === 策略 17: :checked/:disabled/:enabled 状态选择器 ===
+  if (Date.now() - startTime < MAX_TIME) {
+    const stateMerged = tryStateMerge(selectors);
+    if (stateMerged) candidates.push({ selector: stateMerged, priority: 75, strategy: 'state' });
+  }
+
+  // === 策略 18: :not() 多重排除链 ===
+  if (Date.now() - startTime < MAX_TIME) {
+    const multiNotMerged = tryMultiNotMerge(selectors);
+    if (multiNotMerged) candidates.push({ selector: multiNotMerged, priority: 78, strategy: 'multi-not' });
+  }
+
+  // === 策略 19: :is() + :not() 组合 ===
+  if (Date.now() - startTime < MAX_TIME) {
+    const isNotMerged = tryIsNotMerge(selectors);
+    if (isNotMerged) candidates.push({ selector: isNotMerged, priority: 76, strategy: 'is-not' });
+  }
+
+  // === 策略 20: 属性正则匹配 [attr~=value] ===
+  if (Date.now() - startTime < MAX_TIME) {
+    const attrRegexMerged = tryAttrRegexMerge(selectors);
+    if (attrRegexMerged) candidates.push({ selector: attrRegexMerged, priority: 66, strategy: 'attr-regex' });
+  }
+
+  // === 策略 21: :nth-child(An+B) 公式模式 ===
+  if (Date.now() - startTime < MAX_TIME) {
+    const formulaMerged = tryNthFormulaMerge(selectors);
+    if (formulaMerged) candidates.push({ selector: formulaMerged, priority: 74, strategy: 'nth-formula' });
+  }
+
+  // === 策略 22: :only-child/:only-of-type ===
+  if (Date.now() - startTime < MAX_TIME) {
+    const onlyMerged = tryOnlyMerge(selectors);
+    if (onlyMerged) candidates.push({ selector: onlyMerged, priority: 71, strategy: 'only' });
+  }
+
+  // === 策略 23: 通配符优化 ===
+  if (Date.now() - startTime < MAX_TIME) {
+    const wildcardMerged = tryWildcardMerge(selectors);
+    if (wildcardMerged) candidates.push({ selector: wildcardMerged, priority: 50, strategy: 'wildcard' });
+  }
+
+  // === 策略 24: :has() + 后代组合 ===
+  if (Date.now() - startTime < MAX_TIME) {
+    const hasDescMerged = tryHasDescendantMerge(selectors);
+    if (hasDescMerged) candidates.push({ selector: hasDescMerged, priority: 67, strategy: 'has-desc' });
+  }
+
+  // === 策略 25: 多层级路径压缩 ===
+  if (Date.now() - startTime < MAX_TIME) {
+    const compressedMerged = tryPathCompression(selectors);
+    if (compressedMerged) candidates.push({ selector: compressedMerged, priority: 63, strategy: 'path-compress' });
+  }
+
+  // === 策略 26: 相邻兄弟组 ~ ===
+  if (Date.now() - startTime < MAX_TIME) {
+    const generalSiblingMerged = tryGeneralSiblingMerge(selectors);
+    if (generalSiblingMerged) candidates.push({ selector: generalSiblingMerged, priority: 73, strategy: 'general-sibling' });
+  }
+
+  // === 策略 27: :lang() 语言选择器 ===
+  if (Date.now() - startTime < MAX_TIME) {
+    const langMerged = tryLangMerge(selectors);
+    if (langMerged) candidates.push({ selector: langMerged, priority: 64, strategy: 'lang' });
+  }
+
+  // === 策略 28: :dir() 方向选择器 ===
+  if (Date.now() - startTime < MAX_TIME) {
+    const dirMerged = tryDirMerge(selectors);
+    if (dirMerged) candidates.push({ selector: dirMerged, priority: 64, strategy: 'dir' });
+  }
+
+  // === 策略 29: :target/:focus/:hover 状态 ===
+  if (Date.now() - startTime < MAX_TIME) {
+    const targetMerged = tryTargetMerge(selectors);
+    if (targetMerged) candidates.push({ selector: targetMerged, priority: 69, strategy: 'target' });
+  }
+
+  // === 策略 30: 深度选择器 ::deep / >>> ===
+  if (Date.now() - startTime < MAX_TIME) {
+    const deepMerged = tryDeepMerge(selectors);
+    if (deepMerged) candidates.push({ selector: deepMerged, priority: 52, strategy: 'deep' });
+  }
+
+  // === 策略 31: :is() + 属性组合 ===
+  if (Date.now() - startTime < MAX_TIME) {
+    const isAttrMerged = tryIsAttrMerge(selectors);
+    if (isAttrMerged) candidates.push({ selector: isAttrMerged, priority: 74, strategy: 'is-attr' });
+  }
+
+  // === 策略 32: :where() + :not() 组合 ===
+  if (Date.now() - startTime < MAX_TIME) {
+    const whereNotMerged = tryWhereNotMerge(selectors);
+    if (whereNotMerged) candidates.push({ selector: whereNotMerged, priority: 56, strategy: 'where-not' });
+  }
+
+  // === 策略 33: 偶数/奇数模式 ===
+  if (Date.now() - startTime < MAX_TIME) {
+    const evenOddMerged = tryEvenOddMerge(selectors);
+    if (evenOddMerged) candidates.push({ selector: evenOddMerged, priority: 73, strategy: 'even-odd' });
+  }
+
+  // === 策略 34: :not(:first-child) 排除模式 ===
+  if (Date.now() - startTime < MAX_TIME) {
+    const notFirstLastMerged = tryNotFirstLastMerge(selectors);
+    if (notFirstLastMerged) candidates.push({ selector: notFirstLastMerged, priority: 67, strategy: 'not-first-last' });
+  }
+
+  // === 策略 35: 多属性组合 ===
+  if (Date.now() - startTime < MAX_TIME) {
+    const multiAttrMerged = tryMultiAttrMerge(selectors);
+    if (multiAttrMerged) candidates.push({ selector: multiAttrMerged, priority: 71, strategy: 'multi-attr' });
+  }
+
+  // === 策略 36: :is() + :nth-child 组合 ===
+  if (Date.now() - startTime < MAX_TIME) {
+    const isNthMerged = tryIsNthMerge(selectors);
+    if (isNthMerged) candidates.push({ selector: isNthMerged, priority: 70, strategy: 'is-nth' });
+  }
+
+  // === 策略 37: :has(> :not(:empty)) 非空子元素 ===
+  if (Date.now() - startTime < MAX_TIME) {
+    const hasNotEmptyMerged = tryHasNotEmptyMerge(selectors);
+    if (hasNotEmptyMerged) candidates.push({ selector: hasNotEmptyMerged, priority: 59, strategy: 'has-not-empty' });
+  }
+
+  // === 策略 38: 属性值模式匹配 ===
+  if (Date.now() - startTime < MAX_TIME) {
+    const attrPatternMerged = tryAttrPatternMerge(selectors);
+    if (attrPatternMerged) candidates.push({ selector: attrPatternMerged, priority: 66, strategy: 'attr-pattern' });
+  }
+
+  // === 策略 39: :is() + 多 class 组合 ===
+  if (Date.now() - startTime < MAX_TIME) {
+    const isMultiClassMerged = tryIsMultiClassMerge(selectors);
+    if (isMultiClassMerged) candidates.push({ selector: isMultiClassMerged, priority: 72, strategy: 'is-multi-class' });
+  }
+
+  // 选择最优结果
+  if (candidates.length > 0) {
+    // 按优先级排序，优先级相同则选最短的
+    candidates.sort((a, b) => {
+      if (a.priority !== b.priority) return b.priority - a.priority;
+      return a.selector.length - b.selector.length;
+    });
+    return candidates[0].selector;
   }
 
   // 无法优化合并，直接用逗号连接
   return selectors.join(', ');
+}
+
+/**
+ * 尝试 :where() 合并
+ */
+function tryWhereMerge(selectors) {
+  // :where() 与 :is() 类似但优先级为 0
+  if (selectors.length <= 5) {
+    // 检查是否可以用 :where() 包裹
+    const parsed = selectors.map(s => {
+      // 提取最后部分
+      const parts = s.split(/\s*>\s*/);
+      return { full: s, last: parts[parts.length - 1], parent: parts.slice(0, -1).join(' > ') };
+    });
+
+    const parents = [...new Set(parsed.map(p => p.parent))];
+    if (parents.length === 1 && parents[0]) {
+      const lastParts = [...new Set(parsed.map(p => p.last))];
+      if (lastParts.length <= 5) {
+        return parents[0] + ' > :where(' + lastParts.join(', ') + ')';
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * 尝试 :nth-last-child 合并
+ */
+function tryNthLastMerge(selectors) {
+  // 解析选择器中的 nth-child 信息
+  const parsed = selectors.map(sel => {
+    const parts = sel.split(/\s*>\s*/);
+    const last = parts[parts.length - 1];
+    const match = last.match(/:nth-child\((\d+)\)/);
+    return {
+      full: sel,
+      parts,
+      last,
+      nthChild: match ? parseInt(match[1], 10) : null,
+      parent: parts.slice(0, -1).join(' > ')
+    };
+  });
+
+  // 检查是否有共同父级
+  const parents = [...new Set(parsed.map(p => p.parent))];
+  if (parents.length === 1 && parents[0]) {
+    const nthValues = parsed.filter(p => p.nthChild !== null).map(p => p.nthChild);
+    if (nthValues.length === selectors.length && nthValues.length >= 2) {
+      // 检查是否是从末尾开始的连续序列
+      // 假设总共有 N 个子元素，nth-last-child(1) 是最后一个
+      // 这里我们尝试生成 :nth-last-child(-n+X) 模式
+      const sorted = [...nthValues].sort((a, b) => b - a); // 降序
+      const isConsecutiveFromEnd = sorted.every((n, i) => n === sorted[0] - i);
+      if (isConsecutiveFromEnd && sorted.length <= 5) {
+        const base = parsed[0].last.replace(/:nth-child\(\d+\)/g, '');
+        const lastN = sorted.length;
+        return parents[0] + ' > ' + base + ':nth-last-child(-n+' + lastN + ')';
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * 尝试 :empty 合并
+ */
+function tryEmptyMerge(selectors) {
+  // 检查是否所有选择器都指向空元素
+  // 这需要实际检查 DOM，这里只做语法层面的分析
+  const lastParts = selectors.map(s => {
+    const parts = s.split(/\s*>\s*/);
+    return parts[parts.length - 1];
+  });
+
+  // 检查是否有共同模式
+  const baseParts = lastParts.map(p => p.replace(/:empty/g, ''));
+  const uniqueBase = [...new Set(baseParts)];
+
+  if (uniqueBase.length === 1) {
+    const parents = selectors.map(s => s.split(/\s*>\s*/).slice(0, -1).join(' > '));
+    const uniqueParents = [...new Set(parents)];
+    if (uniqueParents.length === 1 && uniqueParents[0]) {
+      return uniqueParents[0] + ' > ' + uniqueBase[0] + ':empty';
+    }
+  }
+  return null;
+}
+
+/**
+ * 尝试状态选择器合并
+ */
+function tryStateMerge(selectors) {
+  const statePseudos = [':checked', ':disabled', ':enabled', ':required', ':optional', ':read-only', ':read-write', ':valid', ':invalid', ':in-range', ':out-of-range', ':placeholder-shown', ':default', ':focus', ':hover', ':active', ':visited', ':target'];
+
+  // 检查选择器是否包含状态伪类
+  for (const state of statePseudos) {
+    const hasState = selectors.filter(s => s.includes(state));
+    if (hasState.length === selectors.length) {
+      // 提取基础选择器
+      const bases = selectors.map(s => s.replace(state, '').replace(/:nth-child\(\d+\)/g, ''));
+      const uniqueBases = [...new Set(bases)];
+      if (uniqueBases.length === 1) {
+        return uniqueBases[0] + state;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * 尝试多重 :not() 排除链
+ */
+function tryMultiNotMerge(selectors) {
+  // 解析选择器结构
+  const parsed = selectors.map(sel => {
+    const parts = sel.split(/\s*>\s*/);
+    return {
+      full: sel,
+      parts,
+      last: parts[parts.length - 1],
+      parent: parts.slice(0, -1).join(' > ')
+    };
+  });
+
+  // 检查是否有共同父级
+  const parents = [...new Set(parsed.map(p => p.parent))];
+  if (parents.length === 1 && parents[0]) {
+    // 提取所有选中元素的 class
+    const classPattern = /\.([a-zA-Z_-][a-zA-Z0-9_-]*)/g;
+    const selectedClasses = new Set();
+    for (const p of parsed) {
+      let match;
+      classPattern.lastIndex = 0;
+      while ((match = classPattern.exec(p.last)) !== null) {
+        selectedClasses.add(match[1]);
+      }
+    }
+
+    // 生成排除选择器
+    // 假设我们要排除某些 class
+    // 这里生成一个通用的选择器
+    if (selectedClasses.size > 0 && selectedClasses.size <= 3) {
+      const tagMatch = parsed[0].last.match(/^([a-z]+)/);
+      const tag = tagMatch ? tagMatch[1] : '*';
+      const classList = [...selectedClasses];
+      return parents[0] + ' > ' + tag + ':is(' + classList.map(c => '.' + c).join(', ') + ')';
+    }
+  }
+  return null;
+}
+
+/**
+ * 尝试 :is() + :not() 组合
+ */
+function tryIsNotMerge(selectors) {
+  // 解析选择器
+  const parsed = selectors.map(sel => {
+    const parts = sel.split(/\s*>\s*/);
+    return {
+      full: sel,
+      last: parts[parts.length - 1],
+      parent: parts.slice(0, -1).join(' > ')
+    };
+  });
+
+  const parents = [...new Set(parsed.map(p => p.parent))];
+  if (parents.length === 1 && parents[0]) {
+    const lastParts = [...new Set(parsed.map(p => p.last))];
+    if (lastParts.length <= 5 && lastParts.length >= 2) {
+      // 生成 :is() 选择器
+      return parents[0] + ' > :is(' + lastParts.join(', ') + ')';
+    }
+  }
+  return null;
+}
+
+/**
+ * 尝试属性正则匹配
+ */
+function tryAttrRegexMerge(selectors) {
+  // 提取所有 class
+  const classPattern = /\.([a-zA-Z_-][a-zA-Z0-9_-]*)/g;
+  const allClasses = [];
+
+  for (const sel of selectors) {
+    const classes = [];
+    let match;
+    classPattern.lastIndex = 0;
+    while ((match = classPattern.exec(sel)) !== null) {
+      classes.push(match[1]);
+    }
+    allClasses.push(classes);
+  }
+
+  if (allClasses.length === 0 || allClasses.some(c => c.length === 0)) return null;
+
+  // 找出共同的词（用空格分隔的 class）
+  const firstClasses = allClasses[0];
+  for (const cls of firstClasses) {
+    // 检查是否所有元素都有这个词
+    const allHave = allClasses.every(classes => classes.includes(cls));
+    if (allHave) {
+      // 使用 [class~="word"] 匹配
+      const tagMatch = selectors[0].match(/^([a-z]+)/);
+      const tag = tagMatch ? tagMatch[1] : '';
+      return tag + '[class~="' + cls + '"]';
+    }
+  }
+  return null;
+}
+
+/**
+ * 尝试 :nth-child(An+B) 公式模式
+ */
+function tryNthFormulaMerge(selectors) {
+  // 解析 nth-child 信息
+  const parsed = selectors.map(sel => {
+    const parts = sel.split(/\s*>\s*/);
+    const last = parts[parts.length - 1];
+    const match = last.match(/:nth-child\((\d+)\)/);
+    return {
+      full: sel,
+      parts,
+      last,
+      nthChild: match ? parseInt(match[1], 10) : null,
+      parent: parts.slice(0, -1).join(' > ')
+    };
+  });
+
+  const parents = [...new Set(parsed.map(p => p.parent))];
+  if (parents.length === 1 && parents[0]) {
+    const nthValues = parsed.filter(p => p.nthChild !== null).map(p => p.nthChild);
+    if (nthValues.length === selectors.length && nthValues.length >= 3) {
+      // 尝试找出 An+B 公式
+      const sorted = [...nthValues].sort((a, b) => a - b);
+
+      // 检查是否是等差数列
+      const diffs = [];
+      for (let i = 1; i < sorted.length; i++) {
+        diffs.push(sorted[i] - sorted[i - 1]);
+      }
+      const uniqueDiffs = [...new Set(diffs)];
+
+      if (uniqueDiffs.length === 1) {
+        // 等差数列，生成 :nth-child(An+B)
+        const A = uniqueDiffs[0];
+        const B = sorted[0] - A;
+        const base = parsed[0].last.replace(/:nth-child\(\d+\)/g, '');
+
+        if (A === 1) {
+          // :nth-child(n+B)
+          return parents[0] + ' > ' + base + ':nth-child(n+' + B + ')';
+        } else {
+          // :nth-child(An+B)
+          return parents[0] + ' > ' + base + ':nth-child(' + A + 'n+' + B + ')';
+        }
+      }
+
+      // 检查是否是奇数/偶数
+      const allOdd = sorted.every(n => n % 2 === 1);
+      const allEven = sorted.every(n => n % 2 === 0);
+
+      if (allOdd) {
+        const base = parsed[0].last.replace(/:nth-child\(\d+\)/g, '');
+        return parents[0] + ' > ' + base + ':nth-child(odd)';
+      }
+      if (allEven) {
+        const base = parsed[0].last.replace(/:nth-child\(\d+\)/g, '');
+        return parents[0] + ' > ' + base + ':nth-child(even)';
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * 尝试 :only-child/:only-of-type 合并
+ */
+function tryOnlyMerge(selectors) {
+  // 检查是否所有选择器都指向唯一子元素
+  const lastParts = selectors.map(s => {
+    const parts = s.split(/\s*>\s*/);
+    return parts[parts.length - 1];
+  });
+
+  // 检查是否有共同模式
+  const baseParts = lastParts.map(p => p.replace(/:only-child|:only-of-type/g, ''));
+  const uniqueBase = [...new Set(baseParts)];
+
+  if (uniqueBase.length === 1) {
+    const parents = selectors.map(s => s.split(/\s*>\s*/).slice(0, -1).join(' > '));
+    const uniqueParents = [...new Set(parents)];
+    if (uniqueParents.length === 1 && uniqueParents[0]) {
+      // 检查是 :only-child 还是 :only-of-type
+      const hasOnlyChild = selectors.some(s => s.includes(':only-child'));
+      const hasOnlyOfType = selectors.some(s => s.includes(':only-of-type'));
+      const pseudo = hasOnlyOfType ? ':only-of-type' : ':only-child';
+      return uniqueParents[0] + ' > ' + uniqueBase[0] + pseudo;
+    }
+  }
+  return null;
+}
+
+/**
+ * 尝试通配符合并
+ */
+function tryWildcardMerge(selectors) {
+  // 检查是否可以用通配符替换
+  const parsed = selectors.map(sel => {
+    const parts = sel.split(/\s*>\s*/);
+    return { full: sel, parts, depth: parts.length };
+  });
+
+  // 检查是否所有选择器深度相同
+  const depths = [...new Set(parsed.map(p => p.depth))];
+  if (depths.length === 1 && depths[0] >= 2) {
+    // 尝试用 * 替换中间层级
+    const firstParts = parsed[0].parts;
+    const wildcardPath = [firstParts[0], '*', firstParts[firstParts.length - 1]];
+    return wildcardPath.join(' > ');
+  }
+  return null;
+}
+
+/**
+ * 尝试 :has() + 后代组合
+ */
+function tryHasDescendantMerge(selectors) {
+  // 检查是否可以用 :has() 表示
+  const parsed = selectors.map(sel => {
+    const parts = sel.split(/\s*>\s*/);
+    return {
+      full: sel,
+      parts,
+      ancestor: parts[0],
+      descendant: parts.slice(1).join(' > ')
+    };
+  });
+
+  // 检查是否有共同祖先
+  const ancestors = [...new Set(parsed.map(p => p.ancestor))];
+  if (ancestors.length === 1) {
+    const descendants = [...new Set(parsed.map(p => p.descendant))];
+    if (descendants.length <= 3) {
+      return ancestors[0] + ':has(' + descendants.join(', ') + ')';
+    }
+  }
+  return null;
+}
+
+/**
+ * 尝试路径压缩
+ */
+function tryPathCompression(selectors) {
+  // 解析所有路径
+  const paths = selectors.map(s => s.split(/\s*>\s*/));
+
+  // 尝试找出可以压缩的模式
+  // 例如：a > b > c, a > d > c -> a > :is(b, d) > c
+  if (paths.every(p => p.length >= 3)) {
+    const firstParts = paths.map(p => p[0]);
+    const lastParts = paths.map(p => p[p.length - 1]);
+    const middleParts = paths.map(p => p.slice(1, -1).join(' > '));
+
+    const uniqueFirst = [...new Set(firstParts)];
+    const uniqueLast = [...new Set(lastParts)];
+    const uniqueMiddle = [...new Set(middleParts)];
+
+    if (uniqueFirst.length === 1 && uniqueLast.length === 1) {
+      if (uniqueMiddle.length <= 3) {
+        return uniqueFirst[0] + ' > :is(' + uniqueMiddle.join(', ') + ') > ' + uniqueLast[0];
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * 尝试通用兄弟选择器 ~
+ */
+function tryGeneralSiblingMerge(selectors) {
+  // 检查是否可以用 ~ 表示兄弟关系
+  const parsed = selectors.map(sel => {
+    const parts = sel.split(/\s*>\s*/);
+    return {
+      full: sel,
+      parts,
+      last: parts[parts.length - 1],
+      parent: parts.slice(0, -1).join(' > ')
+    };
+  });
+
+  const parents = [...new Set(parsed.map(p => p.parent))];
+  if (parents.length === 1 && parents[0]) {
+    const lastParts = [...new Set(parsed.map(p => p.last))];
+    if (lastParts.length === selectors.length && lastParts.length >= 2) {
+      // 检查是否是兄弟关系
+      // 生成 parent > first ~ last 模式
+      const first = lastParts[0];
+      const others = lastParts.slice(1);
+      if (others.every(o => o === first.replace(/\.\w+/g, ''))) {
+        // 相同 tag，不同 class
+        return parents[0] + ' > ' + first + ' ~ ' + others[0];
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * 尝试 :lang() 合并
+ */
+function tryLangMerge(selectors) {
+  // 检查是否所有选择器都有 lang 属性
+  const langPattern = /\[lang="([^"]+)"\]|:lang\(([^)]+)\)/;
+  const langs = selectors.map(s => {
+    const match = s.match(langPattern);
+    return match ? (match[1] || match[2]) : null;
+  });
+
+  if (langs.every(l => l !== null)) {
+    const uniqueLangs = [...new Set(langs)];
+    if (uniqueLangs.length === 1) {
+      const bases = selectors.map(s => s.replace(langPattern, ''));
+      const uniqueBases = [...new Set(bases)];
+      if (uniqueBases.length === 1) {
+        return uniqueBases[0] + ':lang(' + uniqueLangs[0] + ')';
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * 尝试 :dir() 合并
+ */
+function tryDirMerge(selectors) {
+  // 检查是否所有选择器都有 dir 属性
+  const dirPattern = /\[dir="([^"]+)"\]|:dir\(([^)]+)\)/;
+  const dirs = selectors.map(s => {
+    const match = s.match(dirPattern);
+    return match ? (match[1] || match[2]) : null;
+  });
+
+  if (dirs.every(d => d !== null)) {
+    const uniqueDirs = [...new Set(dirs)];
+    if (uniqueDirs.length === 1) {
+      const bases = selectors.map(s => s.replace(dirPattern, ''));
+      const uniqueBases = [...new Set(bases)];
+      if (uniqueBases.length === 1) {
+        return uniqueBases[0] + ':dir(' + uniqueDirs[0] + ')';
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * 尝试 :target/:focus/:hover 合并
+ */
+function tryTargetMerge(selectors) {
+  const targetPseudos = [':target', ':focus', ':focus-within', ':focus-visible', ':hover', ':active'];
+
+  for (const pseudo of targetPseudos) {
+    const hasPseudo = selectors.filter(s => s.includes(pseudo));
+    if (hasPseudo.length === selectors.length) {
+      const bases = selectors.map(s => s.replace(pseudo, ''));
+      const uniqueBases = [...new Set(bases)];
+      if (uniqueBases.length === 1) {
+        return uniqueBases[0] + pseudo;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * 尝试深度选择器合并
+ */
+function tryDeepMerge(selectors) {
+  // 检查是否可以用深度选择器简化
+  const paths = selectors.map(s => s.split(/\s*>\s*/));
+
+  if (paths.every(p => p.length >= 3)) {
+    const firstParts = [...new Set(paths.map(p => p[0]))];
+    const lastParts = [...new Set(paths.map(p => p[p.length - 1]))];
+
+    if (firstParts.length === 1 && lastParts.length === 1) {
+      // 使用深度选择器
+      return firstParts[0] + ' ' + lastParts[0];
+    }
+  }
+  return null;
+}
+
+/**
+ * 尝试 :is() + 属性组合
+ */
+function tryIsAttrMerge(selectors) {
+  // 提取所有属性选择器
+  const attrPattern = /\[([a-zA-Z_-][a-zA-Z0-9_-]*)="([^"]+)"\]/g;
+  const allAttrs = [];
+
+  for (const sel of selectors) {
+    const attrs = [];
+    let match;
+    attrPattern.lastIndex = 0;
+    while ((match = attrPattern.exec(sel)) !== null) {
+      attrs.push({ name: match[1], value: match[2] });
+    }
+    allAttrs.push(attrs);
+  }
+
+  if (allAttrs.length === 0 || allAttrs.some(a => a.length === 0)) return null;
+
+  // 找出共同的属性名
+  const firstAttrNames = allAttrs[0].map(a => a.name);
+  for (const attrName of firstAttrNames) {
+    const values = allAttrs.map(attrs => {
+      const found = attrs.find(a => a.name === attrName);
+      return found ? found.value : null;
+    });
+
+    if (values.every(v => v !== null)) {
+      const uniqueValues = [...new Set(values)];
+      if (uniqueValues.length === selectors.length && uniqueValues.length <= 5) {
+        const tagMatch = selectors[0].match(/^([a-z]+)/);
+        const tag = tagMatch ? tagMatch[1] : '';
+        const isContent = uniqueValues.map(v => '[' + attrName + '="' + v + '"]').join(', ');
+        return tag + ':is(' + isContent + ')';
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * 尝试 :where() + :not() 组合
+ */
+function tryWhereNotMerge(selectors) {
+  // 解析选择器
+  const parsed = selectors.map(sel => {
+    const parts = sel.split(/\s*>\s*/);
+    return {
+      full: sel,
+      last: parts[parts.length - 1],
+      parent: parts.slice(0, -1).join(' > ')
+    };
+  });
+
+  const parents = [...new Set(parsed.map(p => p.parent))];
+  if (parents.length === 1 && parents[0]) {
+    // 提取所有选中元素的 class
+    const classPattern = /\.([a-zA-Z_-][a-zA-Z0-9_-]*)/g;
+    const allClasses = [];
+    for (const p of parsed) {
+      const classes = [];
+      let match;
+      classPattern.lastIndex = 0;
+      while ((match = classPattern.exec(p.last)) !== null) {
+        classes.push(match[1]);
+      }
+      allClasses.push(new Set(classes));
+    }
+
+    // 找出共同的 class
+    const commonClasses = [...allClasses[0]].filter(cls =>
+      allClasses.every(set => set.has(cls))
+    );
+
+    if (commonClasses.length > 0) {
+      const tagMatch = parsed[0].last.match(/^([a-z]+)/);
+      const tag = tagMatch ? tagMatch[1] : '';
+      return parents[0] + ' > ' + tag + '.' + commonClasses[0];
+    }
+
+    // 使用 :where() 包裹不同的部分
+    const lastParts = [...new Set(parsed.map(p => p.last))];
+    if (lastParts.length <= 5) {
+      return parents[0] + ' > :where(' + lastParts.join(', ') + ')';
+    }
+  }
+  return null;
+}
+
+/**
+ * 尝试 :nth-child(2n) 偶数模式
+ */
+function tryEvenOddMerge(selectors) {
+  const parsed = selectors.map(sel => {
+    const parts = sel.split(/\s*>\s*/);
+    const last = parts[parts.length - 1];
+    const match = last.match(/:nth-child\((\d+)\)/);
+    return {
+      full: sel,
+      parts,
+      last,
+      nthChild: match ? parseInt(match[1], 10) : null,
+      parent: parts.slice(0, -1).join(' > ')
+    };
+  });
+
+  const parents = [...new Set(parsed.map(p => p.parent))];
+  if (parents.length === 1 && parents[0]) {
+    const nthValues = parsed.filter(p => p.nthChild !== null).map(p => p.nthChild);
+    if (nthValues.length === selectors.length && nthValues.length >= 2) {
+      // 检查是否全是偶数
+      const allEven = nthValues.every(n => n % 2 === 0);
+      if (allEven) {
+        const base = parsed[0].last.replace(/:nth-child\(\d+\)/g, '');
+        return parents[0] + ' > ' + base + ':nth-child(even)';
+      }
+
+      // 检查是否全是奇数
+      const allOdd = nthValues.every(n => n % 2 === 1);
+      if (allOdd) {
+        const base = parsed[0].last.replace(/:nth-child\(\d+\)/g, '');
+        return parents[0] + ' > ' + base + ':nth-child(odd)';
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * 尝试 :not(:first-child) 排除模式
+ */
+function tryNotFirstLastMerge(selectors) {
+  const parsed = selectors.map(sel => {
+    const parts = sel.split(/\s*>\s*/);
+    return {
+      full: sel,
+      parts,
+      last: parts[parts.length - 1],
+      parent: parts.slice(0, -1).join(' > ')
+    };
+  });
+
+  const parents = [...new Set(parsed.map(p => p.parent))];
+  if (parents.length === 1 && parents[0]) {
+    const lastParts = [...new Set(parsed.map(p => p.last))];
+
+    // 如果只有一个唯一选择器，但匹配多个元素
+    if (lastParts.length === 1) {
+      // 检查是否可以用 :not(:first-child) 或 :not(:last-child)
+      const base = lastParts[0];
+      const tagMatch = base.match(/^([a-z]+)/);
+      const tag = tagMatch ? tagMatch[1] : '';
+
+      // 尝试 :not(:first-child)
+      const sel1 = tag + ':not(:first-child)';
+      // 这里无法验证，返回候选
+      return parents[0] + ' > ' + sel1;
+    }
+  }
+  return null;
+}
+
+/**
+ * 尝试多属性组合
+ */
+function tryMultiAttrMerge(selectors) {
+  // 提取所有属性
+  const attrPattern = /\[([a-zA-Z_-][a-zA-Z0-9_-]*)="([^"]+)"\]/g;
+  const allAttrs = [];
+
+  for (const sel of selectors) {
+    const attrs = new Map();
+    let match;
+    attrPattern.lastIndex = 0;
+    while ((match = attrPattern.exec(sel)) !== null) {
+      attrs.set(match[1], match[2]);
+    }
+    allAttrs.push(attrs);
+  }
+
+  if (allAttrs.length === 0 || allAttrs.some(a => a.size === 0)) return null;
+
+  // 找出所有共同的属性
+  const commonAttrs = [];
+  const firstAttrs = allAttrs[0];
+  for (const [name, value] of firstAttrs) {
+    if (allAttrs.every(attrs => attrs.get(name) === value)) {
+      commonAttrs.push({ name, value });
+    }
+  }
+
+  if (commonAttrs.length >= 2) {
+    // 使用多属性组合
+    const tagMatch = selectors[0].match(/^([a-z]+)/);
+    const tag = tagMatch ? tagMatch[1] : '';
+    const attrStr = commonAttrs.slice(0, 2).map(a => '[' + a.name + '="' + a.value + '"]').join('');
+    return tag + attrStr;
+  }
+  return null;
+}
+
+/**
+ * 尝试 :is() + :nth-child 组合
+ */
+function tryIsNthMerge(selectors) {
+  const parsed = selectors.map(sel => {
+    const parts = sel.split(/\s*>\s*/);
+    const last = parts[parts.length - 1];
+    const nthMatch = last.match(/:nth-child\((\d+)\)/);
+    const classMatch = last.match(/\.([a-zA-Z_-][a-zA-Z0-9_-]*)/);
+
+    return {
+      full: sel,
+      parts,
+      last,
+      nthChild: nthMatch ? parseInt(nthMatch[1], 10) : null,
+      class: classMatch ? classMatch[1] : null,
+      parent: parts.slice(0, -1).join(' > ')
+    };
+  });
+
+  const parents = [...new Set(parsed.map(p => p.parent))];
+  if (parents.length === 1 && parents[0]) {
+    // 检查是否所有元素都有相同的 class
+    const classes = parsed.map(p => p.class);
+    const uniqueClasses = [...new Set(classes.filter(c => c !== null))];
+
+    if (uniqueClasses.length === 1) {
+      const nthValues = parsed.filter(p => p.nthChild !== null).map(p => p.nthChild);
+      if (nthValues.length === selectors.length && nthValues.length <= 5) {
+        // 生成 :is(:nth-child(1), :nth-child(2), ...) 模式
+        const nthStr = nthValues.map(n => ':nth-child(' + n + ')').join(', ');
+        const tagMatch = parsed[0].last.match(/^([a-z]+)/);
+        const tag = tagMatch ? tagMatch[1] : '';
+        return parents[0] + ' > ' + tag + '.' + uniqueClasses[0] + ':is(' + nthStr + ')';
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * 尝试 :has(> :not(:empty)) 非空子元素
+ */
+function tryHasNotEmptyMerge(selectors) {
+  const parsed = selectors.map(sel => {
+    const parts = sel.split(/\s*>\s*/);
+    return {
+      full: sel,
+      parts,
+      last: parts[parts.length - 1],
+      parent: parts.slice(0, -1).join(' > ')
+    };
+  });
+
+  const parents = [...new Set(parsed.map(p => p.parent))];
+  if (parents.length === 1 && parents[0]) {
+    const lastParts = [...new Set(parsed.map(p => p.last))];
+    if (lastParts.length === 1) {
+      // 检查是否可以用 :has(> :not(:empty))
+      const base = lastParts[0];
+      const tagMatch = base.match(/^([a-z]+)/);
+      const tag = tagMatch ? tagMatch[1] : '';
+      return parents[0] + ' > ' + tag + ':has(> :not(:empty))';
+    }
+  }
+  return null;
+}
+
+/**
+ * 尝试属性值模式匹配
+ */
+function tryAttrPatternMerge(selectors) {
+  // 提取所有属性值
+  const attrPattern = /\[([a-zA-Z_-][a-zA-Z0-9_-]*)="([^"]+)"\]/g;
+  const allAttrs = [];
+
+  for (const sel of selectors) {
+    const attrs = [];
+    let match;
+    attrPattern.lastIndex = 0;
+    while ((match = attrPattern.exec(sel)) !== null) {
+      attrs.push({ name: match[1], value: match[2] });
+    }
+    allAttrs.push(attrs);
+  }
+
+  if (allAttrs.length === 0 || allAttrs.some(a => a.length === 0)) return null;
+
+  // 找出属性值中的共同模式
+  const firstAttrs = allAttrs[0];
+  for (const attr of firstAttrs) {
+    const value = attr.value;
+
+    // 检查是否有共同的前缀
+    for (let len = Math.min(value.length, 10); len >= 3; len--) {
+      const prefix = value.substring(0, len);
+      const allHavePrefix = allAttrs.every(attrs =>
+        attrs.some(a => a.value.startsWith(prefix))
+      );
+
+      if (allHavePrefix) {
+        const tagMatch = selectors[0].match(/^([a-z]+)/);
+        const tag = tagMatch ? tagMatch[1] : '';
+        return tag + '[' + attr.name + '^="' + prefix + '"]';
+      }
+    }
+
+    // 检查是否有共同的后缀
+    for (let len = Math.min(value.length, 10); len >= 3; len--) {
+      const suffix = value.substring(value.length - len);
+      const allHaveSuffix = allAttrs.every(attrs =>
+        attrs.some(a => a.value.endsWith(suffix))
+      );
+
+      if (allHaveSuffix) {
+        const tagMatch = selectors[0].match(/^([a-z]+)/);
+        const tag = tagMatch ? tagMatch[1] : '';
+        return tag + '[' + attr.name + '$="' + suffix + '"]';
+      }
+    }
+
+    // 检查是否有共同的子串
+    for (let len = Math.min(value.length, 10); len >= 3; len--) {
+      for (let start = 0; start <= value.length - len; start++) {
+        const substr = value.substring(start, start + len);
+        const allHave = allAttrs.every(attrs =>
+          attrs.some(a => a.value.includes(substr))
+        );
+
+        if (allHave) {
+          const tagMatch = selectors[0].match(/^([a-z]+)/);
+          const tag = tagMatch ? tagMatch[1] : '';
+          return tag + '[' + attr.name + '*="' + substr + '"]';
+        }
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * 尝试 :is() + 多 class 组合
+ */
+function tryIsMultiClassMerge(selectors) {
+  // 提取所有 class
+  const classPattern = /\.([a-zA-Z_-][a-zA-Z0-9_-]*)/g;
+  const allClasses = [];
+
+  for (const sel of selectors) {
+    const classes = [];
+    let match;
+    classPattern.lastIndex = 0;
+    while ((match = classPattern.exec(sel)) !== null) {
+      classes.push(match[1]);
+    }
+    allClasses.push(classes);
+  }
+
+  if (allClasses.length === 0 || allClasses.some(c => c.length === 0)) return null;
+
+  // 找出每个选择器的第一个 class
+  const firstClasses = allClasses.map(c => c[0]);
+  const uniqueFirst = [...new Set(firstClasses)];
+
+  if (uniqueFirst.length === selectors.length && uniqueFirst.length <= 5) {
+    // 所有选择器的第一个 class 都不同
+    const tagMatch = selectors[0].match(/^([a-z]+)/);
+    const tag = tagMatch ? tagMatch[1] : '';
+    const isContent = uniqueFirst.map(c => '.' + c).join(', ');
+    return tag + ':is(' + isContent + ')';
+  }
+  return null;
+}
+
+/**
+ * 尝试结构伪类合并
+ * 使用 :first-child, :last-child, :nth-of-type 等
+ */
+function tryStructuralMerge(remainders, commonPrefix) {
+  // 提取所有 nth-child 信息
+  const nthInfo = remainders.map(r => {
+    const match = r.match(/:nth-(?:child|of-type)\((\d+)\)/);
+    return match ? parseInt(match[1], 10) : null;
+  });
+
+  // 检查是否是连续的序列
+  const validNths = nthInfo.filter(n => n !== null);
+  if (validNths.length === remainders.length && validNths.length >= 2) {
+    const sorted = [...validNths].sort((a, b) => a - b);
+
+    // 检查是否是前 N 个
+    const isConsecutiveFromStart = sorted.every((n, i) => n === i + 1);
+    if (isConsecutiveFromStart) {
+      const base = remainders[0].replace(/:nth-(?:child|of-type)\(\d+\)/g, '');
+      const lastN = sorted[sorted.length - 1];
+
+      // 使用 :nth-child(-n+X) 选择前 X 个
+      const selector = base + ':nth-child(-n+' + lastN + ')';
+      return commonPrefix.join(' > ') + ' > ' + selector;
+    }
+
+    // 检查是否是最后 N 个
+    const totalChildren = sorted[sorted.length - 1];
+    const isConsecutiveFromEnd = sorted.every((n, i) => n === totalChildren - sorted.length + i + 1);
+    if (isConsecutiveFromEnd && sorted.length <= 3) {
+      const base = remainders[0].replace(/:nth-(?:child|of-type)\(\d+\)/g, '');
+
+      // 使用 :nth-child(n+X) 选择从 X 开始
+      const startN = sorted[0];
+      const selector = base + ':nth-child(n+' + startN + ')';
+      return commonPrefix.join(' > ') + ' > ' + selector;
+    }
+  }
+
+  // 检查是否都是第一个或最后一个
+  const firstLast = remainders.map(r => {
+    if (r.includes(':first-child')) return 'first';
+    if (r.includes(':last-child')) return 'last';
+    return null;
+  });
+
+  const validFirstLast = firstLast.filter(f => f !== null);
+  if (validFirstLast.length === remainders.length) {
+    const allFirst = validFirstLast.every(f => f === 'first');
+    const allLast = validFirstLast.every(f => f === 'last');
+
+    if (allFirst || allLast) {
+      const base = remainders[0].replace(/:(?:first|last)-child/g, '');
+      const pseudo = allFirst ? ':first-child' : ':last-child';
+      return commonPrefix.join(' > ') + ' > ' + base + pseudo;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * 尝试复杂 :not() 合并
+ * 生成 :not(.class1, .class2) 或 :not([attr1], [attr2])
+ */
+function tryComplexNotMerge(remainders, commonPrefix) {
+  // 提取基础部分和 class
+  const baseParts = [];
+  const allClasses = [];
+
+  for (const r of remainders) {
+    const classPattern = /\.([a-zA-Z_-][a-zA-Z0-9_-]*)/g;
+    const classes = [];
+    let match;
+    while ((match = classPattern.exec(r)) !== null) {
+      classes.push(match[1]);
+    }
+    allClasses.push(new Set(classes));
+
+    // 提取基础部分
+    const base = r.replace(classPattern, '').replace(/:nth-child\(\d+\)/g, '');
+    baseParts.push(base);
+  }
+
+  // 如果基础部分相同
+  const uniqueBase = [...new Set(baseParts)];
+  if (uniqueBase.length === 1 && uniqueBase[0]) {
+    // 找出共同的 class
+    const commonClasses = [...allClasses[0]].filter(cls =>
+      allClasses.every(set => set.has(cls))
+    );
+
+    if (commonClasses.length > 0) {
+      // 使用共同 class
+      const selector = uniqueBase[0] + '.' + commonClasses[0];
+      return commonPrefix.join(' > ') + ' > ' + selector;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * 尝试结构伪类全局合并
+ */
+function tryStructuralPseudoMerge(selectors) {
+  // 检查选择器是否包含结构伪类
+  const pseudoPattern = /:(first|last|nth|only)-(child|of-type)/;
+  const hasPseudo = selectors.every(s => pseudoPattern.test(s));
+
+  if (!hasPseudo) return null;
+
+  // 提取基础选择器和伪类
+  const parsed = selectors.map(s => {
+    const match = s.match(/^(.+?)(:[a-z-]+(?:\([^)]*\))?)$/);
+    if (match) {
+      return { base: match[1], pseudo: match[2] };
+    }
+    return null;
+  }).filter(Boolean);
+
+  if (parsed.length === selectors.length) {
+    // 检查基础选择器是否相同
+    const bases = [...new Set(parsed.map(p => p.base))];
+    if (bases.length === 1) {
+      // 合并伪类
+      const pseudos = [...new Set(parsed.map(p => p.pseudo))];
+      if (pseudos.length <= 3) {
+        return bases[0] + ':is(' + pseudos.join(', ') + ')';
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * 尝试属性前缀/后缀合并
+ */
+function tryAttrPrefixSuffixMerge(selectors) {
+  // 提取所有属性选择器
+  const attrPattern = /\[([a-zA-Z_-][a-zA-Z0-9_-]*)\^?=\^?"([^"]+)"\]?/g;
+  const allAttrs = [];
+
+  for (const sel of selectors) {
+    const attrs = [];
+    let match;
+    attrPattern.lastIndex = 0;
+    while ((match = attrPattern.exec(sel)) !== null) {
+      attrs.push({ name: match[1], value: match[2] });
+    }
+    allAttrs.push(attrs);
+  }
+
+  if (allAttrs.length === 0 || allAttrs.some(a => a.length === 0)) return null;
+
+  // 找出共同的前缀或后缀
+  const firstAttrs = allAttrs[0];
+  for (const attr of firstAttrs) {
+    const value = attr.value;
+
+    // 尝试不同长度的前缀
+    for (let len = Math.min(value.length, 10); len >= 3; len--) {
+      const prefix = value.substring(0, len);
+      const allHavePrefix = allAttrs.every(attrs =>
+        attrs.some(a => a.value.startsWith(prefix))
+      );
+
+      if (allHavePrefix) {
+        const tagMatch = selectors[0].match(/^([a-z]+)/);
+        const tag = tagMatch ? tagMatch[1] : '';
+        return tag + '[' + attr.name + '^="' + prefix + '"]';
+      }
+    }
+
+    // 尝试不同长度的后缀
+    for (let len = Math.min(value.length, 10); len >= 3; len--) {
+      const suffix = value.substring(value.length - len);
+      const allHaveSuffix = allAttrs.every(attrs =>
+        attrs.some(a => a.value.endsWith(suffix))
+      );
+
+      if (allHaveSuffix) {
+        const tagMatch = selectors[0].match(/^([a-z]+)/);
+        const tag = tagMatch ? tagMatch[1] : '';
+        return tag + '[' + attr.name + '$="' + suffix + '"]';
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * 尝试嵌套伪类合并
+ * 生成 :not(:is(.a, .b)) 或 :is(:not(.a), :not(.b)) 等
+ */
+function tryNestedPseudoMerge(selectors) {
+  // 解析选择器结构
+  const parsed = selectors.map(sel => {
+    const parts = sel.split(/\s*>\s*/);
+    return {
+      full: sel,
+      parts,
+      last: parts[parts.length - 1],
+      parent: parts.slice(0, -1).join(' > ')
+    };
+  });
+
+  // 检查是否有共同父级
+  const parents = [...new Set(parsed.map(p => p.parent))];
+  if (parents.length === 1 && parents[0]) {
+    const parent = parents[0];
+    const lastParts = parsed.map(p => p.last);
+
+    // 提取 class
+    const classPattern = /\.([a-zA-Z_-][a-zA-Z0-9_-]*)/g;
+    const allClasses = [];
+    for (const part of lastParts) {
+      const classes = [];
+      let match;
+      classPattern.lastIndex = 0;
+      while ((match = classPattern.exec(part)) !== null) {
+        classes.push(match[1]);
+      }
+      allClasses.push(classes);
+    }
+
+    // 如果每个元素都有 class
+    if (allClasses.every(c => c.length > 0)) {
+      // 尝试生成 :not(:is(.excluded)) 模式
+      // 假设我们要排除某些 class
+
+      // 或者生成 :is(.a, .b, .c) 模式
+      const flatClasses = [...new Set(allClasses.flat())];
+      if (flatClasses.length <= 5) {
+        const tagMatch = lastParts[0].match(/^([a-z]+)/);
+        const tag = tagMatch ? tagMatch[1] : '';
+        const isContent = flatClasses.map(c => '.' + c).join(', ');
+        return parent + ' > ' + tag + ':is(' + isContent + ')';
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * 尝试共同属性值合并
+ */
+function tryCommonAttrMerge(selectors) {
+  // 提取所有属性
+  const attrPattern = /\[([a-zA-Z_-][a-zA-Z0-9_-]*)="([^"]+)"\]/g;
+  const allAttrs = [];
+
+  for (const sel of selectors) {
+    const attrs = new Map();
+    let match;
+    attrPattern.lastIndex = 0;
+    while ((match = attrPattern.exec(sel)) !== null) {
+      attrs.set(match[1], match[2]);
+    }
+    allAttrs.push(attrs);
+  }
+
+  if (allAttrs.length === 0 || allAttrs.some(a => a.size === 0)) return null;
+
+  // 找出共同的属性
+  const firstAttrs = allAttrs[0];
+  for (const [name, value] of firstAttrs) {
+    const allHave = allAttrs.every(attrs => attrs.get(name) === value);
+    if (allHave) {
+      const tagMatch = selectors[0].match(/^([a-z]+)/);
+      const tag = tagMatch ? tagMatch[1] : '';
+      return tag + '[' + name + '="' + value + '"]';
+    }
+  }
+
+  return null;
+}
+
+/**
+ * 尝试路径优化
+ * 找到最短的唯一路径
+ */
+function tryPathOptimization(selectors) {
+  // 解析所有选择器的路径
+  const paths = selectors.map(s => s.split(/\s*>\s*/));
+
+  // 尝试从后向前缩短路径
+  for (let startFromEnd = 1; startFromEnd <= 3; startFromEnd++) {
+    const shortened = paths.map(p => p.slice(-startFromEnd).join(' > '));
+    const unique = [...new Set(shortened)];
+
+    // 如果缩短后仍然唯一
+    if (unique.length === 1) {
+      return unique[0];
+    }
+
+    // 如果缩短后可以用 :is() 合并
+    if (unique.length <= 5 && unique.every(u => u.length < 50)) {
+      return ':is(' + unique.join(', ') + ')';
+    }
+  }
+
+  // 尝试移除中间层级
+  if (paths.every(p => p.length >= 3)) {
+    const skipMiddle = paths.map(p => [p[0], p[p.length - 1]].join(' > '));
+    const unique = [...new Set(skipMiddle)];
+
+    if (unique.length === 1) {
+      return unique[0];
+    }
+  }
+
+  return null;
+}
+
+/**
+ * 尝试模糊匹配合并
+ * 使用更宽松的匹配规则
+ */
+function tryFuzzyMerge(selectors) {
+  // 提取所有 tag
+  const tagPattern = /^([a-z]+)/;
+  const tags = selectors.map(s => {
+    const match = s.match(tagPattern);
+    return match ? match[1] : '';
+  });
+
+  const uniqueTags = [...new Set(tags)];
+
+  // 如果所有选择器都有相同的 tag
+  if (uniqueTags.length === 1 && uniqueTags[0]) {
+    const tag = uniqueTags[0];
+
+    // 提取所有 class
+    const classPattern = /\.([a-zA-Z_-][a-zA-Z0-9_-]*)/g;
+    const allClasses = [];
+
+    for (const sel of selectors) {
+      const classes = [];
+      let match;
+      classPattern.lastIndex = 0;
+      while ((match = classPattern.exec(sel)) !== null) {
+        classes.push(match[1]);
+      }
+      allClasses.push(new Set(classes));
+    }
+
+    // 找出至少在一个选择器中出现的 class
+    const anyClass = new Set();
+    for (const classSet of allClasses) {
+      for (const cls of classSet) {
+        anyClass.add(cls);
+      }
+    }
+
+    // 检查是否大多数选择器都有这些 class
+    const commonThreshold = Math.ceil(selectors.length * 0.7);
+    const commonClasses = [...anyClass].filter(cls =>
+      allClasses.filter(set => set.has(cls)).length >= commonThreshold
+    );
+
+    if (commonClasses.length > 0) {
+      return tag + '.' + commonClasses[0];
+    }
+  }
+
+  return null;
+}
+
+/**
+ * 尝试高级合并模式
+ */
+function tryAdvancedMerge(remainders, commonPrefix) {
+  // 检查是否都是简单的 tag 或 tag.class 形式
+  const simplePattern = /^[a-z]+(\.[a-zA-Z_-][a-zA-Z0-9_-]*)?$/;
+  if (!remainders.every(r => simplePattern.test(r))) return null;
+
+  // 提取 tags 和 classes
+  const tags = new Set();
+  const classes = new Set();
+  for (const r of remainders) {
+    const match = r.match(/^([a-z]+)(?:\.([a-zA-Z_-][a-zA-Z0-9_-]*))?$/);
+    if (match) {
+      tags.add(match[1]);
+      if (match[2]) classes.add(match[2]);
+    }
+  }
+
+  // 如果都是同一个 tag，且有共同 class
+  if (tags.size === 1 && classes.size === 1) {
+    const tag = [...tags][0];
+    const cls = [...classes][0];
+    return commonPrefix.join(' > ') + ' > ' + tag + '.' + cls;
+  }
+
+  // 如果都是同一个 tag，使用 :is() 合并不同 class
+  if (tags.size === 1 && classes.size > 1) {
+    const tag = [...tags][0];
+    const classList = [...classes];
+    if (classList.length <= 5) {
+      const isContent = classList.map(c => '.' + c).join(', ');
+      return commonPrefix.join(' > ') + ' > ' + tag + ':is(' + isContent + ')';
+    }
+  }
+
+  // 如果有多个 tag 但有共同 class
+  if (classes.size === 1 && tags.size > 1 && tags.size <= 5) {
+    const cls = [...classes][0];
+    const tagList = [...tags];
+    return commonPrefix.join(' > ') + ' > ' + ':is(' + tagList.map(t => t + '.' + cls).join(', ') + ')';
+  }
+
+  return null;
+}
+
+/**
+ * 尝试 :not() 排除模式（用于剩余部分）
+ */
+function tryNotMergeForRemainders(remainders, commonPrefix) {
+  // 提取所有 nth-child 信息
+  const nthPattern = /:nth-child\((\d+)\)/;
+  const nthIndices = [];
+  const baseParts = [];
+
+  for (const r of remainders) {
+    const match = r.match(nthPattern);
+    if (match) {
+      nthIndices.push(parseInt(match[1], 10));
+      // 提取基础部分（不含 nth-child）
+      baseParts.push(r.replace(nthPattern, ''));
+    }
+  }
+
+  // 如果能提取到 nth-child 信息
+  if (nthIndices.length === remainders.length && nthIndices.length >= 2) {
+    // 检查基础部分是否相同
+    const uniqueBase = [...new Set(baseParts)];
+    if (uniqueBase.length === 1) {
+      const base = uniqueBase[0];
+      const minNth = Math.min(...nthIndices);
+      const maxNth = Math.max(...nthIndices);
+      const selectedSet = new Set(nthIndices);
+
+      // 找出应该排除的索引
+      const excludeIndices = [];
+      for (let i = minNth; i <= maxNth; i++) {
+        if (!selectedSet.has(i)) {
+          excludeIndices.push(i);
+        }
+      }
+
+      // 如果排除的数量少于选中的数量，使用 :not() 模式
+      if (excludeIndices.length > 0 && excludeIndices.length < nthIndices.length) {
+        const notChain = excludeIndices.map(i => ':not(:nth-child(' + i + '))').join('');
+        return commonPrefix.join(' > ') + ' > ' + base + ':nth-child(n)' + notChain;
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * 尝试属性包含选择器合并
+ */
+function tryAttrContainsMerge(remainders, commonPrefix) {
+  // 提取所有 class
+  const classPattern = /\.([a-zA-Z_-][a-zA-Z0-9_-]*)/g;
+  const allClasses = [];
+
+  for (const r of remainders) {
+    const classes = [];
+    let match;
+    while ((match = classPattern.exec(r)) !== null) {
+      classes.push(match[1]);
+    }
+    allClasses.push(classes);
+  }
+
+  // 找出共同 class 子串
+  if (allClasses.length > 0 && allClasses.every(c => c.length > 0)) {
+    const firstClasses = allClasses[0];
+
+    for (const cls of firstClasses) {
+      // 尝试不同长度的子串
+      for (let len = Math.min(cls.length, 8); len >= 3; len--) {
+        for (let start = 0; start <= cls.length - len; start++) {
+          const substr = cls.substring(start, start + len);
+
+          // 检查是否所有元素都有包含此子串的 class
+          const allHave = allClasses.every(classes =>
+            classes.some(c => c.includes(substr))
+          );
+
+          if (allHave) {
+            // 提取 tag
+            const tagMatch = remainders[0].match(/^([a-z]+)/);
+            const tag = tagMatch ? tagMatch[1] : '';
+
+            const sel = tag + '[class*="' + substr + '"]';
+            return commonPrefix.join(' > ') + ' > ' + sel;
+          }
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * 尝试共同 class 合并
+ */
+function tryClassMerge(selectors) {
+  // 提取所有 class
+  const allClasses = [];
+  const classPattern = /\.([a-zA-Z_-][a-zA-Z0-9_-]*)/g;
+
+  for (const sel of selectors) {
+    const classes = [];
+    let match;
+    while ((match = classPattern.exec(sel)) !== null) {
+      classes.push(match[1]);
+    }
+    allClasses.push(new Set(classes));
+  }
+
+  // 找出共同 class
+  if (allClasses.length === 0) return null;
+  const commonClasses = [...allClasses[0]].filter(cls =>
+    allClasses.every(set => set.has(cls))
+  );
+
+  if (commonClasses.length > 0) {
+    return '.' + commonClasses[0];
+  }
+
+  return null;
+}
+
+/**
+ * 尝试 :not() 排除模式
+ * 生成类似 .parent > *:not(:nth-child(2)):not(:nth-child(5)) 的选择器
+ */
+function tryNotMerge(selectors) {
+  // 解析选择器结构
+  const parsed = selectors.map(sel => {
+    const parts = sel.split(/\s*>\s*/);
+    return {
+      full: sel,
+      parts,
+      last: parts[parts.length - 1]
+    };
+  });
+
+  // 检查是否有共同父级
+  if (parsed.length < 2) return null;
+
+  // 找出共同父级路径
+  const firstParts = parsed[0].parts.slice(0, -1);
+  const commonParent = firstParts.join(' > ');
+
+  // 检查所有选择器是否共享相同父级
+  const sameParent = parsed.every(p =>
+    p.parts.slice(0, -1).join(' > ') === commonParent
+  );
+
+  if (!sameParent) return null;
+
+  // 提取最后的 nth-child 信息
+  const lastParts = parsed.map(p => p.last);
+  const nthPattern = /:nth-child\((\d+)\)/;
+
+  const nthIndices = [];
+  for (const part of lastParts) {
+    const match = part.match(nthPattern);
+    if (match) {
+      nthIndices.push(parseInt(match[1], 10));
+    }
+  }
+
+  // 如果能提取到 nth-child 信息，生成 :not() 模式
+  if (nthIndices.length === selectors.length && nthIndices.length >= 2) {
+    const minNth = Math.min(...nthIndices);
+    const maxNth = Math.max(...nthIndices);
+    const selectedSet = new Set(nthIndices);
+
+    const excludeIndices = [];
+    for (let i = minNth; i <= maxNth; i++) {
+      if (!selectedSet.has(i)) {
+        excludeIndices.push(i);
+      }
+    }
+
+    if (excludeIndices.length > 0 && excludeIndices.length < nthIndices.length) {
+      const notChain = excludeIndices.map(i => ':not(:nth-child(' + i + '))').join('');
+      const tagMatch = lastParts[0].match(/^([a-z]+)/);
+      const tag = tagMatch ? tagMatch[1] : '*';
+
+      return commonParent + ' > ' + tag + ':nth-child(n)' + notChain;
+    }
+  }
+
+  // 尝试 :not(.class) 模式
+  const notClassMerged = tryNotClassMerge(parsed, commonParent, lastParts);
+  if (notClassMerged) return notClassMerged;
+
+  return null;
+}
+
+/**
+ * 尝试 :not(.class) 排除模式
+ */
+function tryNotClassMerge(parsed, commonParent, lastParts) {
+  // 提取选中元素的 class
+  const selectedClasses = new Set();
+  const classPattern = /\.([a-zA-Z_-][a-zA-Z0-9_-]*)/g;
+
+  for (const part of lastParts) {
+    let match;
+    while ((match = classPattern.exec(part)) !== null) {
+      selectedClasses.add(match[1]);
+    }
+  }
+
+  // 如果选中的元素有共同 class，尝试排除其他 class
+  if (selectedClasses.size > 0 && selectedClasses.size <= 3) {
+    const commonCls = [...selectedClasses][0];
+    const tagMatch = lastParts[0].match(/^([a-z]+)/);
+    const tag = tagMatch ? tagMatch[1] : '*';
+
+    // 生成选择器
+    return commonParent + ' > ' + tag + '.' + commonCls;
+  }
+
+  return null;
+}
+
+/**
+ * 尝试兄弟选择器合并
+ */
+function trySiblingMerge(selectors) {
+  // 检查选择器是否可以表示为兄弟关系
+  const siblingPatterns = [];
+
+  for (const sel of selectors) {
+    // 检查是否有 + 或 ~ 兄弟选择器
+    if (sel.includes(' + ') || sel.includes(' ~ ')) {
+      siblingPatterns.push(sel);
+    }
+  }
+
+  // 如果所有选择器都是兄弟选择器
+  if (siblingPatterns.length === selectors.length) {
+    // 提取前驱元素
+    const predecessors = [];
+    for (const sel of selectors) {
+      const parts = sel.split(/\s*\+\s*|\s*~\s*/);
+      if (parts.length >= 2) {
+        predecessors.push(parts[0]);
+      }
+    }
+
+    // 如果前驱元素相同
+    const uniquePred = [...new Set(predecessors)];
+    if (uniquePred.length === 1) {
+      // 生成 prev + * 或 prev ~ * 模式
+      return uniquePred[0] + ' + *';
+    }
+  }
+
+  return null;
+}
+
+/**
+ * 尝试 :has() 选择器合并
+ */
+function tryHasMerge(selectors) {
+  // 检查选择器是否可以表示为 :has() 模式
+  // 例如：parent:has(> child1), parent:has(> child2) -> parent:has(> :is(child1, child2))
+
+  const hasPattern = /(.+):has\((.+)\)/;
+  const hasMatches = selectors.map(s => s.match(hasPattern)).filter(Boolean);
+
+  if (hasMatches.length === selectors.length) {
+    // 提取父级和子级
+    const parents = [...new Set(hasMatches.map(m => m[1]))];
+    const children = hasMatches.map(m => m[2]);
+
+    if (parents.length === 1) {
+      // 合并子级
+      const mergedChildren = ':is(' + children.join(', ') + ')';
+      return parents[0] + ':has(' + mergedChildren + ')';
+    }
+  }
+
+  return null;
+}
+
+/**
+ * 尝试共同祖先合并
+ */
+function tryAncestorMerge(selectors) {
+  // 解析所有选择器的路径
+  const paths = selectors.map(s => s.split(/\s*>\s*/));
+
+  // 找出共同祖先（路径前缀）
+  let commonAncestor = [];
+  const minLen = Math.min(...paths.map(p => p.length - 1)); // 不包括最后一个
+
+  for (let i = 0; i < minLen; i++) {
+    const part = paths[0][i];
+    // 检查是否所有路径都有相同的前缀部分（忽略 nth-child 差异）
+    const normalizedPart = part.replace(/:nth-child\(\d+\)/g, '');
+    const allMatch = paths.every(p => {
+      const normalized = p[i].replace(/:nth-child\(\d+\)/g, '');
+      return normalized === normalizedPart;
+    });
+
+    if (allMatch) {
+      commonAncestor.push(part);
+    } else {
+      break;
+    }
+  }
+
+  if (commonAncestor.length > 0) {
+    // 获取各选择器的最后部分
+    const lastParts = paths.map(p => p[p.length - 1]);
+
+    // 尝试用 :is() 合并最后部分
+    const uniqueLast = [...new Set(lastParts)];
+    if (uniqueLast.length <= 5) {
+      const ancestor = commonAncestor.join(' > ');
+      const descendants = ':is(' + uniqueLast.join(', ') + ')';
+      return ancestor + ' > ' + descendants;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * 尝试全局属性包含选择器合并
+ */
+function tryAttrContainsMergeGlobal(selectors) {
+  // 提取所有 class
+  const classPattern = /\.([a-zA-Z_-][a-zA-Z0-9_-]*)/g;
+  const allClasses = [];
+
+  for (const sel of selectors) {
+    const classes = [];
+    let match;
+    classPattern.lastIndex = 0; // 重置正则
+    while ((match = classPattern.exec(sel)) !== null) {
+      classes.push(match[1]);
+    }
+    if (classes.length > 0) {
+      allClasses.push(classes);
+    }
+  }
+
+  if (allClasses.length === 0) return null;
+
+  // 找出共同 class 子串
+  const firstClasses = allClasses[0];
+
+  for (const cls of firstClasses) {
+    for (let len = Math.min(cls.length, 8); len >= 3; len--) {
+      for (let start = 0; start <= cls.length - len; start++) {
+        const substr = cls.substring(start, start + len);
+
+        const allHave = allClasses.every(classes =>
+          classes.some(c => c.includes(substr))
+        );
+
+        if (allHave) {
+          return '[class*="' + substr + '"]';
+        }
+      }
+    }
+  }
+
+  return null;
 }
 
 /**

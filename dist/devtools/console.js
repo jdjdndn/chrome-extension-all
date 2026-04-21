@@ -305,7 +305,10 @@ document.querySelectorAll('.info-sub-tab').forEach(tab => {
     document.querySelectorAll('.info-sub-content').forEach(content => {
       content.classList.remove('active');
     });
-    document.getElementById(`info-${subtabId}`).classList.add('active');
+    const targetSubContent = document.getElementById(`info-${subtabId}`);
+    if (targetSubContent) {
+      targetSubContent.classList.add('active');
+    }
 
     // 如果切换到元素标签页
     if (subtabId === 'element') {
@@ -5713,3 +5716,181 @@ historyList?.addEventListener('click', (e) => {
     }
   }
 });
+
+// ========== EventBus 消息监控 ==========
+let eventbusMessages = [];
+let eventbusMonitorEnabled = true;
+let eventbusMonitorPaused = false;
+let eventbusStats = { sent: 0, received: 0, failed: 0, latencies: [] };
+
+const eventbusMessageList = document.getElementById('eventbus-message-list');
+const eventbusFilter = document.getElementById('eventbus-filter');
+const eventbusDirectionFilter = document.getElementById('eventbus-direction-filter');
+const eventbusClearBtn = document.getElementById('eventbus-clear-btn');
+const eventbusPauseBtn = document.getElementById('eventbus-pause-btn');
+const eventbusMonitorCheckbox = document.getElementById('eventbus-monitor-enabled');
+
+// 初始化EventBus监控
+function initEventBusMonitor() {
+  if (typeof EventBus === 'undefined') {
+    console.warn('[EventBus Monitor] EventBus未加载');
+    return;
+  }
+
+  // 启用DevTools监控
+  EventBus.enableDevToolsMonitor();
+
+  // 订阅EventBus内部消息
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message.type === 'EVENTBUS_DEVTOOLS_LOG' && eventbusMonitorEnabled && !eventbusMonitorPaused) {
+      handleEventBusMessages(message.events || []);
+    }
+  });
+
+  console.log('[EventBus Monitor] 已初始化');
+}
+
+// 处理EventBus消息
+function handleEventBusMessages(events) {
+  for (const event of events) {
+    eventbusMessages.unshift(event);
+
+    // 更新统计
+    if (event.direction === 'send') {
+      eventbusStats.sent++;
+    } else if (event.direction === 'receive') {
+      eventbusStats.received++;
+    }
+
+    // 限制消息数量
+    if (eventbusMessages.length > 200) {
+      eventbusMessages.pop();
+    }
+  }
+
+  renderEventBusMessages();
+  updateEventBusStats();
+}
+
+// 渲染EventBus消息列表
+function renderEventBusMessages() {
+  if (!eventbusMessageList) return;
+
+  const filterText = eventbusFilter?.value?.toLowerCase() || '';
+  const directionFilter = eventbusDirectionFilter?.value || 'all';
+
+  let filtered = eventbusMessages;
+
+  // 类型过滤
+  if (filterText) {
+    filtered = filtered.filter(m => m.type?.toLowerCase().includes(filterText));
+  }
+
+  // 方向过滤
+  if (directionFilter !== 'all') {
+    filtered = filtered.filter(m => m.direction === directionFilter);
+  }
+
+  if (filtered.length === 0) {
+    eventbusMessageList.innerHTML = '<div style="color: #999; text-align: center; padding: 40px;">暂无消息</div>';
+    return;
+  }
+
+  eventbusMessageList.innerHTML = filtered.slice(0, 100).map((msg, i) => {
+    const bgColor = msg.direction === 'send' ? '#e3f2fd' : '#e8f5e9';
+    const borderColor = msg.direction === 'send' ? '#2196f3' : '#4caf50';
+    const time = new Date(msg.timestamp).toLocaleTimeString('zh-CN');
+
+    return `
+      <div class="eventbus-msg" style="padding: 8px; margin-bottom: 4px; background: ${bgColor}; border-left: 3px solid ${borderColor}; border-radius: 4px; cursor: pointer;"
+           data-index="${i}">
+        <div style="display: flex; justify-content: space-between; font-size: 11px;">
+          <span style="font-weight: 600; color: #333;">${escapeHtml(msg.type || 'unknown')}</span>
+          <span style="color: #666;">${time}</span>
+        </div>
+        <div style="font-size: 10px; color: #666; margin-top: 4px;">
+          方向: ${msg.direction === 'send' ? '发送' : '接收'} | 来自: ${msg.fromEnv || 'unknown'}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // 点击查看详情
+  eventbusMessageList.querySelectorAll('.eventbus-msg').forEach(el => {
+    el.addEventListener('click', () => {
+      const index = parseInt(el.dataset.index);
+      const msg = filtered[index];
+      if (msg) {
+        console.log('[EventBus Message]', msg);
+        // 显示详情弹窗
+        alert(`消息详情:\n${JSON.stringify(msg, null, 2)}`);
+      }
+    });
+  });
+}
+
+// 更新EventBus统计
+function updateEventBusStats() {
+  const sentEl = document.getElementById('eventbus-sent');
+  const receivedEl = document.getElementById('eventbus-received');
+  const failedEl = document.getElementById('eventbus-failed');
+  const latencyEl = document.getElementById('eventbus-latency');
+
+  if (sentEl) sentEl.textContent = eventbusStats.sent;
+  if (receivedEl) receivedEl.textContent = eventbusStats.received;
+  if (failedEl) failedEl.textContent = eventbusStats.failed;
+
+  // 计算平均延迟
+  if (eventbusStats.latencies.length > 0) {
+    const avg = Math.round(eventbusStats.latencies.reduce((a, b) => a + b, 0) / eventbusStats.latencies.length);
+    if (latencyEl) latencyEl.textContent = avg + 'ms';
+  }
+}
+
+// 清空消息
+if (eventbusClearBtn) {
+  eventbusClearBtn.addEventListener('click', () => {
+    eventbusMessages = [];
+    eventbusStats = { sent: 0, received: 0, failed: 0, latencies: [] };
+    renderEventBusMessages();
+    updateEventBusStats();
+  });
+}
+
+// 暂停/恢复
+if (eventbusPauseBtn) {
+  eventbusPauseBtn.addEventListener('click', () => {
+    eventbusMonitorPaused = !eventbusMonitorPaused;
+    eventbusPauseBtn.textContent = eventbusMonitorPaused ? '▶️ 恢复' : '⏸️ 暂停';
+  });
+}
+
+// 启用/禁用监控
+if (eventbusMonitorCheckbox) {
+  eventbusMonitorCheckbox.addEventListener('change', (e) => {
+    eventbusMonitorEnabled = e.target.checked;
+    if (eventbusMonitorEnabled) {
+      EventBus?.enableDevToolsMonitor();
+    } else {
+      EventBus?.disableDevToolsMonitor();
+    }
+  });
+}
+
+// 过滤器事件
+if (eventbusFilter) {
+  eventbusFilter.addEventListener('input', renderEventBusMessages);
+}
+if (eventbusDirectionFilter) {
+  eventbusDirectionFilter.addEventListener('change', renderEventBusMessages);
+}
+
+// 初始化
+setTimeout(initEventBusMonitor, 500);
+
+// 辅助函数
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}

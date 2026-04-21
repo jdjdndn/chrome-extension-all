@@ -1,10 +1,14 @@
 // Content script for wx.wyaqpx.com (电工考试)
-// 依赖: content/utils/logger.js, storage.js, dom.js, messaging.js
+// 使用公共模块重构
 
 'use strict';
 
-if (!window.DianGongScript) {
-  window.DianGongScript = { isInitialized: false };
+import { createScriptGuard } from './utils/script-guard.js';
+
+// 防重复加载
+const guard = createScriptGuard('DianGong');
+if (guard.check()) {
+  throw new Error('脚本已加载');
 }
 
 const SELECTORS = {
@@ -65,9 +69,9 @@ function autoAnswer() {
   }, 1000);
 }
 
-function init() {
-  if (window.DianGongScript.isInitialized) return;
+let observer = null;
 
+function init() {
   // 确保 document.body 存在
   if (!document.body) {
     if (document.readyState === 'loading') {
@@ -78,23 +82,19 @@ function init() {
     return;
   }
 
-  window.DianGongScript.isInitialized = true;
-
   // 监听 DOM 变化
-  const observer = new MutationObserver(autoAnswer);
+  observer = new MutationObserver(autoAnswer);
   observer.observe(document.body, { childList: true, subtree: true, attributes: true });
 
-  // 存储 observer 以便清理
-  window.DianGongScript.observer = observer;
-
+  guard.markInitialized();
   console.log('[电工考试] 自动答题脚本已加载');
 }
 
 // 清理函数
 function cleanup() {
-  if (window.DianGongScript?.observer) {
-    window.DianGongScript.observer.disconnect();
-    window.DianGongScript.observer = null;
+  if (observer) {
+    observer.disconnect();
+    observer = null;
   }
 }
 

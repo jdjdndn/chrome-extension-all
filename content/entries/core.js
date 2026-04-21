@@ -61,6 +61,7 @@ import '../base/SiteScript.js';
 // 12. 通用功能模块
 import '../common/script-switch.js';
 import '../common/list-link-split-view.js';
+import '../common/clipboard-watcher.js';
 
 // 13. Main entry
 import '../main.js';

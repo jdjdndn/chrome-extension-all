@@ -1,13 +1,19 @@
 // Content script for aliyundrive.com (阿里云盘)
-// 依赖: content/utils/logger.js, storage.js, dom.js, messaging.js
+// 使用公共模块重构
 
 'use strict';
 
-if (!window.AliyunScript) {
-  window.AliyunScript = { isInitialized: false };
+import { createScriptGuard } from './utils/script-guard.js';
+import { createStyleInjector } from './utils/style-injector.js';
+
+// 防重复加载
+const guard = createScriptGuard('Aliyun');
+if (guard.check()) {
+  throw new Error('脚本已加载');
 }
 
 const STYLE_TAG_ID = 'aliyun-fix-style';
+const styleInjector = createStyleInjector(STYLE_TAG_ID);
 
 const styles = `
 /* 固定保存按钮 */
@@ -41,24 +47,12 @@ function fixSaveButton() {
 }
 
 function injectStyles() {
-  // 添加防御性检查
-  if (typeof DOMUtils === 'undefined' || !DOMUtils.upsertStyle) {
-    console.warn('[aliyun] DOMUtils 未加载，手动添加样式');
-    const style = document.getElementById(STYLE_TAG_ID);
-    if (!style) {
-      const newStyle = document.createElement('style');
-      newStyle.id = STYLE_TAG_ID;
-      newStyle.textContent = styles;
-      document.head.appendChild(newStyle);
-    }
-  } else {
-    DOMUtils.upsertStyle(STYLE_TAG_ID, styles);
-  }
+  styleInjector.inject(styles);
 }
 
-function init() {
-  if (window.AliyunScript.isInitialized) return;
+let observer = null;
 
+function init() {
   // 确保 document.body 存在
   if (!document.body) {
     if (document.readyState === 'loading') {
@@ -69,25 +63,21 @@ function init() {
     return;
   }
 
-  window.AliyunScript.isInitialized = true;
-
   injectStyles();
 
   // 监听 DOM 变化
-  const observer = new MutationObserver(fixSaveButton);
+  observer = new MutationObserver(fixSaveButton);
   observer.observe(document.body, { childList: true, subtree: true, attributes: true });
 
-  // 存储 observer 以便清理
-  window.AliyunScript.observer = observer;
-
+  guard.markInitialized();
   console.log('[阿里云盘] 保存按钮固定脚本已加载');
 }
 
 // 清理函数
 function cleanup() {
-  if (window.AliyunScript?.observer) {
-    window.AliyunScript.observer.disconnect();
-    window.AliyunScript.observer = null;
+  if (observer) {
+    observer.disconnect();
+    observer = null;
   }
 }
 
