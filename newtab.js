@@ -581,6 +581,10 @@ searchInput.addEventListener('keypress', (e) => {
   if (e.key === 'Enter') {
     const query = searchInput.value.trim();
     if (query) {
+      // 记录搜索历史
+      if (typeof SearchHistory !== 'undefined') {
+        SearchHistory.add(query);
+      }
       // 判断是否为URL
       if (query.match(/^https?:\/\//i) || query.match(/^[\w.-]+\.[a-z]{2,}/i)) {
         let url = query;
@@ -852,6 +856,274 @@ document.addEventListener('keydown', (e) => {
     searchInput.focus();
   }
 });
+
+// ========== 统一搜索功能 ==========
+const unifiedSearchInput = document.getElementById('unifiedSearchInput');
+const unifiedResults = document.getElementById('unifiedResults');
+const searchSuggestions = document.getElementById('searchSuggestions');
+let unifiedSearchTimeout = null;
+
+// 统一搜索输入处理
+if (unifiedSearchInput) {
+  unifiedSearchInput.addEventListener('input', (e) => {
+    const query = unifiedSearchInput.value.trim();
+    clearTimeout(unifiedSearchTimeout);
+
+    unifiedSearchTimeout = setTimeout(async () => {
+      if (query.length >= 2) {
+        // 显示搜索建议
+        if (typeof SearchHistory !== 'undefined') {
+          const suggestions = await SearchHistory.getSuggestions(query, 5);
+          renderSuggestions(suggestions);
+        }
+        // 执行统一搜索
+        performUnifiedSearch(query);
+      } else {
+        searchSuggestions.classList.remove('show');
+        unifiedResults.innerHTML = '<div class="unified-results-empty">输入关键词开始搜索</div>';
+      }
+    }, 300);
+  });
+
+  // Enter键执行搜索
+  unifiedSearchInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      const query = unifiedSearchInput.value.trim();
+      if (query.length >= 2) {
+        performUnifiedSearch(query);
+        searchSuggestions.classList.remove('show');
+      }
+    }
+  });
+
+  // 聚焦时显示历史建议
+  unifiedSearchInput.addEventListener('focus', async () => {
+    if (unifiedSearchInput.value.trim().length === 0) {
+      if (typeof SearchHistory !== 'undefined') {
+        const recent = await SearchHistory.getRecent(5);
+        renderRecentSearches(recent);
+      }
+    }
+  });
+
+  // 失焦隐藏建议
+  unifiedSearchInput.addEventListener('blur', () => {
+    setTimeout(() => searchSuggestions.classList.remove('show'), 200);
+  });
+}
+
+// 渲染搜索建议
+function renderSuggestions(suggestions) {
+  if (!suggestions || suggestions.length === 0) {
+    searchSuggestions.classList.remove('show');
+    return;
+  }
+
+  searchSuggestions.innerHTML = suggestions.map(s => `
+    <div class="suggestion-item" data-query="${escapeHtml(s.query)}">
+      <span class="suggestion-icon">🔍</span>
+      <span>${escapeHtml(s.query)}</span>
+      <span class="suggestion-count">${s.count}次</span>
+    </div>
+  `).join('');
+
+  searchSuggestions.classList.add('show');
+
+  // 点击建议
+  searchSuggestions.querySelectorAll('.suggestion-item').forEach(item => {
+    item.addEventListener('click', () => {
+      unifiedSearchInput.value = item.dataset.query;
+      performUnifiedSearch(item.dataset.query);
+      searchSuggestions.classList.remove('show');
+    });
+  });
+}
+
+// 渲染最近搜索
+function renderRecentSearches(recent) {
+  if (!recent || recent.length === 0) {
+    searchSuggestions.classList.remove('show');
+    return;
+  }
+
+  searchSuggestions.innerHTML = recent.map(s => `
+    <div class="suggestion-item" data-query="${escapeHtml(s.query)}">
+      <span class="suggestion-icon">🕐</span>
+      <span>${escapeHtml(s.query)}</span>
+      <span class="suggestion-count">${s.count}次</span>
+    </div>
+  `).join('');
+
+  searchSuggestions.classList.add('show');
+
+  searchSuggestions.querySelectorAll('.suggestion-item').forEach(item => {
+    item.addEventListener('click', () => {
+      unifiedSearchInput.value = item.dataset.query;
+      performUnifiedSearch(item.dataset.query);
+      searchSuggestions.classList.remove('show');
+    });
+  });
+}
+
+// 执行统一搜索
+async function performUnifiedSearch(query) {
+  if (typeof UnifiedSearch === 'undefined') {
+    unifiedResults.innerHTML = '<div class="unified-results-empty">搜索模块未加载</div>';
+    return;
+  }
+
+  unifiedResults.innerHTML = '<div class="unified-results-empty">搜索中...</div>';
+
+  // 获取选中的搜索源
+  const sources = [];
+  document.querySelectorAll('[data-source]').forEach(cb => {
+    if (cb.checked) sources.push(cb.dataset.source);
+  });
+
+  const results = await UnifiedSearch.search(query, { sources, limit: 10 });
+  renderUnifiedResults(results, query);
+}
+
+// 渲染统一搜索结果
+function renderUnifiedResults(results, query) {
+  const totalCount = UnifiedSearch.getTotalCount(results);
+
+  if (totalCount === 0) {
+    unifiedResults.innerHTML = `<div class="unified-results-empty">未找到包含 "${escapeHtml(query)}" 的结果</div>`;
+    return;
+  }
+
+  let html = '';
+
+  // 历史记录结果
+  if (results.history && results.history.length > 0) {
+    html += `
+      <div class="unified-result-section">
+        <div class="unified-result-header">
+          <span>🕐</span>
+          <span>历史记录</span>
+          <span class="unified-result-count">${results.history.length}</span>
+        </div>
+        ${results.history.map(item => `
+          <a href="${escapeHtml(item.url)}" class="unified-result-item" target="_blank">
+            <div class="unified-result-icon">${createDomainIcon(item.domain)}</div>
+            <div class="unified-result-info">
+              <div class="unified-result-title">${escapeHtml(item.title)}</div>
+              <div class="unified-result-meta">${escapeHtml(item.domain)} · ${formatTime(item.lastVisitTime)}</div>
+            </div>
+            <span class="unified-result-badge">${item.visitCount || 0}次</span>
+          </a>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  // 书签结果
+  if (results.bookmarks && results.bookmarks.length > 0) {
+    html += `
+      <div class="unified-result-section">
+        <div class="unified-result-header">
+          <span>📌</span>
+          <span>书签</span>
+          <span class="unified-result-count">${results.bookmarks.length}</span>
+        </div>
+        ${results.bookmarks.map(item => `
+          <a href="${escapeHtml(item.url)}" class="unified-result-item" target="_blank">
+            <div class="unified-result-icon">${createDomainIcon(item.domain)}</div>
+            <div class="unified-result-info">
+              <div class="unified-result-title">${escapeHtml(item.title)}</div>
+              <div class="unified-result-meta">${escapeHtml(item.domain)}</div>
+            </div>
+          </a>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  // 下载结果
+  if (results.downloads && results.downloads.length > 0) {
+    html += `
+      <div class="unified-result-section">
+        <div class="unified-result-header">
+          <span>📥</span>
+          <span>下载</span>
+          <span class="unified-result-count">${results.downloads.length}</span>
+        </div>
+        ${results.downloads.map(item => `
+          <div class="unified-result-item" data-download-id="${item.id}">
+            <div class="unified-result-icon">${item.icon || '📎'}</div>
+            <div class="unified-result-info">
+              <div class="unified-result-title">${escapeHtml(item.filename.split('/').pop())}</div>
+              <div class="unified-result-meta">${DownloadsSearch ? DownloadsSearch.formatSize(item.fileSize) : ''} · ${DownloadsSearch ? DownloadsSearch.formatState(item.state).text : item.state}</div>
+            </div>
+            <span class="unified-result-badge">${item.state}</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  // 标签页结果
+  if (results.tabs && results.tabs.length > 0) {
+    html += `
+      <div class="unified-result-section">
+        <div class="unified-result-header">
+          <span>📑</span>
+          <span>标签页</span>
+          <span class="unified-result-count">${results.tabs.length}</span>
+        </div>
+        ${results.tabs.map(item => `
+          <div class="unified-result-item" data-tab-id="${item.tabId}">
+            <div class="unified-result-icon">${item.favIconUrl ? `<img src="${escapeHtml(item.favIconUrl)}" style="width:16px;height:16px;">` : '🌐'}</div>
+            <div class="unified-result-info">
+              <div class="unified-result-title">${escapeHtml(item.title)}</div>
+              <div class="unified-result-meta">${escapeHtml(item.domain)} · ${item.matchCount}处匹配</div>
+            </div>
+            <span class="unified-result-badge">打开</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  unifiedResults.innerHTML = html;
+
+  // 绑定下载项点击
+  unifiedResults.querySelectorAll('[data-download-id]').forEach(item => {
+    item.addEventListener('click', async () => {
+      const id = parseInt(item.dataset.downloadId);
+      if (DownloadsSearch) {
+        await DownloadsSearch.show(id);
+      }
+    });
+  });
+
+  // 绑定标签页点击
+  unifiedResults.querySelectorAll('[data-tab-id]').forEach(item => {
+    item.addEventListener('click', async () => {
+      const tabId = parseInt(item.dataset.tabId);
+      if (TabContentSearch) {
+        await TabContentSearch.goToTab(tabId);
+        await TabContentSearch.highlight(tabId, query);
+      }
+    });
+  });
+}
+
+// 格式化时间
+function formatTime(timestamp) {
+  if (!timestamp) return '';
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diff = now - date;
+  const days = Math.floor(diff / (24 * 60 * 60 * 1000));
+
+  if (days === 0) return '今天';
+  if (days === 1) return '昨天';
+  if (days < 7) return `${days}天前`;
+  if (days < 30) return `${Math.floor(days / 7)}周前`;
+  return `${Math.floor(days / 30)}月前`;
+}
 
 // ========== Tab 切换 ==========
 const tabBtns = document.querySelectorAll('.tab-btn');

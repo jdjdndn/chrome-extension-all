@@ -863,6 +863,178 @@
     .modal-btn.confirm:hover {
       background: #5568d3;
     }
+
+    /* 统一搜索样式 */
+    .unified-search-box {
+      margin-bottom: 20px;
+    }
+
+    .unified-search-input {
+      margin-bottom: 12px;
+    }
+
+    .search-sources {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .search-source-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 13px;
+      color: #666;
+      cursor: pointer;
+    }
+
+    .search-source-item input {
+      accent-color: #667eea;
+    }
+
+    .search-suggestions {
+      display: none;
+      background: #fff;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .search-suggestions.show {
+      display: block;
+    }
+
+    .suggestion-item {
+      padding: 8px 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+    }
+
+    .suggestion-item:hover {
+      background: #f5f5f5;
+    }
+
+    .suggestion-icon {
+      color: #999;
+    }
+
+    .suggestion-count {
+      margin-left: auto;
+      font-size: 11px;
+      color: #999;
+    }
+
+    .unified-results {
+      min-height: 200px;
+    }
+
+    .unified-results-empty {
+      text-align: center;
+      padding: 60px 20px;
+      color: #999;
+    }
+
+    .unified-result-section {
+      margin-bottom: 20px;
+    }
+
+    .unified-result-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    .unified-result-count {
+      font-size: 11px;
+      color: #999;
+      background: #f0f0f0;
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+
+    .unified-result-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .unified-result-item:hover {
+      background: #667eea;
+      color: #fff;
+      transform: translateX(4px);
+    }
+
+    .unified-result-icon {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #fff;
+      border-radius: 6px;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .unified-result-item:hover .unified-result-icon {
+      background: rgba(255,255,255,0.2);
+    }
+
+    .unified-result-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .unified-result-title {
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .unified-result-meta {
+      font-size: 11px;
+      color: #999;
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .unified-result-item:hover .unified-result-meta {
+      color: rgba(255,255,255,0.7);
+    }
+
+    .unified-result-badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #e0e0e0;
+      color: #666;
+    }
+
+    .unified-result-item:hover .unified-result-badge {
+      background: rgba(255,255,255,0.2);
+      color: #fff;
+    }
   </style>
 </head>
 <body>
@@ -938,10 +1110,39 @@
         <span>🏠</span>
         <span>主页</span>
       </button>
+      <button class="tab-btn" data-tab="search">
+        <span>🔍</span>
+        <span>统一搜索</span>
+      </button>
       <button class="tab-btn" data-tab="learn">
         <span>📚</span>
         <span>学习资源</span>
       </button>
+    </div>
+
+    <!-- 统一搜索 Tab -->
+    <div class="tab-content" id="tab-search">
+      <div class="unified-search-box">
+        <input type="text" class="search-input unified-search-input" id="unifiedSearchInput" placeholder="搜索历史、书签、下载、标签页...">
+        <div class="search-sources">
+          <label class="search-source-item">
+            <input type="checkbox" checked data-source="history"> 历史
+          </label>
+          <label class="search-source-item">
+            <input type="checkbox" checked data-source="bookmarks"> 书签
+          </label>
+          <label class="search-source-item">
+            <input type="checkbox" checked data-source="downloads"> 下载
+          </label>
+          <label class="search-source-item">
+            <input type="checkbox" checked data-source="tabs"> 标签页
+          </label>
+        </div>
+      </div>
+      <div class="search-suggestions" id="searchSuggestions"></div>
+      <div class="unified-results" id="unifiedResults">
+        <div class="unified-results-empty">输入关键词开始搜索</div>
+      </div>
     </div>
 
     <!-- 主页 Tab -->
@@ -1121,6 +1322,10 @@
     </div>
   </div>
 
+  <script src="shared/downloads-search.js"></script>
+  <script src="shared/search-history.js"></script>
+  <script src="shared/tab-content-search.js"></script>
+  <script src="shared/unified-search.js"></script>
   <script src="newtab.js"></script>
 </body>
 </html>
