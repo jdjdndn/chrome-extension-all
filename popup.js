@@ -2319,8 +2319,6 @@ function formatBytes(bytes) {
 
 // 统计面板事件绑定（已在统一初始化中调用 initStatsButtons）
 // 以下代码已废弃，保留函数定义供调用
-  }
-});
 
 // ========== 统计图表绘制 ==========
 function drawStatsChart() {
@@ -2469,46 +2467,6 @@ async function addNotification(message, type = 'info') {
 
 // ========== 快速笔记 ==========（已在统一初始化中调用 initQuickNote）
 // ========== 剪贴板历史（增强版） ==========（已在统一初始化中调用 initClipboardHistory）
-        <button class="clipboard-filter" data-filter="code" style="padding: 4px 8px; font-size: 11px; border: 1px solid #dee2e6; border-radius: 4px; cursor: pointer;">代码</button>
-        <button class="clipboard-filter" data-filter="text" style="padding: 4px 8px; font-size: 11px; border: 1px solid #dee2e6; border-radius: 4px; cursor: pointer;">文本</button>
-      </div>
-    `;
-    list.parentNode.insertBefore(searchContainer, list);
-
-    // 搜索事件
-    const searchInput = document.getElementById('clipboard-search');
-    searchInput?.addEventListener('input', () => {
-      loadClipboardHistory(searchInput.value, currentClipboardFilter);
-    });
-
-    // 筛选事件
-    document.querySelectorAll('.clipboard-filter').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.clipboard-filter').forEach(b => {
-          b.classList.remove('active');
-          b.style.background = '';
-          b.style.color = '';
-        });
-        btn.classList.add('active');
-        btn.style.background = '#007bff';
-        btn.style.color = 'white';
-        currentClipboardFilter = btn.dataset.filter;
-        loadClipboardHistory(document.getElementById('clipboard-search')?.value || '', currentClipboardFilter);
-      });
-    });
-  }
-
-  await loadClipboardHistory();
-
-  if (clearBtn) {
-    clearBtn.addEventListener('click', async () => {
-      if (confirm('确定要清空所有剪贴板历史吗？')) {
-        await chrome.storage.local.remove('clipboardHistory');
-        await loadClipboardHistory();
-      }
-    });
-  }
-});
 
 let currentClipboardFilter = 'all';
 
@@ -2703,16 +2661,6 @@ async function loadCustomTemplates() {
 // 模板按钮事件（已在统一初始化中调用 initTemplateButtons）
 
 // ========== 暗黑模式 ==========（已在统一初始化中调用 initThemeToggle）
-function applyTheme(theme) {
-
-  themeToggle.addEventListener('click', async () => {
-    const currentTheme = document.body.classList.contains('dark-mode') ? 'dark' : 'light';
-    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-    applyTheme(newTheme);
-    await chrome.storage.local.set({ theme: newTheme });
-  });
-});
-
 function applyTheme(theme) {
   const themeToggle = document.getElementById('theme-toggle');
   if (theme === 'dark') {
