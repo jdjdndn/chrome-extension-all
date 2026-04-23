@@ -10,27 +10,51 @@
 
   // ========== CDN 源配置(降级链) ==========
   const CDN_SOURCES = [
+    // 国内优先
     {
       id: 'bootcdn',
       name: 'BootCDN',
       baseUrl: 'https://cdn.bootcdn.net/ajax/libs/',
-      // path规则: base + {packageName}/{version}/{file}
+      format: 'bootcdn' // base + package/version/file
+    },
+    {
+      id: 'baomitu',
+      name: '360前端',
+      baseUrl: 'https://cdn.baomitu.com/ajax/libs/',
       format: 'bootcdn'
     },
+    {
+      id: 'staticfile',
+      name: '七牛云',
+      baseUrl: 'https://cdn.staticfile.org/',
+      format: 'bootcdn'
+    },
+    {
+      id: 'bytecdntp',
+      name: '字节CDN',
+      baseUrl: 'https://lf3-cdn-tos.bytecdntp.com/cdn/expire-1-M/',
+      format: 'bootcdn'
+    },
+    // 全球CDN(国内有节点)
     {
       id: 'jsdelivr',
       name: 'jsDelivr',
       baseUrl: 'https://cdn.jsdelivr.net/npm/',
-      // path规则: base + {packageName}@{version}/{file}
-      format: 'npm'
+      format: 'npm' // base + package@version/file
+    },
+    {
+      id: 'cdnjs',
+      name: 'cdnjs',
+      baseUrl: 'https://cdnjs.cloudflare.com/ajax/libs/',
+      format: 'bootcdn'
     },
     {
       id: 'unpkg',
       name: 'unpkg',
       baseUrl: 'https://unpkg.com/',
-      // path规则: base + {packageName}@{version}/{file}
       format: 'npm'
     },
+    // 字体镜像
     {
       id: 'fontMirror',
       name: 'Font Mirror',
@@ -41,6 +65,12 @@
       id: 'loli',
       name: 'LoliNet',
       baseUrl: 'https://fonts.loli.net/',
+      format: 'font'
+    },
+    {
+      id: 'fontsGoogle',
+      name: 'Google Fonts(国内代理)',
+      baseUrl: 'https://fonts.googleapis.cnpmjs.org/',
       format: 'font'
     }
   ];
@@ -105,39 +135,9 @@
       file: 'jquery.min.js',
       defaultVersion: '3.7.1',
       global: '$',
-      cdnOrder: ['bootcdn', 'jsdelivr', 'unpkg']
+      cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr']
     },
     react: {
-      patterns: [
-        /react(?:\.production|\.development)?\.min\.js/i,
-        /react\/([\d.]+)\/umd\/react/i
-      ],
-      versionPatterns: [
-        /react\/(\d+\.\d+\.\d+)/i,
-        /react@(\d+\.\d+\.\d+)/i
-      ],
-      package: 'react',
-      file: 'umd/react.production.min.js',
-      defaultVersion: '18.2.0',
-      global: 'React',
-      cdnOrder: ['bootcdn', 'jsdelivr', 'unpkg']
-    },
-    reactdom: {
-      patterns: [
-        /react-dom(?:\.production|\.development)?\.min\.js/i,
-        /react-dom\/([\d.]+)\/umd\/react-dom/i
-      ],
-      versionPatterns: [
-        /react-dom\/(\d+\.\d+\.\d+)/i,
-        /react-dom@(\d+\.\d+\.\d+)/i
-      ],
-      package: 'react-dom',
-      file: 'umd/react-dom.production.min.js',
-      defaultVersion: '18.2.0',
-      global: 'ReactDOM',
-      cdnOrder: ['bootcdn', 'jsdelivr', 'unpkg']
-    },
-    vue: {
       patterns: [
         /vue(?:\.runtime)?(?:\.min)?\.js/i,
         /vue\/([\d.]+)\/vue/i
@@ -150,7 +150,7 @@
       file: 'dist/vue.global.prod.min.js',
       defaultVersion: '3.4.21',
       global: 'Vue',
-      cdnOrder: ['bootcdn', 'jsdelivr', 'unpkg']
+      cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr']
     },
     lodash: {
       patterns: [
@@ -165,7 +165,7 @@
       file: 'lodash.min.js',
       defaultVersion: '4.17.21',
       global: '_',
-      cdnOrder: ['bootcdn', 'jsdelivr', 'unpkg']
+      cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr']
     },
     axios: {
       patterns: [
@@ -180,7 +180,7 @@
       file: 'dist/axios.min.js',
       defaultVersion: '1.6.7',
       global: 'axios',
-      cdnOrder: ['bootcdn', 'jsdelivr', 'unpkg']
+      cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr']
     },
     moment: {
       patterns: [
@@ -195,7 +195,7 @@
       file: 'min/moment.min.js',
       defaultVersion: '2.30.1',
       global: 'moment',
-      cdnOrder: ['bootcdn', 'jsdelivr', 'unpkg']
+      cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr']
     },
     echarts: {
       patterns: [
@@ -210,7 +210,7 @@
       file: 'dist/echarts.min.js',
       defaultVersion: '5.5.0',
       global: 'echarts',
-      cdnOrder: ['bootcdn', 'jsdelivr', 'unpkg']
+      cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr']
     },
     d3: {
       patterns: [
@@ -225,7 +225,7 @@
       file: 'dist/d3.min.js',
       defaultVersion: '7.8.5',
       global: 'd3',
-      cdnOrder: ['bootcdn', 'jsdelivr', 'unpkg']
+      cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr']
     },
     chartjs: {
       patterns: [
@@ -240,7 +240,7 @@
       file: 'dist/chart.umd.js',
       defaultVersion: '4.4.1',
       global: 'Chart',
-      cdnOrder: ['jsdelivr', 'unpkg'] // bootcdn可能没有
+      cdnOrder: ['jsdelivr', 'cdnjs', 'unpkg']
     },
     threejs: {
       patterns: [
@@ -256,7 +256,7 @@
       file: 'build/three.min.js',
       defaultVersion: '0.168.0',
       global: 'THREE',
-      cdnOrder: ['bootcdn', 'jsdelivr', 'unpkg']
+      cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr']
     },
     dayjs: {
       patterns: [
@@ -271,7 +271,7 @@
       file: 'dayjs.min.js',
       defaultVersion: '1.11.10',
       global: 'dayjs',
-      cdnOrder: ['bootcdn', 'jsdelivr', 'unpkg']
+      cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr']
     },
     animejs: {
       patterns: [
@@ -286,7 +286,7 @@
       file: 'lib/anime.min.js',
       defaultVersion: '3.2.2',
       global: 'anime',
-      cdnOrder: ['jsdelivr', 'unpkg'] // bootcdn可能没有
+      cdnOrder: ['jsdelivr', 'cdnjs', 'unpkg']
     },
     hammerjs: {
       patterns: [
@@ -299,7 +299,7 @@
       file: 'hammer.min.js',
       defaultVersion: '2.0.8',
       global: 'Hammer',
-      cdnOrder: ['bootcdn', 'jsdelivr', 'unpkg']
+      cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr']
     }
   };
 
@@ -317,7 +317,7 @@
       package: 'bootstrap',
       file: 'dist/css/bootstrap.min.css',
       defaultVersion: '5.3.3',
-      cdnOrder: ['bootcdn', 'jsdelivr', 'unpkg']
+      cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr']
     },
     bootstrapGrid: {
       patterns: [
@@ -329,7 +329,7 @@
       package: 'bootstrap',
       file: 'dist/css/bootstrap-grid.min.css',
       defaultVersion: '5.3.3',
-      cdnOrder: ['bootcdn', 'jsdelivr', 'unpkg']
+      cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr']
     },
     tailwind: {
       patterns: [
@@ -354,7 +354,7 @@
       package: 'foundation-sites',
       file: 'dist/css/foundation.min.css',
       defaultVersion: '6.8.1',
-      cdnOrder: ['bootcdn', 'jsdelivr', 'unpkg']
+      cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr']
     },
     animatecss: {
       patterns: [
@@ -367,7 +367,7 @@
       package: 'animate.css',
       file: 'animate.min.css',
       defaultVersion: '4.1.1',
-      cdnOrder: ['bootcdn', 'jsdelivr', 'unpkg']
+      cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr']
     },
     normalize: {
       patterns: [
@@ -380,7 +380,7 @@
       package: 'normalize.css',
       file: 'normalize.min.css',
       defaultVersion: '8.0.1',
-      cdnOrder: ['bootcdn', 'jsdelivr', 'unpkg']
+      cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr']
     }
   };
 
@@ -409,7 +409,7 @@
       package: '@fortawesome/fontawesome-free',
       file: 'css/all.min.css',
       defaultVersion: '6.5.1',
-      cdnOrder: ['bootcdn', 'jsdelivr', 'unpkg'],
+      cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr'],
       description: 'FontAwesome 图标字体'
     }
   };
