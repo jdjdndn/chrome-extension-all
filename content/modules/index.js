@@ -16,7 +16,13 @@
     SelectorWorker: 'content/modules/SelectorWorker.js',
     IncrementalUpdater: 'content/modules/IncrementalUpdater.js',
     SelectorPathVisualizer: 'content/modules/SelectorPathVisualizer.js',
-    OptimizationAdvisor: 'content/modules/OptimizationAdvisor.js'
+    OptimizationAdvisor: 'content/modules/OptimizationAdvisor.js',
+    // 资源加速器模块
+    CDNMappings: 'shared/cdn-mappings.js',
+    JSReplacer: 'content/modules/js-replacer.js',
+    FontReplacer: 'content/modules/font-replacer.js',
+    ImageOptimizer: 'content/modules/image-optimizer.js',
+    ResourceAccelerator: 'content/modules/resource-accelerator.js'
   };
 
   // 模块加载器
