@@ -63,5 +63,8 @@ import '../common/script-switch.js';
 import '../common/list-link-split-view.js';
 import '../common/clipboard-watcher.js';
 
-// 13. Main entry
+// 13. 资源加速器模块
+import '../modules/resource-accelerator.js';
+
+// 14. Main entry
 import '../main.js';
