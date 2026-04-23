@@ -1974,10 +1974,11 @@ if (selectorsEditor) {
   });
 }
 
-// 加载编辑器
+// 加载编辑器 + 初始化导航 + 资源加速器
 document.addEventListener('DOMContentLoaded', () => {
   loadSelectorsEditor();
   initNavigation();
+  initResourceAccelerator();
 });
 
 // ========== Tab切换 ==========
@@ -3056,8 +3057,3 @@ function notifyResourceAccelerator(config) {
     }
   });
 }
-
-// DOM加载后初始化
-document.addEventListener('DOMContentLoaded', () => {
-  initResourceAccelerator();
-});

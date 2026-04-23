@@ -384,12 +384,18 @@
     }
 
     /**
-     * 监听统计消息
+     * 监听统计消息和配置更新
      */
     listenStats() {
-      // 监听来自子模块的消息
       if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
         chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+          // 处理配置更新
+          if (message.type === 'RESOURCE_ACCELERATOR_CONFIG') {
+            this.updateConfig(message.data);
+            return false;
+          }
+
+          // 处理统计消息
           this.updateStats(message);
           return false;
         });
