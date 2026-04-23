@@ -63,7 +63,11 @@ import '../common/script-switch.js';
 import '../common/list-link-split-view.js';
 import '../common/clipboard-watcher.js';
 
-// 13. 资源加速器模块
+// 13. 资源加速器模块（依赖顺序：CDNMappings → 子模块 → 主模块）
+import '../../shared/cdn-mappings.js';
+import '../modules/js-replacer.js';
+import '../modules/font-replacer.js';
+import '../modules/image-optimizer.js';
 import '../modules/resource-accelerator.js';
 
 // 14. Main entry
