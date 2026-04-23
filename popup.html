@@ -564,6 +564,54 @@
     <div id="home-tab" class="tab-panel active">
     <button id="toggle-btn" style="margin-bottom: 12px;">Enable Extension</button>
 
+    <!-- 资源加速器 -->
+    <div class="settings" style="margin-top: 12px;">
+      <h2 style="font-size: 16px; margin: 0 0 12px 0">⚡ 资源加速器</h2>
+      <div class="setting-item">
+        <div class="toggle-container">
+          <label for="ra-enabled">启用资源加速</label>
+          <input type="checkbox" id="ra-enabled" />
+        </div>
+      </div>
+      <div id="ra-settings" style="margin-top: 8px;">
+        <div class="setting-item">
+          <div class="toggle-container">
+            <label for="ra-js-replace">JS库替换 <span id="ra-js-count" style="color: #666; font-size: 11px;"></span></label>
+            <input type="checkbox" id="ra-js-replace" />
+          </div>
+        </div>
+        <div class="setting-item">
+          <div class="toggle-container">
+            <label for="ra-font-replace">字体替换 <span id="ra-font-count" style="color: #666; font-size: 11px;"></span></label>
+            <input type="checkbox" id="ra-font-replace" />
+          </div>
+        </div>
+        <div class="setting-item">
+          <div class="toggle-container">
+            <label for="ra-image-lazy">图片懒加载 <span id="ra-lazy-count" style="color: #666; font-size: 11px;"></span></label>
+            <input type="checkbox" id="ra-image-lazy" />
+          </div>
+        </div>
+        <div class="setting-item">
+          <div class="toggle-container">
+            <label for="ra-image-compress">图片压缩 <span id="ra-compress-count" style="color: #666; font-size: 11px;"></span></label>
+            <input type="checkbox" id="ra-image-compress" />
+          </div>
+        </div>
+        <div class="setting-item" style="margin-top: 8px;">
+          <label for="ra-quality">压缩质量: <span id="ra-quality-value">80</span>%</label>
+          <input type="range" id="ra-quality" min="50" max="100" value="80" step="5" style="width: 100%; margin-top: 4px; accent-color: #007bff;" />
+        </div>
+        <div style="margin-top: 12px; padding: 8px; background: #f8f9fa; border-radius: 6px;">
+          <div style="font-size: 12px; color: #666; margin-bottom: 4px;">本次加速效果</div>
+          <div style="display: flex; gap: 8px; font-size: 11px;">
+            <div style="flex: 1;">节省: <span id="ra-bytes-saved">0</span> KB</div>
+            <div style="flex: 1;">替换: <span id="ra-total-replaced">0</span> 个</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 剪贴板历史 -->
     <div class="settings" style="margin-top: 12px;">
       <h2 style="font-size: 16px; margin: 0 0 12px 0">📋 剪贴板历史</h2>

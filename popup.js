@@ -2951,3 +2951,110 @@ async function loadKeywordsForCategory() {
     keywordsTextarea.value = '';
   }
 }
+
+// ========== 资源加速器控制 ==========
+async function initResourceAccelerator() {
+  const result = await chrome.storage.local.get('resourceAcceleratorConfig');
+  const config = result.resourceAcceleratorConfig || {
+    enabled: false,
+    jsReplace: true,
+    fontReplace: true,
+    imageLazyLoad: true,
+    imageCompress: true,
+    imageQuality: 0.8
+  };
+
+  const enabledEl = document.getElementById('ra-enabled');
+  const jsReplaceEl = document.getElementById('ra-js-replace');
+  const fontReplaceEl = document.getElementById('ra-font-replace');
+  const imageLazyEl = document.getElementById('ra-image-lazy');
+  const imageCompressEl = document.getElementById('ra-image-compress');
+  const qualityEl = document.getElementById('ra-quality');
+  const qualityValueEl = document.getElementById('ra-quality-value');
+  const settingsPanel = document.getElementById('ra-settings');
+
+  if (!enabledEl) return;
+
+  enabledEl.checked = config.enabled;
+  jsReplaceEl.checked = config.jsReplace;
+  fontReplaceEl.checked = config.fontReplace;
+  imageLazyEl.checked = config.imageLazyLoad;
+  imageCompressEl.checked = config.imageCompress;
+  qualityEl.value = config.imageQuality * 100;
+  qualityValueEl.textContent = Math.round(config.imageQuality * 100);
+  settingsPanel.style.display = config.enabled ? 'block' : 'none';
+
+  enabledEl.addEventListener('change', async (e) => {
+    config.enabled = e.target.checked;
+    settingsPanel.style.display = config.enabled ? 'block' : 'none';
+    await chrome.storage.local.set({ resourceAcceleratorConfig: config });
+    notifyResourceAccelerator(config);
+  });
+
+  jsReplaceEl.addEventListener('change', async (e) => {
+    config.jsReplace = e.target.checked;
+    await chrome.storage.local.set({ resourceAcceleratorConfig: config });
+    notifyResourceAccelerator(config);
+  });
+
+  fontReplaceEl.addEventListener('change', async (e) => {
+    config.fontReplace = e.target.checked;
+    await chrome.storage.local.set({ resourceAcceleratorConfig: config });
+    notifyResourceAccelerator(config);
+  });
+
+  imageLazyEl.addEventListener('change', async (e) => {
+    config.imageLazyLoad = e.target.checked;
+    await chrome.storage.local.set({ resourceAcceleratorConfig: config });
+    notifyResourceAccelerator(config);
+  });
+
+  imageCompressEl.addEventListener('change', async (e) => {
+    config.imageCompress = e.target.checked;
+    await chrome.storage.local.set({ resourceAcceleratorConfig: config });
+    notifyResourceAccelerator(config);
+  });
+
+  qualityEl.addEventListener('input', async (e) => {
+    const value = parseInt(e.target.value);
+    qualityValueEl.textContent = value;
+    config.imageQuality = value / 100;
+    await chrome.storage.local.set({ resourceAcceleratorConfig: config });
+  });
+
+  loadResourceAcceleratorStats();
+}
+
+async function loadResourceAcceleratorStats() {
+  const result = await chrome.storage.local.get('resourceAcceleratorStats');
+  const stats = result.resourceAcceleratorStats || {
+    totalJsReplaced: 0,
+    totalFontsReplaced: 0,
+    totalImagesOptimized: 0,
+    totalBytesSaved: 0
+  };
+
+  const jsCountEl = document.getElementById('ra-js-count');
+  const fontCountEl = document.getElementById('ra-font-count');
+  const lazyCountEl = document.getElementById('ra-lazy-count');
+  const compressCountEl = document.getElementById('ra-compress-count');
+  const bytesSavedEl = document.getElementById('ra-bytes-saved');
+  const totalReplacedEl = document.getElementById('ra-total-replaced');
+
+  if (jsCountEl) jsCountEl.textContent = `(${stats.totalJsReplaced})`;
+  if (fontCountEl) fontCountEl.textContent = `(${stats.totalFontsReplaced})`;
+  if (lazyCountEl) lazyCountEl.textContent = `(${stats.totalImagesOptimized})`;
+  if (compressCountEl) compressCountEl.textContent = `(${stats.totalImagesOptimized})`;
+  if (bytesSavedEl) bytesSavedEl.textContent = Math.round(stats.totalBytesSaved / 1024);
+  if (totalReplacedEl) totalReplacedEl.textContent = stats.totalJsReplaced + stats.totalFontsReplaced + stats.totalImagesOptimized;
+}
+
+function notifyResourceAccelerator(config) {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (tabs[0]?.id) {
+      chrome.tabs.sendMessage(tabs[0].id, { type: 'RESOURCE_ACCELERATOR_CONFIG', data: config }).catch(() => {});
+    }
+  });
+}
+
+initResourceAccelerator();
