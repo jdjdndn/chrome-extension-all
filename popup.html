@@ -576,6 +576,12 @@
       <div id="ra-settings" style="margin-top: 8px;">
         <div class="setting-item">
           <div class="toggle-container">
+            <label for="ra-site-enabled">当前站点启用</label>
+            <input type="checkbox" id="ra-site-enabled" checked />
+          </div>
+        </div>
+        <div class="setting-item">
+          <div class="toggle-container">
             <label for="ra-js-replace">JS库替换 <span id="ra-js-count" style="color: #666; font-size: 11px;"></span></label>
             <input type="checkbox" id="ra-js-replace" />
           </div>
@@ -584,6 +590,12 @@
           <div class="toggle-container">
             <label for="ra-font-replace">字体替换 <span id="ra-font-count" style="color: #666; font-size: 11px;"></span></label>
             <input type="checkbox" id="ra-font-replace" />
+          </div>
+        </div>
+        <div class="setting-item">
+          <div class="toggle-container">
+            <label for="ra-css-replace">CSS框架替换 <span id="ra-css-count" style="color: #666; font-size: 11px;"></span></label>
+            <input type="checkbox" id="ra-css-replace" />
           </div>
         </div>
         <div class="setting-item">
@@ -598,6 +610,18 @@
             <input type="checkbox" id="ra-image-compress" />
           </div>
         </div>
+        <div class="setting-item">
+          <div class="toggle-container">
+            <label for="ra-preload">资源预加载</label>
+            <input type="checkbox" id="ra-preload" />
+          </div>
+        </div>
+        <div class="setting-item">
+          <div class="toggle-container">
+            <label for="ra-dedup">资源去重</label>
+            <input type="checkbox" id="ra-dedup" />
+          </div>
+        </div>
         <div class="setting-item" style="margin-top: 8px;">
           <label for="ra-quality">压缩质量: <span id="ra-quality-value">80</span>%</label>
           <input type="range" id="ra-quality" min="50" max="100" value="80" step="5" style="width: 100%; margin-top: 4px; accent-color: #007bff;" />
@@ -605,8 +629,26 @@
         <div style="margin-top: 12px; padding: 8px; background: #f8f9fa; border-radius: 6px;">
           <div style="font-size: 12px; color: #666; margin-bottom: 4px;">本次加速效果</div>
           <div style="display: flex; gap: 8px; font-size: 11px;">
-            <div style="flex: 1;">节省: <span id="ra-bytes-saved">0</span> KB</div>
             <div style="flex: 1;">替换: <span id="ra-total-replaced">0</span> 个</div>
+            <div style="flex: 1;">去重: <span id="ra-dedup-removed">0</span> 个</div>
+          </div>
+        </div>
+        <div id="ra-details-panel" style="margin-top: 8px; max-height: 120px; overflow-y: auto; font-size: 11px; display: none;">
+          <div style="font-size: 12px; color: #666; margin-bottom: 4px; cursor: pointer;" id="ra-details-toggle">替换详情 ▼</div>
+          <div id="ra-details-list" style="padding-left: 8px;"></div>
+        </div>
+        <div style="margin-top: 8px; display: flex; gap: 6px;">
+          <button id="ra-cache-view" style="flex: 1; font-size: 11px; padding: 4px 8px; background: #6c757d;">缓存管理</button>
+          <button id="ra-cache-clear" style="flex: 1; font-size: 11px; padding: 4px 8px; background: #dc3545; color: white;">清除缓存</button>
+        </div>
+        <div id="ra-exclude-section" style="margin-top: 8px;">
+          <div style="font-size: 12px; color: #666; margin-bottom: 4px; cursor: pointer;" id="ra-exclude-toggle">排除域名 ▼</div>
+          <div id="ra-exclude-panel" style="display: none;">
+            <div id="ra-exclude-list" style="font-size: 11px; margin-bottom: 4px;"></div>
+            <div style="display: flex; gap: 4px;">
+              <input type="text" id="ra-exclude-input" placeholder="example.com" style="flex: 1; padding: 4px; font-size: 11px; border: 1px solid #dee2e6; border-radius: 3px;">
+              <button id="ra-exclude-add" style="font-size: 11px; padding: 4px 8px;">添加</button>
+            </div>
           </div>
         </div>
       </div>

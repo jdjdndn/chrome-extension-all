@@ -67,7 +67,10 @@ import '../common/clipboard-watcher.js';
 import '../../shared/cdn-mappings.js';
 import '../modules/js-replacer.js';
 import '../modules/font-replacer.js';
+import '../modules/css-accelerator.js';
 import '../modules/image-optimizer.js';
+import '../modules/resource-preloader.js';
+import '../modules/resource-deduplicator.js';
 import '../modules/resource-accelerator.js';
 
 // 14. Main entry

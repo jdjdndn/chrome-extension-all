@@ -1,7 +1,7 @@
 /**
  * 资源加速器主模块
- * 统一管理JS替换、字体替换、图片优化
- * 支持替换结果缓存持久化
+ * 统一管理JS替换、字体替换、CSS加速、图片优化、资源预加载、资源去重
+ * 支持替换结果缓存持久化(带TTL过期)
  */
 
 (function () {
@@ -10,6 +10,8 @@
   const LOG_PREFIX = '[ResourceAccelerator]';
   const CACHE_KEY = 'resourceAcceleratorCache';
   const CONFIG_KEY = 'resourceAcceleratorConfig';
+  const CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7天过期
+  const CACHE_SAVE_DELAY = 500; // debounce 500ms
 
   /**
    * 默认配置
@@ -18,11 +20,14 @@
     enabled: true,
     jsReplace: true,
     fontReplace: true,
+    cssReplace: true,
     imageLazyLoad: true,
     imageCompress: true,
     imageQuality: 0.8,
     imageMinSize: 51200,
     lazyLoadThreshold: 200,
+    preloadEnabled: true,
+    dedupEnabled: true,
     excludeDomains: [],
     excludeUrls: [],
     cacheEnabled: true
@@ -39,21 +44,31 @@
       this.cache = {
         js: {},
         fonts: {},
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        lastSaved: 0
       };
+
+      // debounce定时器
+      this._cacheSaveTimer = null;
 
       // 子模块实例
       this.modules = {
         jsReplacer: null,
         fontReplacer: null,
-        imageOptimizer: null
+        cssAccelerator: null,
+        imageOptimizer: null,
+        preloader: null,
+        deduplicator: null
       };
 
       // 统计数据
       this.stats = {
         js: { total: 0, replaced: 0, cached: 0, errors: 0 },
         fonts: { total: 0, replaced: 0, cached: 0, errors: 0 },
-        images: { lazyLoaded: 0, compressed: 0, skipped: 0 }
+        css: { total: 0, replaced: 0, cached: 0, errors: 0 },
+        images: { lazyLoaded: 0, compressed: 0, skipped: 0 },
+        preload: { preloaded: 0, prefetched: 0 },
+        dedup: { scripts: 0, styles: 0, removed: 0 }
       };
 
       // 原始方法备份
@@ -134,7 +149,17 @@
         if (typeof chrome !== 'undefined' && chrome.storage?.local) {
           const result = await chrome.storage.local.get(CACHE_KEY);
           if (result[CACHE_KEY]) {
-            this.cache = result[CACHE_KEY];
+            const loaded = result[CACHE_KEY];
+
+            // TTL过期检查
+            const now = Date.now();
+            if (loaded.timestamp && (now - loaded.timestamp) > CACHE_TTL) {
+              console.log(`${LOG_PREFIX} 缓存已过期，清除`);
+              this.cache = { js: {}, fonts: {}, timestamp: now, lastSaved: 0 };
+              return;
+            }
+
+            this.cache = loaded;
             console.log(`${LOG_PREFIX} 缓存已加载`, {
               js: Object.keys(this.cache.js || {}).length,
               fonts: Object.keys(this.cache.fonts || {}).length
@@ -147,20 +172,28 @@
     }
 
     /**
-     * 保存缓存
+     * 保存缓存(debounce批量写入)
      */
-    async saveCache() {
-      try {
-        if (!this.config.cacheEnabled) return;
+    saveCache() {
+      if (!this.config.cacheEnabled) return;
 
-        if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-          this.cache.timestamp = Date.now();
-          await chrome.storage.local.set({ [CACHE_KEY]: this.cache });
-          console.log(`${LOG_PREFIX} 缓存已保存`);
-        }
-      } catch (error) {
-        console.warn(`${LOG_PREFIX} 保存缓存失败:`, error.message);
+      if (this._cacheSaveTimer) {
+        clearTimeout(this._cacheSaveTimer);
       }
+
+      this._cacheSaveTimer = setTimeout(async () => {
+        try {
+          if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+            this.cache.timestamp = Date.now();
+            this.cache.lastSaved = Date.now();
+            await chrome.storage.local.set({ [CACHE_KEY]: this.cache });
+            console.log(`${LOG_PREFIX} 缓存已保存`);
+          }
+        } catch (error) {
+          console.warn(`${LOG_PREFIX} 保存缓存失败:`, error.message);
+        }
+        this._cacheSaveTimer = null;
+      }, CACHE_SAVE_DELAY);
     }
 
     /**
@@ -224,11 +257,13 @@
         return;
       }
 
+      const excludePatterns = this._buildExcludePatterns();
+
       // JS替换模块
       if (this.config.jsReplace && window.JSReplacer) {
         this.modules.jsReplacer = new window.JSReplacer({
           enabled: this.config.enabled,
-          excludePatterns: this._buildExcludePatterns()
+          excludePatterns
         });
         this.modules.jsReplacer.init();
         this._wrapJSReplacer();
@@ -238,10 +273,20 @@
       if (this.config.fontReplace && window.FontReplacer) {
         this.modules.fontReplacer = new window.FontReplacer({
           enabled: this.config.enabled,
-          excludePatterns: this._buildExcludePatterns()
+          excludePatterns
         });
         this.modules.fontReplacer.init();
         this._wrapFontReplacer();
+      }
+
+      // CSS加速模块
+      if (this.config.cssReplace && window.CSSAccelerator) {
+        this.modules.cssAccelerator = new window.CSSAccelerator({
+          enabled: this.config.enabled,
+          excludePatterns
+        });
+        this.modules.cssAccelerator.init();
+        this._wrapCSSAccelerator();
       }
 
       // 图片优化模块
@@ -254,6 +299,29 @@
           compressMinSize: this.config.imageMinSize
         });
         this.modules.imageOptimizer.init();
+      }
+
+      // 资源预加载模块
+      if (this.config.preloadEnabled && window.ResourcePreloader) {
+        this.modules.preloader = new window.ResourcePreloader({
+          enabled: this.config.enabled,
+          preloadJS: this.config.jsReplace,
+          preloadCSS: this.config.cssReplace,
+          preloadFonts: this.config.fontReplace,
+          excludePatterns
+        });
+        this.modules.preloader.init();
+      }
+
+      // 资源去重模块
+      if (this.config.dedupEnabled && window.ResourceDeduplicator) {
+        this.modules.deduplicator = new window.ResourceDeduplicator({
+          enabled: this.config.enabled,
+          dedupJS: this.config.jsReplace,
+          dedupCSS: this.config.cssReplace,
+          excludePatterns
+        });
+        this.modules.deduplicator.init();
       }
     }
 
@@ -384,6 +452,56 @@
     }
 
     /**
+     * 包装CSSAccelerator的processLink方法，添加缓存逻辑
+     */
+    _wrapCSSAccelerator() {
+      if (!this.modules.cssAccelerator) return;
+
+      const origProcess = this.modules.cssAccelerator.processLink.bind(this.modules.cssAccelerator);
+      this._originalProcessCSSLink = origProcess;
+      const self = this;
+
+      this.modules.cssAccelerator.processLink = function (link) {
+        if (!self.config.enabled) return;
+
+        const url = link.href;
+        if (!url) return;
+
+        if (self.modules.cssAccelerator._processedLinks.has(link)) return;
+
+        // 查缓存
+        const cacheKey = self.getCacheKey(url);
+        if (self.config.cacheEnabled && cacheKey && (self.cache.css?.[cacheKey] || self.cache.css?.[url])) {
+          const cachedUrl = self.cache.css[cacheKey] || self.cache.css[url];
+          if (link.href !== cachedUrl) {
+            link.href = cachedUrl;
+            self.stats.css.cached++;
+            self.modules.cssAccelerator._processedLinks.add(link);
+            console.log(`${LOG_PREFIX} 缓存命中(CSS): ${cachedUrl}`);
+          }
+          return;
+        }
+
+        // 缓存未命中
+        const statsBefore = self.modules.cssAccelerator.stats.replaced;
+        origProcess(link);
+
+        // 保存到缓存
+        if (self.config.cacheEnabled && self.modules.cssAccelerator.stats.replaced > statsBefore) {
+          if (!self.cache.css) self.cache.css = {};
+          const details = self.modules.cssAccelerator.stats.details;
+          const detail = details[details.length - 1];
+          if (detail && detail.original && detail.cdn) {
+            const key = self.getCacheKey(detail.original);
+            self.cache.css[key] = detail.cdn;
+            self.cache.css[detail.original] = detail.cdn;
+            self.saveCache();
+          }
+        }
+      };
+    }
+
+    /**
      * 监听统计消息和配置更新
      */
     listenStats() {
@@ -393,6 +511,18 @@
           if (message.type === 'RESOURCE_ACCELERATOR_CONFIG') {
             this.updateConfig(message.data);
             return false;
+          }
+
+          // 返回统计信息
+          if (message.type === 'RESOURCE_ACCELERATOR_GET_STATS') {
+            sendResponse(this.getStats());
+            return true;
+          }
+
+          // 清除缓存
+          if (message.type === 'RESOURCE_ACCELERATOR_CLEAR_CACHE') {
+            this.clearCache().then(() => sendResponse({ cleared: true }));
+            return true;
           }
 
           // 处理统计消息
@@ -415,6 +545,9 @@
         case 'FONT_REPLACER_STATS':
           this.stats.fonts.replaced++;
           break;
+        case 'CSS_ACCELERATOR_STATS':
+          this.stats.css.replaced++;
+          break;
         default:
           break;
       }
@@ -424,25 +557,25 @@
      * 获取统计信息
      */
     getStats() {
-      // 合并子模块统计
       const jsStats = this.modules.jsReplacer?.getStats() || this.stats.js;
       const fontStats = this.modules.fontReplacer?.getStats() || this.stats.fonts;
+      const cssStats = this.modules.cssAccelerator?.getStats() || this.stats.css;
       const imageStats = this.modules.imageOptimizer?.getStats() || this.stats.images;
+      const preloadStats = this.modules.preloader?.getStats() || this.stats.preload;
+      const dedupStats = this.modules.deduplicator?.getStats() || this.stats.dedup;
 
       return {
         enabled: this.config.enabled,
-        js: {
-          ...jsStats,
-          cached: this.stats.js.cached
-        },
-        fonts: {
-          ...fontStats,
-          cached: this.stats.fonts.cached
-        },
+        js: { ...jsStats, cached: this.stats.js.cached },
+        fonts: { ...fontStats, cached: this.stats.fonts.cached },
+        css: { ...cssStats, cached: this.stats.css.cached },
         images: imageStats,
+        preload: preloadStats,
+        dedup: dedupStats,
         cache: {
           jsCount: Object.keys(this.cache.js).length,
           fontCount: Object.keys(this.cache.fonts).length,
+          cssCount: Object.keys(this.cache.css || {}).length,
           timestamp: this.cache.timestamp
         }
       };
@@ -462,6 +595,9 @@
       if (this.modules.fontReplacer) {
         this.modules.fontReplacer.enabled = this.config.fontReplace && this.config.enabled;
       }
+      if (this.modules.cssAccelerator) {
+        this.modules.cssAccelerator.enabled = this.config.cssReplace && this.config.enabled;
+      }
       if (this.modules.imageOptimizer) {
         if (this.config.imageLazyLoad) {
           this.modules.imageOptimizer.enableLazyLoad();
@@ -474,6 +610,12 @@
           this.modules.imageOptimizer.disableCompress();
         }
       }
+      if (this.modules.preloader) {
+        this.modules.preloader.enabled = this.config.preloadEnabled && this.config.enabled;
+      }
+      if (this.modules.deduplicator) {
+        this.modules.deduplicator.enabled = this.config.dedupEnabled && this.config.enabled;
+      }
 
       console.log(`${LOG_PREFIX} 配置已更新`, newConfig);
     }
@@ -485,7 +627,9 @@
       this.cache = {
         js: {},
         fonts: {},
-        timestamp: Date.now()
+        css: {},
+        timestamp: Date.now(),
+        lastSaved: 0
       };
 
       try {
@@ -504,15 +648,12 @@
     enable() {
       this.config.enabled = true;
 
-      if (this.modules.jsReplacer) {
-        this.modules.jsReplacer.enable();
-      }
-      if (this.modules.fontReplacer) {
-        this.modules.fontReplacer.enable();
-      }
-      if (this.modules.imageOptimizer) {
-        this.modules.imageOptimizer.init();
-      }
+      if (this.modules.jsReplacer) this.modules.jsReplacer.enable();
+      if (this.modules.fontReplacer) this.modules.fontReplacer.enable();
+      if (this.modules.cssAccelerator) this.modules.cssAccelerator.enable();
+      if (this.modules.imageOptimizer) this.modules.imageOptimizer.init();
+      if (this.modules.preloader) this.modules.preloader.enable();
+      if (this.modules.deduplicator) this.modules.deduplicator.enable();
 
       console.log(`${LOG_PREFIX} 模块已启用`);
     }
@@ -523,15 +664,12 @@
     disable() {
       this.config.enabled = false;
 
-      if (this.modules.jsReplacer) {
-        this.modules.jsReplacer.disable();
-      }
-      if (this.modules.fontReplacer) {
-        this.modules.fontReplacer.disable();
-      }
-      if (this.modules.imageOptimizer) {
-        this.modules.imageOptimizer.disableLazyLoad();
-      }
+      if (this.modules.jsReplacer) this.modules.jsReplacer.disable();
+      if (this.modules.fontReplacer) this.modules.fontReplacer.disable();
+      if (this.modules.cssAccelerator) this.modules.cssAccelerator.disable();
+      if (this.modules.imageOptimizer) this.modules.imageOptimizer.disableLazyLoad();
+      if (this.modules.preloader) this.modules.preloader.disable();
+      if (this.modules.deduplicator) this.modules.deduplicator.disable();
 
       console.log(`${LOG_PREFIX} 模块已禁用`);
     }
@@ -547,25 +685,30 @@
       if (this._originalProcessLink && this.modules.fontReplacer) {
         this.modules.fontReplacer.processLink = this._originalProcessLink;
       }
+      if (this._originalProcessCSSLink && this.modules.cssAccelerator) {
+        this.modules.cssAccelerator.processLink = this._originalProcessCSSLink;
+      }
 
       // 销毁子模块
-      if (this.modules.jsReplacer) {
-        this.modules.jsReplacer.destroy();
-        this.modules.jsReplacer = null;
-      }
-      if (this.modules.fontReplacer) {
-        this.modules.fontReplacer.destroy();
-        this.modules.fontReplacer = null;
-      }
-      if (this.modules.imageOptimizer) {
-        this.modules.imageOptimizer.destroy();
-        this.modules.imageOptimizer = null;
+      const moduleNames = ['jsReplacer', 'fontReplacer', 'cssAccelerator', 'imageOptimizer', 'preloader', 'deduplicator'];
+      moduleNames.forEach(name => {
+        if (this.modules[name]) {
+          this.modules[name].destroy();
+          this.modules[name] = null;
+        }
+      });
+
+      // 清理debounce定时器
+      if (this._cacheSaveTimer) {
+        clearTimeout(this._cacheSaveTimer);
+        this._cacheSaveTimer = null;
       }
 
       // 重置状态
       this.config.enabled = false;
       this._originalProcessScript = null;
       this._originalProcessLink = null;
+      this._originalProcessCSSLink = null;
 
       console.log(`${LOG_PREFIX} 模块已销毁`);
     }
