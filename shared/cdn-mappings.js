@@ -1,30 +1,52 @@
 /**
  * CDN 映射表配置
- * 用于智能资源加速器，替换慢速网站的JS库、字体、CSS框架资源为公共CDN
- * 支持从原始URL动态提取版本号
+ * 用于智能资源加速器，替换慢速网站资源为公共CDN
+ * 支持多CDN降级链: BootCDN → jsDelivr → unpkg
+ * 只需定义库名和匹配规则，CDN路径自动生成
  */
 
 (function () {
   'use strict';
 
-  // ========== CDN 源配置 ==========
-  const CDN_SOURCES = {
-    bootcdn: {
+  // ========== CDN 源配置(降级链) ==========
+  const CDN_SOURCES = [
+    {
+      id: 'bootcdn',
       name: 'BootCDN',
       baseUrl: 'https://cdn.bootcdn.net/ajax/libs/',
-      description: '国内稳定CDN，支持主流库'
+      // path规则: base + {packageName}/{version}/{file}
+      format: 'bootcdn'
     },
-    fontMirror: {
+    {
+      id: 'jsdelivr',
+      name: 'jsDelivr',
+      baseUrl: 'https://cdn.jsdelivr.net/npm/',
+      // path规则: base + {packageName}@{version}/{file}
+      format: 'npm'
+    },
+    {
+      id: 'unpkg',
+      name: 'unpkg',
+      baseUrl: 'https://unpkg.com/',
+      // path规则: base + {packageName}@{version}/{file}
+      format: 'npm'
+    },
+    {
+      id: 'fontMirror',
       name: 'Font Mirror',
       baseUrl: 'https://fonts.font.im/',
-      description: 'Google Fonts 镜像'
+      format: 'font'
     },
-    loli: {
+    {
+      id: 'loli',
       name: 'LoliNet',
       baseUrl: 'https://fonts.loli.net/',
-      description: 'Google Fonts 备用镜像'
+      format: 'font'
     }
-  };
+  ];
+
+  const CDN_BY_ID = {};
+  CDN_SOURCES.forEach(s => CDN_BY_ID[s.id] = s);
 
   // ========== 版本提取工具 ==========
   function extractVersion(url, patterns) {
@@ -36,7 +58,38 @@
     return null;
   }
 
-  // ========== JS库CDN映射表 ==========
+  /**
+   * 从URL中提取文件名部分
+   */
+  function extractFile(url) {
+    try {
+      const pathname = new URL(url).pathname;
+      const parts = pathname.split('/');
+      return parts[parts.length - 1] || '';
+    } catch {
+      return '';
+    }
+  }
+
+  /**
+   * 构建CDN URL
+   */
+  function buildCDNUrl(cdn, libConfig, version, file) {
+    const ver = version || libConfig.defaultVersion;
+    const pkg = libConfig.package || libConfig.name;
+    const f = file || libConfig.file;
+
+    if (cdn.format === 'bootcdn') {
+      return cdn.baseUrl + pkg + '/' + ver + '/' + f;
+    }
+    if (cdn.format === 'npm') {
+      return cdn.baseUrl + pkg + '@' + ver + '/' + f;
+    }
+    return null;
+  }
+
+  // ========== JS库映射 ==========
+  // 只需: patterns(匹配), file(CDN文件名), 可选: package, defaultVersion
   const JS_CDN_MAP = {
     jquery: {
       patterns: [
@@ -48,131 +101,131 @@
         /jquery[\/-](\d+\.\d+\.\d+)/i,
         /jquery[\/-](\d+\.\d+)/i
       ],
-      cdn: 'bootcdn',
-      pathTemplate: 'jquery/{version}/jquery.min.js',
+      package: 'jquery',
+      file: 'jquery.min.js',
       defaultVersion: '3.7.1',
-      path: 'jquery/3.7.1/jquery.min.js',
-      global: '$'
+      global: '$',
+      cdnOrder: ['bootcdn', 'jsdelivr', 'unpkg']
     },
     react: {
       patterns: [
         /react(?:\.production|\.development)?\.min\.js/i,
-        /react\/([\d.]+)\/react\.min\.js/i
+        /react\/([\d.]+)\/umd\/react/i
       ],
       versionPatterns: [
         /react\/(\d+\.\d+\.\d+)/i,
         /react@(\d+\.\d+\.\d+)/i
       ],
-      cdn: 'bootcdn',
-      pathTemplate: 'react/{version}/umd/react.production.min.js',
+      package: 'react',
+      file: 'umd/react.production.min.js',
       defaultVersion: '18.2.0',
-      path: 'react/18.2.0/umd/react.production.min.js',
-      global: 'React'
+      global: 'React',
+      cdnOrder: ['bootcdn', 'jsdelivr', 'unpkg']
     },
     reactdom: {
       patterns: [
         /react-dom(?:\.production|\.development)?\.min\.js/i,
-        /react-dom\/([\d.]+)\/react-dom\.min\.js/i
+        /react-dom\/([\d.]+)\/umd\/react-dom/i
       ],
       versionPatterns: [
         /react-dom\/(\d+\.\d+\.\d+)/i,
         /react-dom@(\d+\.\d+\.\d+)/i
       ],
-      cdn: 'bootcdn',
-      pathTemplate: 'react-dom/{version}/umd/react-dom.production.min.js',
+      package: 'react-dom',
+      file: 'umd/react-dom.production.min.js',
       defaultVersion: '18.2.0',
-      path: 'react-dom/18.2.0/umd/react-dom.production.min.js',
-      global: 'ReactDOM'
+      global: 'ReactDOM',
+      cdnOrder: ['bootcdn', 'jsdelivr', 'unpkg']
     },
     vue: {
       patterns: [
         /vue(?:\.runtime)?(?:\.min)?\.js/i,
-        /vue\/([\d.]+)\/vue\.min\.js/i
+        /vue\/([\d.]+)\/vue/i
       ],
       versionPatterns: [
         /vue\/(\d+\.\d+\.\d+)/i,
         /vue@(\d+\.\d+\.\d+)/i
       ],
-      cdn: 'bootcdn',
-      pathTemplate: 'vue/{version}/vue.global.prod.min.js',
+      package: 'vue',
+      file: 'dist/vue.global.prod.min.js',
       defaultVersion: '3.4.21',
-      path: 'vue/3.4.21/vue.global.prod.min.js',
-      global: 'Vue'
+      global: 'Vue',
+      cdnOrder: ['bootcdn', 'jsdelivr', 'unpkg']
     },
     lodash: {
       patterns: [
         /lodash(?:[-.]?min)?\.js/i,
-        /lodash\/([\d.]+)\/lodash\.min\.js/i
+        /lodash\/([\d.]+)\/lodash/i
       ],
       versionPatterns: [
         /lodash[\/-](\d+\.\d+\.\d+)/i,
         /lodash\.js\/(\d+\.\d+\.\d+)/i
       ],
-      cdn: 'bootcdn',
-      pathTemplate: 'lodash.js/{version}/lodash.min.js',
+      package: 'lodash',
+      file: 'lodash.min.js',
       defaultVersion: '4.17.21',
-      path: 'lodash.js/4.17.21/lodash.min.js',
-      global: '_'
+      global: '_',
+      cdnOrder: ['bootcdn', 'jsdelivr', 'unpkg']
     },
     axios: {
       patterns: [
         /axios\.min\.js/i,
-        /axios\/([\d.]+)\/axios\.min\.js/i
+        /axios\/([\d.]+)\/axios/i
       ],
       versionPatterns: [
         /axios\/(\d+\.\d+\.\d+)/i,
         /axios@(\d+\.\d+\.\d+)/i
       ],
-      cdn: 'bootcdn',
-      pathTemplate: 'axios/{version}/axios.min.js',
+      package: 'axios',
+      file: 'dist/axios.min.js',
       defaultVersion: '1.6.7',
-      path: 'axios/1.6.7/axios.min.js',
-      global: 'axios'
+      global: 'axios',
+      cdnOrder: ['bootcdn', 'jsdelivr', 'unpkg']
     },
     moment: {
       patterns: [
         /moment(?:\.min)?\.js/i,
-        /moment\/([\d.]+)\/moment\.min\.js/i
+        /moment\/([\d.]+)\/moment/i
       ],
       versionPatterns: [
         /moment[\/-](\d+\.\d+\.\d+)/i,
         /moment\.js\/(\d+\.\d+\.\d+)/i
       ],
-      cdn: 'bootcdn',
-      pathTemplate: 'moment.js/{version}/moment.min.js',
+      package: 'moment',
+      file: 'min/moment.min.js',
       defaultVersion: '2.30.1',
-      path: 'moment.js/2.30.1/moment.min.js',
-      global: 'moment'
+      global: 'moment',
+      cdnOrder: ['bootcdn', 'jsdelivr', 'unpkg']
     },
     echarts: {
       patterns: [
         /echarts(?:\.min)?\.js/i,
-        /echarts\/([\d.]+)\/echarts\.min\.js/i
+        /echarts\/([\d.]+)\/echarts/i
       ],
       versionPatterns: [
         /echarts\/(\d+\.\d+\.\d+)/i,
         /echarts@(\d+\.\d+\.\d+)/i
       ],
-      cdn: 'bootcdn',
-      pathTemplate: 'echarts/{version}/echarts.min.js',
+      package: 'echarts',
+      file: 'dist/echarts.min.js',
       defaultVersion: '5.5.0',
-      path: 'echarts/5.5.0/echarts.min.js',
-      global: 'echarts'
+      global: 'echarts',
+      cdnOrder: ['bootcdn', 'jsdelivr', 'unpkg']
     },
     d3: {
       patterns: [
         /d3(?:\.min)?\.js/i,
-        /d3\/([\d.]+)\/d3\.min\.js/i
+        /d3\/([\d.]+)\/d3/i
       ],
       versionPatterns: [
         /d3\/(\d+\.\d+\.\d+)/i,
         /d3@(\d+\.\d+\.\d+)/i
       ],
-      cdn: 'bootcdn',
-      pathTemplate: 'd3/{version}/d3.min.js',
+      package: 'd3',
+      file: 'dist/d3.min.js',
       defaultVersion: '7.8.5',
-      path: 'd3/7.8.5/d3.min.js',
-      global: 'd3'
+      global: 'd3',
+      cdnOrder: ['bootcdn', 'jsdelivr', 'unpkg']
     },
     chartjs: {
       patterns: [
@@ -183,57 +236,57 @@
         /chart\.js[\/-](\d+\.\d+\.\d+)/i,
         /chartjs\/(\d+\.\d+\.\d+)/i
       ],
-      cdn: 'bootcdn',
-      pathTemplate: 'Chart.js/{version}/chart.umd.js',
+      package: 'chart.js',
+      file: 'dist/chart.umd.js',
       defaultVersion: '4.4.1',
-      path: 'Chart.js/4.4.1/chart.umd.js',
-      global: 'Chart'
+      global: 'Chart',
+      cdnOrder: ['jsdelivr', 'unpkg'] // bootcdn可能没有
     },
     threejs: {
       patterns: [
         /three(?:\.min)?\.js/i,
-        /three\/([\d.]+)\/three\.min\.js/i
+        /three\/([\d.]+)\/three/i
       ],
       versionPatterns: [
-        /three\/(\d+)/i,
+        /three\/(\d+\.\d+\.\d+)/i,
         /three@(\d+\.\d+\.\d+)/i,
         /r(\d+)\/three/i
       ],
-      cdn: 'bootcdn',
-      pathTemplate: 'three.js/{version}/three.min.js',
-      defaultVersion: 'r168',
-      path: 'three.js/r168/three.min.js',
-      global: 'THREE'
+      package: 'three',
+      file: 'build/three.min.js',
+      defaultVersion: '0.168.0',
+      global: 'THREE',
+      cdnOrder: ['bootcdn', 'jsdelivr', 'unpkg']
     },
     dayjs: {
       patterns: [
         /dayjs(?:\.min)?\.js/i,
-        /dayjs\/([\d.]+)\/dayjs\.min\.js/i
+        /dayjs\/([\d.]+)\/dayjs/i
       ],
       versionPatterns: [
         /dayjs\/(\d+\.\d+\.\d+)/i,
         /dayjs@(\d+\.\d+\.\d+)/i
       ],
-      cdn: 'bootcdn',
-      pathTemplate: 'dayjs/{version}/dayjs.min.js',
+      package: 'dayjs',
+      file: 'dayjs.min.js',
       defaultVersion: '1.11.10',
-      path: 'dayjs/1.11.10/dayjs.min.js',
-      global: 'dayjs'
+      global: 'dayjs',
+      cdnOrder: ['bootcdn', 'jsdelivr', 'unpkg']
     },
     animejs: {
       patterns: [
         /anime(?:\.min)?\.js/i,
-        /animejs\/([\d.]+)\/anime\.min\.js/i
+        /animejs\/([\d.]+)\/anime/i
       ],
       versionPatterns: [
         /anime[\/@](\d+\.\d+\.\d+)/i,
         /animejs\/(\d+\.\d+\.\d+)/i
       ],
-      cdn: 'bootcdn',
-      pathTemplate: 'animejs/{version}/anime.min.js',
+      package: 'animejs',
+      file: 'lib/anime.min.js',
       defaultVersion: '3.2.2',
-      path: 'animejs/3.2.2/anime.min.js',
-      global: 'anime'
+      global: 'anime',
+      cdnOrder: ['jsdelivr', 'unpkg'] // bootcdn可能没有
     },
     hammerjs: {
       patterns: [
@@ -242,15 +295,15 @@
       versionPatterns: [
         /hammer[\/.@](\d+\.\d+\.\d+)/i
       ],
-      cdn: 'bootcdn',
-      pathTemplate: 'hammer.js/{version}/hammer.min.js',
+      package: 'hammerjs',
+      file: 'hammer.min.js',
       defaultVersion: '2.0.8',
-      path: 'hammer.js/2.0.8/hammer.min.js',
-      global: 'Hammer'
+      global: 'Hammer',
+      cdnOrder: ['bootcdn', 'jsdelivr', 'unpkg']
     }
   };
 
-  // ========== CSS框架CDN映射表 ==========
+  // ========== CSS框架映射 ==========
   const CSS_CDN_MAP = {
     bootstrap: {
       patterns: [
@@ -259,25 +312,24 @@
         /bootstrap(?:\.min)?\.css/i
       ],
       versionPatterns: [
-        /bootstrap[\/-](\d+\.\d+\.\d+)/i,
-        /bootstrap@(\d+\.\d+\.\d+)/i
+        /bootstrap[\/@-](\d+\.\d+\.\d+)/i
       ],
-      cdn: 'bootcdn',
-      pathTemplate: 'bootstrap/{version}/css/bootstrap.min.css',
+      package: 'bootstrap',
+      file: 'dist/css/bootstrap.min.css',
       defaultVersion: '5.3.3',
-      path: 'bootstrap/5.3.3/css/bootstrap.min.css'
+      cdnOrder: ['bootcdn', 'jsdelivr', 'unpkg']
     },
     bootstrapGrid: {
       patterns: [
         /bootstrap[\/-]([\d.]+)\/css\/bootstrap-grid(?:\.min)?\.css/i
       ],
       versionPatterns: [
-        /bootstrap[\/-](\d+\.\d+\.\d+)/i
+        /bootstrap[\/@-](\d+\.\d+\.\d+)/i
       ],
-      cdn: 'bootcdn',
-      pathTemplate: 'bootstrap/{version}/css/bootstrap-grid.min.css',
+      package: 'bootstrap',
+      file: 'dist/css/bootstrap-grid.min.css',
       defaultVersion: '5.3.3',
-      path: 'bootstrap/5.3.3/css/bootstrap-grid.min.css'
+      cdnOrder: ['bootcdn', 'jsdelivr', 'unpkg']
     },
     tailwind: {
       patterns: [
@@ -286,10 +338,10 @@
       versionPatterns: [
         /tailwindcss[\/@](\d+\.\d+\.\d+)/i
       ],
-      cdn: 'bootcdn',
-      pathTemplate: 'tailwindcss/{version}/tailwind.min.css',
+      package: 'tailwindcss',
+      file: 'dist/tailwind.min.css',
       defaultVersion: '2.2.19',
-      path: 'tailwindcss/2.2.19/tailwind.min.css'
+      cdnOrder: ['jsdelivr', 'unpkg']
     },
     foundation: {
       patterns: [
@@ -297,12 +349,12 @@
         /foundation(?:\.min)?\.css/i
       ],
       versionPatterns: [
-        /foundation[\/-](\d+\.\d+\.\d+)/i
+        /foundation[\/@-](\d+\.\d+\.\d+)/i
       ],
-      cdn: 'bootcdn',
-      pathTemplate: 'foundation/{version}/css/foundation.min.css',
+      package: 'foundation-sites',
+      file: 'dist/css/foundation.min.css',
       defaultVersion: '6.8.1',
-      path: 'foundation/6.8.1/css/foundation.min.css'
+      cdnOrder: ['bootcdn', 'jsdelivr', 'unpkg']
     },
     animatecss: {
       patterns: [
@@ -312,10 +364,10 @@
       versionPatterns: [
         /animate\.css[\/@-](\d+\.\d+\.\d+)/i
       ],
-      cdn: 'bootcdn',
-      pathTemplate: 'animate.css/{version}/animate.min.css',
+      package: 'animate.css',
+      file: 'animate.min.css',
       defaultVersion: '4.1.1',
-      path: 'animate.css/4.1.1/animate.min.css'
+      cdnOrder: ['bootcdn', 'jsdelivr', 'unpkg']
     },
     normalize: {
       patterns: [
@@ -325,19 +377,18 @@
       versionPatterns: [
         /normalize[\/-](\d+\.\d+\.\d+)/i
       ],
-      cdn: 'bootcdn',
-      pathTemplate: 'normalize/{version}/normalize.min.css',
+      package: 'normalize.css',
+      file: 'normalize.min.css',
       defaultVersion: '8.0.1',
-      path: 'normalize/8.0.1/normalize.min.css'
+      cdnOrder: ['bootcdn', 'jsdelivr', 'unpkg']
     }
   };
 
-  // ========== 字体CDN映射表 ==========
+  // ========== 字体映射 ==========
   const FONT_CDN_MAP = {
     googleFonts: {
       patterns: [
-        /fonts\.googleapis\.com\/css/i,
-        /fonts\.googleapis\.com\/css2/i
+        /fonts\.googleapis\.com\/css/i
       ],
       replaceHost: 'fonts.font.im',
       description: 'Google Fonts CSS'
@@ -355,98 +406,81 @@
         /fontawesome-free\/[\d.]+\/css\/all\.min\.css/i,
         /use\.fontawesome\.com\/releases\/[\d.]+\/css\/all\.css/i
       ],
-      cdn: 'bootcdn',
-      path: 'font-awesome/6.5.1/css/all.min.css',
+      package: '@fortawesome/fontawesome-free',
+      file: 'css/all.min.css',
+      defaultVersion: '6.5.1',
+      cdnOrder: ['bootcdn', 'jsdelivr', 'unpkg'],
       description: 'FontAwesome 图标字体'
     }
   };
 
   // ========== 匹配方法 ==========
 
-  /**
-   * 构建带版本的CDN URL
-   */
-  function buildCDNUrl(config, url) {
-    const cdnSource = CDN_SOURCES[config.cdn];
-
-    // 尝试从URL提取版本
-    if (config.versionPatterns && config.pathTemplate) {
-      const version = extractVersion(url, config.versionPatterns);
-      if (version) {
-        return cdnSource.baseUrl + config.pathTemplate.replace('{version}', version);
-      }
-    }
-
-    // 回退到默认路径
-    return cdnSource.baseUrl + config.path;
-  }
-
-  function matchJSLibrary(url) {
+  function matchFromMap(url, map, type) {
     if (!url || typeof url !== 'string') return null;
 
-    for (const [name, config] of Object.entries(JS_CDN_MAP)) {
+    for (const [name, config] of Object.entries(map)) {
       for (const pattern of config.patterns) {
         if (pattern.test(url)) {
-          const cdnUrl = buildCDNUrl(config, url);
-          return {
-            name,
-            originalUrl: url,
-            cdnUrl,
-            global: config.global,
-            cdnName: CDN_SOURCES[config.cdn].name
-          };
-        }
-      }
-    }
-    return null;
-  }
-
-  function matchCSS(url) {
-    if (!url || typeof url !== 'string') return null;
-
-    for (const [name, config] of Object.entries(CSS_CDN_MAP)) {
-      for (const pattern of config.patterns) {
-        if (pattern.test(url)) {
-          const cdnUrl = buildCDNUrl(config, url);
-          return {
-            name,
-            originalUrl: url,
-            cdnUrl,
-            cdnName: CDN_SOURCES[config.cdn].name
-          };
-        }
-      }
-    }
-    return null;
-  }
-
-  function matchFont(url) {
-    if (!url || typeof url !== 'string') return null;
-
-    for (const [name, config] of Object.entries(FONT_CDN_MAP)) {
-      for (const pattern of config.patterns) {
-        if (pattern.test(url)) {
+          // 字体替换host类型
           if (config.replaceHost) {
             return {
               name,
               originalUrl: url,
               cdnUrl: url.replace(/fonts\.googleapis\.com/i, config.replaceHost),
+              cdnName: CDN_BY_ID[config.cdnOrder?.[0]]?.name || config.replaceHost,
               description: config.description
             };
           }
-          if (config.cdn) {
-            const cdnSource = CDN_SOURCES[config.cdn];
+
+          // 提取版本
+          const version = config.versionPatterns
+            ? extractVersion(url, config.versionPatterns)
+            : null;
+
+          // 按CDN降级链尝试
+          const cdnOrder = config.cdnOrder || ['jsdelivr', 'unpkg'];
+          const cdnUrl = tryCDNChain(cdnOrder, config, version);
+
+          if (cdnUrl) {
             return {
               name,
               originalUrl: url,
-              cdnUrl: cdnSource.baseUrl + config.path,
-              description: config.description
+              cdnUrl,
+              version: version || config.defaultVersion,
+              cdnName: CDN_BY_ID[cdnOrder[0]]?.name || cdnOrder[0],
+              type
             };
           }
         }
       }
     }
     return null;
+  }
+
+  /**
+   * 按CDN降级链构建URL(返回第一个可用的)
+   */
+  function tryCDNChain(cdnOrder, config, version) {
+    for (const cdnId of cdnOrder) {
+      const cdn = CDN_BY_ID[cdnId];
+      if (!cdn) continue;
+      const url = buildCDNUrl(cdn, config, version, config.file);
+      if (url) return url;
+    }
+    return null;
+  }
+
+  function matchJSLibrary(url) {
+    return matchFromMap(url, JS_CDN_MAP, 'js');
+  }
+
+  function matchCSS(url) {
+    return matchFromMap(url, CSS_CDN_MAP, 'css');
+  }
+
+  function matchFont(url) {
+    return matchFromMap(url, FONT_CDN_MAP, 'font');
   }
 
   // ========== 导出 ==========
@@ -455,6 +489,7 @@
     CSS_CDN_MAP,
     FONT_CDN_MAP,
     CDN_SOURCES,
+    CDN_BY_ID,
     extractVersion,
     matchJSLibrary,
     matchCSS,
