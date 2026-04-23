@@ -3057,4 +3057,7 @@ function notifyResourceAccelerator(config) {
   });
 }
 
-initResourceAccelerator();
+// DOM加载后初始化
+document.addEventListener('DOMContentLoaded', () => {
+  initResourceAccelerator();
+});
