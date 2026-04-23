@@ -12,6 +12,7 @@
   const CONFIG_KEY = 'resourceAcceleratorConfig';
   const CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7天过期
   const CACHE_SAVE_DELAY = 500; // debounce 500ms
+  const STATS_KEY = 'resourceAcceleratorStats';
 
   /**
    * 默认配置
@@ -50,6 +51,16 @@
 
       // debounce定时器
       this._cacheSaveTimer = null;
+      this._statsSaveTimer = null;
+
+      // 累计统计(持久化用)
+      this._cumulativeStats = {
+        totalJsReplaced: 0,
+        totalFontsReplaced: 0,
+        totalCssReplaced: 0,
+        totalImagesOptimized: 0,
+        totalDedupRemoved: 0
+      };
 
       // 子模块实例
       this.modules = {
@@ -101,6 +112,9 @@
 
       // 5. 监听统计消息
       this.listenStats();
+
+      // 6. 加载累计统计
+      await this._loadCumulativeStats();
 
       console.log(`${LOG_PREFIX} 初始化完成`, {
         jsCacheCount: Object.keys(this.cache.js).length,
@@ -541,16 +555,57 @@
       switch (message.type) {
         case 'JS_REPLACER_STATS':
           this.stats.js.replaced++;
+          this._cumulativeStats.totalJsReplaced++;
           break;
         case 'FONT_REPLACER_STATS':
           this.stats.fonts.replaced++;
+          this._cumulativeStats.totalFontsReplaced++;
           break;
         case 'CSS_ACCELERATOR_STATS':
           this.stats.css.replaced++;
+          this._cumulativeStats.totalCssReplaced++;
           break;
         default:
           break;
       }
+
+      this._saveCumulativeStats();
+    }
+
+    /**
+     * 加载累计统计
+     */
+    async _loadCumulativeStats() {
+      try {
+        if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+          const result = await chrome.storage.local.get(STATS_KEY);
+          if (result[STATS_KEY]) {
+            this._cumulativeStats = { ...this._cumulativeStats, ...result[STATS_KEY] };
+          }
+        }
+      } catch (error) {
+        console.warn(`${LOG_PREFIX} 加载累计统计失败:`, error.message);
+      }
+    }
+
+    /**
+     * 保存累计统计(debounce)
+     */
+    _saveCumulativeStats() {
+      if (this._statsSaveTimer) {
+        clearTimeout(this._statsSaveTimer);
+      }
+
+      this._statsSaveTimer = setTimeout(async () => {
+        try {
+          if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+            await chrome.storage.local.set({ [STATS_KEY]: this._cumulativeStats });
+          }
+        } catch (error) {
+          console.warn(`${LOG_PREFIX} 保存累计统计失败:`, error.message);
+        }
+        this._statsSaveTimer = null;
+      }, CACHE_SAVE_DELAY);
     }
 
     /**
