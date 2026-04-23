@@ -146,6 +146,12 @@ function throttledPrintUrls() {
 
 // Load settings from storage
 async function loadSettings() {
+  // StorageUtils 由 core-bundle.js 加载，挂载在 window 上
+  const StorageUtils = window.StorageUtils;
+  if (!StorageUtils) {
+    console.warn('[Content] StorageUtils 未加载，使用默认设置');
+    return;
+  }
   const result = await StorageUtils.getSync('settings');
   if (result.settings) {
     settings = { ...settings, ...result.settings };
@@ -280,11 +286,14 @@ window.ExtensionAPI = {
 loadSettings().catch(console.error);
 
 // Listen for storage changes
-StorageUtils.onChanged((changes, areaName) => {
-  if (areaName === 'sync' && changes.settings) {
-    settings = { ...settings, ...changes.settings.newValue };
-  }
-});
+const StorageUtils = window.StorageUtils;
+if (StorageUtils) {
+  StorageUtils.onChanged((changes, areaName) => {
+    if (areaName === 'sync' && changes.settings) {
+      settings = { ...settings, ...changes.settings.newValue };
+    }
+  });
+}
 
 // ========== Message Handler ==========
 MessagingUtils.createMessageHandler('content_main_handler', {
