@@ -1,0 +1,9 @@
+{
+  "paths": [
+    "e:/code/chrome-extension-template/package.json",
+    "e:/code/chrome-extension-template/manifest.json",
+    "e:/code/chrome-extension-template/newtab.html",
+    "e:/code/chrome-extension-template/background.js"
+  ],
+  "ts": 1776950155.507
+}
