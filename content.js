@@ -214,7 +214,7 @@ function updateHideElements(enabled, selectors) {
   // Save to storage
   const domain = DOMUtils.getCurrentDomain();
   if (domain) {
-    StorageUtils.setDomainSettings('hideElementsSettings', domain, { enabled, selectors });
+    window.StorageUtils?.setDomainSettings('hideElementsSettings', domain, { enabled, selectors });
   }
 }
 
@@ -235,7 +235,7 @@ async function initHideElements() {
   }
 
   const defaultSelectors = getDomainDefaultHideSelectors();
-  const domainSettings = await StorageUtils.getDomainSettings('hideElementsSettings', domain);
+  const domainSettings = await window.StorageUtils?.getDomainSettings('hideElementsSettings', domain);
 
   // 尝试从本地服务器加载选择器
   let serverSelectors = [];
