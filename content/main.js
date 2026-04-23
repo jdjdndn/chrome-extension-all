@@ -114,9 +114,7 @@
         await loadScript(config.eventbusScript);
       }
 
-      // 加载主 content.js
-      await loadScript('content.js');
-
+      // content.js 已打包到 core-bundle.js，无需动态加载
       console.log('[Main] 所有脚本加载完成');
     };
 

@@ -68,3 +68,6 @@ import '../modules/resource-accelerator.js';
 
 // 14. Main entry
 import '../main.js';
+
+// 15. Content script (原独立文件，现打包到bundle)
+import '../../content.js';
