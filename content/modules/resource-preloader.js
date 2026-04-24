@@ -43,10 +43,51 @@
         return;
       }
 
+      // 1. 先添加CDN域名 preconnect/dns-prefetch(最优先)
+      this._preconnectCDNs();
+
+      // 2. 处理已有资源
       this._processExistingResources();
+
+      // 3. 监听动态资源
       this._setupObserver();
 
       console.log(`${LOG_PREFIX} 初始化完成`);
+    }
+
+    /**
+     * 为所有CDN源添加 preconnect 和 dns-prefetch
+     */
+    _preconnectCDNs() {
+      if (!window.CDNMappings?.CDN_SOURCES) return;
+
+      const head = document.head || document.documentElement;
+
+      window.CDNMappings.CDN_SOURCES.forEach(cdn => {
+        try {
+          const url = new URL(cdn.baseUrl);
+          const origin = url.origin;
+
+          // dns-prefetch
+          if (!document.querySelector(`link[rel="dns-prefetch"][href="${origin}"]`)) {
+            const dnsLink = document.createElement('link');
+            dnsLink.rel = 'dns-prefetch';
+            dnsLink.href = origin;
+            head.insertBefore(dnsLink, head.firstChild);
+          }
+
+          // preconnect(仅前3个优先CDN，避免过多连接)
+          const priorityCDNs = ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr'];
+          if (priorityCDNs.includes(cdn.id) &&
+              !document.querySelector(`link[rel="preconnect"][href="${origin}"]`)) {
+            this._addPreconnect(origin);
+          }
+        } catch {
+          // 无效URL跳过
+        }
+      });
+
+      console.log(`${LOG_PREFIX} CDN preconnect 已添加`);
     }
 
     /**
@@ -62,7 +103,7 @@
         });
       }
 
-      // CSS: preload样式表
+      // CSS: preload样式表(首屏关键CSS优先)
       if (this.preloadCSS) {
         document.querySelectorAll('link[rel="stylesheet"]').forEach(link => {
           if (this._isCritical(link.href, 'css')) {

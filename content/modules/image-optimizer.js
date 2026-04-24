@@ -10,9 +10,9 @@
   }
 
   /**
-   * ImageOptimizer - 图片优化器
+   * ImageOptimizer - 图片/视频优化器
    * 功能：
-   * 1. 懒加载 - IntersectionObserver实现
+   * 1. 懒加载 - IntersectionObserver实现(图片+视频)
    * 2. 本地压缩 - Canvas API
    * 3. WebP支持检测
    */
@@ -40,7 +40,8 @@
       this.stats = {
         lazyLoaded: 0,
         compressed: 0,
-        skipped: 0
+        skipped: 0,
+        videosLazyLoaded: 0
       };
 
       // WebP支持
@@ -53,6 +54,7 @@
     init() {
       if (this.lazyLoadEnabled) {
         this.initLazyLoad();
+        this._initVideoLazyLoad();
       }
       console.log('[ImageOptimizer] 初始化完成', {
         lazyLoad: this.lazyLoadEnabled,
@@ -91,9 +93,13 @@
     _handleIntersection(entries) {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
-          const img = entry.target;
-          this.loadImage(img);
-          this.observer.unobserve(img);
+          const el = entry.target;
+          if (el.tagName === 'VIDEO') {
+            this._loadVideo(el);
+          } else {
+            this.loadImage(el);
+          }
+          this.observer.unobserve(el);
         }
       });
     }
@@ -167,6 +173,18 @@
     }
 
     /**
+     * 判断URL是否同源
+     */
+    _isSameOrigin(url) {
+      try {
+        const imgUrl = new URL(url, location.href);
+        return imgUrl.origin === location.origin;
+      } catch {
+        return false;
+      }
+    }
+
+    /**
      * 加载图片
      */
     async loadImage(img) {
@@ -174,8 +192,9 @@
       if (!originalSrc) return;
 
       try {
-        // 是否需要压缩
-        if (this.compressEnabled && await this._shouldCompress(originalSrc)) {
+        // 跨域图片跳过压缩，避免CORS错误
+        const sameOrigin = this._isSameOrigin(originalSrc);
+        if (this.compressEnabled && sameOrigin && await this._shouldCompress(originalSrc)) {
           const compressedUrl = await this.compressImage(originalSrc);
           if (compressedUrl) {
             img.src = compressedUrl;
@@ -192,7 +211,6 @@
         this.stats.lazyLoaded++;
 
       } catch (error) {
-        console.error('[ImageOptimizer] 加载失败:', error);
         img.src = originalSrc;
       }
     }
@@ -353,12 +371,125 @@
     }
 
     /**
+     * 初始化视频懒加载
+     */
+    _initVideoLazyLoad() {
+      this._processedVideos = new WeakSet();
+
+      // 处理已有视频
+      document.querySelectorAll('video').forEach(v => this._prepareVideo(v));
+
+      // 监听动态添加
+      if (this._mutationObserver) {
+        // 复用已有的 MutationObserver 逻辑
+        const origCallback = this._mutationObserver._callback;
+      }
+
+      // 单独的视频DOM监听
+      this._videoObserver = new MutationObserver(mutations => {
+        mutations.forEach(mutation => {
+          mutation.addedNodes.forEach(node => {
+            if (node.nodeName === 'VIDEO') {
+              this._prepareVideo(node);
+            }
+            if (node.querySelectorAll) {
+              node.querySelectorAll('video').forEach(v => this._prepareVideo(v));
+            }
+          });
+        });
+      });
+
+      this._videoObserver.observe(document.body, { childList: true, subtree: true });
+
+      // 视频懒加载的 IntersectionObserver(复用图片的)
+      this._observeVideos();
+    }
+
+    /**
+     * 观察视频元素
+     */
+    _observeVideos() {
+      document.querySelectorAll('video').forEach(v => {
+        if (!this._processedVideos.has(v)) {
+          if (this.observer) this.observer.observe(v);
+        }
+      });
+    }
+
+    /**
+     * 准备视频懒加载
+     */
+    _prepareVideo(video) {
+      if (this._processedVideos.has(video)) return;
+
+      // 保存原始 src/poster
+      const sources = video.querySelectorAll('source');
+      if (sources.length === 0 && !video.src) return;
+
+      // 已有 preload 设置则跳过
+      if (video.preload === 'none') return;
+
+      // 保存原始 src
+      if (video.src) {
+        video.dataset.src = video.src;
+        video.src = '';
+      }
+      sources.forEach((source, i) => {
+        if (source.src) {
+          source.dataset.src = source.src;
+          source.src = '';
+        }
+      });
+
+      // 设置 preload='none' 阻止自动加载
+      video.preload = 'none';
+      video.dataset.videoLazyLoading = 'true';
+      this._processedVideos.add(video);
+
+      // 用 IntersectionObserver 恢复
+      if (this.observer) {
+        this.observer.observe(video);
+      }
+    }
+
+    /**
+     * 加载懒加载的视频
+     */
+    _loadVideo(video) {
+      if (!video.dataset.videoLazyLoading) return;
+
+      // 恢复 source src
+      video.querySelectorAll('source').forEach(source => {
+        if (source.dataset.src) {
+          source.src = source.dataset.src;
+          delete source.dataset.src;
+        }
+      });
+
+      // 恢复 video src
+      if (video.dataset.src) {
+        video.src = video.dataset.src;
+        delete video.dataset.src;
+      }
+
+      video.dataset.videoLazyLoading = 'false';
+      video.dataset.videoLazyLoaded = 'true';
+      video.load();
+      this.stats.videosLazyLoaded++;
+    }
+
+    /**
      * 销毁
      */
     destroy() {
       this.disableLazyLoad();
+      if (this._videoObserver) {
+        this._videoObserver.disconnect();
+        this._videoObserver = null;
+      }
+      this._processedVideos = new WeakSet();
       this.processedImages = new WeakSet();
-      this.stats = { lazyLoaded: 0, compressed: 0, skipped: 0 };
+      this.stats = { lazyLoaded: 0, compressed: 0, skipped: 0, videosLazyLoaded: 0 };
       console.log('[ImageOptimizer] 已销毁');
     }
   }

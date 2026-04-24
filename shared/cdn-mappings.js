@@ -139,12 +139,43 @@
     },
     react: {
       patterns: [
-        /vue(?:\.runtime)?(?:\.min)?\.js/i,
-        /vue\/([\d.]+)\/vue/i
+        /react(?:\.production)?(?:\.min)?\.js/i,
+        /react\/([\d.]+)\/umd\/react/i,
+        /react@([\d.]+)\/umd\/react/i
       ],
       versionPatterns: [
-        /vue\/(\d+\.\d+\.\d+)/i,
-        /vue@(\d+\.\d+\.\d+)/i
+        /react[\/@](\d+\.\d+\.\d+)/i,
+        /react\.production\.min/i
+      ],
+      package: 'react',
+      file: 'umd/react.production.min.js',
+      defaultVersion: '18.2.0',
+      global: 'React',
+      cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr']
+    },
+    reactDom: {
+      patterns: [
+        /react-dom(?:\.production)?(?:\.min)?\.js/i,
+        /react-dom\/([\d.]+)\/umd\/react-dom/i,
+        /react-dom@([\d.]+)\/umd\/react-dom/i
+      ],
+      versionPatterns: [
+        /react-dom[\/@](\d+\.\d+\.\d+)/i
+      ],
+      package: 'react-dom',
+      file: 'umd/react-dom.production.min.js',
+      defaultVersion: '18.2.0',
+      global: 'ReactDOM',
+      cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr']
+    },
+    vue: {
+      patterns: [
+        /vue(?:\.runtime)?(?:\.production)?(?:\.min)?\.js/i,
+        /vue\/([\d.]+)\/dist\/vue/i,
+        /vue@([\d.]+)\/dist\/vue/i
+      ],
+      versionPatterns: [
+        /vue[\/@](\d+\.\d+\.\d+)/i
       ],
       package: 'vue',
       file: 'dist/vue.global.prod.min.js',
@@ -300,6 +331,117 @@
       defaultVersion: '2.0.8',
       global: 'Hammer',
       cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr']
+    },
+    // ========== 新增常用库 ==========
+    jqueryUi: {
+      patterns: [
+        /jquery-ui(?:\.min)?\.js/i,
+        /jqueryui\/([\d.]+)\/jquery-ui/i
+      ],
+      versionPatterns: [
+        /jquery-ui[\/@](\d+\.\d+\.\d+)/i,
+        /jqueryui[\/@](\d+\.\d+\.\d+)/i
+      ],
+      package: 'jquery-ui',
+      file: 'dist/jquery-ui.min.js',
+      defaultVersion: '1.13.2',
+      global: 'jQuery',
+      cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr']
+    },
+    bootstrapJs: {
+      patterns: [
+        /bootstrap[\/-]([\d.]+)\/js\/bootstrap(?:\.bundle)?(?:\.min)?\.js/i,
+        /bootstrap(?:\.bundle)?(?:\.min)?\.js/i
+      ],
+      versionPatterns: [
+        /bootstrap[\/@-](\d+\.\d+\.\d+)/i
+      ],
+      package: 'bootstrap',
+      file: 'dist/js/bootstrap.min.js',
+      defaultVersion: '5.3.3',
+      global: 'bootstrap',
+      cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr']
+    },
+    popper: {
+      patterns: [
+        /popper(?:\.umd)?(?:\.min)?\.js/i,
+        /popper\.js\/([\d.]+)\/umd\/popper/i
+      ],
+      versionPatterns: [
+        /popper[\/.@](\d+\.\d+\.\d+)/i
+      ],
+      package: '@popperjs/core',
+      file: 'dist/umd/popper.min.js',
+      defaultVersion: '2.11.8',
+      global: 'Popper',
+      cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr']
+    },
+    swiper: {
+      patterns: [
+        /swiper(?:\.bundle)?(?:\.min)?\.js/i,
+        /swiper\/([\d.]+)\/swiper/i
+      ],
+      versionPatterns: [
+        /swiper[\/@](\d+\.\d+\.\d+)/i
+      ],
+      package: 'swiper',
+      file: 'swiper-bundle.min.js',
+      defaultVersion: '11.0.5',
+      global: 'Swiper',
+      cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr']
+    },
+    select2: {
+      patterns: [
+        /select2(?:\.min)?\.js/i,
+        /select2\/([\d.]+)\/js\/select2/i
+      ],
+      versionPatterns: [
+        /select2[\/@](\d+\.\d+\.\d+)/i
+      ],
+      package: 'select2',
+      file: 'dist/js/select2.min.js',
+      defaultVersion: '4.0.13',
+      cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr']
+    },
+    gsap: {
+      patterns: [
+        /gsap(?:\.min)?\.js/i,
+        /gsap\/([\d.]+)\/gsap/i
+      ],
+      versionPatterns: [
+        /gsap[\/@](\d+\.\d+\.\d+)/i
+      ],
+      package: 'gsap',
+      file: 'dist/gsap.min.js',
+      defaultVersion: '3.12.5',
+      global: 'gsap',
+      cdnOrder: ['bootcdn', 'baomitu', 'jsdelivr', 'cdnjs']
+    },
+    socketio: {
+      patterns: [
+        /socket\.io(?:\.min)?\.js/i,
+        /socket\.io\/([\d.]+)\/socket\.io/i
+      ],
+      versionPatterns: [
+        /socket\.io[\/@](\d+\.\d+\.\d+)/i
+      ],
+      package: 'socket.io-client',
+      file: 'dist/socket.io.min.js',
+      defaultVersion: '4.7.4',
+      global: 'io',
+      cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr']
+    },
+    zenscroll: {
+      patterns: [
+        /zenscroll(?:\.min)?\.js/i
+      ],
+      versionPatterns: [
+        /zenscroll[\/@](\d+\.\d+\.\d+)/i
+      ],
+      package: 'zenscroll',
+      file: 'zenscroll-min.js',
+      defaultVersion: '4.0.2',
+      cdnOrder: ['jsdelivr', 'unpkg']
     }
   };
 
@@ -381,6 +523,77 @@
       file: 'normalize.min.css',
       defaultVersion: '8.0.1',
       cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr']
+    },
+    // ========== 图标库 CSS ==========
+    materialIcons: {
+      patterns: [
+        /material-icons(?:\.min)?\.css/i,
+        /fonts\.googleapis\.com\/icon/i,
+        /material\.io\/icons/i
+      ],
+      replaceHost: 'fonts.font.im',
+      description: 'Material Icons'
+    },
+    materialSymbols: {
+      patterns: [
+        /material-symbols(?:\.outlined)?(?:\.min)?\.css/i,
+        /fonts\.googleapis\.com\/css2\?.*material/i
+      ],
+      replaceHost: 'fonts.font.im',
+      description: 'Material Symbols'
+    },
+    ionicons: {
+      patterns: [
+        /ionicons(?:\.min)?\.css/i,
+        /ion\.icons\/([\d.]+)\/css\/ionicons/i
+      ],
+      versionPatterns: [
+        /ionicons[\/@](\d+\.\d+\.\d+)/i
+      ],
+      package: 'ionicons',
+      file: 'dist/css/ionicons.min.css',
+      defaultVersion: '7.2.1',
+      cdnOrder: ['jsdelivr', 'cdnjs', 'unpkg']
+    },
+    // ========== 更多 CSS 库 ==========
+    swiperCss: {
+      patterns: [
+        /swiper(?:\.bundle)?(?:\.min)?\.css/i,
+        /swiper\/([\d.]+)\/swiper-bundle\.min\.css/i
+      ],
+      versionPatterns: [
+        /swiper[\/@](\d+\.\d+\.\d+)/i
+      ],
+      package: 'swiper',
+      file: 'swiper-bundle.min.css',
+      defaultVersion: '11.0.5',
+      cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr']
+    },
+    hoverCss: {
+      patterns: [
+        /hover(?:\.min)?\.css/i,
+        /hover\.css\/([\d.]+)\/css/i
+      ],
+      versionPatterns: [
+        /hover\.css[\/@](\d+\.\d+\.\d+)/i
+      ],
+      package: 'hover.css',
+      file: 'css/hover-min.css',
+      defaultVersion: '2.3.2',
+      cdnOrder: ['bootcdn', 'baomitu', 'jsdelivr']
+    },
+    aos: {
+      patterns: [
+        /aos(?:\.min)?\.css/i,
+        /aos\/([\d.]+)\/dist\/aos/i
+      ],
+      versionPatterns: [
+        /aos[\/@](\d+\.\d+\.\d+)/i
+      ],
+      package: 'aos',
+      file: 'dist/aos.css',
+      defaultVersion: '2.3.4',
+      cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr']
     }
   };
 
@@ -411,6 +624,133 @@
       defaultVersion: '6.5.1',
       cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr'],
       description: 'FontAwesome 图标字体'
+    },
+    // ========== 新增字体映射 ==========
+    fontAwesomeV4: {
+      patterns: [
+        /font-awesome\/4\.[\d.]+\/css\/font-awesome(?:\.min)?\.css/i,
+        /maxcdn\.bootstrapcdn\.com\/font-awesome\/4/i
+      ],
+      package: 'font-awesome',
+      file: 'css/font-awesome.min.css',
+      defaultVersion: '4.7.0',
+      cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr'],
+      description: 'FontAwesome 4.x 图标字体'
+    },
+    iconfont: {
+      patterns: [
+        /at\.alicdn\.com\/t\/font_\d+/i
+      ],
+      description: '阿里巴巴 iconfont',
+      // iconfont 无法替换，仅标记不处理
+      skip: true
+    }
+  };
+
+  // ========== CDN 健康探测 ==========
+
+  const CDNHealthProbe = {
+    // 缓存: { cdnId: { healthy, latency, timestamp } }
+    _cache: {},
+    TTL: 5 * 60 * 1000, // 5分钟
+    TIMEOUT: 3000, // 3秒超时
+    _pending: {}, // 防止重复探测
+
+    /**
+     * 探测单个CDN可用性
+     */
+    async probe(cdnId) {
+      const now = Date.now();
+      const cached = this._cache[cdnId];
+
+      // 缓存有效
+      if (cached && (now - cached.timestamp) < this.TTL) {
+        return cached;
+      }
+
+      // 防止并发重复探测
+      if (this._pending[cdnId]) {
+        return this._pending[cdnId];
+      }
+
+      const cdn = CDN_BY_ID[cdnId];
+      if (!cdn || cdn.format === 'font') {
+        return { healthy: true, latency: 0, timestamp: now };
+      }
+
+      const probePromise = this._doProbe(cdnId, cdn);
+      this._pending[cdnId] = probePromise;
+
+      try {
+        const result = await probePromise;
+        this._cache[cdnId] = result;
+        return result;
+      } finally {
+        delete this._pending[cdnId];
+      }
+    },
+
+    async _doProbe(cdnId, cdn) {
+      const start = performance.now();
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), this.TIMEOUT);
+
+        await fetch(cdn.baseUrl, {
+          method: 'HEAD',
+          mode: 'no-cors',
+          signal: controller.signal
+        });
+
+        clearTimeout(timer);
+        const latency = Math.round(performance.now() - start);
+
+        console.log(`[CDNProbe] ${cdn.name} ✓ ${latency}ms`);
+        return { healthy: true, latency, timestamp: Date.now() };
+      } catch (e) {
+        const latency = Math.round(performance.now() - start);
+        console.warn(`[CDNProbe] ${cdn.name} ✗ ${latency}ms`);
+        return { healthy: false, latency: Infinity, timestamp: Date.now() };
+      }
+    },
+
+    /**
+     * 批量探测一组CDN
+     */
+    async probeAll(cdnIds) {
+      await Promise.allSettled(cdnIds.map(id => this.probe(id)));
+    },
+
+    /**
+     * 获取健康的CDN列表(按延迟排序)
+     */
+    getHealthy(cdnIds) {
+      const now = Date.now();
+      return cdnIds
+        .map(id => {
+          const cached = this._cache[id];
+          if (!cached || (now - cached.timestamp) >= this.TTL) return null;
+          return { id, ...cached };
+        })
+        .filter(Boolean)
+        .filter(c => c.healthy)
+        .sort((a, b) => a.latency - b.latency);
+    },
+
+    /**
+     * 标记CDN不可用(资源加载失败时调用)
+     */
+    markUnhealthy(cdnId) {
+      this._cache[cdnId] = { healthy: false, latency: Infinity, timestamp: Date.now() };
+      const cdn = CDN_BY_ID[cdnId];
+      if (cdn) console.warn(`[CDNProbe] ${cdn.name} 标记不可用`);
+    },
+
+    /**
+     * 清除缓存
+     */
+    clear() {
+      this._cache = {};
     }
   };
 
@@ -438,17 +778,19 @@
             ? extractVersion(url, config.versionPatterns)
             : null;
 
-          // 按CDN降级链尝试
+          // 按CDN降级链尝试(考虑健康状态)
           const cdnOrder = config.cdnOrder || ['jsdelivr', 'unpkg'];
-          const cdnUrl = tryCDNChain(cdnOrder, config, version);
+          const result = tryCDNChain(cdnOrder, config, version);
 
-          if (cdnUrl) {
+          if (result) {
             return {
               name,
               originalUrl: url,
-              cdnUrl,
+              cdnUrl: result.url,
               version: version || config.defaultVersion,
-              cdnName: CDN_BY_ID[cdnOrder[0]]?.name || cdnOrder[0],
+              cdnName: CDN_BY_ID[result.cdnId]?.name || result.cdnId,
+              cdnId: result.cdnId,
+              fallbackUrls: result.fallbackUrls,
               type
             };
           }
@@ -459,14 +801,44 @@
   }
 
   /**
-   * 按CDN降级链构建URL(返回第一个可用的)
+   * 按CDN降级链构建URL(健康探测 + 备选URL)
+   * 返回 { url, cdnId, fallbackUrls }
    */
   function tryCDNChain(cdnOrder, config, version) {
+    const healthy = CDNHealthProbe.getHealthy(cdnOrder);
+    const healthyIds = healthy.map(h => h.id);
+    // 合并：健康CDN优先，未知状态其次，不健康放最后
+    const ordered = [...new Set([...healthyIds, ...cdnOrder])];
+    const fallbackUrls = [];
+    let primary = null;
+
+    for (const cdnId of ordered) {
+      const cdn = CDN_BY_ID[cdnId];
+      if (!cdn) continue;
+      const url = buildCDNUrl(cdn, config, version, config.file);
+      if (!url) continue;
+
+      const cached = CDNHealthProbe._cache[cdnId];
+      const isHealthy = !cached || cached.healthy;
+
+      if (!primary && isHealthy) {
+        primary = { url, cdnId };
+      } else if (primary) {
+        fallbackUrls.push({ url, cdnId });
+      }
+    }
+
+    if (primary) {
+      primary.fallbackUrls = fallbackUrls;
+      return primary;
+    }
+
+    // 全部不可用时回退到第一个
     for (const cdnId of cdnOrder) {
       const cdn = CDN_BY_ID[cdnId];
       if (!cdn) continue;
       const url = buildCDNUrl(cdn, config, version, config.file);
-      if (url) return url;
+      if (url) return { url, cdnId, fallbackUrls: [] };
     }
     return null;
   }
@@ -490,6 +862,7 @@
     FONT_CDN_MAP,
     CDN_SOURCES,
     CDN_BY_ID,
+    CDNHealthProbe,
     extractVersion,
     matchJSLibrary,
     matchCSS,

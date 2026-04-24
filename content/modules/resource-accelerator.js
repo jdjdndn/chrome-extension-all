@@ -12,6 +12,7 @@
   const CONFIG_KEY = 'resourceAcceleratorConfig';
   const CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7天过期
   const CACHE_SAVE_DELAY = 500; // debounce 500ms
+  const MAX_CACHE_ENTRIES = 200; // 每类缓存最大条目数
   const STATS_KEY = 'resourceAcceleratorStats';
 
   /**
@@ -107,13 +108,16 @@
       // 3. 先用缓存替换页面中已存在的资源
       this._applyCacheToPage();
 
-      // 4. 初始化子模块
+      // 4. 后台探测CDN健康(不阻塞初始化)
+      this._probeCDNHealth();
+
+      // 5. 初始化子模块
       this.initModules();
 
-      // 5. 监听统计消息
+      // 6. 监听统计消息
       this.listenStats();
 
-      // 6. 加载累计统计
+      // 7. 加载累计统计
       await this._loadCumulativeStats();
 
       console.log(`${LOG_PREFIX} 初始化完成`, {
@@ -186,10 +190,15 @@
     }
 
     /**
-     * 保存缓存(debounce批量写入)
+     * 保存缓存(debounce批量写入 + LRU淘汰)
      */
     saveCache() {
       if (!this.config.cacheEnabled) return;
+
+      // LRU淘汰: 超过上限时清理最旧的条目
+      this._evictCache('js');
+      this._evictCache('fonts');
+      this._evictCache('css');
 
       if (this._cacheSaveTimer) {
         clearTimeout(this._cacheSaveTimer);
@@ -208,6 +217,34 @@
         }
         this._cacheSaveTimer = null;
       }, CACHE_SAVE_DELAY);
+    }
+
+    /**
+     * LRU淘汰: 超过MAX_CACHE_ENTRIES时移除最旧条目
+     */
+    _evictCache(type) {
+      const entries = this.cache[type];
+      if (!entries || typeof entries !== 'object') return;
+
+      const keys = Object.keys(entries);
+      if (keys.length <= MAX_CACHE_ENTRIES) return;
+
+      // 按访问时间排序淘汰(如果有_accessTime)否则按插入顺序
+      const toRemove = keys.length - MAX_CACHE_ENTRIES;
+      let removed = 0;
+
+      for (const key of keys) {
+        if (removed >= toRemove) break;
+        // 保留带版本号的精确匹配，优先删除 URL 全路径 key
+        if (key.startsWith('http')) {
+          delete entries[key];
+          removed++;
+        }
+      }
+
+      if (removed > 0) {
+        console.log(`${LOG_PREFIX} ${type}缓存淘汰 ${removed} 条`);
+      }
     }
 
     /**
@@ -368,6 +405,85 @@
     }
 
     /**
+     * 后台探测所有CDN健康状态(不阻塞主流程)
+     */
+    _probeCDNHealth() {
+      if (!window.CDNMappings?.CDNHealthProbe) return;
+
+      const allCdnIds = window.CDNMappings.CDN_SOURCES
+        .filter(c => c.format !== 'font')
+        .map(c => c.id);
+
+      // 延迟探测，不阻塞页面初始化
+      setTimeout(() => {
+        window.CDNMappings.CDNHealthProbe.probeAll(allCdnIds).then(() => {
+          console.log(`${LOG_PREFIX} CDN健康探测完成`);
+        });
+      }, 2000);
+
+      // 每5分钟重新探测
+      this._healthProbeInterval = setInterval(() => {
+        window.CDNMappings.CDNHealthProbe.probeAll(allCdnIds);
+      }, 5 * 60 * 1000);
+    }
+
+    /**
+     * 资源加载失败时尝试降级到下一个CDN
+     */
+    _handleLoadError(element, match, originalUrl) {
+      if (!match?.fallbackUrls?.length || !window.CDNMappings?.CDNHealthProbe) return false;
+
+      // 标记当前CDN不可用
+      if (match.cdnId) {
+        window.CDNMappings.CDNHealthProbe.markUnhealthy(match.cdnId);
+      }
+
+      // 尝试下一个降级CDN
+      const next = match.fallbackUrls.shift();
+      if (!next) return false;
+
+      console.log(`${LOG_PREFIX} 降级到 ${window.CDNMappings.CDN_BY_ID[next.cdnId]?.name}: ${next.url}`);
+
+      if (element.tagName === 'SCRIPT') {
+        element.src = next.url;
+      } else if (element.tagName === 'LINK') {
+        element.href = next.url;
+      } else {
+        return false;
+      }
+
+      // 更新缓存
+      const cacheKey = this.getCacheKey(originalUrl);
+      const cacheType = element.tagName === 'SCRIPT' ? 'js' : 'css';
+      if (cacheKey && this.config.cacheEnabled) {
+        if (!this.cache[cacheType]) this.cache[cacheType] = {};
+        this.cache[cacheType][cacheKey] = next.url;
+        this.cache[cacheType][originalUrl] = next.url;
+        this.saveCache();
+      }
+
+      // 绑定下次失败的降级
+      this._bindFallback(element, match, originalUrl);
+      return true;
+    }
+
+    /**
+     * 绑定资源加载失败的降级处理
+     */
+    _bindFallback(element, match, originalUrl) {
+      const self = this;
+      element.addEventListener('error', function onError() {
+        element.removeEventListener('error', onError);
+        if (!self._handleLoadError(element, match, originalUrl)) {
+          // 所有降级都失败，恢复原始URL
+          console.warn(`${LOG_PREFIX} 所有CDN降级失败，恢复原始URL`);
+          if (element.tagName === 'SCRIPT') element.src = originalUrl;
+          else if (element.tagName === 'LINK') element.href = originalUrl;
+        }
+      }, { once: true });
+    }
+
+    /**
      * 包装JSReplacer的processScript方法，添加缓存逻辑
      */
     _wrapJSReplacer() {
@@ -402,7 +518,7 @@
         const statsBefore = self.modules.jsReplacer.stats.replaced;
         self._originalProcessScript(script);
 
-        // 3. 如果替换成功，保存到缓存
+        // 3. 如果替换成功，保存到缓存 + 绑定降级
         if (self.config.cacheEnabled && self.modules.jsReplacer.stats.replaced > statsBefore) {
           const details = self.modules.jsReplacer.stats.details;
           const detail = details[details.length - 1];
@@ -411,6 +527,13 @@
             self.cache.js[key] = detail.cdn;
             self.cache.js[detail.original] = detail.cdn;
             self.saveCache();
+
+            // 匹配结果含降级信息时绑定error降级
+            const match = window.CDNMappings?.matchJSLibrary(detail.original);
+            if (match?.fallbackUrls?.length) {
+              match.cdnUrl = detail.cdn;
+              self._bindFallback(script, match, detail.original);
+            }
           }
         }
       };
@@ -500,7 +623,7 @@
         const statsBefore = self.modules.cssAccelerator.stats.replaced;
         origProcess(link);
 
-        // 保存到缓存
+        // 保存到缓存 + 绑定降级
         if (self.config.cacheEnabled && self.modules.cssAccelerator.stats.replaced > statsBefore) {
           if (!self.cache.css) self.cache.css = {};
           const details = self.modules.cssAccelerator.stats.details;
@@ -510,6 +633,13 @@
             self.cache.css[key] = detail.cdn;
             self.cache.css[detail.original] = detail.cdn;
             self.saveCache();
+
+            // 绑定error降级
+            const match = window.CDNMappings?.matchCSS(detail.original);
+            if (match?.fallbackUrls?.length) {
+              match.cdnUrl = detail.cdn;
+              self._bindFallback(link, match, detail.original);
+            }
           }
         }
       };
@@ -757,6 +887,12 @@
       if (this._cacheSaveTimer) {
         clearTimeout(this._cacheSaveTimer);
         this._cacheSaveTimer = null;
+      }
+
+      // 清理CDN健康探测定时器
+      if (this._healthProbeInterval) {
+        clearInterval(this._healthProbeInterval);
+        this._healthProbeInterval = null;
       }
 
       // 重置状态
