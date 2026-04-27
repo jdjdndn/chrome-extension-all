@@ -31,7 +31,11 @@ import '../utils/messaging.js';
 // 9. ContentBridge
 import '../utils/content-bridge.js';
 
-// 10. Core modules
+// 10. 资源加速器（最优先加载 — document_start 时尽早拦截资源）
+import '../../shared/cdn-mappings.js';
+import '../modules/resource-accelerator.js';
+
+// 11. Core modules
 import '../core/store.js';
 import '../core/services.js';
 import '../core/pipeline.js';
@@ -62,16 +66,6 @@ import '../base/SiteScript.js';
 import '../common/script-switch.js';
 import '../common/list-link-split-view.js';
 import '../common/clipboard-watcher.js';
-
-// 13. 资源加速器模块（依赖顺序：CDNMappings → 子模块 → 主模块）
-import '../../shared/cdn-mappings.js';
-import '../modules/js-replacer.js';
-import '../modules/font-replacer.js';
-import '../modules/css-accelerator.js';
-import '../modules/image-optimizer.js';
-import '../modules/resource-preloader.js';
-import '../modules/resource-deduplicator.js';
-import '../modules/resource-accelerator.js';
 
 // 14. Main entry
 import '../main.js';

@@ -19,9 +19,10 @@
     },
     {
       id: 'baomitu',
-      name: '360前端',
+      name: '360前端(证书异常，降级)',
       baseUrl: 'https://cdn.baomitu.com/ajax/libs/',
-      format: 'bootcdn'
+      format: 'bootcdn',
+      _disabled: true // SSL证书过期 ERR_CERT_DATE_INVALID
     },
     {
       id: 'staticfile',
@@ -647,113 +648,6 @@
     }
   };
 
-  // ========== CDN 健康探测 ==========
-
-  const CDNHealthProbe = {
-    // 缓存: { cdnId: { healthy, latency, timestamp } }
-    _cache: {},
-    TTL: 5 * 60 * 1000, // 5分钟
-    TIMEOUT: 3000, // 3秒超时
-    _pending: {}, // 防止重复探测
-
-    /**
-     * 探测单个CDN可用性
-     */
-    async probe(cdnId) {
-      const now = Date.now();
-      const cached = this._cache[cdnId];
-
-      // 缓存有效
-      if (cached && (now - cached.timestamp) < this.TTL) {
-        return cached;
-      }
-
-      // 防止并发重复探测
-      if (this._pending[cdnId]) {
-        return this._pending[cdnId];
-      }
-
-      const cdn = CDN_BY_ID[cdnId];
-      if (!cdn || cdn.format === 'font') {
-        return { healthy: true, latency: 0, timestamp: now };
-      }
-
-      const probePromise = this._doProbe(cdnId, cdn);
-      this._pending[cdnId] = probePromise;
-
-      try {
-        const result = await probePromise;
-        this._cache[cdnId] = result;
-        return result;
-      } finally {
-        delete this._pending[cdnId];
-      }
-    },
-
-    async _doProbe(cdnId, cdn) {
-      const start = performance.now();
-      try {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), this.TIMEOUT);
-
-        await fetch(cdn.baseUrl, {
-          method: 'HEAD',
-          mode: 'no-cors',
-          signal: controller.signal
-        });
-
-        clearTimeout(timer);
-        const latency = Math.round(performance.now() - start);
-
-        console.log(`[CDNProbe] ${cdn.name} ✓ ${latency}ms`);
-        return { healthy: true, latency, timestamp: Date.now() };
-      } catch (e) {
-        const latency = Math.round(performance.now() - start);
-        console.warn(`[CDNProbe] ${cdn.name} ✗ ${latency}ms`);
-        return { healthy: false, latency: Infinity, timestamp: Date.now() };
-      }
-    },
-
-    /**
-     * 批量探测一组CDN
-     */
-    async probeAll(cdnIds) {
-      await Promise.allSettled(cdnIds.map(id => this.probe(id)));
-    },
-
-    /**
-     * 获取健康的CDN列表(按延迟排序)
-     */
-    getHealthy(cdnIds) {
-      const now = Date.now();
-      return cdnIds
-        .map(id => {
-          const cached = this._cache[id];
-          if (!cached || (now - cached.timestamp) >= this.TTL) return null;
-          return { id, ...cached };
-        })
-        .filter(Boolean)
-        .filter(c => c.healthy)
-        .sort((a, b) => a.latency - b.latency);
-    },
-
-    /**
-     * 标记CDN不可用(资源加载失败时调用)
-     */
-    markUnhealthy(cdnId) {
-      this._cache[cdnId] = { healthy: false, latency: Infinity, timestamp: Date.now() };
-      const cdn = CDN_BY_ID[cdnId];
-      if (cdn) console.warn(`[CDNProbe] ${cdn.name} 标记不可用`);
-    },
-
-    /**
-     * 清除缓存
-     */
-    clear() {
-      this._cache = {};
-    }
-  };
-
   // ========== 匹配方法 ==========
 
   function matchFromMap(url, map, type) {
@@ -801,46 +695,24 @@
   }
 
   /**
-   * 按CDN降级链构建URL(健康探测 + 备选URL)
+   * 按CDN降级链构建URL + 备选URL
    * 返回 { url, cdnId, fallbackUrls }
    */
   function tryCDNChain(cdnOrder, config, version) {
-    const healthy = CDNHealthProbe.getHealthy(cdnOrder);
-    const healthyIds = healthy.map(h => h.id);
-    // 合并：健康CDN优先，未知状态其次，不健康放最后
-    const ordered = [...new Set([...healthyIds, ...cdnOrder])];
-    const fallbackUrls = [];
-    let primary = null;
+    const urls = [];
 
-    for (const cdnId of ordered) {
-      const cdn = CDN_BY_ID[cdnId];
-      if (!cdn) continue;
-      const url = buildCDNUrl(cdn, config, version, config.file);
-      if (!url) continue;
-
-      const cached = CDNHealthProbe._cache[cdnId];
-      const isHealthy = !cached || cached.healthy;
-
-      if (!primary && isHealthy) {
-        primary = { url, cdnId };
-      } else if (primary) {
-        fallbackUrls.push({ url, cdnId });
-      }
-    }
-
-    if (primary) {
-      primary.fallbackUrls = fallbackUrls;
-      return primary;
-    }
-
-    // 全部不可用时回退到第一个
     for (const cdnId of cdnOrder) {
       const cdn = CDN_BY_ID[cdnId];
-      if (!cdn) continue;
+      if (!cdn || cdn._disabled) continue;
       const url = buildCDNUrl(cdn, config, version, config.file);
-      if (url) return { url, cdnId, fallbackUrls: [] };
+      if (url) urls.push({ url, cdnId });
     }
-    return null;
+
+    if (urls.length === 0) return null;
+
+    const [primary, ...fallbacks] = urls;
+    primary.fallbackUrls = fallbacks;
+    return primary;
   }
 
   function matchJSLibrary(url) {
@@ -862,7 +734,6 @@
     FONT_CDN_MAP,
     CDN_SOURCES,
     CDN_BY_ID,
-    CDNHealthProbe,
     extractVersion,
     matchJSLibrary,
     matchCSS,

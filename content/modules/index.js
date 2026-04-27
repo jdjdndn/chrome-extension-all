@@ -19,12 +19,6 @@
     OptimizationAdvisor: 'content/modules/OptimizationAdvisor.js',
     // 资源加速器模块
     CDNMappings: 'shared/cdn-mappings.js',
-    JSReplacer: 'content/modules/js-replacer.js',
-    FontReplacer: 'content/modules/font-replacer.js',
-    CSSAccelerator: 'content/modules/css-accelerator.js',
-    ImageOptimizer: 'content/modules/image-optimizer.js',
-    ResourcePreloader: 'content/modules/resource-preloader.js',
-    ResourceDeduplicator: 'content/modules/resource-deduplicator.js',
     ResourceAccelerator: 'content/modules/resource-accelerator.js'
   };
 

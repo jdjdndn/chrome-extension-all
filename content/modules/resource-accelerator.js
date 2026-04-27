@@ -1,935 +1,454 @@
 /**
- * 资源加速器主模块
- * 统一管理JS替换、字体替换、CSS加速、图片优化、资源预加载、资源去重
- * 支持替换结果缓存持久化(带TTL过期)
+ * 资源加速器主模块 (v2)
+ * 1个共享MutationObserver + 按需分发子模块
+ * 子模块: JS替换、字体替换、图片/视频懒加载
  */
 
 (function () {
   'use strict';
 
   const LOG_PREFIX = '[ResourceAccelerator]';
-  const CACHE_KEY = 'resourceAcceleratorCache';
   const CONFIG_KEY = 'resourceAcceleratorConfig';
-  const CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7天过期
-  const CACHE_SAVE_DELAY = 500; // debounce 500ms
-  const MAX_CACHE_ENTRIES = 200; // 每类缓存最大条目数
   const STATS_KEY = 'resourceAcceleratorStats';
 
-  /**
-   * 默认配置
-   */
   const DEFAULT_CONFIG = {
     enabled: true,
     jsReplace: true,
     fontReplace: true,
-    cssReplace: true,
     imageLazyLoad: true,
-    imageCompress: true,
-    imageQuality: 0.8,
-    imageMinSize: 51200,
     lazyLoadThreshold: 200,
-    preloadEnabled: true,
-    dedupEnabled: true,
     excludeDomains: [],
-    excludeUrls: [],
-    cacheEnabled: true
+    excludeUrls: []
   };
 
-  /**
-   * ResourceAccelerator - 资源加速器主类
-   */
   class ResourceAccelerator {
     constructor(options = {}) {
       this.config = { ...DEFAULT_CONFIG, ...options };
-
-      // 缓存数据
-      this.cache = {
-        js: {},
-        fonts: {},
-        timestamp: Date.now(),
-        lastSaved: 0
-      };
-
-      // debounce定时器
-      this._cacheSaveTimer = null;
-      this._statsSaveTimer = null;
-
-      // 累计统计(持久化用)
-      this._cumulativeStats = {
-        totalJsReplaced: 0,
-        totalFontsReplaced: 0,
-        totalCssReplaced: 0,
-        totalImagesOptimized: 0,
-        totalDedupRemoved: 0
-      };
-
-      // 子模块实例
-      this.modules = {
-        jsReplacer: null,
-        fontReplacer: null,
-        cssAccelerator: null,
-        imageOptimizer: null,
-        preloader: null,
-        deduplicator: null
-      };
-
-      // 统计数据
-      this.stats = {
-        js: { total: 0, replaced: 0, cached: 0, errors: 0 },
-        fonts: { total: 0, replaced: 0, cached: 0, errors: 0 },
-        css: { total: 0, replaced: 0, cached: 0, errors: 0 },
-        images: { lazyLoaded: 0, compressed: 0, skipped: 0 },
-        preload: { preloaded: 0, prefetched: 0 },
-        dedup: { scripts: 0, styles: 0, removed: 0 }
-      };
-
-      // 原始方法备份
-      this._originalProcessScript = null;
-      this._originalProcessLink = null;
-
-      console.log(`${LOG_PREFIX} 模块初始化完成`);
+      this._observer = null;       // 共享MutationObserver
+      this._ioObserver = null;     // IntersectionObserver(懒加载用)
+      this._processedScripts = new WeakMap();  // script → originalSrc
+      this._processedLinks = new WeakMap();    // link → originalHref
+      this._processedImages = new WeakSet();
+      this._processedVideos = new WeakSet();
+      this._cspRestricted = undefined;
+      this._stats = { jsReplaced: 0, jsErrors: 0, fontsReplaced: 0, fontErrors: 0, imagesLazy: 0, videosLazy: 0, preloadHints: 0, cdnLoadMs: 0, cdnLoadCount: 0 };
+      this._cumulativeStats = null;
+      this._perfObserver = null;
     }
 
-    /**
-     * 初始化
-     */
     async init() {
-      if (!this.config.enabled) {
-        console.log(`${LOG_PREFIX} 模块已禁用`);
-        return;
-      }
+      if (!this.config.enabled) return;
 
       // 1. 加载配置
-      await this.loadConfig();
+      await this._loadConfig();
+      if (!this.config.enabled) return;
 
-      // 2. 加载缓存
-      await this.loadCache();
+      // 2. CSP预检
+      await this._precheckCSP();
 
-      // 3. 先用缓存替换页面中已存在的资源
-      this._applyCacheToPage();
+      // 3. CDN preconnect
+      this._addCDNPreconnect();
 
-      // 4. 后台探测CDN健康(不阻塞初始化)
-      this._probeCDNHealth();
+      // 4. 处理已有资源 + 启动共享Observer
+      this._initSharedObserver();
 
-      // 5. 初始化子模块
-      this.initModules();
+      // 5. 加载累计统计
+      this._loadCumulativeStats();
 
-      // 6. 监听统计消息
-      this.listenStats();
-
-      // 7. 加载累计统计
-      await this._loadCumulativeStats();
+      // 6. 性能度量
+      this._initPerfObserver();
 
       console.log(`${LOG_PREFIX} 初始化完成`, {
-        jsCacheCount: Object.keys(this.cache.js).length,
-        fontCacheCount: Object.keys(this.cache.fonts).length
+        cspRestricted: !!this._cspRestricted,
+        jsReplace: !this._cspRestricted && this.config.jsReplace,
+        fontReplace: !this._cspRestricted && this.config.fontReplace,
+        lazyLoad: this.config.imageLazyLoad
       });
     }
 
-    /**
-     * 加载配置
-     */
-    async loadConfig() {
-      try {
-        if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-          const result = await chrome.storage.local.get(CONFIG_KEY);
-          if (result[CONFIG_KEY]) {
-            this.config = { ...DEFAULT_CONFIG, ...result[CONFIG_KEY] };
-            console.log(`${LOG_PREFIX} 配置已加载`);
-          }
-        }
-      } catch (error) {
-        console.warn(`${LOG_PREFIX} 加载配置失败:`, error.message);
-      }
-    }
+    // ========== 共享MutationObserver ==========
 
-    /**
-     * 保存配置
-     */
-    async saveConfig() {
-      try {
-        if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-          await chrome.storage.local.set({ [CONFIG_KEY]: this.config });
-          console.log(`${LOG_PREFIX} 配置已保存`);
-        }
-      } catch (error) {
-        console.warn(`${LOG_PREFIX} 保存配置失败:`, error.message);
-      }
-    }
+    _initSharedObserver() {
+      // 处理已有资源
+      this._processExistingResources();
 
-    /**
-     * 加载缓存
-     */
-    async loadCache() {
-      try {
-        if (!this.config.cacheEnabled) return;
+      // 启动共享Observer
+      this._observer = new MutationObserver(mutations => {
+        for (const mutation of mutations) {
+          for (const node of mutation.addedNodes) {
+            if (!node.tagName) continue;
+            const tag = node.tagName;
 
-        if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-          const result = await chrome.storage.local.get(CACHE_KEY);
-          if (result[CACHE_KEY]) {
-            const loaded = result[CACHE_KEY];
-
-            // TTL过期检查
-            const now = Date.now();
-            if (loaded.timestamp && (now - loaded.timestamp) > CACHE_TTL) {
-              console.log(`${LOG_PREFIX} 缓存已过期，清除`);
-              this.cache = { js: {}, fonts: {}, timestamp: now, lastSaved: 0 };
-              return;
+            if (tag === 'SCRIPT' && node.src) {
+              this._onScriptAdded(node);
+            } else if (tag === 'LINK' && node.rel === 'stylesheet' && node.href) {
+              this._onLinkAdded(node);
+            } else if (tag === 'IMG') {
+              this._onImageAdded(node);
+            } else if (tag === 'VIDEO') {
+              this._onVideoAdded(node);
             }
 
-            this.cache = loaded;
-            console.log(`${LOG_PREFIX} 缓存已加载`, {
-              js: Object.keys(this.cache.js || {}).length,
-              fonts: Object.keys(this.cache.fonts || {}).length
-            });
+            // 子元素
+            if (node.querySelectorAll) {
+              node.querySelectorAll('script[src]').forEach(s => this._onScriptAdded(s));
+              node.querySelectorAll('link[rel="stylesheet"]').forEach(l => this._onLinkAdded(l));
+              if (this.config.imageLazyLoad) {
+                node.querySelectorAll('img').forEach(i => this._onImageAdded(i));
+                node.querySelectorAll('video').forEach(v => this._onVideoAdded(v));
+              }
+            }
           }
-        }
-      } catch (error) {
-        console.warn(`${LOG_PREFIX} 加载缓存失败:`, error.message);
-      }
-    }
-
-    /**
-     * 保存缓存(debounce批量写入 + LRU淘汰)
-     */
-    saveCache() {
-      if (!this.config.cacheEnabled) return;
-
-      // LRU淘汰: 超过上限时清理最旧的条目
-      this._evictCache('js');
-      this._evictCache('fonts');
-      this._evictCache('css');
-
-      if (this._cacheSaveTimer) {
-        clearTimeout(this._cacheSaveTimer);
-      }
-
-      this._cacheSaveTimer = setTimeout(async () => {
-        try {
-          if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-            this.cache.timestamp = Date.now();
-            this.cache.lastSaved = Date.now();
-            await chrome.storage.local.set({ [CACHE_KEY]: this.cache });
-            console.log(`${LOG_PREFIX} 缓存已保存`);
-          }
-        } catch (error) {
-          console.warn(`${LOG_PREFIX} 保存缓存失败:`, error.message);
-        }
-        this._cacheSaveTimer = null;
-      }, CACHE_SAVE_DELAY);
-    }
-
-    /**
-     * LRU淘汰: 超过MAX_CACHE_ENTRIES时移除最旧条目
-     */
-    _evictCache(type) {
-      const entries = this.cache[type];
-      if (!entries || typeof entries !== 'object') return;
-
-      const keys = Object.keys(entries);
-      if (keys.length <= MAX_CACHE_ENTRIES) return;
-
-      // 按访问时间排序淘汰(如果有_accessTime)否则按插入顺序
-      const toRemove = keys.length - MAX_CACHE_ENTRIES;
-      let removed = 0;
-
-      for (const key of keys) {
-        if (removed >= toRemove) break;
-        // 保留带版本号的精确匹配，优先删除 URL 全路径 key
-        if (key.startsWith('http')) {
-          delete entries[key];
-          removed++;
-        }
-      }
-
-      if (removed > 0) {
-        console.log(`${LOG_PREFIX} ${type}缓存淘汰 ${removed} 条`);
-      }
-    }
-
-    /**
-     * 生成缓存键
-     */
-    getCacheKey(url) {
-      if (!url || typeof url !== 'string') return null;
-      // 移除协议和查询参数，保留核心路径
-      try {
-        const urlObj = new URL(url);
-        return urlObj.hostname + urlObj.pathname;
-      } catch {
-        return url;
-      }
-    }
-
-    /**
-     * 应用缓存到页面已存在的资源
-     */
-    _applyCacheToPage() {
-      if (!this.config.cacheEnabled) return;
-
-      // 处理已存在的script标签
-      if (this.config.jsReplace && Object.keys(this.cache.js).length > 0) {
-        const scripts = document.querySelectorAll('script[src]');
-        scripts.forEach(script => {
-          const originalUrl = script.src;
-          const cacheKey = this.getCacheKey(originalUrl);
-          const cachedUrl = this.cache.js[cacheKey] || this.cache.js[originalUrl];
-          if (cachedUrl && originalUrl !== cachedUrl) {
-            script.src = cachedUrl;
-            this.stats.js.cached++;
-            console.log(`${LOG_PREFIX} 页面缓存命中(JS): ${cachedUrl}`);
-          }
-        });
-      }
-
-      // 处理已存在的link标签
-      if (this.config.fontReplace && Object.keys(this.cache.fonts).length > 0) {
-        const links = document.querySelectorAll('link[rel="stylesheet"]');
-        links.forEach(link => {
-          const originalUrl = link.href;
-          const cacheKey = this.getCacheKey(originalUrl);
-          const cachedUrl = this.cache.fonts[cacheKey] || this.cache.fonts[originalUrl];
-          if (cachedUrl && originalUrl !== cachedUrl) {
-            link.href = cachedUrl;
-            this.stats.fonts.cached++;
-            console.log(`${LOG_PREFIX} 页面缓存命中(字体): ${cachedUrl}`);
-          }
-        });
-      }
-    }
-
-    /**
-     * 初始化子模块
-     */
-    initModules() {
-      // 检查当前域名是否被排除
-      if (this._isDomainExcluded()) {
-        console.log(`${LOG_PREFIX} 当前域名在排除列表中，跳过初始化`);
-        return;
-      }
-
-      const excludePatterns = this._buildExcludePatterns();
-
-      // JS替换模块
-      if (this.config.jsReplace && window.JSReplacer) {
-        this.modules.jsReplacer = new window.JSReplacer({
-          enabled: this.config.enabled,
-          excludePatterns
-        });
-        this.modules.jsReplacer.init();
-        this._wrapJSReplacer();
-      }
-
-      // 字体替换模块
-      if (this.config.fontReplace && window.FontReplacer) {
-        this.modules.fontReplacer = new window.FontReplacer({
-          enabled: this.config.enabled,
-          excludePatterns
-        });
-        this.modules.fontReplacer.init();
-        this._wrapFontReplacer();
-      }
-
-      // CSS加速模块
-      if (this.config.cssReplace && window.CSSAccelerator) {
-        this.modules.cssAccelerator = new window.CSSAccelerator({
-          enabled: this.config.enabled,
-          excludePatterns
-        });
-        this.modules.cssAccelerator.init();
-        this._wrapCSSAccelerator();
-      }
-
-      // 图片优化模块
-      if ((this.config.imageLazyLoad || this.config.imageCompress) && window.ImageOptimizer) {
-        this.modules.imageOptimizer = new window.ImageOptimizer({
-          lazyLoadEnabled: this.config.imageLazyLoad,
-          lazyLoadThreshold: this.config.lazyLoadThreshold,
-          compressEnabled: this.config.imageCompress,
-          compressQuality: this.config.imageQuality,
-          compressMinSize: this.config.imageMinSize
-        });
-        this.modules.imageOptimizer.init();
-      }
-
-      // 资源预加载模块
-      if (this.config.preloadEnabled && window.ResourcePreloader) {
-        this.modules.preloader = new window.ResourcePreloader({
-          enabled: this.config.enabled,
-          preloadJS: this.config.jsReplace,
-          preloadCSS: this.config.cssReplace,
-          preloadFonts: this.config.fontReplace,
-          excludePatterns
-        });
-        this.modules.preloader.init();
-      }
-
-      // 资源去重模块
-      if (this.config.dedupEnabled && window.ResourceDeduplicator) {
-        this.modules.deduplicator = new window.ResourceDeduplicator({
-          enabled: this.config.enabled,
-          dedupJS: this.config.jsReplace,
-          dedupCSS: this.config.cssReplace,
-          excludePatterns
-        });
-        this.modules.deduplicator.init();
-      }
-    }
-
-    /**
-     * 检查当前域名是否被排除
-     */
-    _isDomainExcluded() {
-      const hostname = window.location.hostname;
-      return this.config.excludeDomains.some(domain =>
-        hostname === domain || hostname.endsWith('.' + domain)
-      );
-    }
-
-    /**
-     * 构建排除模式
-     */
-    _buildExcludePatterns() {
-      const patterns = [];
-
-      // 添加URL排除规则
-      this.config.excludeUrls.forEach(url => {
-        try {
-          patterns.push(new RegExp(url.replace(/\*/g, '.*'), 'i'));
-        } catch {
-          // 忽略无效正则
         }
       });
 
-      return patterns;
+      this._observer.observe(document.documentElement, {
+        childList: true, subtree: true
+      });
     }
 
-    /**
-     * 后台探测所有CDN健康状态(不阻塞主流程)
-     */
-    _probeCDNHealth() {
-      if (!window.CDNMappings?.CDNHealthProbe) return;
-
-      const allCdnIds = window.CDNMappings.CDN_SOURCES
-        .filter(c => c.format !== 'font')
-        .map(c => c.id);
-
-      // 延迟探测，不阻塞页面初始化
-      setTimeout(() => {
-        window.CDNMappings.CDNHealthProbe.probeAll(allCdnIds).then(() => {
-          console.log(`${LOG_PREFIX} CDN健康探测完成`);
-        });
-      }, 2000);
-
-      // 每5分钟重新探测
-      this._healthProbeInterval = setInterval(() => {
-        window.CDNMappings.CDNHealthProbe.probeAll(allCdnIds);
-      }, 5 * 60 * 1000);
+    _processExistingResources() {
+      // 已有脚本
+      document.querySelectorAll('script[src]').forEach(s => this._onScriptAdded(s));
+      // 已有样式
+      document.querySelectorAll('link[rel="stylesheet"]').forEach(l => this._onLinkAdded(l));
+      // 已有图片/视频
+      if (this.config.imageLazyLoad) {
+        document.querySelectorAll('img').forEach(i => this._onImageAdded(i));
+        document.querySelectorAll('video').forEach(v => this._onVideoAdded(v));
+      }
     }
 
-    /**
-     * 资源加载失败时尝试降级到下一个CDN
-     */
-    _handleLoadError(element, match, originalUrl) {
-      if (!match?.fallbackUrls?.length || !window.CDNMappings?.CDNHealthProbe) return false;
+    // ========== 脚本处理 ==========
 
-      // 标记当前CDN不可用
-      if (match.cdnId) {
-        window.CDNMappings.CDNHealthProbe.markUnhealthy(match.cdnId);
-      }
+    _onScriptAdded(script) {
+      if (this._cspRestricted || !this.config.jsReplace) return;
+      const url = script.src;
+      if (!url || this._processedScripts.has(script)) return;
 
-      // 尝试下一个降级CDN
-      const next = match.fallbackUrls.shift();
-      if (!next) return false;
+      // 排除规则
+      if (this._isExcluded(url)) return;
+      if (this._isCDNUrl(url)) return;
 
-      console.log(`${LOG_PREFIX} 降级到 ${window.CDNMappings.CDN_BY_ID[next.cdnId]?.name}: ${next.url}`);
+      const match = window.CDNMappings?.matchJSLibrary(url);
+      if (!match) return;
 
-      if (element.tagName === 'SCRIPT') {
-        element.src = next.url;
-      } else if (element.tagName === 'LINK') {
-        element.href = next.url;
-      } else {
-        return false;
-      }
+      const originalSrc = script.src;
+      this._processedScripts.set(script, originalSrc);
 
-      // 更新缓存
-      const cacheKey = this.getCacheKey(originalUrl);
-      const cacheType = element.tagName === 'SCRIPT' ? 'js' : 'css';
-      if (cacheKey && this.config.cacheEnabled) {
-        if (!this.cache[cacheType]) this.cache[cacheType] = {};
-        this.cache[cacheType][cacheKey] = next.url;
-        this.cache[cacheType][originalUrl] = next.url;
-        this.saveCache();
-      }
+      // Preload提示：提前发起CDN获取
+      this._addPreloadHint(match.cdnUrl, 'js');
 
-      // 绑定下次失败的降级
-      this._bindFallback(element, match, originalUrl);
-      return true;
-    }
+      const fallbacks = (match.fallbackUrls || []).map(f => f.url);
+      script.src = match.cdnUrl;
 
-    /**
-     * 绑定资源加载失败的降级处理
-     */
-    _bindFallback(element, match, originalUrl) {
-      const self = this;
-      element.addEventListener('error', function onError() {
-        element.removeEventListener('error', onError);
-        if (!self._handleLoadError(element, match, originalUrl)) {
-          // 所有降级都失败，恢复原始URL
-          console.warn(`${LOG_PREFIX} 所有CDN降级失败，恢复原始URL`);
-          if (element.tagName === 'SCRIPT') element.src = originalUrl;
-          else if (element.tagName === 'LINK') element.href = originalUrl;
+      script.onerror = () => {
+        if (fallbacks.length > 0) {
+          script.src = fallbacks.shift();
+        } else {
+          this._processedScripts.delete(script);
+          script.src = originalSrc;
+          this._stats.jsErrors++;
         }
-      }, { once: true });
+      };
+
+      this._stats.jsReplaced++;
+      console.log(`${LOG_PREFIX} JS: ${match.name} → ${match.cdnName}`);
     }
 
-    /**
-     * 包装JSReplacer的processScript方法，添加缓存逻辑
-     */
-    _wrapJSReplacer() {
-      if (!this.modules.jsReplacer) return;
+    // ========== 字体/样式处理 ==========
 
-      this._originalProcessScript = this.modules.jsReplacer.processScript.bind(this.modules.jsReplacer);
-      const self = this;
+    _onLinkAdded(link) {
+      if (this._cspRestricted || !this.config.fontReplace) return;
+      const url = link.href;
+      if (!url || this._processedLinks.has(link)) return;
 
-      this.modules.jsReplacer.processScript = function (script) {
-        if (!self.config.enabled) return;
+      if (this._isExcluded(url)) return;
+      if (this._isCDNUrl(url)) return;
 
-        const url = script.src;
-        if (!url) return;
+      const match = window.CDNMappings?.matchFont(url) || window.CDNMappings?.matchCSS(url);
+      if (!match) return;
 
-        // 避免重复处理
-        if (self.modules.jsReplacer._processedScripts.has(script)) return;
+      const originalHref = link.href;
+      this._processedLinks.set(link, originalHref);
 
-        // 1. 先查缓存
-        const cacheKey = self.getCacheKey(url);
-        if (self.config.cacheEnabled && cacheKey && (self.cache.js[cacheKey] || self.cache.js[url])) {
-          const cachedUrl = self.cache.js[cacheKey] || self.cache.js[url];
-          if (script.src !== cachedUrl) {
-            script.src = cachedUrl;
-            self.stats.js.cached++;
-            self.modules.jsReplacer._processedScripts.add(script);
-            console.log(`${LOG_PREFIX} 缓存命中(JS): ${cachedUrl}`);
+      // Preload提示：提前发起CDN获取
+      this._addPreloadHint(match.cdnUrl, 'css');
+
+      const fallbacks = (match.fallbackUrls || []).map(f => f.url);
+      link.href = match.cdnUrl;
+
+      link.onerror = () => {
+        if (fallbacks.length > 0) {
+          link.href = fallbacks.shift();
+        } else {
+          this._processedLinks.delete(link);
+          link.href = originalHref;
+          this._stats.fontErrors++;
+        }
+      };
+
+      this._stats.fontsReplaced++;
+      console.log(`${LOG_PREFIX} Font/CSS: ${match.name} → ${match.cdnName}`);
+    }
+
+    // ========== 图片懒加载 ==========
+
+    _onImageAdded(img) {
+      if (!this.config.imageLazyLoad) return;
+      if (this._processedImages.has(img)) return;
+      if (!img.src || img.dataset.src || img.src.startsWith('data:')) return;
+
+      // 排除已有loading属性的
+      if (img.loading === 'eager' || img.hasAttribute('data-no-lazy')) return;
+
+      // 已完成加载的图片跳过
+      if (img.complete && img.naturalWidth > 0) return;
+
+      // 原生懒加载属性（补充保障）
+      img.loading = 'lazy';
+      if ('fetchPriority' in img) img.fetchPriority = 'low';
+
+      this._initIntersectionObserver();
+
+      img.dataset.src = img.src;
+      img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+      img.dataset.lazyLoading = 'true';
+      this._processedImages.add(img);
+      this._ioObserver.observe(img);
+    }
+
+    // ========== 视频懒加载 ==========
+
+    _onVideoAdded(video) {
+      if (!this.config.imageLazyLoad) return;
+      if (this._processedVideos.has(video)) return;
+      if (video.preload === 'none') return;
+
+      const sources = video.querySelectorAll('source');
+      if (!video.src && sources.length === 0) return;
+
+      this._initIntersectionObserver();
+
+      if (video.src) {
+        video.dataset.src = video.src;
+        video.src = '';
+      }
+      sources.forEach(s => {
+        if (s.src) { s.dataset.src = s.src; s.src = ''; }
+      });
+
+      video.preload = 'none';
+      video.dataset.videoLazyLoading = 'true';
+      this._processedVideos.add(video);
+      this._ioObserver.observe(video);
+    }
+
+    // ========== IntersectionObserver(懒加载共用) ==========
+
+    _initIntersectionObserver() {
+      if (this._ioObserver) return;
+      this._ioObserver = new IntersectionObserver(entries => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const el = entry.target;
+          if (el.tagName === 'VIDEO') {
+            this._loadVideo(el);
+          } else {
+            this._loadImage(el);
           }
-          return;
+          this._ioObserver.unobserve(el);
         }
+      }, {
+        rootMargin: `${this.config.lazyLoadThreshold || 200}px 0px`,
+        threshold: 0.01
+      });
+    }
 
-        // 2. 缓存未命中，走原逻辑
-        const statsBefore = self.modules.jsReplacer.stats.replaced;
-        self._originalProcessScript(script);
+    _loadImage(img) {
+      const src = img.dataset.src;
+      if (!src) return;
+      img.src = src;
+      img.dataset.lazyLoading = 'false';
+      img.dataset.lazyLoaded = 'true';
+      this._stats.imagesLazy++;
+    }
 
-        // 3. 如果替换成功，保存到缓存 + 绑定降级
-        if (self.config.cacheEnabled && self.modules.jsReplacer.stats.replaced > statsBefore) {
-          const details = self.modules.jsReplacer.stats.details;
-          const detail = details[details.length - 1];
-          if (detail && detail.original && detail.cdn) {
-            const key = self.getCacheKey(detail.original);
-            self.cache.js[key] = detail.cdn;
-            self.cache.js[detail.original] = detail.cdn;
-            self.saveCache();
+    _loadVideo(video) {
+      video.querySelectorAll('source').forEach(s => {
+        if (s.dataset.src) { s.src = s.dataset.src; delete s.dataset.src; }
+      });
+      if (video.dataset.src) { video.src = video.dataset.src; delete video.dataset.src; }
+      video.dataset.videoLazyLoading = 'false';
+      video.dataset.videoLazyLoaded = 'true';
+      video.load();
+      this._stats.videosLazy++;
+    }
 
-            // 匹配结果含降级信息时绑定error降级
-            const match = window.CDNMappings?.matchJSLibrary(detail.original);
-            if (match?.fallbackUrls?.length) {
-              match.cdnUrl = detail.cdn;
-              self._bindFallback(script, match, detail.original);
+    // ========== CDN preconnect ==========
+
+    _addCDNPreconnect() {
+      if (!window.CDNMappings?.CDN_SOURCES) return;
+      const head = document.head || document.documentElement;
+      const priorityCDNs = ['bootcdn', 'staticfile', 'jsdelivr'];
+
+      window.CDNMappings.CDN_SOURCES.forEach(cdn => {
+        if (cdn._disabled) return;
+        try {
+          const origin = new URL(cdn.baseUrl).origin;
+          if (document.querySelector(`link[rel="dns-prefetch"][href="${origin}"]`)) return;
+          const link = document.createElement('link');
+          link.rel = priorityCDNs.includes(cdn.id) ? 'preconnect' : 'dns-prefetch';
+          link.href = origin;
+          if (link.rel === 'preconnect') link.crossOrigin = 'anonymous';
+          head.insertBefore(link, head.firstChild);
+        } catch {}
+      });
+    }
+
+    // ========== Preload 提示 ==========
+
+    _addPreloadHint(cdnUrl, type) {
+      const head = document.head || document.documentElement;
+      if (head.querySelector(`link[rel="preload"][href="${cdnUrl}"]`)) return;
+      const link = document.createElement('link');
+      link.rel = 'preload';
+      link.href = cdnUrl;
+      link.as = type === 'js' ? 'script' : 'style';
+      head.insertBefore(link, head.firstChild);
+      this._stats.preloadHints++;
+    }
+
+    // ========== 性能度量 ==========
+
+    _initPerfObserver() {
+      if (this._perfObserver) return;
+      const cdnHosts = ['cdn.bootcdn.net', 'cdn.jsdelivr.net', 'cdn.staticfile.org',
+        'cdnjs.cloudflare.com', 'unpkg.com', 'fonts.font.im', 'fonts.loli.net',
+        'lf3-cdn-tos.bytecdntp.com', 'fonts.googleapis.cnpmjs.org'];
+      try {
+        this._perfObserver = new PerformanceObserver(list => {
+          for (const entry of list.getEntries()) {
+            if (cdnHosts.some(h => entry.name.includes(h))) {
+              this._stats.cdnLoadMs += Math.round(entry.duration);
+              this._stats.cdnLoadCount++;
             }
           }
-        }
-      };
-    }
-
-    /**
-     * 包装FontReplacer的processLink方法，添加缓存逻辑
-     */
-    _wrapFontReplacer() {
-      if (!this.modules.fontReplacer) return;
-
-      this._originalProcessLink = this.modules.fontReplacer.processLink.bind(this.modules.fontReplacer);
-      const self = this;
-
-      this.modules.fontReplacer.processLink = function (link) {
-        if (!self.config.enabled) return;
-
-        const url = link.href;
-        if (!url) return;
-
-        // 避免重复处理
-        if (self.modules.fontReplacer._processedLinks.has(link)) return;
-
-        // 1. 先查缓存
-        const cacheKey = self.getCacheKey(url);
-        if (self.config.cacheEnabled && cacheKey && (self.cache.fonts[cacheKey] || self.cache.fonts[url])) {
-          const cachedUrl = self.cache.fonts[cacheKey] || self.cache.fonts[url];
-          if (link.href !== cachedUrl) {
-            link.href = cachedUrl;
-            self.stats.fonts.cached++;
-            self.modules.fontReplacer._processedLinks.add(link);
-            console.log(`${LOG_PREFIX} 缓存命中(字体): ${cachedUrl}`);
-          }
-          return;
-        }
-
-        // 2. 缓存未命中，走原逻辑
-        const statsBefore = self.modules.fontReplacer.stats.replaced;
-        self._originalProcessLink(link);
-
-        // 3. 如果替换成功，保存到缓存
-        if (self.config.cacheEnabled && self.modules.fontReplacer.stats.replaced > statsBefore) {
-          const details = self.modules.fontReplacer.stats.details;
-          const detail = details[details.length - 1];
-          if (detail && detail.original && detail.cdn) {
-            const key = self.getCacheKey(detail.original);
-            self.cache.fonts[key] = detail.cdn;
-            self.cache.fonts[detail.original] = detail.cdn;
-            self.saveCache();
-          }
-        }
-      };
-    }
-
-    /**
-     * 包装CSSAccelerator的processLink方法，添加缓存逻辑
-     */
-    _wrapCSSAccelerator() {
-      if (!this.modules.cssAccelerator) return;
-
-      const origProcess = this.modules.cssAccelerator.processLink.bind(this.modules.cssAccelerator);
-      this._originalProcessCSSLink = origProcess;
-      const self = this;
-
-      this.modules.cssAccelerator.processLink = function (link) {
-        if (!self.config.enabled) return;
-
-        const url = link.href;
-        if (!url) return;
-
-        if (self.modules.cssAccelerator._processedLinks.has(link)) return;
-
-        // 查缓存
-        const cacheKey = self.getCacheKey(url);
-        if (self.config.cacheEnabled && cacheKey && (self.cache.css?.[cacheKey] || self.cache.css?.[url])) {
-          const cachedUrl = self.cache.css[cacheKey] || self.cache.css[url];
-          if (link.href !== cachedUrl) {
-            link.href = cachedUrl;
-            self.stats.css.cached++;
-            self.modules.cssAccelerator._processedLinks.add(link);
-            console.log(`${LOG_PREFIX} 缓存命中(CSS): ${cachedUrl}`);
-          }
-          return;
-        }
-
-        // 缓存未命中
-        const statsBefore = self.modules.cssAccelerator.stats.replaced;
-        origProcess(link);
-
-        // 保存到缓存 + 绑定降级
-        if (self.config.cacheEnabled && self.modules.cssAccelerator.stats.replaced > statsBefore) {
-          if (!self.cache.css) self.cache.css = {};
-          const details = self.modules.cssAccelerator.stats.details;
-          const detail = details[details.length - 1];
-          if (detail && detail.original && detail.cdn) {
-            const key = self.getCacheKey(detail.original);
-            self.cache.css[key] = detail.cdn;
-            self.cache.css[detail.original] = detail.cdn;
-            self.saveCache();
-
-            // 绑定error降级
-            const match = window.CDNMappings?.matchCSS(detail.original);
-            if (match?.fallbackUrls?.length) {
-              match.cdnUrl = detail.cdn;
-              self._bindFallback(link, match, detail.original);
-            }
-          }
-        }
-      };
-    }
-
-    /**
-     * 监听统计消息和配置更新
-     */
-    listenStats() {
-      if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
-        chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-          // 处理配置更新
-          if (message.type === 'RESOURCE_ACCELERATOR_CONFIG') {
-            this.updateConfig(message.data);
-            return false;
-          }
-
-          // 返回统计信息
-          if (message.type === 'RESOURCE_ACCELERATOR_GET_STATS') {
-            sendResponse(this.getStats());
-            return true;
-          }
-
-          // 清除缓存
-          if (message.type === 'RESOURCE_ACCELERATOR_CLEAR_CACHE') {
-            this.clearCache().then(() => sendResponse({ cleared: true }));
-            return true;
-          }
-
-          // 处理统计消息
-          this.updateStats(message);
-          return false;
         });
-      }
+        this._perfObserver.observe({ type: 'resource', buffered: false });
+      } catch {}
     }
 
-    /**
-     * 更新统计
-     */
-    updateStats(message) {
-      if (!message || !message.type) return;
+    // ========== CSP预检 ==========
 
-      switch (message.type) {
-        case 'JS_REPLACER_STATS':
-          this.stats.js.replaced++;
-          this._cumulativeStats.totalJsReplaced++;
-          break;
-        case 'FONT_REPLACER_STATS':
-          this.stats.fonts.replaced++;
-          this._cumulativeStats.totalFontsReplaced++;
-          break;
-        case 'CSS_ACCELERATOR_STATS':
-          this.stats.css.replaced++;
-          this._cumulativeStats.totalCssReplaced++;
-          break;
-        default:
-          break;
+    async _precheckCSP() {
+      const metaCSP = document.querySelector('meta[http-equiv="Content-Security-Policy"]');
+      if (metaCSP) {
+        const content = metaCSP.getAttribute('content') || '';
+        const scriptSrc = content.match(/script-src\s+([^;]+)/);
+        if (scriptSrc && !/https?:|\*\./.test(scriptSrc[1])) {
+          this._cspRestricted = true;
+          return;
+        }
       }
 
-      this._saveCumulativeStats();
+      this._cspRestricted = await new Promise(resolve => {
+        let resolved = false;
+        const finish = (val) => {
+          if (resolved) return;
+          resolved = true;
+          document.removeEventListener('securitypolicyviolation', onViolation);
+          if (test.parentNode) test.remove();
+          resolve(val);
+        };
+        const onViolation = (e) => {
+          if (e.blockedURL?.includes('bootcdn')) finish(true);
+        };
+        document.addEventListener('securitypolicyviolation', onViolation);
+
+        const test = document.createElement('script');
+        test.src = 'https://cdn.bootcdn.net/__csp_probe__';
+        test.onload = () => finish(false);
+        test.onerror = () => setTimeout(() => finish(false), 20);
+        (document.head || document.documentElement).appendChild(test);
+        setTimeout(() => finish(false), 800);
+      });
+
+      if (this._cspRestricted) console.log(`${LOG_PREFIX} CSP: 外部脚本被阻止`);
     }
 
-    /**
-     * 加载累计统计
-     */
+    // ========== 工具方法 ==========
+
+    _isExcluded(url) {
+      if (!url || typeof url !== 'string') return true;
+      if (/^chrome-extension:|^moz-extension:|^about:|^data:|^javascript:/i.test(url)) return true;
+      return (this.config.excludeUrls || []).some(pattern => {
+        try { return new RegExp(pattern.replace(/\*/g, '.*'), 'i').test(url); } catch { return false; }
+      });
+    }
+
+    _isCDNUrl(url) {
+      if (!window.CDNMappings?.CDN_SOURCES) return false;
+      return window.CDNMappings.CDN_SOURCES.some(cdn => {
+        try { return url.includes(new URL(cdn.baseUrl).hostname); } catch { return false; }
+      });
+    }
+
+    // ========== 配置 & 统计 ==========
+
+    async _loadConfig() {
+      try {
+        const result = await chrome.storage.local.get(CONFIG_KEY);
+        if (result[CONFIG_KEY]) this.config = { ...DEFAULT_CONFIG, ...result[CONFIG_KEY] };
+      } catch {}
+    }
+
     async _loadCumulativeStats() {
       try {
-        if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-          const result = await chrome.storage.local.get(STATS_KEY);
-          if (result[STATS_KEY]) {
-            this._cumulativeStats = { ...this._cumulativeStats, ...result[STATS_KEY] };
-          }
-        }
-      } catch (error) {
-        console.warn(`${LOG_PREFIX} 加载累计统计失败:`, error.message);
-      }
+        const result = await chrome.storage.local.get(STATS_KEY);
+        this._cumulativeStats = result[STATS_KEY] || { totalJsReplaced: 0, totalFontsReplaced: 0, totalImagesLazy: 0 };
+        this._cumulativeStats.totalJsReplaced += this._stats.jsReplaced;
+        this._cumulativeStats.totalFontsReplaced += this._stats.fontsReplaced;
+        this._cumulativeStats.totalImagesLazy += this._stats.imagesLazy;
+        await chrome.storage.local.set({ [STATS_KEY]: this._cumulativeStats });
+      } catch {}
     }
 
-    /**
-     * 保存累计统计(debounce)
-     */
-    _saveCumulativeStats() {
-      if (this._statsSaveTimer) {
-        clearTimeout(this._statsSaveTimer);
-      }
+    getStats() { return { ...this._stats, cspRestricted: !!this._cspRestricted }; }
 
-      this._statsSaveTimer = setTimeout(async () => {
-        try {
-          if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-            await chrome.storage.local.set({ [STATS_KEY]: this._cumulativeStats });
-          }
-        } catch (error) {
-          console.warn(`${LOG_PREFIX} 保存累计统计失败:`, error.message);
-        }
-        this._statsSaveTimer = null;
-      }, CACHE_SAVE_DELAY);
-    }
-
-    /**
-     * 获取统计信息
-     */
-    getStats() {
-      const jsStats = this.modules.jsReplacer?.getStats() || this.stats.js;
-      const fontStats = this.modules.fontReplacer?.getStats() || this.stats.fonts;
-      const cssStats = this.modules.cssAccelerator?.getStats() || this.stats.css;
-      const imageStats = this.modules.imageOptimizer?.getStats() || this.stats.images;
-      const preloadStats = this.modules.preloader?.getStats() || this.stats.preload;
-      const dedupStats = this.modules.deduplicator?.getStats() || this.stats.dedup;
-
-      return {
-        enabled: this.config.enabled,
-        js: { ...jsStats, cached: this.stats.js.cached },
-        fonts: { ...fontStats, cached: this.stats.fonts.cached },
-        css: { ...cssStats, cached: this.stats.css.cached },
-        images: imageStats,
-        preload: preloadStats,
-        dedup: dedupStats,
-        cache: {
-          jsCount: Object.keys(this.cache.js).length,
-          fontCount: Object.keys(this.cache.fonts).length,
-          cssCount: Object.keys(this.cache.css || {}).length,
-          timestamp: this.cache.timestamp
-        }
-      };
-    }
-
-    /**
-     * 更新配置
-     */
-    async updateConfig(newConfig) {
-      this.config = { ...this.config, ...newConfig };
-      await this.saveConfig();
-
-      // 同步更新子模块
-      if (this.modules.jsReplacer) {
-        this.modules.jsReplacer.enabled = this.config.jsReplace && this.config.enabled;
-      }
-      if (this.modules.fontReplacer) {
-        this.modules.fontReplacer.enabled = this.config.fontReplace && this.config.enabled;
-      }
-      if (this.modules.cssAccelerator) {
-        this.modules.cssAccelerator.enabled = this.config.cssReplace && this.config.enabled;
-      }
-      if (this.modules.imageOptimizer) {
-        if (this.config.imageLazyLoad) {
-          this.modules.imageOptimizer.enableLazyLoad();
-        } else {
-          this.modules.imageOptimizer.disableLazyLoad();
-        }
-        if (this.config.imageCompress) {
-          this.modules.imageOptimizer.enableCompress();
-        } else {
-          this.modules.imageOptimizer.disableCompress();
-        }
-      }
-      if (this.modules.preloader) {
-        this.modules.preloader.enabled = this.config.preloadEnabled && this.config.enabled;
-      }
-      if (this.modules.deduplicator) {
-        this.modules.deduplicator.enabled = this.config.dedupEnabled && this.config.enabled;
-      }
-
-      console.log(`${LOG_PREFIX} 配置已更新`, newConfig);
-    }
-
-    /**
-     * 清除缓存
-     */
-    async clearCache() {
-      this.cache = {
-        js: {},
-        fonts: {},
-        css: {},
-        timestamp: Date.now(),
-        lastSaved: 0
-      };
-
-      try {
-        if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-          await chrome.storage.local.remove(CACHE_KEY);
-        }
-        console.log(`${LOG_PREFIX} 缓存已清除`);
-      } catch (error) {
-        console.warn(`${LOG_PREFIX} 清除缓存失败:`, error.message);
-      }
-    }
-
-    /**
-     * 启用模块
-     */
-    enable() {
-      this.config.enabled = true;
-
-      if (this.modules.jsReplacer) this.modules.jsReplacer.enable();
-      if (this.modules.fontReplacer) this.modules.fontReplacer.enable();
-      if (this.modules.cssAccelerator) this.modules.cssAccelerator.enable();
-      if (this.modules.imageOptimizer) this.modules.imageOptimizer.init();
-      if (this.modules.preloader) this.modules.preloader.enable();
-      if (this.modules.deduplicator) this.modules.deduplicator.enable();
-
-      console.log(`${LOG_PREFIX} 模块已启用`);
-    }
-
-    /**
-     * 禁用模块
-     */
-    disable() {
-      this.config.enabled = false;
-
-      if (this.modules.jsReplacer) this.modules.jsReplacer.disable();
-      if (this.modules.fontReplacer) this.modules.fontReplacer.disable();
-      if (this.modules.cssAccelerator) this.modules.cssAccelerator.disable();
-      if (this.modules.imageOptimizer) this.modules.imageOptimizer.disableLazyLoad();
-      if (this.modules.preloader) this.modules.preloader.disable();
-      if (this.modules.deduplicator) this.modules.deduplicator.disable();
-
-      console.log(`${LOG_PREFIX} 模块已禁用`);
-    }
-
-    /**
-     * 销毁模块
-     */
-    destroy() {
-      // 恢复原始方法
-      if (this._originalProcessScript && this.modules.jsReplacer) {
-        this.modules.jsReplacer.processScript = this._originalProcessScript;
-      }
-      if (this._originalProcessLink && this.modules.fontReplacer) {
-        this.modules.fontReplacer.processLink = this._originalProcessLink;
-      }
-      if (this._originalProcessCSSLink && this.modules.cssAccelerator) {
-        this.modules.cssAccelerator.processLink = this._originalProcessCSSLink;
-      }
-
-      // 销毁子模块
-      const moduleNames = ['jsReplacer', 'fontReplacer', 'cssAccelerator', 'imageOptimizer', 'preloader', 'deduplicator'];
-      moduleNames.forEach(name => {
-        if (this.modules[name]) {
-          this.modules[name].destroy();
-          this.modules[name] = null;
-        }
+    restoreAll() {
+      document.querySelectorAll('script[src]').forEach(s => {
+        const orig = this._processedScripts.get(s);
+        if (orig && s.src !== orig) s.src = orig;
       });
+      document.querySelectorAll('link[rel="stylesheet"]').forEach(l => {
+        const orig = this._processedLinks.get(l);
+        if (orig && l.href !== orig) l.href = orig;
+      });
+    }
 
-      // 清理debounce定时器
-      if (this._cacheSaveTimer) {
-        clearTimeout(this._cacheSaveTimer);
-        this._cacheSaveTimer = null;
-      }
-
-      // 清理CDN健康探测定时器
-      if (this._healthProbeInterval) {
-        clearInterval(this._healthProbeInterval);
-        this._healthProbeInterval = null;
-      }
-
-      // 重置状态
-      this.config.enabled = false;
-      this._originalProcessScript = null;
-      this._originalProcessLink = null;
-      this._originalProcessCSSLink = null;
-
-      console.log(`${LOG_PREFIX} 模块已销毁`);
+    destroy() {
+      if (this._observer) { this._observer.disconnect(); this._observer = null; }
+      if (this._ioObserver) { this._ioObserver.disconnect(); this._ioObserver = null; }
+      if (this._perfObserver) { this._perfObserver.disconnect(); this._perfObserver = null; }
+      this.restoreAll();
+      this._processedScripts = new WeakMap();
+      this._processedLinks = new WeakMap();
+      this._processedImages = new WeakSet();
+      this._processedVideos = new WeakSet();
+      console.log(`${LOG_PREFIX} 已销毁`);
     }
   }
 
-  // 导出
   window.ResourceAccelerator = ResourceAccelerator;
 
   // 自动初始化
-  const autoInit = () => {
-    if (window.resourceAcceleratorInstance) {
-      console.log(`${LOG_PREFIX} 已存在实例，跳过自动初始化`);
-      return;
-    }
-
+  if (window.resourceAcceleratorInstance) {
+    console.log(`${LOG_PREFIX} 已存在实例，跳过`);
+  } else {
     const accelerator = new ResourceAccelerator();
     accelerator.init().then(() => {
       window.resourceAcceleratorInstance = accelerator;
-      console.log(`${LOG_PREFIX} 自动初始化完成`);
-    }).catch(error => {
-      console.error(`${LOG_PREFIX} 自动初始化失败:`, error);
-    });
-  };
-
-  // 根据文档状态选择初始化时机
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', autoInit);
-  } else {
-    // 延迟初始化，确保其他模块已加载
-    setTimeout(autoInit, 0);
+    }).catch(err => console.error(`${LOG_PREFIX} 初始化失败:`, err));
   }
-
 })();

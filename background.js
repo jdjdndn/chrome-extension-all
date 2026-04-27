@@ -600,6 +600,8 @@ async function loadSettings() {
     await updateNetworkRules();
     // Update response blocking rules
     await updateResponseBlockingRules();
+    // CDN 资源重定向规则
+    await updateCDNRedirectRules();
   } catch (error) {
     console.error('Error loading settings:', error);
   }
@@ -2279,6 +2281,87 @@ async function updateResponseBlockingRules() {
     }
   } catch (error) {
     console.error('Error updating response blocking rules:', error);
+  }
+}
+
+// ========== CDN 资源重定向规则 (ID 3000-3099) ==========
+// 使用 declarativeNetRequest 在网络层拦截，消除DOM层时序竞争
+// 仅用于字体/CSS（CSP style-src通常宽松），JS保持DOM层安全替换
+
+const CDN_REDIRECT_DOMAINS = [
+  'cdn.bootcdn.net', 'cdn.baomitu.com', 'cdn.staticfile.org',
+  'lf3-cdn-tos.bytecdntp.com', 'cdn.jsdelivr.net',
+  'cdnjs.cloudflare.com', 'unpkg.com',
+  'fonts.font.im', 'fonts.loli.net', 'fonts.googleapis.cnpmjs.org'
+];
+
+const CDN_FONT_REDIRECT_RULES = [
+  // Google Fonts CSS → fonts.font.im (保留完整路径和查询参数)
+  {
+    id: 3001,
+    regexFilter: '^https://fonts\\.googleapis\\.com/(css.*)',
+    substitution: 'https://fonts.font.im/\\1',
+    resourceTypes: ['stylesheet']
+  },
+  // Google Fonts Early Access → fonts.font.im
+  {
+    id: 3002,
+    regexFilter: '^https://fonts\\.googleapis\\.com/(earlyaccess.*)',
+    substitution: 'https://fonts.font.im/\\1',
+    resourceTypes: ['stylesheet']
+  },
+  // Google Fonts icon → fonts.font.im
+  {
+    id: 3003,
+    regexFilter: '^https://fonts\\.googleapis\\.com/(icon.*)',
+    substitution: 'https://fonts.font.im/\\1',
+    resourceTypes: ['stylesheet']
+  },
+  // Google Fonts CSS2 API → fonts.font.im
+  {
+    id: 3004,
+    regexFilter: '^https://fonts\\.googleapis\\.com/(css2.*)',
+    substitution: 'https://fonts.font.im/\\1',
+    resourceTypes: ['stylesheet']
+  },
+  // Font Awesome CSS → BootCDN (常见慢速源)
+  {
+    id: 3010,
+    regexFilter: 'use\\.fontawesome\\.com/releases/(\\d+\\.\\d+\\.\\d+)/css/(all(?:\\.min)?\\.css)',
+    substitution: 'https://cdn.bootcdn.net/ajax/libs/font-awesome/\\1/css/all.min.css',
+    resourceTypes: ['stylesheet']
+  }
+];
+
+async function updateCDNRedirectRules() {
+  try {
+    const existingRules = await chrome.declarativeNetRequest.getDynamicRules();
+    const oldIds = existingRules
+      .filter(rule => rule.id >= 3000 && rule.id < 3100)
+      .map(rule => rule.id);
+
+    if (oldIds.length > 0) {
+      await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: oldIds });
+    }
+
+    const rules = CDN_FONT_REDIRECT_RULES.map(r => ({
+      id: r.id,
+      priority: 1,
+      action: {
+        type: 'redirect',
+        redirect: { regexSubstitution: r.substitution }
+      },
+      condition: {
+        regexFilter: r.regexFilter,
+        resourceTypes: r.resourceTypes,
+        excludedRequestDomains: CDN_REDIRECT_DOMAINS
+      }
+    }));
+
+    await chrome.declarativeNetRequest.updateDynamicRules({ addRules: rules });
+    console.log('[Background] CDN 重定向规则已注册:', rules.length, '条');
+  } catch (error) {
+    console.error('[Background] CDN 重定向规则注册失败:', error);
   }
 }
 
