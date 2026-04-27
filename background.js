@@ -2292,45 +2292,87 @@ const CDN_REDIRECT_DOMAINS = [
   'cdn.bootcdn.net', 'cdn.baomitu.com', 'cdn.staticfile.org',
   'lf3-cdn-tos.bytecdntp.com', 'cdn.jsdelivr.net',
   'cdnjs.cloudflare.com', 'unpkg.com',
-  'fonts.font.im', 'fonts.loli.net', 'fonts.googleapis.cnpmjs.org'
+  'fonts.font.im', 'fonts.loli.net', 'fonts.googleapis.cnpmjs.org',
+  'fonts.googleapis.com', 'use.fontawesome.com', 'maxcdn.bootstrapcdn.com',
+  'stackpath.bootstrapcdn.com', 'ajax.googleapis.com'
 ];
 
-const CDN_FONT_REDIRECT_RULES = [
-  // Google Fonts CSS → fonts.font.im (保留完整路径和查询参数)
-  {
-    id: 3001,
-    regexFilter: '^https://fonts\\.googleapis\\.com/(css.*)',
-    substitution: 'https://fonts.font.im/\\1',
-    resourceTypes: ['stylesheet']
-  },
-  // Google Fonts Early Access → fonts.font.im
-  {
-    id: 3002,
-    regexFilter: '^https://fonts\\.googleapis\\.com/(earlyaccess.*)',
-    substitution: 'https://fonts.font.im/\\1',
-    resourceTypes: ['stylesheet']
-  },
-  // Google Fonts icon → fonts.font.im
-  {
-    id: 3003,
-    regexFilter: '^https://fonts\\.googleapis\\.com/(icon.*)',
-    substitution: 'https://fonts.font.im/\\1',
-    resourceTypes: ['stylesheet']
-  },
-  // Google Fonts CSS2 API → fonts.font.im
-  {
-    id: 3004,
-    regexFilter: '^https://fonts\\.googleapis\\.com/(css2.*)',
-    substitution: 'https://fonts.font.im/\\1',
-    resourceTypes: ['stylesheet']
-  },
-  // Font Awesome CSS → BootCDN (常见慢速源)
-  {
-    id: 3010,
-    regexFilter: 'use\\.fontawesome\\.com/releases/(\\d+\\.\\d+\\.\\d+)/css/(all(?:\\.min)?\\.css)',
-    substitution: 'https://cdn.bootcdn.net/ajax/libs/font-awesome/\\1/css/all.min.css',
-    resourceTypes: ['stylesheet']
-  }
+// DNR CDN重定向规则 (ID 3000-3099)
+// 覆盖: 字体/CSS框架/图标库 — 这些资源的style-src CSP通常宽松
+// JS库保持DOM层安全替换(有CSP预检机制)
+const CDN_REDIRECT_RULES = [
+  // ===== Google Fonts → fonts.font.im (host替换, 保留完整路径) =====
+  { id: 3001, regex: '^https://fonts\\.googleapis\\.com/(css2.*)', sub: 'https://fonts.font.im/\\1' },
+  { id: 3002, regex: '^https://fonts\\.googleapis\\.com/(css\\?.*)', sub: 'https://fonts.font.im/\\1' },
+  { id: 3003, regex: '^https://fonts\\.googleapis\\.com/(earlyaccess.*)', sub: 'https://fonts.font.im/\\1' },
+  { id: 3004, regex: '^https://fonts\\.googleapis\\.com/(icon.*)', sub: 'https://fonts.font.im/\\1' },
+
+  // ===== 慢速CDN源 CSS 全拦截 → bootcdn =====
+  // ajax.googleapis.com/ajax/libs/{lib}/{ver}/{file}.css
+  { id: 3005, regex: '^https://ajax\\.googleapis\\.com/ajax/libs/([^/]+)/(\\d+\\.\\d+(?:\\.\\d+)?)/(.*)\\.css',
+    sub: 'https://cdn.bootcdn.net/ajax/libs/\\1/\\2/\\3.css' },
+  // stackpath.bootstrapcdn.com/{lib}/{ver}/...
+  { id: 3006, regex: '^https://stackpath\\.bootstrapcdn\\.com/(.*)',
+    sub: 'https://cdn.bootcdn.net/ajax/libs/\\1' },
+  // maxcdn.bootstrapcdn.com/{lib}/{ver}/...
+  { id: 3007, regex: '^https://maxcdn\\.bootstrapcdn\\.com/(.*)',
+    sub: 'https://cdn.bootcdn.net/ajax/libs/\\1' },
+
+  // ===== FontAwesome (各来源) =====
+  { id: 3010, regex: 'use\\.fontawesome\\.com/releases/(\\d+\\.\\d+\\.\\d+)/css/all(?:\\.min)?\\.css',
+    sub: 'https://cdn.bootcdn.net/ajax/libs/font-awesome/\\1/css/all.min.css' },
+  { id: 3011, regex: '(?:/|^)font-awesome/(\\d+\\.\\d+\\.\\d+)/css/font-awesome(?:\\.min)?\\.css',
+    sub: 'https://cdn.bootcdn.net/ajax/libs/font-awesome/\\1/css/font-awesome.min.css' },
+  { id: 3012, regex: '(?:/|^)fontawesome-free/(\\d+\\.\\d+\\.\\d+)/css/all(?:\\.min)?\\.css',
+    sub: 'https://cdn.bootcdn.net/ajax/libs/font-awesome/\\1/css/all.min.css' },
+
+  // ===== Bootstrap CSS =====
+  { id: 3020, regex: 'bootstrap[/-](\\d+\\.\\d+\\.\\d+)/(?:css|dist/css)/bootstrap(?:\\.min)?\\.css',
+    sub: 'https://cdn.bootcdn.net/ajax/libs/bootstrap/\\1/css/bootstrap.min.css' },
+  { id: 3021, regex: '(?:^|/)bootstrap(?:\\.min)?\\.css(?:\\?|#|$)',
+    sub: 'https://cdn.bootcdn.net/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css' },
+  { id: 3022, regex: 'bootstrap[/-](\\d+\\.\\d+\\.\\d+)/css/bootstrap-grid(?:\\.min)?\\.css',
+    sub: 'https://cdn.bootcdn.net/ajax/libs/bootstrap/\\1/css/bootstrap-grid.min.css' },
+
+  // ===== Normalize =====
+  { id: 3030, regex: '(?:^|/)normalize(?:\\.min)?\\.css(?:\\?|#|$)',
+    sub: 'https://cdn.bootcdn.net/ajax/libs/normalize.css/8.0.1/normalize.min.css' },
+
+  // ===== Animate.css =====
+  { id: 3031, regex: 'animate[/.-](\\d+\\.\\d+\\.\\d+)/animate(?:\\.min)?\\.css',
+    sub: 'https://cdn.bootcdn.net/ajax/libs/animate.css/\\1/animate.min.css' },
+  { id: 3032, regex: '(?:^|/)animate(?:\\.min)?\\.css(?:\\?|#|$)',
+    sub: 'https://cdn.bootcdn.net/ajax/libs/animate.css/4.1.1/animate.min.css' },
+
+  // ===== Foundation =====
+  { id: 3033, regex: 'foundation[/-](\\d+\\.\\d+\\.\\d+)/css/foundation(?:\\.min)?\\.css',
+    sub: 'https://cdn.bootcdn.net/ajax/libs/foundation-sites/\\1/css/foundation.min.css' },
+  { id: 3034, regex: '(?:^|/)foundation(?:\\.min)?\\.css(?:\\?|#|$)',
+    sub: 'https://cdn.bootcdn.net/ajax/libs/foundation-sites/6.8.1/css/foundation.min.css' },
+
+  // ===== Swiper CSS =====
+  { id: 3040, regex: 'swiper[/-](\\d+\\.\\d+\\.\\d+)/.*swiper(?:-bundle)?(?:\\.min)?\\.css',
+    sub: 'https://cdn.bootcdn.net/ajax/libs/swiper/\\1/swiper-bundle.min.css' },
+  { id: 3041, regex: '(?:^|/)swiper(?:-bundle)?(?:\\.min)?\\.css(?:\\?|#|$)',
+    sub: 'https://cdn.bootcdn.net/ajax/libs/swiper/11.0.5/swiper-bundle.min.css' },
+
+  // ===== AOS =====
+  { id: 3042, regex: 'aos[/-](\\d+\\.\\d+\\.\\d+)/dist/aos(?:\\.min)?\\.css',
+    sub: 'https://cdn.bootcdn.net/ajax/libs/aos/\\1/aos.css' },
+  { id: 3043, regex: '(?:^|/)aos(?:\\.min)?\\.css(?:\\?|#|$)',
+    sub: 'https://cdn.bootcdn.net/ajax/libs/aos/2.3.4/aos.css' },
+
+  // ===== Hover.css =====
+  { id: 3044, regex: 'hover\\.css/(\\d+\\.\\d+\\.\\d+)/css/hover(?:-min)?(?:\\.min)?\\.css',
+    sub: 'https://cdn.bootcdn.net/ajax/libs/hover.css/\\1/css/hover-min.css' },
+  { id: 3045, regex: '(?:^|/)hover-min(?:\\.min)?\\.css(?:\\?|#|$)',
+    sub: 'https://cdn.bootcdn.net/ajax/libs/hover.css/2.3.2/css/hover-min.css' },
+
+  // ===== Ionicons =====
+  { id: 3050, regex: 'ionicons[/-](\\d+\\.\\d+\\.\\d+)/css/ionicons(?:\\.min)?\\.css',
+    sub: 'https://cdn.jsdelivr.net/npm/ionicons@\\1/dist/css/ionicons.min.css' },
+  { id: 3051, regex: '(?:^|/)ionicons(?:\\.min)?\\.css(?:\\?|#|$)',
+    sub: 'https://cdn.jsdelivr.net/npm/ionicons@7.2.1/dist/css/ionicons.min.css' }
 ];
 
 async function updateCDNRedirectRules() {
@@ -2344,7 +2386,7 @@ async function updateCDNRedirectRules() {
       await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: oldIds });
     }
 
-    const rules = CDN_FONT_REDIRECT_RULES.map(r => ({
+    const rules = CDN_REDIRECT_RULES.map(r => ({
       id: r.id,
       priority: 1,
       action: {
