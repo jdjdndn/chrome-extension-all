@@ -1,0 +1,5 @@
+{"ts":"2026-04-25T13:40:19.960Z","tool":"Edit","category":"build_failure","action":"fix_input","confidence":0.8,"message":"[Edit] 构建失败","systemHint":"[error-recovery] 构建失败，修复类型/语法错误后重试"}
+{"ts":"2026-04-25T13:52:57.564Z","tool":"Bash","category":"test_failure","action":"fix_input","confidence":0.8,"message":"[Bash] 测试失败","systemHint":"[error-recovery] 测试失败，分析失败用例修复代码"}
+{"ts":"2026-04-25T14:01:19.253Z","tool":"Edit","category":"tool_misuse","action":"fix_input","confidence":0.8,"message":"[Edit] 工具参数错误","systemHint":"[error-recovery] 工具参数不正确，检查参数格式"}
+{"ts":"2026-04-25T14:11:26.914Z","tool":"Edit","category":"tool_misuse","action":"fix_input","confidence":0.8,"message":"[Edit] 工具参数错误","systemHint":"[error-recovery] 工具参数不正确，检查参数格式"}
+{"ts":"2026-04-25T14:42:26.303Z","tool":"Bash","category":"tool_misuse","action":"fix_input","confidence":0.8,"message":"[Bash] 工具参数错误","systemHint":"[error-recovery] 工具参数不正确，检查参数格式"}

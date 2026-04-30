@@ -1936,7 +1936,7 @@ if (!window.PanelPositionManager) {
       });
 
       this.components.sort((a, b) => a.priority - b.priority);
-      logger.debug((`注册: ${id}, priority=${priority}, requiresHTags=${requiresHTags}`);
+      logger.debug(`注册: ${id}, priority=${priority}, requiresHTags=${requiresHTags}`);
       this.scheduleCalculate();
     },
 

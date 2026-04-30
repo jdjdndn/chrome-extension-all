@@ -1,0 +1,15 @@
+{
+  "date": "2026-04-25",
+  "totalTurns": 0,
+  "fitnessScores": [],
+  "avgFitness": 0,
+  "maxFitness": 0,
+  "minFitness": 0,
+  "subtaskSuccesses": 0,
+  "subtaskTotal": 0,
+  "knowledgeAdded": 0,
+  "knowledgeTotal": 0,
+  "skillUtilization": 0,
+  "toolUsage": {},
+  "errors": 0
+}

@@ -70,7 +70,10 @@
   const AUTO_FOLLOW_KEYWORDS = ['ootd'];
 
   const AD_SVG_PATHS = [
+    // 旧版广告标识（fill-opacity=".5"）
     '<path d="M9.492 2.004L8.22 2.22c.216.336.408.72.588 1.128h-4.38v3.636c-.024 2.34-.348 4.176-.972 5.496l.96.852c.744-1.596 1.128-3.708 1.164-6.348V4.452h8.796V3.348h-4.308a16.717 16.717 0 0 0-.576-1.344zm15.564 6.672h-8.04v4.548h1.152v-.576h5.736v.576h1.152V8.676zm-6.888 2.904V9.756h5.736v1.824h-5.736zm-.276-6.732h2.688v1.656h-5.04V7.62h10.92V6.504h-4.74V4.848h3.828V3.756H21.72V2.148h-1.14v1.608h-2.016c.204-.408.372-.852.516-1.32l-1.128-.144c-.384 1.248-1.104 2.292-2.16 3.144l.684.9a8.301 8.301 0 0 0 1.416-1.488z" fill="#fff" fill-opacity=".5"></path>',
+    // 新版广告标识（不感兴趣，fill-opacity=".8"，16.724）
+    '<path d="M9.491 2.004L8.22 2.22c.216.336.408.72.588 1.128h-4.38v3.636c-.024 2.34-.348 4.176-.972 5.496l.96.852c.744-1.596 1.128-3.708 1.164-6.348V4.452h8.796V3.348h-4.308a16.724 16.724 0 0 0-.576-1.344zm15.564 6.672h-8.04v4.548h1.152v-.576h5.736v.576h1.152V8.676zm-6.888 2.904V9.756h5.736v1.824h-5.736zm-.276-6.732h2.688v1.656h-5.04V7.62h10.92V6.504h-4.74V4.848h3.828V3.756H21.72V2.148h-1.14v1.608h-2.016c.204-.408.372-.852.516-1.32l-1.128-.144c-.384 1.248-1.104 2.292-2.16 3.144l.684.9a8.301 8.301 0 0 0 1.416-1.488z" fill="#fff" fill-opacity=".8"></path>'
   ];
 
   const AI_KEYWORDS = ['AI'];
@@ -495,16 +498,36 @@ function isElementInViewportAndVisible(element) {
 
 function detectAdSvg() {
   const visiblePaths = [...document.querySelectorAll('path')].filter(item => isElementInViewportAndVisible(item));
-  return AD_SVG_PATHS.some(adPath => visiblePaths.some(it => it.outerHTML === adPath));
+
+  // 检测新版广告标识（不感兴趣，fill-opacity=".8"）
+  const newAdPath = AD_SVG_PATHS.find(adPath => adPath.includes('fill-opacity=".8"'));
+  if (newAdPath && visiblePaths.some(it => it.outerHTML === newAdPath)) {
+    return { detected: true, type: '不感兴趣', path: 'new' };
+  }
+
+  // 检测旧版广告标识（fill-opacity=".5"）
+  const oldAdPath = AD_SVG_PATHS.find(adPath => adPath.includes('fill-opacity=".5"'));
+  if (oldAdPath && visiblePaths.some(it => it.outerHTML === oldAdPath)) {
+    return { detected: true, type: '广告视频', path: 'old' };
+  }
+
+  // 兼容：其他未知的广告标识（如果有）
+  if (AD_SVG_PATHS.some(adPath => visiblePaths.some(it => it.outerHTML === adPath))) {
+    return { detected: true, type: '广告', path: 'unknown' };
+  }
+
+  return { detected: false };
 }
 
 function skipAD(videoBody) {
   if (videoBody && VideoStateManager.isSkipAd(videoBody)) return;
-  if (detectAdSvg()) {
-    logger.debug('[广告检测] 检测到广告标识');
+
+  const adResult = detectAdSvg();
+  if (adResult.detected) {
+    logger.debug(`[广告检测] 检测到${adResult.type}标识 (${adResult.path})`);
     if (videoBody) VideoStateManager.setSkipAd(videoBody, true);
     triggerKeyboardEvent("skipAD_mark", "keydown", { keyCode: 82, key: "r", code: "KeyR" });
-    setTimeout(() => skipToNextVideo('广告视频'), 200);
+    setTimeout(() => skipToNextVideo(adResult.type), 200);
   }
 }
 
