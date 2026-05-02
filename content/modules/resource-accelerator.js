@@ -51,7 +51,9 @@
     _mutationTimer: null,
     _isProcessingBatch: false,
     // 去重集合
-    dedupSet: new Set()
+    dedupSet: new Set(),
+    // 最近50条替换记录
+    recentReplacements: []
   };
 
   // ========== 统计持久化（防抖）==========
@@ -141,6 +143,16 @@
     };
 
     state.stats.jsReplaced++;
+    state.recentReplacements.push({
+      type: 'js',
+      name: match.name,
+      original: originalSrc,
+      cdn: match.cdnUrl,
+      timestamp: Date.now()
+    });
+    if (state.recentReplacements.length > 50) {
+      state.recentReplacements.shift();
+    }
     _persistStats();
     if (state.config.dedupEnabled) state.dedupSet.add(originalSrc);
     console.log(`${LOG_PREFIX} JS: ${match.name} → ${match.cdnName}`);
@@ -196,6 +208,16 @@
       state.stats.fontsReplaced++;
     } else {
       state.stats.cssReplaced = (state.stats.cssReplaced || 0) + 1;
+    }
+    state.recentReplacements.push({
+      type: fontMatch ? 'font' : 'css',
+      name: match.name,
+      original: originalHref,
+      cdn: match.cdnUrl,
+      timestamp: Date.now()
+    });
+    if (state.recentReplacements.length > 50) {
+      state.recentReplacements.shift();
     }
     _persistStats();
     if (state.config.dedupEnabled) state.dedupSet.add(originalHref);
@@ -594,7 +616,11 @@
 
   window.ResourceAccelerator = {
     init,
-    getStats: () => ({ ...state.stats, cspRestricted: state.cspRestricted }),
+    getStats: () => ({
+      ...state.stats,
+      cspRestricted: state.cspRestricted,
+      recentReplacements: state.recentReplacements.slice(-50)
+    }),
     getConfig: () => ({ ...state.config }),
     destroy: () => {
       _observer.disconnect();
