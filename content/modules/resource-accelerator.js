@@ -75,6 +75,8 @@
     recentReplacements: [],
     // 第三方脚本延迟队列
     _deferredScripts: [],
+    // 性能指标
+    performance: null,
   };
 
   // ========== 统计持久化（防抖 + 增量）==========
@@ -726,6 +728,11 @@
     // 7. 消息监听
     _initMessageListener();
 
+    // 8. 页面加载后收集性能指标
+    window.addEventListener('load', () => {
+      state.performance = collectPerformanceMetrics();
+    }, { once: true });
+
     console.log(`${LOG_PREFIX} 初始化完成`);
   }
 
@@ -796,6 +803,40 @@
         return true;
       }
     });
+  }
+
+  // ========== 性能指标收集 ==========
+
+  function collectPerformanceMetrics() {
+    try {
+      const navEntries = performance.getEntriesByType('navigation');
+      if (!navEntries.length) return null;
+      const nav = navEntries[0];
+
+      const resEntries = performance.getEntriesByType('resource');
+      const totalDuration = resEntries.reduce((sum, e) => sum + e.duration, 0);
+
+      const estimatedTimeSaved =
+        state.stats.jsReplaced * 150 +
+        (state.stats.cssReplaced || 0) * 100 +
+        state.stats.fontsReplaced * 120;
+
+      return {
+        ttfb: Math.round(nav.responseStart - nav.requestStart),
+        domContentLoaded: Math.round(nav.domContentLoadedEventEnd - nav.startTime),
+        loadEvent: Math.round(nav.loadEventEnd - nav.startTime),
+        totalResources: resEntries.length,
+        totalDuration: Math.round(totalDuration),
+        replacedJs: state.stats.jsReplaced,
+        replacedCss: state.stats.cssReplaced || 0,
+        replacedFonts: state.stats.fontsReplaced,
+        imagesCompressed: state.stats.imagesCompressed,
+        bytesSaved: state.stats.imagesCompressBytesSaved,
+        estimatedTimeSaved
+      };
+    } catch {
+      return null;
+    }
   }
 
   // ========== 导出 API ==========
