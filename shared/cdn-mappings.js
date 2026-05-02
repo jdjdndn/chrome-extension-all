@@ -849,9 +849,13 @@
    * 返回 { url, cdnId, fallbackUrls }
    */
   function tryCDNChain(cdnOrder, config, version) {
+    // 过滤不健康CDN，全部不健康时降级为原始顺序
+    const healthyOrder = getHealthyCDNOrder(cdnOrder);
+    const effectiveOrder = healthyOrder.length > 0 ? healthyOrder : cdnOrder;
+
     const urls = [];
 
-    for (const cdnId of cdnOrder) {
+    for (const cdnId of effectiveOrder) {
       const cdn = CDN_BY_ID[cdnId];
       if (!cdn || cdn._disabled) continue;
       const url = buildCDNUrl(cdn, config, version, config.file);
