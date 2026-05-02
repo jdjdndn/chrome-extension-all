@@ -33,7 +33,8 @@
     maxCompressQueueSize: 50,  // 最大队列长度
     mutationBatchInterval: 50,  // mutation批量处理间隔(ms)
     enableBatchProcessing: true,  // 启用批量处理
-    dedupEnabled: true  // 资源去重
+    dedupEnabled: true,  // 资源去重
+    imageMaxDimension: 2048  // 最大输出尺寸，0=不限制
   };
 
   // ========== 全局状态（同步初始化）==========
@@ -344,11 +345,18 @@
         }
 
         try {
+          const MAX_DIMENSION = state.config.imageMaxDimension || 2048;
+          let { naturalWidth: w, naturalHeight: h } = img;
+          if (MAX_DIMENSION > 0 && (w > MAX_DIMENSION || h > MAX_DIMENSION)) {
+            const scale = MAX_DIMENSION / Math.max(w, h);
+            w = Math.round(w * scale);
+            h = Math.round(h * scale);
+          }
           const canvas = document.createElement('canvas');
-          canvas.width = img.naturalWidth;
-          canvas.height = img.naturalHeight;
+          canvas.width = w;
+          canvas.height = h;
           const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0);
+          ctx.drawImage(img, 0, 0, w, h);
 
           const mimeType = supportsWebP() ? 'image/webp' : 'image/jpeg';
           canvas.toBlob(blob => {
