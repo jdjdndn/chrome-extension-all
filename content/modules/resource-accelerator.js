@@ -19,6 +19,7 @@
     enabled: true,
     jsReplace: true,
     fontReplace: true,
+    cssReplace: true,
     imageLazyLoad: true,
     imageCompress: true,
     imageQuality: 0.8,
@@ -117,7 +118,7 @@
   // ========== 核心拦截：样式/字体处理 ==========
 
   function processLink(link) {
-    if (state.cspRestricted || !state.config.fontReplace) return;
+    if (state.cspRestricted) return;
     const url = link.href;
     if (!url || link.dataset._raProcessed) return;
 
@@ -125,7 +126,15 @@
 
     if (isExcluded(url) || isCDNUrl(url)) return;
 
-    const match = window.CDNMappings?.matchFont(url) || window.CDNMappings?.matchCSS(url);
+    // 先尝试字体匹配，再尝试CSS匹配
+    const fontMatch = window.CDNMappings?.matchFont(url);
+    const cssMatch = !fontMatch ? window.CDNMappings?.matchCSS(url) : null;
+
+    // 检查各自的开关
+    if (fontMatch && !state.config.fontReplace) return;
+    if (cssMatch && !state.config.cssReplace) return;
+
+    const match = fontMatch || cssMatch;
     if (!match) return;
 
     const originalHref = link.href;
