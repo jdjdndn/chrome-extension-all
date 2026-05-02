@@ -443,6 +443,129 @@
       file: 'zenscroll-min.js',
       defaultVersion: '4.0.2',
       cdnOrder: ['jsdelivr', 'unpkg']
+    },
+    // ========== v4 新增库 ==========
+    alpine: {
+      patterns: [
+        /alpine(?:\.min)?\.js/i,
+        /alpinejs[\/@]([\d.]+)\/dist\/alpine/i
+      ],
+      versionPatterns: [
+        /alpinejs[\/@](\d+\.\d+\.\d+)/i
+      ],
+      package: 'alpinejs',
+      file: 'dist/cdn.min.js',
+      defaultVersion: '3.14.3',
+      global: 'Alpine',
+      cdnOrder: ['jsdelivr', 'cdnjs', 'unpkg']
+    },
+    htmx: {
+      patterns: [
+        /htmx(?:\.min)?\.js/i,
+        /htmx[\/@]([\d.]+)\/dist\/htmx/i
+      ],
+      versionPatterns: [
+        /htmx[\/@](\d+\.\d+\.\d+)/i
+      ],
+      package: 'htmx.org',
+      file: 'dist/htmx.min.js',
+      defaultVersion: '2.0.4',
+      global: 'htmx',
+      cdnOrder: ['jsdelivr', 'cdnjs', 'unpkg']
+    },
+    lottie: {
+      patterns: [
+        /lottie(?:\.min)?\.js/i,
+        /lottie-web[\/@]([\d.]+)\/build\/player\/lottie/i
+      ],
+      versionPatterns: [
+        /lottie-web[\/@](\d+\.\d+\.\d+)/i
+      ],
+      package: 'lottie-web',
+      file: 'build/player/lottie.min.js',
+      defaultVersion: '5.12.2',
+      global: 'lottie',
+      cdnOrder: ['jsdelivr', 'cdnjs', 'unpkg']
+    },
+    splide: {
+      patterns: [
+        /splide(?:\.min)?\.js/i,
+        /@splidejs[\/]splide[\/@]([\d.]+)\/dist\/js\/splide/i
+      ],
+      versionPatterns: [
+        /splide[\/@](\d+\.\d+\.\d+)/i
+      ],
+      package: '@splidejs/splide',
+      file: 'dist/js/splide.min.js',
+      defaultVersion: '4.1.6',
+      cdnOrder: ['jsdelivr', 'unpkg']
+    },
+    noUiSlider: {
+      patterns: [
+        /nouislider(?:\.min)?\.js/i,
+        /nouislider[\/@]([\d.]+)\/dist\/nouislider/i
+      ],
+      versionPatterns: [
+        /nouislider[\/@](\d+\.\d+\.\d+)/i
+      ],
+      package: 'nouislider',
+      file: 'dist/nouislider.min.js',
+      defaultVersion: '15.7.1',
+      cdnOrder: ['jsdelivr', 'cdnjs', 'unpkg']
+    },
+    flatpickr: {
+      patterns: [
+        /flatpickr(?:\.min)?\.js/i,
+        /flatpickr[\/@]([\d.]+)\/dist\/flatpickr/i
+      ],
+      versionPatterns: [
+        /flatpickr[\/@](\d+\.\d+\.\d+)/i
+      ],
+      package: 'flatpickr',
+      file: 'dist/flatpickr.min.js',
+      defaultVersion: '4.6.13',
+      cdnOrder: ['jsdelivr', 'cdnjs', 'unpkg']
+    },
+    tomSelect: {
+      patterns: [
+        /tom-select(?:\.complete)?(?:\.min)?\.js/i,
+        /tom-select[\/@]([\d.]+)\/dist\/js\/tom-select\.complete/i
+      ],
+      versionPatterns: [
+        /tom-select[\/@](\d+\.\d+\.\d+)/i
+      ],
+      package: 'tom-select',
+      file: 'dist/js/tom-select.complete.min.js',
+      defaultVersion: '2.3.1',
+      cdnOrder: ['jsdelivr', 'unpkg']
+    },
+    sortable: {
+      patterns: [
+        /sortable(?:\.min)?\.js/i,
+        /sortablejs[\/@]([\d.]+)\/Sortable\.min/i
+      ],
+      versionPatterns: [
+        /sortablejs[\/@](\d+\.\d+\.\d+)/i,
+        /Sortable@([\d.]+)/i
+      ],
+      package: 'sortablejs',
+      file: 'Sortable.min.js',
+      defaultVersion: '1.15.3',
+      global: 'Sortable',
+      cdnOrder: ['jsdelivr', 'cdnjs', 'unpkg']
+    },
+    stimulus: {
+      patterns: [
+        /stimulus(?:\.min)?\.js/i,
+        /@hotwired[\/]stimulus[\/@]([\d.]+)\/dist\/stimulus/i
+      ],
+      versionPatterns: [
+        /stimulus[\/@](\d+\.\d+\.\d+)/i
+      ],
+      package: '@hotwired/stimulus',
+      file: 'dist/stimulus.umd.js',
+      defaultVersion: '3.2.2',
+      cdnOrder: ['jsdelivr', 'unpkg']
     }
   };
 
@@ -595,6 +718,33 @@
       file: 'dist/aos.css',
       defaultVersion: '2.3.4',
       cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr']
+    },
+    // ========== v4 新增 CSS 库 ==========
+    picoCss: {
+      patterns: [
+        /pico(?:\.min)?\.css/i,
+        /@picocss[\/]pico[\/@]([\d.]+)\/css\/pico/i
+      ],
+      versionPatterns: [
+        /pico[\/@](\d+\.\d+\.\d+)/i
+      ],
+      package: '@picocss/pico',
+      file: 'css/pico.min.css',
+      defaultVersion: '2.0.6',
+      cdnOrder: ['jsdelivr', 'unpkg']
+    },
+    openProps: {
+      patterns: [
+        /open-props(?:\.min)?\.css/i,
+        /open-props[\/@]([\d.]+)\/open-props(?:\.min)?\.css/i
+      ],
+      versionPatterns: [
+        /open-props[\/@](\d+\.\d+\.\d+)/i
+      ],
+      package: 'open-props',
+      file: 'open-props.min.css',
+      defaultVersion: '1.7.7',
+      cdnOrder: ['jsdelivr', 'unpkg']
     }
   };
 
@@ -727,6 +877,53 @@
     return matchFromMap(url, FONT_CDN_MAP, 'font');
   }
 
+  // ========== CDN健康探测 ==========
+
+  const _cdnHealth = {};
+  const HEALTH_KEY = 'cdnHealthCache';
+  const HEALTH_TTL = 5 * 60 * 1000; // 5分钟缓存
+
+  async function probeCDN(cdn) {
+    const start = performance.now();
+    try {
+      await fetch(cdn.baseUrl, { method: 'HEAD', mode: 'no-cors', signal: AbortSignal.timeout(3000) });
+      return { healthy: true, rtt: Math.round(performance.now() - start) };
+    } catch {
+      return { healthy: false, rtt: Infinity };
+    }
+  }
+
+  async function probeAllCDNs() {
+    // 读取缓存
+    try {
+      const cached = await chrome.storage.local.get(HEALTH_KEY);
+      if (cached[HEALTH_KEY]?.timestamp > Date.now() - HEALTH_TTL) {
+        Object.assign(_cdnHealth, cached[HEALTH_KEY].data || {});
+        return;
+      }
+    } catch {}
+
+    const probes = CDN_SOURCES.filter(c => !c._disabled).map(async cdn => {
+      _cdnHealth[cdn.id] = await probeCDN(cdn);
+      _cdnHealth[cdn.id].lastProbe = Date.now();
+    });
+    await Promise.allSettled(probes);
+
+    // 缓存结果
+    try {
+      await chrome.storage.local.set({ [HEALTH_KEY]: { data: _cdnHealth, timestamp: Date.now() } });
+    } catch {}
+  }
+
+  function getCDNHealth() { return { ..._cdnHealth }; }
+
+  function getHealthyCDNOrder(cdnOrder) {
+    return cdnOrder.filter(id => {
+      const health = _cdnHealth[id];
+      return !health || (health.healthy && health.rtt < 500);
+    });
+  }
+
   // ========== 导出 ==========
   window.CDNMappings = {
     JS_CDN_MAP,
@@ -737,7 +934,10 @@
     extractVersion,
     matchJSLibrary,
     matchCSS,
-    matchFont
+    matchFont,
+    probeAllCDNs,
+    getCDNHealth,
+    getHealthyCDNOrder
   };
 
 })();

@@ -3115,6 +3115,39 @@ async function initResourceAccelerator() {
     });
   }
 
+  // CDN状态展示
+  const cdnToggle = document.getElementById('ra-cdn-toggle');
+  const cdnPanel = document.getElementById('ra-cdn-panel');
+  const cdnList = document.getElementById('ra-cdn-list');
+
+  if (cdnToggle && cdnPanel) {
+    cdnToggle.addEventListener('click', () => {
+      const isOpen = cdnPanel.style.display !== 'none';
+      cdnPanel.style.display = isOpen ? 'none' : 'block';
+      cdnToggle.textContent = isOpen ? 'CDN状态 ▼' : 'CDN状态 ▲';
+      if (!isOpen) loadCDNStatus();
+    });
+  }
+
+  function loadCDNStatus() {
+    if (!cdnList) return;
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]?.id) {
+        chrome.tabs.sendMessage(tabs[0].id, { type: 'RESOURCE_ACCELERATOR_GET_CDN_HEALTH' }).then(health => {
+          if (!health) { cdnList.innerHTML = '<div style="color: #999;">加载中...</div>'; return; }
+          const html = Object.entries(health).map(([id, data]) => {
+            const status = data.healthy ? '✅' : '⚠️';
+            const rtt = data.healthy ? `${data.rtt}ms` : '超时';
+            return `<div style="display: flex; justify-content: space-between; padding: 2px 0;"><span>${status} ${id}</span><span>${rtt}</span></div>`;
+          }).join('');
+          cdnList.innerHTML = html || '<div style="color: #999;">暂无数据</div>';
+        }).catch(() => {
+          cdnList.innerHTML = '<div style="color: #999;">无法获取</div>';
+        });
+      }
+    });
+  }
+
   // 替换详情面板
   const detailsToggle = document.getElementById('ra-details-toggle');
   const detailsPanel = document.getElementById('ra-details-panel');
@@ -3162,25 +3195,47 @@ async function loadResourceAcceleratorStats() {
     totalFontsReplaced: 0,
     totalCssReplaced: 0,
     totalImagesOptimized: 0,
-    totalDedupRemoved: 0,
-    totalBytesSaved: 0
+    totalImagesCompressed: 0,
+    totalBytesSaved: 0,
+    totalDedupRemoved: 0
   };
 
+  // 累计统计（括号内）
   const jsCountEl = document.getElementById('ra-js-count');
   const fontCountEl = document.getElementById('ra-font-count');
   const cssCountEl = document.getElementById('ra-css-count');
   const lazyCountEl = document.getElementById('ra-lazy-count');
   const compressCountEl = document.getElementById('ra-compress-count');
-  const totalReplacedEl = document.getElementById('ra-total-replaced');
-  const dedupRemovedEl = document.getElementById('ra-dedup-removed');
 
   if (jsCountEl) jsCountEl.textContent = `(${stats.totalJsReplaced})`;
   if (fontCountEl) fontCountEl.textContent = `(${stats.totalFontsReplaced})`;
   if (cssCountEl) cssCountEl.textContent = `(${stats.totalCssReplaced || 0})`;
   if (lazyCountEl) lazyCountEl.textContent = `(${stats.totalImagesOptimized})`;
-  if (compressCountEl) compressCountEl.textContent = `(${stats.totalImagesOptimized})`;
-  if (totalReplacedEl) totalReplacedEl.textContent = (stats.totalJsReplaced || 0) + (stats.totalFontsReplaced || 0) + (stats.totalCssReplaced || 0) + (stats.totalImagesOptimized || 0);
-  if (dedupRemovedEl) dedupRemovedEl.textContent = stats.totalDedupRemoved || 0;
+  if (compressCountEl) compressCountEl.textContent = `(${stats.totalImagesCompressed || 0})`;
+
+  // 本次会话统计（新增卡片）
+  const jsSessionEl = document.getElementById('ra-js-count-session');
+  const cssSessionEl = document.getElementById('ra-css-count-session');
+  const fontSessionEl = document.getElementById('ra-font-count-session');
+  const imageSessionEl = document.getElementById('ra-image-count-session');
+  const compressSessionEl = document.getElementById('ra-compress-count-session');
+  const bytesSavedEl = document.getElementById('ra-bytes-saved');
+
+  // 获取content script会话统计
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (tabs[0]?.id) {
+      chrome.tabs.sendMessage(tabs[0]?.id, { type: 'RESOURCE_ACCELERATOR_GET_STATS' }).then(sessionStats => {
+        if (jsSessionEl) jsSessionEl.textContent = sessionStats.jsReplaced || 0;
+        if (cssSessionEl) cssSessionEl.textContent = sessionStats.cssReplaced || 0;
+        if (fontSessionEl) fontSessionEl.textContent = sessionStats.fontsReplaced || 0;
+        if (imageSessionEl) imageSessionEl.textContent = (sessionStats.imagesLazy || 0) + (sessionStats.imagesCompressed || 0);
+        if (compressSessionEl) compressSessionEl.textContent = sessionStats.imagesCompressed || 0;
+        if (bytesSavedEl) bytesSavedEl.textContent = Math.round((stats.totalBytesSaved || 0) / 1024);
+      }).catch(() => {
+        // 静默失败
+      });
+    }
+  });
 }
 
 function notifyResourceAccelerator(config) {

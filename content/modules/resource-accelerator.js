@@ -16,6 +16,10 @@
     jsReplace: true,
     fontReplace: true,
     imageLazyLoad: true,
+    imageCompress: true,
+    imageQuality: 0.8,
+    imageMinSize: 102400,  // 100KB
+    imageMaxConcurrency: 3,
     lazyLoadThreshold: 200,
     excludeDomains: [],
     excludeUrls: []
@@ -31,9 +35,13 @@
       this._processedImages = new WeakSet();
       this._processedVideos = new WeakSet();
       this._cspRestricted = undefined;
-      this._stats = { jsReplaced: 0, jsErrors: 0, fontsReplaced: 0, fontErrors: 0, imagesLazy: 0, videosLazy: 0, preloadHints: 0, cdnLoadMs: 0, cdnLoadCount: 0 };
+      this._stats = { jsReplaced: 0, jsErrors: 0, fontsReplaced: 0, fontErrors: 0, imagesLazy: 0, imagesCompressed: 0, imagesCompressBytesSaved: 0, videosLazy: 0, preloadHints: 0, cdnLoadMs: 0, cdnLoadCount: 0 };
       this._cumulativeStats = null;
       this._perfObserver = null;
+      // 图片压缩
+      this._compressQueue = [];
+      this._compressingCount = 0;
+      this._supportsWebP = undefined;
     }
 
     async init() {
@@ -49,14 +57,20 @@
       // 3. CDN preconnect
       this._addCDNPreconnect();
 
-      // 4. 处理已有资源 + 启动共享Observer
+      // 4. CDN健康探测（异步，不阻塞）
+      window.CDNMappings?.probeAllCDNs?.();
+
+      // 5. 处理已有资源 + 启动共享Observer
       this._initSharedObserver();
 
-      // 5. 加载累计统计
+      // 6. 加载累计统计
       this._loadCumulativeStats();
 
-      // 6. 性能度量
+      // 7. 性能度量
       this._initPerfObserver();
+
+      // 8. 消息监听
+      this._initMessageListener();
 
       console.log(`${LOG_PREFIX} 初始化完成`, {
         cspRestricted: !!this._cspRestricted,
@@ -268,10 +282,91 @@
     _loadImage(img) {
       const src = img.dataset.src;
       if (!src) return;
-      img.src = src;
+
+      if (this.config.imageCompress) {
+        this._enqueueCompress(img, src);
+      } else {
+        img.src = src;
+      }
       img.dataset.lazyLoading = 'false';
       img.dataset.lazyLoaded = 'true';
       this._stats.imagesLazy++;
+    }
+
+    // ========== 图片压缩 ==========
+
+    _enqueueCompress(img, src) {
+      this._compressQueue.push({ img, src });
+      this._processCompressQueue();
+    }
+
+    async _processCompressQueue() {
+      while (this._compressingCount < this.config.imageMaxConcurrency && this._compressQueue.length > 0) {
+        const task = this._compressQueue.shift();
+        this._compressingCount++;
+        try {
+          const compressed = await this._compressImage(task.src);
+          task.img.src = compressed || task.src;
+        } catch {
+          task.img.src = task.src;
+        } finally {
+          this._compressingCount--;
+          this._processCompressQueue();
+        }
+      }
+    }
+
+    async _compressImage(url) {
+      // 检查域名排除
+      try {
+        const urlObj = new URL(url, location.href);
+        if (this.config.excludeDomains.some(d => urlObj.hostname.includes(d))) return null;
+      } catch { return null; }
+
+      // 非图片类型不压缩
+      if (/\.(webp|svg|gif)$/i.test(url)) return null;
+
+      return new Promise(resolve => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          // 小图不压缩
+          const bytes = img.naturalWidth * img.naturalHeight * 4;
+          if (bytes < this.config.imageMinSize) { resolve(null); return; }
+
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+
+            const mimeType = this._supportsWebP() ? 'image/webp' : 'image/jpeg';
+            canvas.toBlob(blob => {
+              if (blob && blob.size < bytes) {
+                this._stats.imagesCompressed++;
+                this._stats.imagesCompressBytesSaved += (bytes - blob.size);
+                resolve(URL.createObjectURL(blob));
+              } else {
+                resolve(null);
+              }
+            }, mimeType, this.config.imageQuality);
+          } catch { resolve(null); }
+        };
+        img.onerror = () => resolve(null);
+        img.src = url;
+      });
+    }
+
+    _supportsWebP() {
+      if (this._supportsWebP !== undefined) return this._supportsWebP;
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 1;
+        canvas.height = 1;
+        this._supportsWebP = canvas.toDataURL('image/webp').startsWith('data:image/webp');
+      } catch { this._supportsWebP = false; }
+      return this._supportsWebP;
     }
 
     _loadVideo(video) {
@@ -377,6 +472,28 @@
       if (this._cspRestricted) console.log(`${LOG_PREFIX} CSP: 外部脚本被阻止`);
     }
 
+    // ========== 消息监听 ==========
+
+    _initMessageListener() {
+      chrome.runtime?.onMessage?.addListener((message, sender, sendResponse) => {
+        if (message.type === 'RESOURCE_ACCELERATOR_GET_STATS') {
+          sendResponse(this.getStats());
+          return true;
+        }
+        if (message.type === 'RESOURCE_ACCELERATOR_GET_CDN_HEALTH') {
+          sendResponse(window.CDNMappings?.getCDNHealth?.() || {});
+          return true;
+        }
+        if (message.type === 'RESOURCE_ACCELERATOR_CONFIG') {
+          this.config = { ...this.config, ...message.data };
+          if (!this.config.enabled) {
+            this._observer?.disconnect();
+          }
+          return true;
+        }
+      });
+    }
+
     // ========== 工具方法 ==========
 
     _isExcluded(url) {
@@ -406,10 +523,12 @@
     async _loadCumulativeStats() {
       try {
         const result = await chrome.storage.local.get(STATS_KEY);
-        this._cumulativeStats = result[STATS_KEY] || { totalJsReplaced: 0, totalFontsReplaced: 0, totalImagesLazy: 0 };
+        this._cumulativeStats = result[STATS_KEY] || { totalJsReplaced: 0, totalFontsReplaced: 0, totalImagesLazy: 0, totalImagesCompressed: 0, totalBytesSaved: 0 };
         this._cumulativeStats.totalJsReplaced += this._stats.jsReplaced;
         this._cumulativeStats.totalFontsReplaced += this._stats.fontsReplaced;
         this._cumulativeStats.totalImagesLazy += this._stats.imagesLazy;
+        this._cumulativeStats.totalImagesCompressed += this._stats.imagesCompressed;
+        this._cumulativeStats.totalBytesSaved += this._stats.imagesCompressBytesSaved;
         await chrome.storage.local.set({ [STATS_KEY]: this._cumulativeStats });
       } catch {}
     }
@@ -431,6 +550,7 @@
       if (this._observer) { this._observer.disconnect(); this._observer = null; }
       if (this._ioObserver) { this._ioObserver.disconnect(); this._ioObserver = null; }
       if (this._perfObserver) { this._perfObserver.disconnect(); this._perfObserver = null; }
+      this._compressQueue = [];
       this.restoreAll();
       this._processedScripts = new WeakMap();
       this._processedLinks = new WeakMap();

@@ -627,10 +627,16 @@
           <input type="range" id="ra-quality" min="50" max="100" value="80" step="5" style="width: 100%; margin-top: 4px; accent-color: #007bff;" />
         </div>
         <div style="margin-top: 12px; padding: 8px; background: #f8f9fa; border-radius: 6px;">
-          <div style="font-size: 12px; color: #666; margin-bottom: 4px;">本次加速效果</div>
-          <div style="display: flex; gap: 8px; font-size: 11px;">
-            <div style="flex: 1;">替换: <span id="ra-total-replaced">0</span> 个</div>
-            <div style="flex: 1;">去重: <span id="ra-dedup-removed">0</span> 个</div>
+          <div style="font-size: 12px; color: #666; margin-bottom: 8px;">本次加速效果</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 11px;">
+            <div style="padding: 4px 6px; background: white; border-radius: 4px; border-left: 3px solid #007bff;">JS替换: <span id="ra-js-count-session">0</span></div>
+            <div style="padding: 4px 6px; background: white; border-radius: 4px; border-left: 3px solid #28a745;">CSS替换: <span id="ra-css-count-session">0</span></div>
+            <div style="padding: 4px 6px; background: white; border-radius: 4px; border-left: 3px solid #17a2b8;">字体替换: <span id="ra-font-count-session">0</span></div>
+            <div style="padding: 4px 6px; background: white; border-radius: 4px; border-left: 3px solid #ffc107;">图片优化: <span id="ra-image-count-session">0</span></div>
+          </div>
+          <div style="margin-top: 8px; display: flex; gap: 8px; font-size: 11px; color: #555;">
+            <div>💾 节省: <span id="ra-bytes-saved">0</span> KB</div>
+            <div>🖼️ 压缩: <span id="ra-compress-count-session">0</span> 张</div>
           </div>
         </div>
         <div id="ra-details-panel" style="margin-top: 8px; max-height: 120px; overflow-y: auto; font-size: 11px; display: none;">
@@ -649,6 +655,12 @@
               <input type="text" id="ra-exclude-input" placeholder="example.com" style="flex: 1; padding: 4px; font-size: 11px; border: 1px solid #dee2e6; border-radius: 3px;">
               <button id="ra-exclude-add" style="font-size: 11px; padding: 4px 8px;">添加</button>
             </div>
+          </div>
+        </div>
+        <div id="ra-cdn-status" style="margin-top: 8px;">
+          <div style="font-size: 12px; color: #666; margin-bottom: 4px; cursor: pointer;" id="ra-cdn-toggle">CDN状态 ▼</div>
+          <div id="ra-cdn-panel" style="display: none; font-size: 11px;">
+            <div id="ra-cdn-list" style="max-height: 100px; overflow-y: auto;"></div>
           </div>
         </div>
       </div>
