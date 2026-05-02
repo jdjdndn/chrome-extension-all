@@ -32,7 +32,8 @@
     maxPreloadHints: 10,  // 最大preload提示数
     maxCompressQueueSize: 50,  // 最大队列长度
     mutationBatchInterval: 50,  // mutation批量处理间隔(ms)
-    enableBatchProcessing: true  // 启用批量处理
+    enableBatchProcessing: true,  // 启用批量处理
+    dedupEnabled: true  // 资源去重
   };
 
   // ========== 全局状态（同步初始化）==========
@@ -48,7 +49,9 @@
     // 批量处理
     _mutationBatch: [],
     _mutationTimer: null,
-    _isProcessingBatch: false
+    _isProcessingBatch: false,
+    // 去重集合
+    dedupSet: new Set()
   };
 
   // ========== 工具方法（同步）==========
@@ -90,6 +93,9 @@
 
     if (isExcluded(url) || isCDNUrl(url)) return;
 
+    // 去重检查：同一原始URL不重复替换
+    if (state.config.dedupEnabled && state.dedupSet.has(url)) return;
+
     const match = window.CDNMappings?.matchJSLibrary(url);
     if (!match) return;
 
@@ -112,6 +118,7 @@
     };
 
     state.stats.jsReplaced++;
+    if (state.config.dedupEnabled) state.dedupSet.add(originalSrc);
     console.log(`${LOG_PREFIX} JS: ${match.name} → ${match.cdnName}`);
   }
 
@@ -125,6 +132,9 @@
     link.dataset._raProcessed = '1';
 
     if (isExcluded(url) || isCDNUrl(url)) return;
+
+    // 去重检查：同一原始URL不重复替换
+    if (state.config.dedupEnabled && state.dedupSet.has(url)) return;
 
     // 先尝试字体匹配，再尝试CSS匹配
     const fontMatch = window.CDNMappings?.matchFont(url);
@@ -155,6 +165,7 @@
     };
 
     state.stats.fontsReplaced++;
+    if (state.config.dedupEnabled) state.dedupSet.add(originalHref);
     console.log(`${LOG_PREFIX} Font/CSS: ${match.name} → ${match.cdnName}`);
   }
 
