@@ -238,12 +238,22 @@
     // 非图片类型不压缩
     if (/\.(webp|svg|gif)$/i.test(url)) return null;
 
+    // 用 fetch HEAD 获取实际文件大小，避免像素估算对 JPEG 严重偏大
+    let actualSize = 0;
+    try {
+      const resp = await fetch(url, { method: 'HEAD', mode: 'no-cors' });
+      const contentLength = parseInt(resp.headers.get('content-length') || '0');
+      if (contentLength > 0) actualSize = contentLength;
+    } catch {
+      // HEAD 失败时降级为像素估算（继续后续流程）
+    }
+
     return new Promise(resolve => {
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = () => {
-        // 小图不压缩
-        const bytes = img.naturalWidth * img.naturalHeight * 4;
+        // 如果 HEAD 获取到了大小，用实际大小判断；否则用像素估算降级
+        const bytes = actualSize || (img.naturalWidth * img.naturalHeight * 4);
         if (bytes < state.config.imageMinSize) { resolve(null); return; }
 
         try {
