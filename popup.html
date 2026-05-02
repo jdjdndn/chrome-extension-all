@@ -622,6 +622,33 @@
             <input type="checkbox" id="ra-dedup" />
           </div>
         </div>
+        <div class="setting-item">
+          <div class="toggle-container">
+            <label for="ra-third-party-defer">第三方脚本延迟 <span id="ra-third-party-count" style="color: #666; font-size: 11px;"></span></label>
+            <input type="checkbox" id="ra-third-party-defer" />
+          </div>
+        </div>
+        <div id="ra-third-party-settings" style="display: none; margin-top: 4px; padding: 8px; background: #f8f9fa; border-radius: 6px;">
+          <div style="font-size: 11px; color: #666; margin-bottom: 6px;">延迟策略</div>
+          <select id="ra-deferral-strategy" style="width: 100%; padding: 4px; font-size: 11px; border: 1px solid #ddd; border-radius: 4px;">
+            <option value="idle">空闲时加载 (requestIdleCallback)</option>
+            <option value="defer">页面加载后 3 秒</option>
+            <option value="block">完全阻止</option>
+          </select>
+          <div style="margin-top: 8px;">
+            <div style="font-size: 11px; color: #666; margin-bottom: 4px;">自定义规则</div>
+            <div id="ra-3p-user-rules-list" style="max-height: 80px; overflow-y: auto; font-size: 11px;"></div>
+            <div style="display: flex; gap: 4px; margin-top: 4px;">
+              <input type="text" id="ra-3p-rule-pattern" placeholder="URL正则模式" style="flex: 1; padding: 4px; font-size: 11px; border: 1px solid #ddd; border-radius: 3px;">
+              <select id="ra-3p-rule-strategy" style="padding: 4px; font-size: 11px; border: 1px solid #ddd; border-radius: 3px;">
+                <option value="idle">idle</option>
+                <option value="defer">defer</option>
+                <option value="block">block</option>
+              </select>
+              <button id="ra-3p-rule-add" style="font-size: 11px; padding: 4px 8px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer;">+</button>
+            </div>
+          </div>
+        </div>
         <div class="setting-item" style="margin-top: 8px;">
           <label for="ra-quality">压缩质量: <span id="ra-quality-value">80</span>% <span id="ra-quality-hint" style="color: #999; font-size: 11px;"></span></label>
           <input type="range" id="ra-quality" min="50" max="100" value="80" step="5" style="width: 100%; margin-top: 4px; accent-color: #007bff;" />

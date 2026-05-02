@@ -1451,6 +1451,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   initQuickNote();
   initClipboardHistory();
   initShortcutsHelp();
+
+  // 空格键点击支持
+  document.addEventListener('keydown', (e) => {
+    if (e.key === ' ' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      const active = document.activeElement;
+      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT')) return;
+      if (active && active.isContentEditable) return;
+      e.preventDefault();
+      active?.click();
+    }
+  });
   initTemplateButtons();
   initThemeToggle();
   initImportExport();
@@ -2929,6 +2940,9 @@ async function initResourceAccelerator() {
   const imageCompressEl = document.getElementById('ra-image-compress');
   const preloadEl = document.getElementById('ra-preload');
   const dedupEl = document.getElementById('ra-dedup');
+  const thirdPartyDeferEl = document.getElementById('ra-third-party-defer');
+  const thirdPartySettingsEl = document.getElementById('ra-third-party-settings');
+  const deferralStrategyEl = document.getElementById('ra-deferral-strategy');
   const qualityEl = document.getElementById('ra-quality');
   const qualityValueEl = document.getElementById('ra-quality-value');
   const settingsPanel = document.getElementById('ra-settings');
@@ -3030,6 +3044,81 @@ async function initResourceAccelerator() {
       config.dedupEnabled = e.target.checked;
       await saveAndNotify();
     });
+  }
+
+  // 第三方脚本延迟配置
+  if (thirdPartyDeferEl) {
+    if (!config.thirdPartyDeferral) {
+      config.thirdPartyDeferral = { enabled: false, strategy: 'idle', rules: [], userRules: [], maxDeferralMs: 10000 };
+    }
+    thirdPartyDeferEl.checked = config.thirdPartyDeferral.enabled;
+    if (thirdPartySettingsEl) {
+      thirdPartySettingsEl.style.display = config.thirdPartyDeferral.enabled ? 'block' : 'none';
+    }
+    if (deferralStrategyEl) {
+      deferralStrategyEl.value = config.thirdPartyDeferral.strategy || 'idle';
+    }
+
+    thirdPartyDeferEl.addEventListener('change', async (e) => {
+      config.thirdPartyDeferral.enabled = e.target.checked;
+      if (thirdPartySettingsEl) {
+        thirdPartySettingsEl.style.display = e.target.checked ? 'block' : 'none';
+      }
+      await saveAndNotify();
+    });
+
+    if (deferralStrategyEl) {
+      deferralStrategyEl.addEventListener('change', async (e) => {
+        config.thirdPartyDeferral.strategy = e.target.value;
+        await saveAndNotify();
+      });
+    }
+
+    // 渲染自定义规则列表
+    function render3pUserRules() {
+      const listEl = document.getElementById('ra-3p-user-rules-list');
+      if (!listEl) return;
+      const userRules = config.thirdPartyDeferral.userRules || [];
+      listEl.innerHTML = userRules.map((r, i) =>
+        `<div style="display:flex;align-items:center;gap:4px;padding:2px 0;">
+          <span style="flex:1;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${r.pattern}">${r.pattern}</span>
+          <span style="color:#666;font-size:10px;">${r.strategy}</span>
+          <button data-3p-rule-remove="${i}" style="background:#dc3545;color:white;border:none;border-radius:3px;cursor:pointer;font-size:10px;padding:1px 4px;line-height:1;">×</button>
+        </div>`
+      ).join('');
+    }
+    render3pUserRules();
+
+    // 添加自定义规则
+    const ruleAddBtn = document.getElementById('ra-3p-rule-add');
+    const rulePatternInput = document.getElementById('ra-3p-rule-pattern');
+    const ruleStrategySelect = document.getElementById('ra-3p-rule-strategy');
+    if (ruleAddBtn) {
+      ruleAddBtn.addEventListener('click', async () => {
+        const pattern = rulePatternInput?.value?.trim();
+        const strategy = ruleStrategySelect?.value || 'idle';
+        if (!pattern) return;
+        try { new RegExp(pattern); } catch { alert('Invalid regex'); return; }
+        if (!config.thirdPartyDeferral.userRules) config.thirdPartyDeferral.userRules = [];
+        config.thirdPartyDeferral.userRules.push({ pattern, strategy });
+        rulePatternInput.value = '';
+        render3pUserRules();
+        await saveAndNotify();
+      });
+    }
+
+    // 删除自定义规则（事件委托）
+    const rulesListEl = document.getElementById('ra-3p-user-rules-list');
+    if (rulesListEl) {
+      rulesListEl.addEventListener('click', async (e) => {
+        const idx = e.target.dataset['3pRuleRemove'];
+        if (idx !== undefined && config.thirdPartyDeferral?.userRules) {
+          config.thirdPartyDeferral.userRules.splice(parseInt(idx), 1);
+          render3pUserRules();
+          await saveAndNotify();
+        }
+      });
+    }
   }
 
   const qualityHintEl = document.getElementById('ra-quality-hint');
@@ -3245,6 +3334,13 @@ async function loadResourceAcceleratorStats() {
         if (imageSessionEl) imageSessionEl.textContent = (sessionStats.imagesLazy || 0) + (sessionStats.imagesCompressed || 0);
         if (compressSessionEl) compressSessionEl.textContent = sessionStats.imagesCompressed || 0;
         if (bytesSavedEl) bytesSavedEl.textContent = Math.round((sessionStats.imagesCompressBytesSaved || 0) / 1024);
+        // 第三方延迟统计
+        const thirdPartyCountEl = document.getElementById('ra-third-party-count');
+        if (thirdPartyCountEl) {
+          const deferred = sessionStats.thirdPartyDeferred || 0;
+          const blocked = sessionStats.thirdPartyBlocked || 0;
+          thirdPartyCountEl.textContent = deferred + blocked > 0 ? `(延迟${deferred}/阻止${blocked})` : '';
+        }
       }).catch(() => {
         // 静默失败
       });
