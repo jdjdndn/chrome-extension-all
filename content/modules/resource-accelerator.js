@@ -158,12 +158,31 @@
   // ========== 第三方脚本延迟加载 ==========
 
   function matchDeferralRule(url) {
-    const { strategy, rules } = state.config.thirdPartyDeferral;
+    const deferral = state.config.thirdPartyDeferral;
+    if (!deferral?.enabled) return null;
+
+    // 1. User-defined rules (regex match, highest priority)
+    for (const rule of (deferral.userRules || [])) {
+      try {
+        if (new RegExp(rule.pattern, 'i').test(url)) {
+          return { pattern: rule.pattern, strategy: rule.strategy, name: rule.pattern };
+        }
+      } catch {}
+    }
+
+    // 2. Built-in rules (string includes match)
+    const { strategy, rules } = deferral;
     for (const rule of rules) {
       if (url.includes(rule.pattern)) {
-        return { pattern: rule.pattern, strategy: rule.strategy || strategy };
+        return { pattern: rule.pattern, strategy: rule.strategy || strategy, name: rule.pattern };
       }
     }
+
+    // 3. Auto-detection: non-CDN, cross-domain
+    if (isThirdPartyScript(url)) {
+      return { pattern: '*', strategy: strategy || 'idle', name: 'auto-detected' };
+    }
+
     return null;
   }
 
