@@ -356,24 +356,29 @@ if (window.KeyboardClickLoaded) {
       const clientX = this.mouseX;
       const clientY = this.mouseY;
 
+      // 计算相对于元素的偏移（进度条等控件依赖此属性）
+      const rect = el.getBoundingClientRect();
+      const offsetX = clientX - rect.left;
+      const offsetY = clientY - rect.top;
+
       // 1. mousedown
       el.dispatchEvent(new MouseEvent('mousedown', {
         bubbles: true, cancelable: true,
-        clientX, clientY,
+        clientX, clientY, offsetX, offsetY,
         button: 0, buttons: 1,
       }));
 
       // 2. mouseup
       el.dispatchEvent(new MouseEvent('mouseup', {
         bubbles: true, cancelable: true,
-        clientX, clientY,
+        clientX, clientY, offsetX, offsetY,
         button: 0, buttons: 0,
       }));
 
       // 3. click（带完整坐标信息）
       el.dispatchEvent(new MouseEvent('click', {
         bubbles: true, cancelable: true,
-        clientX, clientY,
+        clientX, clientY, offsetX, offsetY,
         button: 0, buttons: 0,
       }));
     }

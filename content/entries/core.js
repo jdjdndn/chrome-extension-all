@@ -1,39 +1,40 @@
 /**
  * 核心模块入口
  * 将 manifest.json 中的 content_scripts 合并为单个 bundle
- * 加载顺序与原 manifest 保持一致
+ * 加载顺序优化：资源加速器最先加载
  */
 
-// 1. EventBus
-import '../../event-bus-v4.6.js';
-
-// 2. Logger
-import '../utils/logger.js';
-
-// 3. ScriptLoader
-import '../core/script-loader.js';
-
-// 4. DomainConfig
-import '../domain-config.js';
-
-// 5. StorageBridge
-import '../utils/storage-bridge.js';
-
-// 6. StorageUtils
-import '../utils/storage.js';
-
-// 7. DOMUtils
-import '../utils/dom.js';
-
-// 8. MessagingUtils
-import '../utils/messaging.js';
-
-// 9. ContentBridge
-import '../utils/content-bridge.js';
-
-// 10. 资源加速器（最优先加载 — document_start 时尽早拦截资源）
+// 1. 资源加速器（最高优先级 — document_start 时立即拦截资源）
+// 必须在所有其他模块之前加载，以便拦截后续所有资源请求
 import '../../shared/cdn-mappings.js';
 import '../modules/resource-accelerator.js';
+
+// 2. EventBus
+import '../../event-bus-v4.6.js';
+
+// 3. Logger
+import '../utils/logger.js';
+
+// 4. ScriptLoader
+import '../core/script-loader.js';
+
+// 5. DomainConfig
+import '../domain-config.js';
+
+// 6. StorageBridge
+import '../utils/storage-bridge.js';
+
+// 7. StorageUtils
+import '../utils/storage.js';
+
+// 8. DOMUtils
+import '../utils/dom.js';
+
+// 9. MessagingUtils
+import '../utils/messaging.js';
+
+// 10. ContentBridge
+import '../utils/content-bridge.js';
 
 // 11. Core modules
 import '../core/store.js';
