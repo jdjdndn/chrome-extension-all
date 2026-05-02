@@ -63,6 +63,7 @@
     compressQueue: [],
     compressingCount: 0,
     _supportsWebP: undefined,
+    _imageFormat: null,
     // 批量处理
     _mutationBatch: [],
     _mutationTimer: null,
@@ -156,6 +157,33 @@
       state._supportsWebP = canvas.toDataURL('image/webp').startsWith('data:image/webp');
     } catch { state._supportsWebP = false; }
     return state._supportsWebP;
+  }
+
+  const IMAGE_FORMAT_PRIORITY = [
+    { mime: 'image/avif', test: 'image/avif' },
+    { mime: 'image/webp', test: 'image/webp' },
+    { mime: 'image/jpeg', test: null },
+  ];
+
+  function getSupportedImageFormat() {
+    if (state._imageFormat) return state._imageFormat;
+    const canvas = document.createElement('canvas');
+    canvas.width = 1;
+    canvas.height = 1;
+    for (const fmt of IMAGE_FORMAT_PRIORITY) {
+      try {
+        if (!fmt.test) {
+          state._imageFormat = fmt;
+          return fmt;
+        }
+        if (canvas.toDataURL(fmt.mime).startsWith(`data:${fmt.mime}`)) {
+          state._imageFormat = fmt;
+          return fmt;
+        }
+      } catch {}
+    }
+    state._imageFormat = IMAGE_FORMAT_PRIORITY[2];
+    return state._imageFormat;
   }
 
   // ========== 第三方脚本延迟加载 ==========
@@ -477,7 +505,7 @@
     }
 
     // 非图片类型不压缩
-    if (/\.(webp|svg|gif)$/i.test(url)) {
+    if (/\.(webp|svg|gif|avif)$/i.test(url)) {
       state._compressCache.set(url, { skip: true });
       return null;
     }
@@ -508,7 +536,8 @@
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, w, h);
 
-          const mimeType = supportsWebP() ? 'image/webp' : 'image/jpeg';
+          const format = getSupportedImageFormat();
+          const mimeType = format.mime;
           canvas.toBlob(blob => {
             if (blob && blob.size < bytes) {
               state.stats.imagesCompressed++;
