@@ -34,7 +34,22 @@
     mutationBatchInterval: 50,  // mutation批量处理间隔(ms)
     enableBatchProcessing: true,  // 启用批量处理
     dedupEnabled: true,  // 资源去重
-    imageMaxDimension: 2048  // 最大输出尺寸，0=不限制
+    imageMaxDimension: 2048,  // 最大输出尺寸，0=不限制
+    // 第三方脚本延迟加载
+    thirdPartyDeferral: {
+      enabled: false,
+      strategy: 'idle',  // idle | defer | block | pass
+      rules: [
+        { pattern: 'google-analytics.com', strategy: 'idle' },
+        { pattern: 'googletagmanager.com', strategy: 'idle' },
+        { pattern: 'baidu.com/hm.js', strategy: 'idle' },
+        { pattern: 'cnzz.com', strategy: 'idle' },
+        { pattern: 'umeng.com', strategy: 'idle' },
+        { pattern: 'jsagent', strategy: 'defer' },
+        { pattern: 'widget', strategy: 'defer' },
+      ],
+      maxDeferralMs: 10000,
+    },
   };
 
   // ========== 全局状态（同步初始化）==========
@@ -42,7 +57,7 @@
     config: { ...DEFAULT_CONFIG },
     cspRestricted: false,
     initialized: false,
-    stats: { jsReplaced: 0, jsErrors: 0, fontsReplaced: 0, fontErrors: 0, cssReplaced: 0, cssErrors: 0, imagesLazy: 0, imagesCompressed: 0, imagesCompressBytesSaved: 0, videosLazy: 0, preloadHints: 0, cdnLoadMs: 0, cdnLoadCount: 0 },
+    stats: { jsReplaced: 0, jsErrors: 0, fontsReplaced: 0, fontErrors: 0, cssReplaced: 0, cssErrors: 0, imagesLazy: 0, imagesCompressed: 0, imagesCompressBytesSaved: 0, videosLazy: 0, preloadHints: 0, cdnLoadMs: 0, cdnLoadCount: 0, thirdPartyDeferred: 0, thirdPartyBlocked: 0 },
     // 图片压缩
     compressQueue: [],
     compressingCount: 0,
@@ -56,7 +71,9 @@
     // 去重集合
     dedupSet: new Set(),
     // 最近50条替换记录
-    recentReplacements: []
+    recentReplacements: [],
+    // 第三方脚本延迟队列
+    _deferredScripts: [],
   };
 
   // ========== 统计持久化（防抖 + 增量）==========
@@ -109,6 +126,24 @@
     });
   }
 
+  function getBaseDomain(hostname) {
+    const parts = hostname.split('.');
+    return parts.slice(-2).join('.');
+  }
+
+  function isThirdPartyScript(url) {
+    try {
+      const urlObj = new URL(url);
+      const pageBase = getBaseDomain(location.hostname);
+      const scriptBase = getBaseDomain(urlObj.hostname);
+      if (pageBase === scriptBase) return false;
+      if (isCDNUrl(url)) return false;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   function supportsWebP() {
     if (state._supportsWebP !== undefined) return state._supportsWebP;
     try {
@@ -120,10 +155,78 @@
     return state._supportsWebP;
   }
 
+  // ========== 第三方脚本延迟加载 ==========
+
+  function matchDeferralRule(url) {
+    const { strategy, rules } = state.config.thirdPartyDeferral;
+    for (const rule of rules) {
+      if (url.includes(rule.pattern)) {
+        return { pattern: rule.pattern, strategy: rule.strategy || strategy };
+      }
+    }
+    return null;
+  }
+
+  function deferScript(script, strategy) {
+    if (state.cspRestricted) return;
+
+    const src = script.src;
+    script.removeAttribute('src');
+    script.dataset._deferredSrc = src;
+    script.dataset._deferralStrategy = strategy;
+    script.dataset._raDeferralTime = Date.now();
+
+    const loadFn = () => {
+      if (script.dataset._raLoaded) return;
+      script.src = script.dataset._deferredSrc;
+      script.dataset._raLoaded = 'true';
+      console.log(`${LOG_PREFIX} 第三方脚本延迟加载完成: ${src.substring(0, 60)}...`);
+    };
+
+    const maxMs = state.config.thirdPartyDeferral.maxDeferralMs;
+
+    // 最大延迟时间兜底
+    const forceLoadTimer = setTimeout(() => {
+      if (!script.dataset._raLoaded) {
+        console.log(`${LOG_PREFIX} 第三方脚本超过最大延迟，强制加载: ${src.substring(0, 60)}...`);
+        loadFn();
+      }
+    }, maxMs);
+
+    // 加载成功后清除定时器
+    const origOnload = script.onload;
+    script.onload = () => {
+      clearTimeout(forceLoadTimer);
+      if (origOnload) origOnload.call(script);
+    };
+
+    switch (strategy) {
+      case 'idle':
+        if ('requestIdleCallback' in window) {
+          requestIdleCallback(loadFn, { timeout: maxMs });
+        } else {
+          setTimeout(loadFn, 100);
+        }
+        break;
+      case 'defer':
+        if (document.readyState === 'complete') {
+          setTimeout(loadFn, 3000);
+        } else {
+          window.addEventListener('load', () => setTimeout(loadFn, 3000), { once: true });
+        }
+        break;
+      case 'block':
+        clearTimeout(forceLoadTimer);
+        state.stats.thirdPartyBlocked++;
+        console.log(`${LOG_PREFIX} 第三方脚本已阻止: ${src.substring(0, 60)}...`);
+        break;
+    }
+  }
+
   // ========== 核心拦截：脚本处理 ==========
 
-  function processScript(script) {
-    if (state.cspRestricted || !state.config.jsReplace) return;
+  async function processScript(script) {
+    if (state.cspRestricted) return;
     const url = script.src;
     if (!url || script.dataset._raProcessed) return;
 
@@ -134,8 +237,30 @@
     // 去重检查：同一原始URL不重复替换
     if (state.config.dedupEnabled && state.dedupSet.has(url)) return;
 
-    const match = window.CDNMappings?.matchJSLibrary(url);
-    if (!match) return;
+    // 使用异步匹配（支持 jsDelivr API 动态查询）
+    const match = await window.CDNMappings?.matchJSLibraryAsync?.(url);
+
+    // CDN 无法替换 → 尝试第三方延迟
+    if (!match) {
+      if (state.config.thirdPartyDeferral?.enabled && state.config.jsReplace) {
+        const deferralRule = matchDeferralRule(url);
+        if (deferralRule) {
+          deferScript(script, deferralRule.strategy);
+          state.stats.thirdPartyDeferred++;
+          state.recentReplacements.push({
+            type: 'thirdParty',
+            name: deferralRule.pattern,
+            original: url,
+            strategy: deferralRule.strategy,
+            timestamp: Date.now()
+          });
+          if (state.recentReplacements.length > 50) state.recentReplacements.shift();
+          _persistStats();
+          return;
+        }
+      }
+      return;
+    }
 
     const originalSrc = script.src;
     script.dataset._originalSrc = originalSrc;
@@ -161,14 +286,16 @@
       name: match.name,
       original: originalSrc,
       cdn: match.cdnUrl,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      isAutoDetected: match.isAutoDetected,
+      isDynamic: match.isDynamic
     });
     if (state.recentReplacements.length > 50) {
       state.recentReplacements.shift();
     }
     _persistStats();
     if (state.config.dedupEnabled) state.dedupSet.add(originalSrc);
-    console.log(`${LOG_PREFIX} JS: ${match.name} → ${match.cdnName}`);
+    console.log(`${LOG_PREFIX} JS: ${match.name} → ${match.cdnName}${match.isDynamic ? ' (dynamic)' : ''}`);
   }
 
   // ========== 核心拦截：样式/字体处理 ==========
@@ -658,7 +785,8 @@
     getStats: () => ({
       ...state.stats,
       cspRestricted: state.cspRestricted,
-      recentReplacements: state.recentReplacements.slice(-50)
+      recentReplacements: state.recentReplacements.slice(-50),
+      thirdPartyDeferralEnabled: state.config.thirdPartyDeferral?.enabled || false,
     }),
     getConfig: () => ({ ...state.config }),
     destroy: () => {
