@@ -582,19 +582,19 @@
         </div>
         <div class="setting-item">
           <div class="toggle-container">
-            <label for="ra-js-replace">JS库替换 <span id="ra-js-count" style="color: #666; font-size: 11px;"></span></label>
+            <label for="ra-js-replace">JS库替换</label>
             <input type="checkbox" id="ra-js-replace" />
           </div>
         </div>
         <div class="setting-item">
           <div class="toggle-container">
-            <label for="ra-font-replace">字体替换 <span id="ra-font-count" style="color: #666; font-size: 11px;"></span></label>
+            <label for="ra-font-replace">字体替换</label>
             <input type="checkbox" id="ra-font-replace" />
           </div>
         </div>
         <div class="setting-item">
           <div class="toggle-container">
-            <label for="ra-css-replace">CSS框架替换 <span id="ra-css-count" style="color: #666; font-size: 11px;"></span></label>
+            <label for="ra-css-replace">CSS框架替换</label>
             <input type="checkbox" id="ra-css-replace" />
           </div>
         </div>
@@ -623,20 +623,26 @@
           </div>
         </div>
         <div class="setting-item" style="margin-top: 8px;">
-          <label for="ra-quality">压缩质量: <span id="ra-quality-value">80</span>%</label>
+          <label for="ra-quality">压缩质量: <span id="ra-quality-value">80</span>% <span id="ra-quality-hint" style="color: #999; font-size: 11px;"></span></label>
           <input type="range" id="ra-quality" min="50" max="100" value="80" step="5" style="width: 100%; margin-top: 4px; accent-color: #007bff;" />
         </div>
         <div style="margin-top: 12px; padding: 8px; background: #f8f9fa; border-radius: 6px;">
-          <div style="font-size: 12px; color: #666; margin-bottom: 8px;">本次加速效果</div>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 11px;">
-            <div style="padding: 4px 6px; background: white; border-radius: 4px; border-left: 3px solid #007bff;">JS替换: <span id="ra-js-count-session">0</span></div>
-            <div style="padding: 4px 6px; background: white; border-radius: 4px; border-left: 3px solid #28a745;">CSS替换: <span id="ra-css-count-session">0</span></div>
-            <div style="padding: 4px 6px; background: white; border-radius: 4px; border-left: 3px solid #17a2b8;">字体替换: <span id="ra-font-count-session">0</span></div>
-            <div style="padding: 4px 6px; background: white; border-radius: 4px; border-left: 3px solid #ffc107;">图片优化: <span id="ra-image-count-session">0</span></div>
+          <div style="font-size: 12px; color: #666; margin-bottom: 8px;">本次会话</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; font-size: 11px;">
+            <div style="padding: 4px 6px; background: white; border-radius: 4px; border-left: 3px solid #007bff;">JS: <span id="ra-js-count-session">0</span></div>
+            <div style="padding: 4px 6px; background: white; border-radius: 4px; border-left: 3px solid #28a745;">CSS: <span id="ra-css-count-session">0</span></div>
+            <div style="padding: 4px 6px; background: white; border-radius: 4px; border-left: 3px solid #17a2b8;">字体: <span id="ra-font-count-session">0</span></div>
+            <div style="padding: 4px 6px; background: white; border-radius: 4px; border-left: 3px solid #ffc107;">图片: <span id="ra-image-count-session">0</span></div>
+            <div style="padding: 4px 6px; background: white; border-radius: 4px; border-left: 3px solid #dc3545;">压缩: <span id="ra-compress-count-session">0</span></div>
+            <div style="padding: 4px 6px; background: white; border-radius: 4px; border-left: 3px solid #6f42c1;">节省: <span id="ra-bytes-saved">0</span> KB</div>
           </div>
-          <div style="margin-top: 8px; display: flex; gap: 8px; font-size: 11px; color: #555;">
-            <div>💾 节省: <span id="ra-bytes-saved">0</span> KB</div>
-            <div>🖼️ 压缩: <span id="ra-compress-count-session">0</span> 张</div>
+          <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e9ecef;">
+            <div style="font-size: 12px; color: #666; margin-bottom: 8px;">累计加速 (<span id="ra-total-count">0</span>次)</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; font-size: 11px;">
+              <div style="padding: 4px 6px; background: white; border-radius: 4px;">JS: <span id="ra-js-count">0</span></div>
+              <div style="padding: 4px 6px; background: white; border-radius: 4px;">CSS: <span id="ra-css-count">0</span></div>
+              <div style="padding: 4px 6px; background: white; border-radius: 4px;">字体: <span id="ra-font-count">0</span></div>
+            </div>
           </div>
         </div>
         <div id="ra-details-panel" style="margin-top: 8px; max-height: 120px; overflow-y: auto; font-size: 11px; display: none;">

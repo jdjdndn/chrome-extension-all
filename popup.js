@@ -2956,6 +2956,12 @@ async function initResourceAccelerator() {
   if (dedupEl) dedupEl.checked = config.dedupEnabled !== false;
   qualityEl.value = config.imageQuality * 100;
   qualityValueEl.textContent = Math.round(config.imageQuality * 100);
+  // 初始化压缩质量提示
+  const qualityHintInit = document.getElementById('ra-quality-hint');
+  if (qualityHintInit) {
+    const savedPct = Math.round((1 - config.imageQuality) * 60);
+    qualityHintInit.textContent = savedPct > 0 ? `(预估节省 ~${savedPct}%)` : '';
+  }
   settingsPanel.style.display = config.enabled ? 'block' : 'none';
 
   // 通用配置保存函数
@@ -3026,10 +3032,17 @@ async function initResourceAccelerator() {
     });
   }
 
+  const qualityHintEl = document.getElementById('ra-quality-hint');
+
   qualityEl.addEventListener('input', async (e) => {
     const value = parseInt(e.target.value);
     qualityValueEl.textContent = value;
     config.imageQuality = value / 100;
+    // 根据历史压缩率估算节省比例
+    if (qualityHintEl) {
+      const savedPct = Math.round((1 - value / 100) * 60);  // 粗略估算
+      qualityHintEl.textContent = savedPct > 0 ? `(预估节省 ~${savedPct}%)` : '';
+    }
     await chrome.storage.local.set({ resourceAcceleratorConfig: config });
   });
 
@@ -3207,11 +3220,17 @@ async function loadResourceAcceleratorStats() {
   const lazyCountEl = document.getElementById('ra-lazy-count');
   const compressCountEl = document.getElementById('ra-compress-count');
 
-  if (jsCountEl) jsCountEl.textContent = `(${stats.totalJsReplaced})`;
-  if (fontCountEl) fontCountEl.textContent = `(${stats.totalFontsReplaced})`;
-  if (cssCountEl) cssCountEl.textContent = `(${stats.totalCssReplaced || 0})`;
-  if (lazyCountEl) lazyCountEl.textContent = `(${stats.totalImagesOptimized})`;
-  if (compressCountEl) compressCountEl.textContent = `(${stats.totalImagesCompressed || 0})`;
+  if (jsCountEl) jsCountEl.textContent = stats.totalJsReplaced || 0;
+  if (fontCountEl) fontCountEl.textContent = stats.totalFontsReplaced || 0;
+  if (cssCountEl) cssCountEl.textContent = stats.totalCssReplaced || 0;
+  if (lazyCountEl) lazyCountEl.textContent = stats.totalImagesOptimized || 0;
+  if (compressCountEl) compressCountEl.textContent = stats.totalImagesCompressed || 0;
+
+  // 累计次数
+  const totalCountEl = document.getElementById('ra-total-count');
+  if (totalCountEl) {
+    totalCountEl.textContent = (stats.totalJsReplaced || 0) + (stats.totalCssReplaced || 0) + (stats.totalFontsReplaced || 0) + (stats.totalImagesOptimized || 0);
+  }
 
   // 本次会话统计（新增卡片）
   const jsSessionEl = document.getElementById('ra-js-count-session');
