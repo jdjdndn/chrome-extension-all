@@ -763,6 +763,7 @@ if (window.TextCollectorLoaded) {
     // 元素选择处理
     handleMouseOver(e) {
       if (this.selectionMode !== 'element') return;
+      if (!e.target || typeof e.target.closest !== 'function') return;
       if (e.target.closest(`#${CONTAINER_ID}`)) return;
 
       e.target.classList.add('yc-highlight-element');
@@ -770,12 +771,14 @@ if (window.TextCollectorLoaded) {
 
     handleMouseOut(e) {
       if (this.selectionMode !== 'element') return;
+      if (!e.target || typeof e.target.classList?.remove !== 'function') return;
 
       e.target.classList.remove('yc-highlight-element');
     }
 
     handleClick(e) {
       if (this.selectionMode !== 'element') return;
+      if (!e.target || typeof e.target.closest !== 'function') return;
       if (e.target.closest(`#${CONTAINER_ID}`)) return;
 
       const text = e.target.innerText?.trim();

@@ -323,6 +323,68 @@
         accelerator.performance === null || typeof accelerator.performance === 'object',
         'performance field exists'
       );
+
+      // v7: Site config
+      this.assert(
+        typeof accelerator.config.siteConfig === 'object',
+        'siteConfig config exists'
+      );
+      this.assert(
+        accelerator.config.siteConfig.enabled === true,
+        'siteConfig.enabled defaults to true'
+      );
+      this.assert(
+        Array.isArray(accelerator.config.siteConfig.rules),
+        'siteConfig.rules array exists'
+      );
+
+      // v7: Precise image compression
+      this.assert(
+        typeof accelerator.getImageActualSize === 'function',
+        'getImageActualSize function exists'
+      );
+
+      // v7: Config import/export
+      this.assert(
+        typeof accelerator.exportConfig === 'function',
+        'exportConfig function exists'
+      );
+      this.assert(
+        typeof accelerator.importConfig === 'function',
+        'importConfig function exists'
+      );
+      this.assert(
+        typeof accelerator.resetConfig === 'function',
+        'resetConfig function exists'
+      );
+
+      // v7: Performance baseline
+      this.assert(
+        typeof accelerator.savePerformanceBaseline === 'function',
+        'savePerformanceBaseline function exists'
+      );
+      this.assert(
+        typeof accelerator.getPerformanceComparison === 'function',
+        'getPerformanceComparison function exists'
+      );
+      this.assert(
+        typeof accelerator.resetPerformanceBaseline === 'function',
+        'resetPerformanceBaseline function exists'
+      );
+
+      // v7: Advanced filter
+      this.assert(
+        typeof accelerator.config.advancedFilter === 'object',
+        'advancedFilter config exists'
+      );
+      this.assert(
+        accelerator.config.advancedFilter.enabled === false,
+        'advancedFilter.enabled defaults to false'
+      );
+      this.assert(
+        Array.isArray(accelerator.config.advancedFilter.rules),
+        'advancedFilter.rules array exists'
+      );
     }
   };
 

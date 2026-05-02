@@ -573,6 +573,17 @@
           <input type="checkbox" id="ra-enabled" />
         </div>
       </div>
+      <div id="ra-site-config-section" style="margin-top: 8px; padding: 8px; background: #f8f9fa; border-radius: 6px;">
+        <div style="font-size: 12px; color: #666; margin-bottom: 4px; cursor: pointer;" id="ra-site-config-toggle">站点配置管理 ▼</div>
+        <div id="ra-site-config-panel" style="display: none;">
+          <div id="ra-site-rules-list" style="max-height: 100px; overflow-y: auto; font-size: 11px; margin-bottom: 4px;"></div>
+          <div style="display: flex; gap: 4px; margin-top: 4px;">
+            <input type="text" id="ra-site-rule-domain" placeholder="域名 (如 example.com 或 *.github.io)" style="flex: 1; padding: 4px; font-size: 11px; border: 1px solid #ddd; border-radius: 3px;">
+            <button id="ra-site-rule-add" style="font-size: 11px; padding: 4px 8px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer;">添加</button>
+          </div>
+          <div style="margin-top: 4px; font-size: 10px; color: #999;">点击规则可编辑功能开关</div>
+        </div>
+      </div>
       <div id="ra-settings" style="margin-top: 8px;">
         <div class="setting-item">
           <div class="toggle-container">
@@ -692,10 +703,83 @@
           <div style="margin-top: 4px; font-size: 12px; color: #1b5e20; font-weight: 500;">
             预估节省: ~<span id="ra-perf-time">0</span>s
           </div>
+          <div id="ra-comparison-panel" style="margin-top: 8px; padding: 8px; background: white; border-radius: 4px; display: none;">
+            <div style="font-size: 11px; color: #666; margin-bottom: 4px;">加速前后对比</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; font-size: 10px;">
+              <div>指标</div>
+              <div>加速前</div>
+              <div>加速后</div>
+              <div>页面加载</div>
+              <div id="ra-comp-load-before">-</div>
+              <div id="ra-comp-load-after">-</div>
+              <div>资源请求</div>
+              <div id="ra-comp-resources-before">-</div>
+              <div id="ra-comp-resources-after">-</div>
+              <div>传输体积</div>
+              <div id="ra-comp-size-before">-</div>
+              <div id="ra-comp-size-after">-</div>
+            </div>
+            <div style="margin-top: 4px; font-size: 11px; color: #1b5e20;">
+              节省时间: <span id="ra-comp-time-saved">0</span>s (<span id="ra-comp-time-percent">0</span>%)
+            </div>
+            <div style="font-size: 11px; color: #1b5e20;">
+              节省流量: <span id="ra-comp-size-saved">0</span> (<span id="ra-comp-size-percent">0</span>%)
+            </div>
+          </div>
+          <div style="margin-top: 6px; display: flex; gap: 4px;">
+            <button id="ra-save-baseline" style="flex: 1; font-size: 10px; padding: 2px 4px; background: #28a745; color: white; border: none; border-radius: 3px; cursor: pointer;">保存基线</button>
+            <button id="ra-reset-baseline" style="flex: 1; font-size: 10px; padding: 2px 4px; background: #6c757d; color: white; border: none; border-radius: 3px; cursor: pointer;">重置基线</button>
+          </div>
         </div>
         <div style="margin-top: 8px; display: flex; gap: 6px;">
           <button id="ra-cache-view" style="flex: 1; font-size: 11px; padding: 4px 8px; background: #6c757d;">缓存管理</button>
           <button id="ra-cache-clear" style="flex: 1; font-size: 11px; padding: 4px 8px; background: #dc3545; color: white;">清除缓存</button>
+        </div>
+        <div id="ra-config-section" style="margin-top: 8px; padding: 8px; background: #f8f9fa; border-radius: 6px;">
+          <div style="font-size: 12px; color: #666; margin-bottom: 4px; cursor: pointer;" id="ra-config-toggle">配置管理 ▼</div>
+          <div id="ra-config-panel" style="display: none;">
+            <div style="display: flex; gap: 4px; margin-bottom: 4px;">
+              <button id="ra-config-export" style="flex: 1; font-size: 11px; padding: 4px 8px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer;">导出配置</button>
+              <button id="ra-config-import" style="flex: 1; font-size: 11px; padding: 4px 8px; background: #28a745; color: white; border: none; border-radius: 3px; cursor: pointer;">导入配置</button>
+              <button id="ra-config-reset" style="flex: 1; font-size: 11px; padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 3px; cursor: pointer;">重置默认</button>
+            </div>
+            <input type="file" id="ra-config-file-input" accept=".json" style="display: none;">
+            <div style="font-size: 10px; color: #999;">导出/导入站点规则、第三方延迟规则等配置</div>
+          </div>
+        </div>
+        <div id="ra-filter-section" style="margin-top: 8px; padding: 8px; background: #f8f9fa; border-radius: 6px;">
+          <div style="font-size: 12px; color: #666; margin-bottom: 4px; cursor: pointer;" id="ra-filter-toggle">高级过滤规则 ▼</div>
+          <div id="ra-filter-panel" style="display: none;">
+            <div style="display: flex; align-items: center; gap: 4px; margin-bottom: 4px;">
+              <label style="font-size: 11px;">启用:</label>
+              <input type="checkbox" id="ra-filter-enabled" />
+            </div>
+            <div id="ra-filter-rules-list" style="max-height: 100px; overflow-y: auto; font-size: 11px; margin-bottom: 4px;"></div>
+            <div style="display: flex; gap: 4px; margin-top: 4px;">
+              <select id="ra-filter-type" style="padding: 4px; font-size: 11px; border: 1px solid #ddd; border-radius: 3px;">
+                <option value="exclude">排除</option>
+                <option value="include">包含</option>
+              </select>
+              <select id="ra-filter-match" style="padding: 4px; font-size: 11px; border: 1px solid #ddd; border-radius: 3px;">
+                <option value="extension">扩展名</option>
+                <option value="path">路径</option>
+                <option value="domain">域名</option>
+                <option value="query">查询参数</option>
+                <option value="regex">正则</option>
+              </select>
+              <input type="text" id="ra-filter-value" placeholder="匹配值" style="flex: 1; padding: 4px; font-size: 11px; border: 1px solid #ddd; border-radius: 3px;">
+            </div>
+            <div style="display: flex; gap: 4px; margin-top: 4px;">
+              <select id="ra-filter-action" style="flex: 1; padding: 4px; font-size: 11px; border: 1px solid #ddd; border-radius: 3px;">
+                <option value="skipAll">跳过所有</option>
+                <option value="skipCompress">跳过压缩</option>
+                <option value="skipReplace">跳过替换</option>
+                <option value="forceReplace">强制替换</option>
+              </select>
+              <button id="ra-filter-add" style="font-size: 11px; padding: 4px 8px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer;">添加</button>
+            </div>
+            <div style="margin-top: 4px; font-size: 10px; color: #999;">规则按顺序匹配，先匹配先执行</div>
+          </div>
         </div>
         <div id="ra-exclude-section" style="margin-top: 8px;">
           <div style="font-size: 12px; color: #666; margin-bottom: 4px; cursor: pointer;" id="ra-exclude-toggle">排除域名 ▼</div>

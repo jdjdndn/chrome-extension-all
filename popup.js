@@ -1793,7 +1793,7 @@ function initStatsButtons() {
   }
 
   if (exportCsvBtn) {
-    exportCsvBtn.addEventListener('click', exportStatsCsv);
+    exportCsvBtn.addEventListener('click', exportStatsToCSV);
   }
 }
 
@@ -2919,7 +2919,7 @@ async function loadKeywordsForCategory() {
 async function initResourceAccelerator() {
   const result = await chrome.storage.local.get('resourceAcceleratorConfig');
   const config = result.resourceAcceleratorConfig || {
-    enabled: false,
+    enabled: true,
     jsReplace: true,
     fontReplace: true,
     cssReplace: true,
@@ -2992,14 +2992,33 @@ async function initResourceAccelerator() {
 
   // 站点级开关
   if (siteEnabledEl) {
+    // 初始化 siteConfig
+    if (!config.siteConfig) config.siteConfig = { enabled: true, rules: [] };
+
+    // 检查当前站点是否有规则
+    const existingRule = config.siteConfig.rules.find(r => r.domain === currentHost);
+    siteEnabledEl.checked = existingRule ? existingRule.enabled !== false : true;
+
     siteEnabledEl.addEventListener('change', async (e) => {
-      if (!config.excludeDomains) config.excludeDomains = [];
-      if (!e.target.checked) {
-        if (!config.excludeDomains.includes(currentHost)) {
-          config.excludeDomains.push(currentHost);
+      if (!config.siteConfig) config.siteConfig = { enabled: true, rules: [] };
+
+      const existingIdx = config.siteConfig.rules.findIndex(r => r.domain === currentHost);
+      if (e.target.checked) {
+        // 启用：如果存在规则且 enabled 为 false，则设置为 true；否则删除规则（使用全局配置）
+        if (existingIdx !== -1) {
+          if (config.siteConfig.rules[existingIdx].enabled === false) {
+            config.siteConfig.rules[existingIdx].enabled = true;
+          } else {
+            config.siteConfig.rules.splice(existingIdx, 1);
+          }
         }
       } else {
-        config.excludeDomains = config.excludeDomains.filter(d => d !== currentHost);
+        // 禁用：添加或更新规则
+        if (existingIdx !== -1) {
+          config.siteConfig.rules[existingIdx].enabled = false;
+        } else {
+          config.siteConfig.rules.push({ domain: currentHost, enabled: false });
+        }
       }
       await saveAndNotify();
     });
@@ -3115,6 +3134,306 @@ async function initResourceAccelerator() {
         if (idx !== undefined && config.thirdPartyDeferral?.userRules) {
           config.thirdPartyDeferral.userRules.splice(parseInt(idx), 1);
           render3pUserRules();
+          await saveAndNotify();
+        }
+      });
+    }
+  }
+
+  // 站点配置管理
+  const siteConfigToggle = document.getElementById('ra-site-config-toggle');
+  const siteConfigPanel = document.getElementById('ra-site-config-panel');
+  const siteRulesList = document.getElementById('ra-site-rules-list');
+  const siteRuleDomainInput = document.getElementById('ra-site-rule-domain');
+  const siteRuleAddBtn = document.getElementById('ra-site-rule-add');
+
+  if (siteConfigToggle && siteConfigPanel) {
+    // 初始化 siteConfig
+    if (!config.siteConfig) config.siteConfig = { enabled: true, rules: [] };
+
+    // 渲染站点规则列表
+    function renderSiteRules() {
+      if (!siteRulesList) return;
+      const rules = config.siteConfig.rules || [];
+      siteRulesList.innerHTML = rules.map((r, i) => {
+        const isCurrentSite = r.domain === currentHost;
+        const statusColor = r.enabled !== false ? '#28a745' : '#dc3545';
+        const statusText = r.enabled !== false ? '启用' : '禁用';
+        return `<div style="display:flex;align-items:center;gap:4px;padding:2px 0;${isCurrentSite ? 'background:#e3f2fd;border-radius:3px;padding:2px 4px;' : ''}">
+          <span style="flex:1;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${r.domain}">${r.domain}${isCurrentSite ? ' (当前)' : ''}</span>
+          <span style="color:${statusColor};font-size:10px;">${statusText}</span>
+          <button data-site-rule-edit="${i}" style="background:#ffc107;color:#333;border:none;border-radius:3px;cursor:pointer;font-size:10px;padding:1px 4px;line-height:1;">编辑</button>
+          <button data-site-rule-remove="${i}" style="background:#dc3545;color:white;border:none;border-radius:3px;cursor:pointer;font-size:10px;padding:1px 4px;line-height:1;">×</button>
+        </div>`;
+      }).join('');
+    }
+    renderSiteRules();
+
+    // 切换面板显示
+    siteConfigToggle.addEventListener('click', () => {
+      const isVisible = siteConfigPanel.style.display !== 'none';
+      siteConfigPanel.style.display = isVisible ? 'none' : 'block';
+      siteConfigToggle.textContent = isVisible ? '站点配置管理 ▼' : '站点配置管理 ▲';
+    });
+
+    // 添加站点规则
+    if (siteRuleAddBtn) {
+      siteRuleAddBtn.addEventListener('click', async () => {
+        const domain = siteRuleDomainInput?.value?.trim();
+        if (!domain) return;
+
+        // 检查是否已存在
+        const existingIdx = config.siteConfig.rules.findIndex(r => r.domain === domain);
+        if (existingIdx !== -1) {
+          alert('该域名已存在规则');
+          return;
+        }
+
+        // 添加新规则
+        config.siteConfig.rules.push({
+          domain: domain,
+          enabled: true,
+          jsReplace: true,
+          fontReplace: true,
+          cssReplace: true,
+          imageLazyLoad: true,
+          imageCompress: true
+        });
+
+        siteRuleDomainInput.value = '';
+        renderSiteRules();
+        await saveAndNotify();
+      });
+    }
+
+    // 编辑/删除站点规则（事件委托）
+    if (siteRulesList) {
+      siteRulesList.addEventListener('click', async (e) => {
+        const editIdx = e.target.dataset.siteRuleEdit;
+        const removeIdx = e.target.dataset.siteRuleRemove;
+
+        if (editIdx !== undefined) {
+          // 编辑规则：切换 enabled 状态
+          const idx = parseInt(editIdx);
+          const rule = config.siteConfig.rules[idx];
+          if (rule) {
+            rule.enabled = rule.enabled === false ? true : false;
+            renderSiteRules();
+            await saveAndNotify();
+          }
+        }
+
+        if (removeIdx !== undefined) {
+          // 删除规则
+          const idx = parseInt(removeIdx);
+          config.siteConfig.rules.splice(idx, 1);
+          renderSiteRules();
+          await saveAndNotify();
+        }
+      });
+    }
+  }
+
+  // 配置管理
+  const configToggle = document.getElementById('ra-config-toggle');
+  const configPanel = document.getElementById('ra-config-panel');
+  const configExportBtn = document.getElementById('ra-config-export');
+  const configImportBtn = document.getElementById('ra-config-import');
+  const configResetBtn = document.getElementById('ra-config-reset');
+  const configFileInput = document.getElementById('ra-config-file-input');
+
+  if (configToggle && configPanel) {
+    // 切换面板显示
+    configToggle.addEventListener('click', () => {
+      const isVisible = configPanel.style.display !== 'none';
+      configPanel.style.display = isVisible ? 'none' : 'block';
+      configToggle.textContent = isVisible ? '配置管理 ▼' : '配置管理 ▲';
+    });
+
+    // 导出配置
+    if (configExportBtn) {
+      configExportBtn.addEventListener('click', async () => {
+        const exportData = {
+          version: '1.0',
+          exportTime: new Date().toISOString(),
+          config: config
+        };
+        const jsonString = JSON.stringify(exportData, null, 2);
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `resource-accelerator-config-${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        alert('配置已导出');
+      });
+    }
+
+    // 导入配置
+    if (configImportBtn && configFileInput) {
+      configImportBtn.addEventListener('click', () => {
+        configFileInput.click();
+      });
+
+      configFileInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+          try {
+            const importData = JSON.parse(event.target.result);
+
+            // 验证格式
+            if (!importData.version || !importData.config) {
+              alert('无效的配置格式');
+              return;
+            }
+
+            // 验证版本
+            if (importData.version !== '1.0') {
+              alert(`不支持的配置版本: ${importData.version}`);
+              return;
+            }
+
+            // 合并配置
+            const mergedConfig = { ...config, ...importData.config };
+            config = mergedConfig;
+
+            // 保存到 storage
+            await chrome.storage.local.set({ resourceAcceleratorConfig: config });
+
+            // 重新加载页面以应用新配置
+            alert('配置已导入，页面将刷新以应用新配置');
+            window.location.reload();
+          } catch (err) {
+            alert(`导入配置失败: ${err.message}`);
+          }
+        };
+        reader.readAsText(file);
+
+        // 清空 input
+        configFileInput.value = '';
+      });
+    }
+
+    // 重置配置
+    if (configResetBtn) {
+      configResetBtn.addEventListener('click', async () => {
+        if (!confirm('确定要重置为默认配置吗？这将清除所有自定义设置。')) {
+          return;
+        }
+
+        config = {
+          enabled: true,
+          jsReplace: true,
+          fontReplace: true,
+          cssReplace: true,
+          imageLazyLoad: true,
+          imageCompress: true,
+          imageQuality: 0.8,
+          preloadEnabled: true,
+          dedupEnabled: true,
+          excludeDomains: [],
+          siteConfig: { enabled: true, rules: [] }
+        };
+
+        await chrome.storage.local.set({ resourceAcceleratorConfig: config });
+        alert('配置已重置，页面将刷新');
+        window.location.reload();
+      });
+    }
+  }
+
+  // 高级过滤规则管理
+  const filterToggle = document.getElementById('ra-filter-toggle');
+  const filterPanel = document.getElementById('ra-filter-panel');
+  const filterEnabledEl = document.getElementById('ra-filter-enabled');
+  const filterRulesList = document.getElementById('ra-filter-rules-list');
+  const filterTypeEl = document.getElementById('ra-filter-type');
+  const filterMatchEl = document.getElementById('ra-filter-match');
+  const filterValueEl = document.getElementById('ra-filter-value');
+  const filterActionEl = document.getElementById('ra-filter-action');
+  const filterAddBtn = document.getElementById('ra-filter-add');
+
+  if (filterToggle && filterPanel) {
+    // 初始化 advancedFilter
+    if (!config.advancedFilter) config.advancedFilter = { enabled: false, rules: [] };
+
+    // 渲染过滤规则列表
+    function renderFilterRules() {
+      if (!filterRulesList) return;
+      const rules = config.advancedFilter.rules || [];
+      filterRulesList.innerHTML = rules.map((r, i) => {
+        const typeColor = r.type === 'exclude' ? '#dc3545' : '#28a745';
+        const typeText = r.type === 'exclude' ? '排除' : '包含';
+        return `<div style="display:flex;align-items:center;gap:4px;padding:2px 0;">
+          <span style="color:${typeColor};font-size:10px;width:30px;">${typeText}</span>
+          <span style="flex:1;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${r.description || r.value}">${r.match}:${r.value}</span>
+          <span style="color:#666;font-size:10px;">${r.action}</span>
+          <button data-filter-rule-remove="${i}" style="background:#dc3545;color:white;border:none;border-radius:3px;cursor:pointer;font-size:10px;padding:1px 4px;line-height:1;">×</button>
+        </div>`;
+      }).join('');
+    }
+    renderFilterRules();
+
+    // 设置启用状态
+    if (filterEnabledEl) {
+      filterEnabledEl.checked = config.advancedFilter.enabled;
+      filterEnabledEl.addEventListener('change', async (e) => {
+        config.advancedFilter.enabled = e.target.checked;
+        await saveAndNotify();
+      });
+    }
+
+    // 切换面板显示
+    filterToggle.addEventListener('click', () => {
+      const isVisible = filterPanel.style.display !== 'none';
+      filterPanel.style.display = isVisible ? 'none' : 'block';
+      filterToggle.textContent = isVisible ? '高级过滤规则 ▼' : '高级过滤规则 ▲';
+    });
+
+    // 添加过滤规则
+    if (filterAddBtn) {
+      filterAddBtn.addEventListener('click', async () => {
+        const type = filterTypeEl?.value || 'exclude';
+        const match = filterMatchEl?.value || 'extension';
+        const value = filterValueEl?.value?.trim();
+        const action = filterActionEl?.value || 'skipAll';
+
+        if (!value) return;
+
+        // 验证正则
+        if (match === 'regex') {
+          try { new RegExp(value); } catch { alert('无效的正则表达式'); return; }
+        }
+
+        config.advancedFilter.rules.push({
+          type,
+          match,
+          value,
+          action,
+          description: `${type === 'exclude' ? '排除' : '包含'} ${match}=${value}`
+        });
+
+        filterValueEl.value = '';
+        renderFilterRules();
+        await saveAndNotify();
+      });
+    }
+
+    // 删除过滤规则（事件委托）
+    if (filterRulesList) {
+      filterRulesList.addEventListener('click', async (e) => {
+        const idx = e.target.dataset.filterRuleRemove;
+        if (idx !== undefined && config.advancedFilter?.rules) {
+          config.advancedFilter.rules.splice(parseInt(idx), 1);
+          renderFilterRules();
           await saveAndNotify();
         }
       });
@@ -3353,6 +3672,9 @@ async function loadResourceAcceleratorStats() {
             if (el('ra-perf-bytes')) el('ra-perf-bytes').textContent = perf.bytesSaved ? fmtBytes(perf.bytesSaved) : '0';
             if (el('ra-perf-time')) el('ra-perf-time').textContent = perf.estimatedTimeSaved ? (perf.estimatedTimeSaved / 1000).toFixed(1) : '0';
           }
+
+          // 加载性能对比
+          loadPerformanceComparison();
         }
         // 第三方延迟统计
         const thirdPartyCountEl = document.getElementById('ra-third-party-count');
@@ -3367,6 +3689,85 @@ async function loadResourceAcceleratorStats() {
     }
   });
 }
+
+// 加载性能对比数据
+async function loadPerformanceComparison() {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) return;
+
+    const response = await chrome.tabs.sendMessage(tab.id, { type: 'RESOURCE_ACCELERATOR_GET_STATS' });
+    if (!response?.success) return;
+
+    // 通过 content script 获取对比数据
+    const comparisonResponse = await chrome.tabs.sendMessage(tab.id, { type: 'RESOURCE_ACCELERATOR_GET_COMPARISON' });
+    if (!comparisonResponse?.success || !comparisonResponse.data) return;
+
+    const comparison = comparisonResponse.data;
+    const comparisonPanel = document.getElementById('ra-comparison-panel');
+    if (!comparisonPanel) return;
+
+    comparisonPanel.style.display = 'block';
+
+    const fmt = (ms) => ms > 1000 ? (ms / 1000).toFixed(1) + 's' : ms + 'ms';
+    const fmtBytes = (b) => b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.round(b / 1024) + ' KB';
+
+    const el = (id) => document.getElementById(id);
+
+    // 填充对比数据
+    if (el('ra-comp-load-before')) el('ra-comp-load-before').textContent = fmt(comparison.baseline.loadEvent);
+    if (el('ra-comp-load-after')) el('ra-comp-load-after').textContent = fmt(comparison.current.loadEvent);
+    if (el('ra-comp-resources-before')) el('ra-comp-resources-before').textContent = comparison.baseline.totalResources;
+    if (el('ra-comp-resources-after')) el('ra-comp-resources-after').textContent = comparison.current.totalResources;
+    if (el('ra-comp-size-before')) el('ra-comp-size-before').textContent = fmtBytes(comparison.baseline.totalTransferSize);
+    if (el('ra-comp-size-after')) el('ra-comp-size-after').textContent = fmtBytes(comparison.current.totalTransferSize);
+    if (el('ra-comp-time-saved')) el('ra-comp-time-saved').textContent = (comparison.savings.loadTimeSaved / 1000).toFixed(1);
+    if (el('ra-comp-time-percent')) el('ra-comp-time-percent').textContent = comparison.savings.loadTimePercent;
+    if (el('ra-comp-size-saved')) el('ra-comp-size-saved').textContent = fmtBytes(comparison.savings.transferSizeSaved);
+    if (el('ra-comp-size-percent')) el('ra-comp-size-percent').textContent = comparison.savings.transferSizePercent;
+  } catch {
+    // 静默失败
+  }
+}
+
+// 基线按钮事件
+document.addEventListener('DOMContentLoaded', () => {
+  const saveBaselineBtn = document.getElementById('ra-save-baseline');
+  const resetBaselineBtn = document.getElementById('ra-reset-baseline');
+
+  if (saveBaselineBtn) {
+    saveBaselineBtn.addEventListener('click', async () => {
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (!tab?.id) return;
+
+        await chrome.tabs.sendMessage(tab.id, { type: 'RESOURCE_ACCELERATOR_SAVE_BASELINE' });
+        alert('基线已保存');
+        loadPerformanceComparison();
+      } catch {
+        alert('保存基线失败');
+      }
+    });
+  }
+
+  if (resetBaselineBtn) {
+    resetBaselineBtn.addEventListener('click', async () => {
+      if (!confirm('确定要重置基线数据吗？')) return;
+
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (!tab?.id) return;
+
+        await chrome.tabs.sendMessage(tab.id, { type: 'RESOURCE_ACCELERATOR_RESET_BASELINE' });
+        alert('基线已重置');
+        const comparisonPanel = document.getElementById('ra-comparison-panel');
+        if (comparisonPanel) comparisonPanel.style.display = 'none';
+      } catch {
+        alert('重置基线失败');
+      }
+    });
+  }
+});
 
 function notifyResourceAccelerator(config) {
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {

@@ -12,6 +12,7 @@
     'redirect-links': true,    // 重定向链接替换
     'text-to-link': true,      // 文本转链接
     'link-blank': true,        // 非同源链接新页面打开
+    'link-validator': true,    // 链接有效性验证
     'add-title': true,         // 添加 title
     'doc-generator': true,     // 文档生成器
     'text-collector': true,    // 文本收集器
@@ -121,6 +122,7 @@
     'redirect-links': '重定向链接替换',
     'text-to-link': '文本转链接',
     'link-blank': '非同源链接新窗口打开',
+    'link-validator': '链接有效性验证',
     'add-title': '添加 title 属性',
     'doc-generator': '文档生成器',
     'text-collector': '文本收集器',

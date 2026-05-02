@@ -798,6 +798,224 @@
     }
   };
 
+  // ========== 智能 URL 解析（自动识别 npm 包）==========
+
+  // 通用 npm 包名提取模式
+  const GENERIC_PACKAGE_PATTERNS = [
+    // @scope/package@version/file.js 或 @scope/package@version.js
+    /\/(@[a-z0-9-]+\/[a-z0-9-]+)@([a-z0-9._-]+)\/?.*\.js$/i,
+    // @scope/package/file.js (无版本，从路径提取)
+    /\/(@[a-z0-9-]+\/[a-z0-9-]+)\/(?:v?[\d.]+|latest)\/.*\.js$/i,
+    // package@version/file.js
+    /\/([a-z][a-z0-9._-]*)@([a-z0-9._-]+)\/?.*\.js$/i,
+    // package/version/file.js
+    /\/([a-z][a-z0-9._-]*)\/(v?[\d.]+)\/.*\.js$/i,
+    // package-version.min.js (简单模式)
+    /\/([a-z][a-z0-9._-]*)[-.]?([\d.]+)?(?:\.min)?\.js$/i
+  ];
+
+  /**
+   * 从 URL 中智能提取包名和版本
+   * 返回 { packageName, version } 或 null
+   */
+  function extractPackageInfo(url) {
+    if (!url || typeof url !== 'string') return null;
+
+    try {
+      const urlObj = new URL(url);
+      const pathname = urlObj.pathname;
+
+      for (const pattern of GENERIC_PACKAGE_PATTERNS) {
+        const match = pathname.match(pattern);
+        if (match) {
+          const packageName = match[1];
+          let version = match[2] || null;
+
+          // 清理版本号
+          if (version) {
+            version = version.replace(/^v/i, '');
+            // 只保留有效版本格式
+            if (!/^\d+\.\d+/.test(version)) version = null;
+          }
+
+          // 跳过已知的非包名模式
+          if (skipPackage(packageName)) continue;
+
+          return { packageName, version };
+        }
+      }
+    } catch {}
+
+    return null;
+  }
+
+  /**
+   * 判断是否应跳过的包名（静态资源、非JS库等）
+   */
+  function skipPackage(name) {
+    if (!name) return true;
+    const lower = name.toLowerCase();
+    // 跳过常见非包名路径
+    const skipList = [
+      'static', 'assets', 'public', 'lib', 'vendor', 'dist', 'build',
+      'js', 'scripts', 'bundle', 'app', 'main', 'index', 'common',
+      'utils', 'helpers', 'components', 'modules', 'plugins',
+      'css', 'style', 'styles', 'images', 'img', 'fonts'
+    ];
+    return skipList.includes(lower) || /^\d/.test(lower);
+  }
+
+  /**
+   * 智能匹配：根据提取的包信息构建 CDN URL
+   */
+  function smartMatchJSLibrary(url) {
+    const info = extractPackageInfo(url);
+    if (!info) return null;
+
+    const { packageName, version } = info;
+    const fallbackVersion = version || 'latest';
+
+    // 构建 jsDelivr URL (npm 格式)
+    const jsdelivrUrl = `https://cdn.jsdelivr.net/npm/${packageName}@${fallbackVersion}/${packageName}.min.js`;
+
+    // 构建备选 CDN URLs
+    const fallbackUrls = [
+      { url: `https://unpkg.com/${packageName}@${fallbackVersion}/${packageName}.min.js`, cdnId: 'unpkg' },
+      { url: `https://cdnjs.cloudflare.com/ajax/libs/${packageName}/${fallbackVersion}/${packageName}.min.js`, cdnId: 'cdnjs' }
+    ];
+
+    return {
+      name: packageName,
+      originalUrl: url,
+      cdnUrl: jsdelivrUrl,
+      version: fallbackVersion,
+      cdnName: 'jsDelivr (auto)',
+      cdnId: 'jsdelivr',
+      fallbackUrls,
+      type: 'js',
+      isAutoDetected: true
+    };
+  }
+
+  // ========== jsDelivr API 动态查询 ==========
+
+  const _jsdelivrCache = new Map(); // packageName -> { exists, version, file, timestamp }
+  const JSDELIVR_CACHE_TTL = 30 * 60 * 1000; // 30分钟缓存
+  const JSDELIVR_RATE_LIMIT = 100; // 100ms 间隔
+  let _lastJsdelivrQuery = 0;
+
+  /**
+   * 通过 jsDelivr API 查询 npm 包信息
+   * 返回 { packageName, version, file } 或 null
+   */
+  async function queryJsdelivrAPI(packageName) {
+    if (!packageName) return null;
+
+    // 检查缓存
+    const cached = _jsdelivrCache.get(packageName);
+    if (cached && Date.now() - cached.timestamp < JSDELIVR_CACHE_TTL) {
+      return cached.exists ? cached : null;
+    }
+
+    // 速率限制
+    const now = Date.now();
+    const waitTime = JSDELIVR_RATE_LIMIT - (now - _lastJsdelivrQuery);
+    if (waitTime > 0) {
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+    }
+    _lastJsdelivrQuery = Date.now();
+
+    try {
+      // 查询包的最新版本
+      const response = await fetch(
+        `https://data.jsdelivr.com/v1/packages/npm/${encodeURIComponent(packageName)}/flat`,
+        { signal: AbortSignal.timeout(3000) }
+      );
+
+      if (!response.ok) {
+        _jsdelivrCache.set(packageName, { exists: false, timestamp: Date.now() });
+        return null;
+      }
+
+      const data = await response.json();
+      if (!data || !data.files || data.files.length === 0) {
+        _jsdelivrCache.set(packageName, { exists: false, timestamp: Date.now() });
+        return null;
+      }
+
+      // 查找常见的入口文件
+      const commonFiles = [
+        `${packageName}.min.js`,
+        `${packageName}.js`,
+        `dist/${packageName}.min.js`,
+        `dist/${packageName}.js`,
+        `dist/${packageName}.umd.min.js`,
+        `dist/${packageName}.umd.js`,
+        `build/${packageName}.min.js`,
+        `lib/${packageName}.min.js`,
+        `index.min.js`,
+        `index.js`
+      ];
+
+      let foundFile = null;
+      for (const file of commonFiles) {
+        if (data.files.some(f => f.name === file)) {
+          foundFile = file;
+          break;
+        }
+      }
+
+      if (!foundFile) {
+        _jsdelivrCache.set(packageName, { exists: false, timestamp: Date.now() });
+        return null;
+      }
+
+      const version = data.version || 'latest';
+      const result = {
+        exists: true,
+        packageName,
+        version,
+        file: foundFile,
+        timestamp: Date.now()
+      };
+
+      _jsdelivrCache.set(packageName, result);
+      return result;
+
+    } catch {
+      _jsdelivrCache.set(packageName, { exists: false, timestamp: Date.now() });
+      return null;
+    }
+  }
+
+  /**
+   * 通过 jsDelivr API 动态匹配 JS 库
+   */
+  async function dynamicMatchJSLibrary(url) {
+    const info = extractPackageInfo(url);
+    if (!info) return null;
+
+    const pkgInfo = await queryJsdelivrAPI(info.packageName);
+    if (!pkgInfo) return null;
+
+    const version = info.version || pkgInfo.version;
+    const jsdelivrUrl = `https://cdn.jsdelivr.net/npm/${pkgInfo.packageName}@${version}/${pkgInfo.file}`;
+
+    return {
+      name: pkgInfo.packageName,
+      originalUrl: url,
+      cdnUrl: jsdelivrUrl,
+      version,
+      cdnName: 'jsDelivr (dynamic)',
+      cdnId: 'jsdelivr',
+      fallbackUrls: [
+        { url: `https://unpkg.com/${pkgInfo.packageName}@${version}/${pkgInfo.file}`, cdnId: 'unpkg' }
+      ],
+      type: 'js',
+      isDynamic: true
+    };
+  }
+
   // ========== 匹配方法 ==========
 
   function matchFromMap(url, map, type) {
@@ -870,7 +1088,29 @@
   }
 
   function matchJSLibrary(url) {
-    return matchFromMap(url, JS_CDN_MAP, 'js');
+    // 优先使用硬编码映射
+    const hardcoded = matchFromMap(url, JS_CDN_MAP, 'js');
+    if (hardcoded) return hardcoded;
+
+    // 硬编码匹配失败，尝试智能 URL 解析
+    return smartMatchJSLibrary(url);
+  }
+
+  /**
+   * 异步匹配 JS 库（包含 jsDelivr API 查询）
+   * 用于需要完整功能的场景
+   */
+  async function matchJSLibraryAsync(url) {
+    // 优先使用硬编码映射
+    const hardcoded = matchFromMap(url, JS_CDN_MAP, 'js');
+    if (hardcoded) return hardcoded;
+
+    // 尝试智能 URL 解析（同步）
+    const smart = smartMatchJSLibrary(url);
+    if (smart) return smart;
+
+    // 最后尝试 jsDelivr API 动态查询（异步）
+    return await dynamicMatchJSLibrary(url);
   }
 
   function matchCSS(url) {
@@ -936,12 +1176,17 @@
     CDN_SOURCES,
     CDN_BY_ID,
     extractVersion,
+    extractPackageInfo,
     matchJSLibrary,
+    matchJSLibraryAsync,
     matchCSS,
     matchFont,
     probeAllCDNs,
     getCDNHealth,
-    getHealthyCDNOrder
+    getHealthyCDNOrder,
+    // 测试/调试用
+    _jsdelivrCache,
+    queryJsdelivrAPI
   };
 
 })();

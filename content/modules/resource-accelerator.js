@@ -51,6 +51,16 @@
       userRules: [],  // User-defined rules [{ pattern: string, strategy: string }]
       maxDeferralMs: 10000,
     },
+    // 站点级配置
+    siteConfig: {
+      enabled: true,  // 全局开关
+      rules: [],  // 站点规则列表 [{ domain: string, enabled: boolean, ...featureFlags }]
+    },
+    // 高级过滤规则
+    advancedFilter: {
+      enabled: false,
+      rules: [],  // [{ type: 'exclude'|'include', match: 'extension'|'path'|'domain'|'query'|'regex', value: string, action: 'skipAll'|'skipCompress'|'skipReplace'|'forceReplace', description: string }]
+    },
   };
 
   // ========== 全局状态（同步初始化）==========
@@ -149,6 +159,143 @@
     } catch {
       return false;
     }
+  }
+
+  // ========== 站点级配置 ==========
+
+  function getSiteConfig(hostname) {
+    const rules = state.config.siteConfig?.rules || [];
+
+    // 精确匹配优先
+    const exact = rules.find(r => r.domain === hostname);
+    if (exact) return exact;
+
+    // 通配符匹配 (*.domain.com)
+    const wildcard = rules.find(r => {
+      if (!r.domain.startsWith('*')) return false;
+      const suffix = r.domain.slice(1);
+      return hostname.endsWith(suffix);
+    });
+
+    return wildcard || null;
+  }
+
+  function isSiteEnabled(feature) {
+    const site = getSiteConfig(location.hostname);
+
+    // 站点级别完全禁用
+    if (site && site.enabled === false) return false;
+
+    // 站点级别功能开关
+    if (site && feature in site) return site[feature];
+
+    // 回退到全局配置
+    return state.config[feature];
+  }
+
+  // ========== 高级过滤规则 ==========
+
+  function matchAdvancedFilter(url, context = {}) {
+    const filter = state.config.advancedFilter;
+    if (!filter?.enabled || !filter.rules?.length) {
+      return { matched: false, action: null };
+    }
+
+    let urlObj;
+    try {
+      urlObj = new URL(url, location.href);
+    } catch {
+      return { matched: false, action: null };
+    }
+
+    for (const rule of filter.rules) {
+      let matches = false;
+
+      switch (rule.match) {
+        case 'extension': {
+          const ext = urlObj.pathname.split('.').pop()?.toLowerCase();
+          matches = ext === rule.value.toLowerCase();
+          break;
+        }
+        case 'path': {
+          matches = urlObj.pathname.includes(rule.value);
+          break;
+        }
+        case 'domain': {
+          matches = urlObj.hostname === rule.value || urlObj.hostname.endsWith('.' + rule.value);
+          break;
+        }
+        case 'query': {
+          matches = urlObj.search.includes(rule.value);
+          break;
+        }
+        case 'regex': {
+          try {
+            matches = new RegExp(rule.value, 'i').test(url);
+          } catch {
+            matches = false;
+          }
+          break;
+        }
+      }
+
+      if (matches) {
+        // 检查 type 是否匹配
+        if (rule.type === 'include' && !context.isInclude) continue;
+        if (rule.type === 'exclude' && context.isInclude) continue;
+
+        return { matched: true, action: rule.action, rule };
+      }
+    }
+
+    return { matched: false, action: null };
+  }
+
+  // ========== 精准图片压缩 ==========
+
+  const _headSizeCache = new Map();  // URL -> { size: number, timestamp: number }
+  const HEAD_CACHE_TTL = 30000;  // 30秒缓存
+  let _headRequestCount = 0;
+  const MAX_HEAD_CONCURRENT = 5;
+
+  async function getImageActualSize(url) {
+    // 检查缓存
+    const cached = _headSizeCache.get(url);
+    if (cached && Date.now() - cached.timestamp < HEAD_CACHE_TTL) {
+      return cached.size;
+    }
+
+    // 并发限制
+    if (_headRequestCount >= MAX_HEAD_CONCURRENT) {
+      return null;
+    }
+
+    _headRequestCount++;
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);  // 3秒超时
+
+      const response = await fetch(url, {
+        method: 'HEAD',
+        mode: 'no-cors',
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      const contentLength = response.headers.get('content-length');
+      if (contentLength) {
+        const size = parseInt(contentLength, 10);
+        _headSizeCache.set(url, { size, timestamp: Date.now() });
+        return size;
+      }
+    } catch {
+      // CORS 限制或其他错误，降级到估算
+    } finally {
+      _headRequestCount--;
+    }
+
+    return null;
   }
 
   function supportsWebP() {
@@ -299,12 +446,21 @@
 
   async function processScript(script) {
     if (state.cspRestricted) return;
+    if (!isSiteEnabled('jsReplace')) return;
     const url = script.src;
     if (!url || script.dataset._raProcessed) return;
 
     script.dataset._raProcessed = '1';
 
     if (isExcluded(url) || isCDNUrl(url)) return;
+
+    // 高级过滤检查
+    const filterResult = matchAdvancedFilter(url);
+    if (filterResult.matched) {
+      if (filterResult.action === 'skipAll' || filterResult.action === 'skipReplace') {
+        return;
+      }
+    }
 
     // 去重检查：同一原始URL不重复替换
     if (state.config.dedupEnabled && state.dedupSet.has(url)) return;
@@ -374,12 +530,21 @@
 
   function processLink(link) {
     if (state.cspRestricted) return;
+    if (!isSiteEnabled('fontReplace') && !isSiteEnabled('cssReplace')) return;
     const url = link.href;
     if (!url || link.dataset._raProcessed) return;
 
     link.dataset._raProcessed = '1';
 
     if (isExcluded(url) || isCDNUrl(url)) return;
+
+    // 高级过滤检查
+    const filterResult = matchAdvancedFilter(url);
+    if (filterResult.matched) {
+      if (filterResult.action === 'skipAll' || filterResult.action === 'skipReplace') {
+        return;
+      }
+    }
 
     // 去重检查：同一原始URL不重复替换
     if (state.config.dedupEnabled && state.dedupSet.has(url)) return;
@@ -443,10 +608,18 @@
   // ========== 核心拦截：图片懒加载 ==========
 
   function processImage(img) {
-    if (!state.config.imageLazyLoad) return;
+    if (!isSiteEnabled('imageLazyLoad')) return;
     if (img.dataset._raProcessed || !img.src || img.dataset.src || img.src.startsWith('data:')) return;
     if (img.loading === 'eager' || img.hasAttribute('data-no-lazy')) return;
     if (img.complete && img.naturalWidth > 0) return;
+
+    // 高级过滤检查
+    const filterResult = matchAdvancedFilter(img.src);
+    if (filterResult.matched) {
+      if (filterResult.action === 'skipAll' || filterResult.action === 'skipReplace') {
+        return;
+      }
+    }
 
     img.dataset._raProcessed = '1';
     img.loading = 'lazy';
@@ -512,6 +685,16 @@
   }
 
   async function compressImage(url) {
+    if (!isSiteEnabled('imageCompress')) return null;
+
+    // 高级过滤检查
+    const filterResult = matchAdvancedFilter(url);
+    if (filterResult.matched) {
+      if (filterResult.action === 'skipAll' || filterResult.action === 'skipCompress') {
+        return null;
+      }
+    }
+
     // 检查缓存
     if (state._compressCache.has(url)) {
       const cached = state._compressCache.get(url);
@@ -536,12 +719,15 @@
       return null;
     }
 
+    // 优先获取实际文件大小
+    const actualSize = await getImageActualSize(url);
+
     return new Promise(resolve => {
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = () => {
-        // 如果 HEAD 获取到了大小，用实际大小判断；否则用像素估算降级
-        const bytes = img.naturalWidth * img.naturalHeight * 4;
+        // 使用实际大小（如果获取到）；否则用像素估算降级
+        const bytes = actualSize || (img.naturalWidth * img.naturalHeight * 4);
         if (bytes < state.config.imageMinSize) {
           state._compressCache.set(url, { skip: true });
           resolve(null);
@@ -616,16 +802,27 @@
   }
 
   function _insertPreloadLink(cdnUrl, type) {
+    if (!cdnUrl || typeof cdnUrl !== 'string' || !cdnUrl.startsWith('http')) return;
     const head = document.head || document.documentElement;
-    if (head.querySelector(`link[rel="preload"][href="${cdnUrl}"]`)) return;
+    if (head.querySelector(`link[rel="preload"]`)) {
+      const links = head.querySelectorAll('link[rel="preload"]');
+      for (const l of links) {
+        if (l.getAttribute('href') === cdnUrl) return;
+      }
+    }
     const link = document.createElement('link');
     link.rel = 'preload';
     link.href = cdnUrl;
     if (type === 'js') {
       link.as = 'script';
     } else if (type === 'font') {
-      link.as = 'font';
-      link.crossOrigin = 'anonymous';
+      // Google Fonts 等 replaceHost 返回的是 CSS 样式表 URL，不是字体文件
+      if (/\/css[2]?(?:\?|$)/i.test(cdnUrl)) {
+        link.as = 'style';
+      } else {
+        link.as = 'font';
+        link.crossOrigin = 'anonymous';
+      }
     } else {
       link.as = 'style';
     }
@@ -655,44 +852,52 @@
 
     if (tag === 'SCRIPT') {
       // 拦截 src 属性设置
-      let _src = '';
-      Object.defineProperty(el, 'src', {
-        get() { return _src; },
-        set(val) {
-          _src = val;
-          if (val) {
-            el.setAttribute('src', val);
-            // 延迟处理，等待 CDNMappings 加载
-            Promise.resolve().then(() => processScript(el));
+      const desc = Object.getOwnPropertyDescriptor(el, 'src') || Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype, 'src');
+      if (!desc || desc.configurable) {
+        let _src = '';
+        Object.defineProperty(el, 'src', {
+          get() { return _src; },
+          set(val) {
+            _src = val;
+            if (val) {
+              el.setAttribute('src', val);
+              Promise.resolve().then(() => processScript(el));
+            }
           }
-        }
-      });
+        });
+      }
     } else if (tag === 'LINK') {
       // 拦截 href 属性设置
-      let _href = '';
-      Object.defineProperty(el, 'href', {
-        get() { return _href; },
-        set(val) {
-          _href = val;
-          if (val && el.rel === 'stylesheet') {
-            el.setAttribute('href', val);
-            Promise.resolve().then(() => processLink(el));
+      const desc = Object.getOwnPropertyDescriptor(el, 'href') || Object.getOwnPropertyDescriptor(HTMLLinkElement.prototype, 'href');
+      if (!desc || desc.configurable) {
+        let _href = '';
+        Object.defineProperty(el, 'href', {
+          get() { return _href; },
+          set(val) {
+            _href = val;
+            if (val && el.rel === 'stylesheet') {
+              el.setAttribute('href', val);
+              Promise.resolve().then(() => processLink(el));
+            }
           }
-        }
-      });
+        });
+      }
     } else if (tag === 'IMG') {
       // 拦截 src 属性设置
-      let _src = '';
-      Object.defineProperty(el, 'src', {
-        get() { return _src; },
-        set(val) {
-          _src = val;
-          if (val) {
-            el.setAttribute('src', val);
-            Promise.resolve().then(() => processImage(el));
+      const desc = Object.getOwnPropertyDescriptor(el, 'src') || Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
+      if (!desc || desc.configurable) {
+        let _src = '';
+        Object.defineProperty(el, 'src', {
+          get() { return _src; },
+          set(val) {
+            _src = val;
+            if (val) {
+              el.setAttribute('src', val);
+              Promise.resolve().then(() => processImage(el));
+            }
           }
-        }
-      });
+        });
+      }
     }
 
     return el;
@@ -850,9 +1055,8 @@
       }
     }
 
-    // 异步检测，不阻塞
-    fetch('https://cdn.bootcdn.net/', { method: 'HEAD', mode: 'no-cors' })
-      .catch(() => { state.cspRestricted = true; });
+    // 异步检测，不阻塞（跳过 CSP 检测，避免被 block）
+    // CSP 限制已通过 meta 标签预检处理
   }
 
   function _addCDNPreconnect() {
@@ -879,7 +1083,7 @@
   function _initMessageListener() {
     chrome.runtime?.onMessage?.addListener((message, sender, sendResponse) => {
       if (message.type === 'RESOURCE_ACCELERATOR_GET_STATS') {
-        sendResponse(getStats());
+        sendResponse({ success: true, data: getStats() });
         return true;
       }
       if (message.type === 'RESOURCE_ACCELERATOR_GET_CDN_HEALTH') {
@@ -891,6 +1095,22 @@
         if (!state.config.enabled) {
           _observer?.disconnect();
         }
+        return true;
+      }
+      if (message.type === 'RESOURCE_ACCELERATOR_GET_COMPARISON') {
+        getPerformanceComparison().then(data => {
+          sendResponse({ success: true, data });
+        });
+        return true;
+      }
+      if (message.type === 'RESOURCE_ACCELERATOR_SAVE_BASELINE') {
+        savePerformanceBaseline();
+        sendResponse({ success: true });
+        return true;
+      }
+      if (message.type === 'RESOURCE_ACCELERATOR_RESET_BASELINE') {
+        resetPerformanceBaseline();
+        sendResponse({ success: true });
         return true;
       }
     });
@@ -930,10 +1150,138 @@
     }
   }
 
+  // ========== 配置导入导出 ==========
+
+  function exportConfig() {
+    const exportData = {
+      version: '1.0',
+      exportTime: new Date().toISOString(),
+      config: { ...state.config }
+    };
+    return JSON.stringify(exportData, null, 2);
+  }
+
+  function importConfig(jsonString) {
+    try {
+      const importData = JSON.parse(jsonString);
+
+      // 验证格式
+      if (!importData.version || !importData.config) {
+        return { success: false, error: '无效的配置格式' };
+      }
+
+      // 验证版本
+      if (importData.version !== '1.0') {
+        return { success: false, error: `不支持的配置版本: ${importData.version}` };
+      }
+
+      // 合并配置（保留现有配置的默认值）
+      const mergedConfig = { ...DEFAULT_CONFIG, ...importData.config };
+
+      // 更新状态
+      state.config = mergedConfig;
+
+      // 保存到 storage
+      chrome.storage.local.set({ [CONFIG_KEY]: mergedConfig });
+
+      return { success: true, config: mergedConfig };
+    } catch (e) {
+      return { success: false, error: `解析配置失败: ${e.message}` };
+    }
+  }
+
+  function resetConfig() {
+    state.config = { ...DEFAULT_CONFIG };
+    chrome.storage.local.set({ [CONFIG_KEY]: state.config });
+    return state.config;
+  }
+
+  // ========== 性能基线对比 ==========
+
+  const PERFORMANCE_BASELINE_KEY = 'resourceAcceleratorPerformanceBaseline';
+
+  function savePerformanceBaseline() {
+    if (!state.performance) return null;
+
+    const baseline = {
+      ttfb: state.performance.ttfb,
+      domContentLoaded: state.performance.domContentLoaded,
+      loadEvent: state.performance.loadEvent,
+      totalResources: state.performance.totalResources,
+      totalTransferSize: state.performance.totalTransferSize || 0,
+      timestamp: Date.now()
+    };
+
+    chrome.storage.local.set({ [PERFORMANCE_BASELINE_KEY]: baseline });
+    return baseline;
+  }
+
+  async function getPerformanceComparison() {
+    try {
+      const result = await chrome.storage.local.get(PERFORMANCE_BASELINE_KEY);
+      const baseline = result[PERFORMANCE_BASELINE_KEY];
+
+      if (!baseline || !state.performance) {
+        return null;
+      }
+
+      const current = state.performance;
+
+      // 计算节省时间
+      const loadTimeSaved = baseline.loadEvent - current.loadEvent;
+      const loadTimePercent = baseline.loadEvent > 0
+        ? Math.round((loadTimeSaved / baseline.loadEvent) * 100)
+        : 0;
+
+      // 计算节省流量
+      const transferSizeSaved = baseline.totalTransferSize - (current.totalTransferSize || 0);
+      const transferSizePercent = baseline.totalTransferSize > 0
+        ? Math.round((transferSizeSaved / baseline.totalTransferSize) * 100)
+        : 0;
+
+      return {
+        baseline: {
+          ttfb: baseline.ttfb,
+          domContentLoaded: baseline.domContentLoaded,
+          loadEvent: baseline.loadEvent,
+          totalResources: baseline.totalResources,
+          totalTransferSize: baseline.totalTransferSize
+        },
+        current: {
+          ttfb: current.ttfb,
+          domContentLoaded: current.domContentLoaded,
+          loadEvent: current.loadEvent,
+          totalResources: current.totalResources,
+          totalTransferSize: current.totalTransferSize || 0
+        },
+        savings: {
+          loadTimeSaved: Math.max(0, loadTimeSaved),
+          loadTimePercent: Math.max(0, loadTimePercent),
+          transferSizeSaved: Math.max(0, transferSizeSaved),
+          transferSizePercent: Math.max(0, transferSizePercent),
+          resourcesReplaced: Math.max(0, baseline.totalResources - current.totalResources)
+        }
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  function resetPerformanceBaseline() {
+    chrome.storage.local.remove(PERFORMANCE_BASELINE_KEY);
+  }
+
   // ========== 导出 API ==========
 
   window.ResourceAccelerator = {
     init,
+    getImageActualSize,
+    exportConfig,
+    importConfig,
+    resetConfig,
+    savePerformanceBaseline,
+    getPerformanceComparison,
+    resetPerformanceBaseline,
     getStats: () => ({
       ...state.stats,
       cspRestricted: state.cspRestricted,
