@@ -26,7 +26,12 @@
     imageMaxConcurrency: 3,
     lazyLoadThreshold: 200,
     excludeDomains: [],
-    excludeUrls: []
+    excludeUrls: [],
+    // 性能优化配置
+    maxPreloadHints: 10,  // 最大preload提示数
+    maxCompressQueueSize: 50,  // 最大队列长度
+    mutationBatchInterval: 50,  // mutation批量处理间隔(ms)
+    enableBatchProcessing: true  // 启用批量处理
   };
 
   // ========== 全局状态（同步初始化）==========
@@ -38,7 +43,11 @@
     // 图片压缩
     compressQueue: [],
     compressingCount: 0,
-    _supportsWebP: undefined
+    _supportsWebP: undefined,
+    // 批量处理
+    _mutationBatch: [],
+    _mutationTimer: null,
+    _isProcessingBatch: false
   };
 
   // ========== 工具方法（同步）==========
@@ -169,6 +178,14 @@
   // ========== 图片压缩 ==========
 
   function enqueueCompress(img, src) {
+    // 限制队列大小，避免内存溢出
+    if (state.compressQueue.length >= state.config.maxCompressQueueSize) {
+      // 队列满时直接加载原图
+      img.src = src;
+      img.dataset.lazyLoading = 'false';
+      img.dataset.lazyLoaded = 'true';
+      return;
+    }
     state.compressQueue.push({ img, src });
     processCompressQueue();
   }
@@ -247,6 +264,9 @@
   // ========== Preload 提示 ==========
 
   function addPreloadHint(cdnUrl, type) {
+    // 限制preload提示数量，避免过多标签影响性能
+    if (state.stats.preloadHints >= state.config.maxPreloadHints) return;
+
     const head = document.head || document.documentElement;
     if (head.querySelector(`link[rel="preload"][href="${cdnUrl}"]`)) return;
     const link = document.createElement('link');
@@ -338,6 +358,57 @@
   // ========== MutationObserver（兜底）==========
 
   const _observer = new MutationObserver(mutations => {
+    if (!state.config.enableBatchProcessing) {
+      // 不启用批量处理时，直接处理
+      _processMutations(mutations);
+      return;
+    }
+
+    // 批量处理：收集所有需要处理的节点
+    for (const mutation of mutations) {
+      for (const node of mutation.addedNodes) {
+        if (!node.tagName) continue;
+        state._mutationBatch.push(node);
+      }
+    }
+
+    // 设置定时器，批量处理
+    if (!state._mutationTimer) {
+      state._mutationTimer = setTimeout(() => {
+        state._mutationTimer = null;
+        _processBatch();
+      }, state.config.mutationBatchInterval);
+    }
+  });
+
+  function _processBatch() {
+    if (state._isProcessingBatch || state._mutationBatch.length === 0) return;
+
+    state._isProcessingBatch = true;
+    const batch = state._mutationBatch.splice(0, 100); // 每次处理100个节点
+
+    batch.forEach(node => {
+      if (!node.tagName) return;
+      if (node.tagName === 'SCRIPT' && node.src) processScript(node);
+      else if (node.tagName === 'LINK' && node.rel === 'stylesheet') processLink(node);
+      else if (node.tagName === 'IMG') processImage(node);
+
+      if (node.querySelectorAll) {
+        node.querySelectorAll('script[src]').forEach(processScript);
+        node.querySelectorAll('link[rel="stylesheet"]').forEach(processLink);
+        node.querySelectorAll('img[src]').forEach(processImage);
+      }
+    });
+
+    state._isProcessingBatch = false;
+
+    // 如果还有剩余节点，继续处理
+    if (state._mutationBatch.length > 0) {
+      setTimeout(_processBatch, 0);
+    }
+  }
+
+  function _processMutations(mutations) {
     for (const mutation of mutations) {
       for (const node of mutation.addedNodes) {
         if (!node.tagName) continue;
@@ -352,7 +423,7 @@
         }
       }
     }
-  });
+  }
 
   // ========== 初始化（异步但不阻塞）==========
 

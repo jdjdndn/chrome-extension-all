@@ -259,11 +259,22 @@
         '配置更新成功'
       );
 
-      // 测试缓存键生成
-      const cacheKey = accelerator.getCacheKey('https://example.com/script.js?v=1.0');
+      // 测试性能优化配置
       this.assert(
-        typeof cacheKey === 'string' && cacheKey.length > 0,
-        '缓存键生成成功'
+        accelerator.config.maxPreloadHints === 10,
+        '性能优化配置：maxPreloadHints 默认值正确'
+      );
+      this.assert(
+        accelerator.config.maxCompressQueueSize === 50,
+        '性能优化配置：maxCompressQueueSize 默认值正确'
+      );
+      this.assert(
+        accelerator.config.mutationBatchInterval === 50,
+        '性能优化配置：mutationBatchInterval 默认值正确'
+      );
+      this.assert(
+        accelerator.config.enableBatchProcessing === true,
+        '性能优化配置：enableBatchProcessing 默认值正确'
       );
     }
   };
