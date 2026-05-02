@@ -50,6 +50,8 @@
     _mutationBatch: [],
     _mutationTimer: null,
     _isProcessingBatch: false,
+    // 压缩结果缓存（同一页面会话内避免重复压缩）
+    _compressCache: new Map(),
     // 去重集合
     dedupSet: new Set(),
     // 最近50条替换记录
@@ -295,14 +297,29 @@
   }
 
   async function compressImage(url) {
+    // 检查缓存
+    if (state._compressCache.has(url)) {
+      const cached = state._compressCache.get(url);
+      return cached.skip ? null : cached.result;
+    }
+
     // 检查域名排除
     try {
       const urlObj = new URL(url, location.href);
-      if (state.config.excludeDomains.some(d => urlObj.hostname.includes(d))) return null;
-    } catch { return null; }
+      if (state.config.excludeDomains.some(d => urlObj.hostname.includes(d))) {
+        state._compressCache.set(url, { skip: true });
+        return null;
+      }
+    } catch {
+      state._compressCache.set(url, { skip: true });
+      return null;
+    }
 
     // 非图片类型不压缩
-    if (/\.(webp|svg|gif)$/i.test(url)) return null;
+    if (/\.(webp|svg|gif)$/i.test(url)) {
+      state._compressCache.set(url, { skip: true });
+      return null;
+    }
 
     // 用 fetch HEAD 获取实际文件大小，避免像素估算对 JPEG 严重偏大
     let actualSize = 0;
@@ -320,7 +337,11 @@
       img.onload = () => {
         // 如果 HEAD 获取到了大小，用实际大小判断；否则用像素估算降级
         const bytes = actualSize || (img.naturalWidth * img.naturalHeight * 4);
-        if (bytes < state.config.imageMinSize) { resolve(null); return; }
+        if (bytes < state.config.imageMinSize) {
+          state._compressCache.set(url, { skip: true });
+          resolve(null);
+          return;
+        }
 
         try {
           const canvas = document.createElement('canvas');
@@ -335,14 +356,23 @@
               state.stats.imagesCompressed++;
               state.stats.imagesCompressBytesSaved += (bytes - blob.size);
               _persistStats();
-              resolve(URL.createObjectURL(blob));
+              const blobUrl = URL.createObjectURL(blob);
+              state._compressCache.set(url, { skip: false, result: blobUrl });
+              resolve(blobUrl);
             } else {
+              state._compressCache.set(url, { skip: true });
               resolve(null);
             }
           }, mimeType, state.config.imageQuality);
-        } catch { resolve(null); }
+        } catch {
+          state._compressCache.set(url, { skip: true });
+          resolve(null);
+        }
       };
-      img.onerror = () => resolve(null);
+      img.onerror = () => {
+        state._compressCache.set(url, { skip: true });
+        resolve(null);
+      };
       img.src = url;
     });
   }
