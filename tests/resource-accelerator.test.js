@@ -87,14 +87,45 @@
         'Vue URL匹配正确'
       );
 
-      // 测试未知URL
-      const unknownResult = window.CDNMappings.matchJSLibrary(
-        'https://example.com/custom.js'
+      // 测试智能匹配 - 已知包名模式
+      const smartMatch = window.CDNMappings.matchJSLibrary(
+        'https://example.com/lodash@4.17.21/lodash.min.js'
       );
       this.assert(
-        unknownResult === null,
-        '未知URL返回null'
+        smartMatch && smartMatch.isAutoDetected === true,
+        '智能匹配识别 lodash 包'
       );
+
+      // 测试智能匹配 - scope 包名
+      const scopeMatch = window.CDNMappings.matchJSLibrary(
+        'https://cdn.example.com/@babel/core@7.24.0/dist/bundle.js'
+      );
+      this.assert(
+        scopeMatch && scopeMatch.isAutoDetected === true,
+        '智能匹配识别 @babel/core scope 包'
+      );
+
+      // 测试完全未知URL（无包名模式）
+      const unknownResult = window.CDNMappings.matchJSLibrary(
+        'https://example.com/custom-library.js'
+      );
+      this.assert(
+        unknownResult === null || unknownResult.isAutoDetected,
+        '未知URL返回null或自动检测结果'
+      );
+
+      // 测试异步匹配（jsDelivr API 查询）
+      try {
+        const asyncMatch = await window.CDNMappings.matchJSLibraryAsync(
+          'https://example.com/ramda@0.29.0/ramda.min.js'
+        );
+        this.assert(
+          asyncMatch !== null,
+          '异步匹配 ramda 包成功'
+        );
+      } catch (e) {
+        this.assert(false, `异步匹配异常: ${e.message}`);
+      }
 
       // 测试字体匹配
       const fontResult = window.CDNMappings.matchFont(
@@ -275,6 +306,22 @@
       this.assert(
         accelerator.config.enableBatchProcessing === true,
         '性能优化配置：enableBatchProcessing 默认值正确'
+      );
+
+      // v6: Third-party deferral config
+      this.assert(
+        typeof accelerator.config.thirdPartyDeferral === 'object',
+        'thirdPartyDeferral config exists'
+      );
+      this.assert(
+        Array.isArray(accelerator.config.thirdPartyDeferral.userRules),
+        'userRules array exists'
+      );
+
+      // v6: Performance field
+      this.assert(
+        accelerator.performance === null || typeof accelerator.performance === 'object',
+        'performance field exists'
       );
     }
   };
