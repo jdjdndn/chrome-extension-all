@@ -37,7 +37,7 @@
     imageMaxDimension: 2048,  // 最大输出尺寸，0=不限制
     // 第三方脚本延迟加载
     thirdPartyDeferral: {
-      enabled: false,
+      enabled: true,
       strategy: 'idle',  // idle | defer | block | pass
       rules: [
         { pattern: 'google-analytics.com', strategy: 'idle' },
@@ -76,6 +76,9 @@
     recentReplacements: [],
     // 第三方脚本延迟队列
     _deferredScripts: [],
+    // 字体预加载候选队列（weight-based priority）
+    _fontCandidates: [],
+    _fontPreloadedUrls: new Set(),
     // 性能指标
     performance: null,
   };
@@ -184,6 +187,25 @@
     }
     state._imageFormat = IMAGE_FORMAT_PRIORITY[2];
     return state._imageFormat;
+  }
+
+  function getWeightPriority(weight) {
+    if (!weight || weight === 'unknown') return 99;
+    const w = parseInt(weight);
+    if (w === 400 || weight === 'normal') return 0;
+    if (w === 700 || weight === 'bold') return 1;
+    return 2;
+  }
+
+  function parseFontWeight(url) {
+    const queryMatch = url.match(/wght[@=](\d+)/i);
+    if (queryMatch) return queryMatch[1];
+    const nameMatch = url.match(/-(Regular|Bold|Light|Medium|SemiBold|ExtraBold|Thin|Black)/i);
+    if (nameMatch) {
+      const map = { regular: '400', bold: '700', light: '300', medium: '500', semibold: '600', extrabold: '800', thin: '100', black: '900' };
+      return map[nameMatch[1].toLowerCase()] || 'unknown';
+    }
+    return null;
   }
 
   // ========== 第三方脚本延迟加载 ==========
@@ -376,7 +398,11 @@
     const originalHref = link.href;
     link.dataset._originalHref = originalHref;
 
-    addPreloadHint(match.cdnUrl, 'css');
+    if (fontMatch) {
+      addPreloadHint(match.cdnUrl, 'font', { weight: parseFontWeight(originalHref) });
+    } else {
+      addPreloadHint(match.cdnUrl, 'css');
+    }
 
     const fallbacks = (match.fallbackUrls || []).map(f => f.url);
     link.href = match.cdnUrl;
@@ -566,18 +592,54 @@
 
   // ========== Preload 提示 ==========
 
-  function addPreloadHint(cdnUrl, type) {
-    // 限制preload提示数量，避免过多标签影响性能
+  function addPreloadHint(cdnUrl, type, fontInfo) {
     if (state.stats.preloadHints >= state.config.maxPreloadHints) return;
 
+    if (type === 'font') {
+      if (state._fontPreloadedUrls.has(cdnUrl)) return;
+
+      const weight = fontInfo?.weight || parseFontWeight(cdnUrl);
+      state._fontCandidates.push({
+        url: cdnUrl,
+        priority: getWeightPriority(weight),
+        weight: weight || 'unknown'
+      });
+
+      state._fontCandidates.sort((a, b) => a.priority - b.priority);
+      state._fontCandidates = state._fontCandidates.slice(0, 3);
+
+      _flushFontPreloads();
+      return;
+    }
+
+    _insertPreloadLink(cdnUrl, type);
+  }
+
+  function _insertPreloadLink(cdnUrl, type) {
     const head = document.head || document.documentElement;
     if (head.querySelector(`link[rel="preload"][href="${cdnUrl}"]`)) return;
     const link = document.createElement('link');
     link.rel = 'preload';
     link.href = cdnUrl;
-    link.as = type === 'js' ? 'script' : 'style';
+    if (type === 'js') {
+      link.as = 'script';
+    } else if (type === 'font') {
+      link.as = 'font';
+      link.crossOrigin = 'anonymous';
+    } else {
+      link.as = 'style';
+    }
     head.insertBefore(link, head.firstChild);
     state.stats.preloadHints++;
+  }
+
+  function _flushFontPreloads() {
+    for (const candidate of state._fontCandidates) {
+      if (!state._fontPreloadedUrls.has(candidate.url)) {
+        _insertPreloadLink(candidate.url, 'font');
+        state._fontPreloadedUrls.add(candidate.url);
+      }
+    }
   }
 
   // ========== API 拦截（核心优化）==========
