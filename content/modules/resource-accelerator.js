@@ -48,6 +48,7 @@
         { pattern: 'jsagent', strategy: 'defer' },
         { pattern: 'widget', strategy: 'defer' },
       ],
+      userRules: [],  // User-defined rules [{ pattern: string, strategy: string }]
       maxDeferralMs: 10000,
     },
   };
