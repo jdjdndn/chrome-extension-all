@@ -676,6 +676,23 @@
           <div style="font-size: 12px; color: #666; margin-bottom: 4px; cursor: pointer;" id="ra-details-toggle">替换详情 ▼</div>
           <div id="ra-details-list" style="padding-left: 8px;"></div>
         </div>
+        <div id="ra-performance-panel" style="margin-top: 8px; padding: 8px; background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border-radius: 6px; display: none;">
+          <div style="font-size: 12px; color: #2e7d32; margin-bottom: 6px; font-weight: 500;">加速效果（预估）</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; font-size: 11px;">
+            <div>首字节: <span id="ra-perf-ttfb">-</span></div>
+            <div>DOM Ready: <span id="ra-perf-dcl">-</span></div>
+            <div>完全加载: <span id="ra-perf-load">-</span></div>
+          </div>
+          <div style="margin-top: 4px; font-size: 11px; color: #555;">
+            替换: JS <span id="ra-perf-js">0</span> / CSS <span id="ra-perf-css">0</span> / 字体 <span id="ra-perf-font">0</span>
+          </div>
+          <div style="margin-top: 2px; font-size: 11px; color: #555;">
+            图片压缩: <span id="ra-perf-img">0</span> 张，节省 <span id="ra-perf-bytes">0</span>
+          </div>
+          <div style="margin-top: 4px; font-size: 12px; color: #1b5e20; font-weight: 500;">
+            预估节省: ~<span id="ra-perf-time">0</span>s
+          </div>
+        </div>
         <div style="margin-top: 8px; display: flex; gap: 6px;">
           <button id="ra-cache-view" style="flex: 1; font-size: 11px; padding: 4px 8px; background: #6c757d;">缓存管理</button>
           <button id="ra-cache-clear" style="flex: 1; font-size: 11px; padding: 4px 8px; background: #dc3545; color: white;">清除缓存</button>

@@ -847,6 +847,7 @@
       ...state.stats,
       cspRestricted: state.cspRestricted,
       recentReplacements: state.recentReplacements.slice(-50),
+      performance: state.performance,
       thirdPartyDeferralEnabled: state.config.thirdPartyDeferral?.enabled || false,
     }),
     getConfig: () => ({ ...state.config }),

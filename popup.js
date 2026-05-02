@@ -3334,6 +3334,26 @@ async function loadResourceAcceleratorStats() {
         if (imageSessionEl) imageSessionEl.textContent = (sessionStats.imagesLazy || 0) + (sessionStats.imagesCompressed || 0);
         if (compressSessionEl) compressSessionEl.textContent = sessionStats.imagesCompressed || 0;
         if (bytesSavedEl) bytesSavedEl.textContent = Math.round((sessionStats.imagesCompressBytesSaved || 0) / 1024);
+        // Performance metrics display
+        if (sessionStats?.performance) {
+          const perf = sessionStats.performance;
+          const perfPanel = document.getElementById('ra-performance-panel');
+          if (perfPanel) {
+            perfPanel.style.display = 'block';
+            const fmt = (ms) => ms > 1000 ? (ms / 1000).toFixed(1) + 's' : ms + 'ms';
+            const fmtBytes = (b) => b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.round(b / 1024) + ' KB';
+            const el = (id) => document.getElementById(id);
+            if (el('ra-perf-ttfb')) el('ra-perf-ttfb').textContent = perf.ttfb ? fmt(perf.ttfb) : '-';
+            if (el('ra-perf-dcl')) el('ra-perf-dcl').textContent = perf.domContentLoaded ? fmt(perf.domContentLoaded) : '-';
+            if (el('ra-perf-load')) el('ra-perf-load').textContent = perf.loadEvent ? fmt(perf.loadEvent) : '-';
+            if (el('ra-perf-js')) el('ra-perf-js').textContent = perf.replacedJs || 0;
+            if (el('ra-perf-css')) el('ra-perf-css').textContent = perf.replacedCss || 0;
+            if (el('ra-perf-font')) el('ra-perf-font').textContent = perf.replacedFonts || 0;
+            if (el('ra-perf-img')) el('ra-perf-img').textContent = perf.imagesCompressed || 0;
+            if (el('ra-perf-bytes')) el('ra-perf-bytes').textContent = perf.bytesSaved ? fmtBytes(perf.bytesSaved) : '0';
+            if (el('ra-perf-time')) el('ra-perf-time').textContent = perf.estimatedTimeSaved ? (perf.estimatedTimeSaved / 1000).toFixed(1) : '0';
+          }
+        }
         // 第三方延迟统计
         const thirdPartyCountEl = document.getElementById('ra-third-party-count');
         if (thirdPartyCountEl) {
