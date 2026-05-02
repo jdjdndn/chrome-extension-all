@@ -59,9 +59,11 @@
     recentReplacements: []
   };
 
-  // ========== 统计持久化（防抖）==========
+  // ========== 统计持久化（防抖 + 增量）==========
 
   let _statsTimer = null;
+  const _lastPersisted = { jsReplaced: 0, fontsReplaced: 0, cssReplaced: 0, imagesLazy: 0, imagesCompressed: 0, imagesCompressBytesSaved: 0 };
+
   function _persistStats() {
     if (_statsTimer) return;
     _statsTimer = setTimeout(async () => {
@@ -69,15 +71,23 @@
       try {
         const result = await chrome.storage.local.get(STATS_KEY);
         const stored = result[STATS_KEY] || {};
-        const merged = {
-          totalJsReplaced: (stored.totalJsReplaced || 0) + state.stats.jsReplaced,
-          totalFontsReplaced: (stored.totalFontsReplaced || 0) + state.stats.fontsReplaced,
-          totalCssReplaced: (stored.totalCssReplaced || 0) + (state.stats.cssReplaced || 0),
-          totalImagesOptimized: (stored.totalImagesOptimized || 0) + state.stats.imagesLazy,
-          totalImagesCompressed: (stored.totalImagesCompressed || 0) + state.stats.imagesCompressed,
-          totalBytesSaved: (stored.totalBytesSaved || 0) + state.stats.imagesCompressBytesSaved,
+        // 只写入自上次持久化以来的增量
+        const delta = {
+          totalJsReplaced: (stored.totalJsReplaced || 0) + (state.stats.jsReplaced - _lastPersisted.jsReplaced),
+          totalFontsReplaced: (stored.totalFontsReplaced || 0) + (state.stats.fontsReplaced - _lastPersisted.fontsReplaced),
+          totalCssReplaced: (stored.totalCssReplaced || 0) + ((state.stats.cssReplaced || 0) - _lastPersisted.cssReplaced),
+          totalImagesOptimized: (stored.totalImagesOptimized || 0) + (state.stats.imagesLazy - _lastPersisted.imagesLazy),
+          totalImagesCompressed: (stored.totalImagesCompressed || 0) + (state.stats.imagesCompressed - _lastPersisted.imagesCompressed),
+          totalBytesSaved: (stored.totalBytesSaved || 0) + (state.stats.imagesCompressBytesSaved - _lastPersisted.imagesCompressBytesSaved),
         };
-        await chrome.storage.local.set({ [STATS_KEY]: merged });
+        await chrome.storage.local.set({ [STATS_KEY]: delta });
+        // 更新快照
+        _lastPersisted.jsReplaced = state.stats.jsReplaced;
+        _lastPersisted.fontsReplaced = state.stats.fontsReplaced;
+        _lastPersisted.cssReplaced = state.stats.cssReplaced || 0;
+        _lastPersisted.imagesLazy = state.stats.imagesLazy;
+        _lastPersisted.imagesCompressed = state.stats.imagesCompressed;
+        _lastPersisted.imagesCompressBytesSaved = state.stats.imagesCompressBytesSaved;
       } catch {}
     }, 2000);
   }
@@ -251,6 +261,7 @@
       img.dataset.lazyLoading = 'true';
       state.stats.imagesLazy++;
       _persistStats();
+    }
   }
 
   // ========== 图片压缩 ==========
@@ -322,22 +333,12 @@
       return null;
     }
 
-    // 用 fetch HEAD 获取实际文件大小，避免像素估算对 JPEG 严重偏大
-    let actualSize = 0;
-    try {
-      const resp = await fetch(url, { method: 'HEAD', mode: 'no-cors' });
-      const contentLength = parseInt(resp.headers.get('content-length') || '0');
-      if (contentLength > 0) actualSize = contentLength;
-    } catch {
-      // HEAD 失败时降级为像素估算（继续后续流程）
-    }
-
     return new Promise(resolve => {
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = () => {
         // 如果 HEAD 获取到了大小，用实际大小判断；否则用像素估算降级
-        const bytes = actualSize || (img.naturalWidth * img.naturalHeight * 4);
+        const bytes = img.naturalWidth * img.naturalHeight * 4;
         if (bytes < state.config.imageMinSize) {
           state._compressCache.set(url, { skip: true });
           resolve(null);
@@ -663,6 +664,9 @@
     destroy: () => {
       _observer.disconnect();
       state.compressQueue = [];
+      state.recentReplacements = [];
+      state.dedupSet.clear();
+      state._compressCache.clear();
       document.createElement = _createElement;
       Element.prototype.appendChild = _appendChild;
       Element.prototype.insertBefore = _insertBefore;

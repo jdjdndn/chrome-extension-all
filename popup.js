@@ -3181,24 +3181,19 @@ function showCacheDetails(stats) {
 
   document.getElementById('ra-details-panel').style.display = 'block';
 
-  const lines = [];
-  if (stats.js?.details?.length) {
-    stats.js.details.forEach(d => {
-      lines.push(`<div style="color: #28a745;">JS: ${d.name} → ${d.cdn}</div>`);
-    });
-  }
-  if (stats.fonts?.details?.length) {
-    stats.fonts.details.forEach(d => {
-      lines.push(`<div style="color: #17a2b8;">字体: ${d.name} → ${d.cdn}</div>`);
-    });
-  }
-  if (stats.css?.details?.length) {
-    stats.css.details.forEach(d => {
-      lines.push(`<div style="color: #ffc107;">CSS: ${d.name} → ${d.cdn}</div>`);
-    });
+  const replacements = stats.recentReplacements || [];
+  if (replacements.length === 0) {
+    listEl.innerHTML = '<div style="color: #999;">本次无替换</div>';
+    return;
   }
 
-  listEl.innerHTML = lines.length > 0 ? lines.join('') : '<div style="color: #999;">本次无替换</div>';
+  const lines = replacements.map(r => {
+    const color = r.type === 'js' ? '#28a745' : r.type === 'font' ? '#17a2b8' : '#ffc107';
+    const label = r.type === 'js' ? 'JS' : r.type === 'font' ? '字体' : 'CSS';
+    return `<div style="color: ${color};">${label}: ${r.name} → ${r.cdn}</div>`;
+  });
+
+  listEl.innerHTML = lines.join('');
 }
 
 async function loadResourceAcceleratorStats() {
@@ -3249,7 +3244,7 @@ async function loadResourceAcceleratorStats() {
         if (fontSessionEl) fontSessionEl.textContent = sessionStats.fontsReplaced || 0;
         if (imageSessionEl) imageSessionEl.textContent = (sessionStats.imagesLazy || 0) + (sessionStats.imagesCompressed || 0);
         if (compressSessionEl) compressSessionEl.textContent = sessionStats.imagesCompressed || 0;
-        if (bytesSavedEl) bytesSavedEl.textContent = Math.round((stats.totalBytesSaved || 0) / 1024);
+        if (bytesSavedEl) bytesSavedEl.textContent = Math.round((sessionStats.imagesCompressBytesSaved || 0) / 1024);
       }).catch(() => {
         // 静默失败
       });
