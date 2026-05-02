@@ -41,7 +41,7 @@
     config: { ...DEFAULT_CONFIG },
     cspRestricted: false,
     initialized: false,
-    stats: { jsReplaced: 0, jsErrors: 0, fontsReplaced: 0, fontErrors: 0, imagesLazy: 0, imagesCompressed: 0, imagesCompressBytesSaved: 0, videosLazy: 0, preloadHints: 0, cdnLoadMs: 0, cdnLoadCount: 0 },
+    stats: { jsReplaced: 0, jsErrors: 0, fontsReplaced: 0, fontErrors: 0, cssReplaced: 0, cssErrors: 0, imagesLazy: 0, imagesCompressed: 0, imagesCompressBytesSaved: 0, videosLazy: 0, preloadHints: 0, cdnLoadMs: 0, cdnLoadCount: 0 },
     // 图片压缩
     compressQueue: [],
     compressingCount: 0,
@@ -184,14 +184,22 @@
         link.href = fallbacks.shift();
       } else {
         link.href = originalHref;
-        state.stats.fontErrors++;
+        if (fontMatch) {
+          state.stats.fontErrors++;
+        } else {
+          state.stats.cssErrors = (state.stats.cssErrors || 0) + 1;
+        }
       }
     };
 
-    state.stats.fontsReplaced++;
+    if (fontMatch) {
+      state.stats.fontsReplaced++;
+    } else {
+      state.stats.cssReplaced = (state.stats.cssReplaced || 0) + 1;
+    }
     _persistStats();
     if (state.config.dedupEnabled) state.dedupSet.add(originalHref);
-    console.log(`${LOG_PREFIX} Font/CSS: ${match.name} → ${match.cdnName}`);
+    console.log(`${LOG_PREFIX} ${fontMatch ? 'Font' : 'CSS'}: ${match.name} → ${match.cdnName}`);
   }
 
   // ========== 核心拦截：图片懒加载 ==========
