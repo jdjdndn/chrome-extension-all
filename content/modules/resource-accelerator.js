@@ -154,13 +154,15 @@
 
     const originalSrc = img.src;
     img.dataset.src = originalSrc;
-    img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-    img.dataset.lazyLoading = 'true';
-    state.stats.imagesLazy++;
 
-    // 图片压缩
+    // 图片压缩：预压缩后直接加载
     if (state.config.imageCompress) {
       enqueueCompress(img, originalSrc);
+    } else {
+      // 仅懒加载，设置占位图
+      img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+      img.dataset.lazyLoading = 'true';
+      state.stats.imagesLazy++;
     }
   }
 
@@ -178,10 +180,23 @@
       try {
         const compressed = await compressImage(task.src);
         if (compressed) {
-          // 等待图片进入视口时加载压缩版本
-          task.img.dataset.src = compressed;
+          // 压缩成功，直接加载压缩版本
+          task.img.src = compressed;
+          task.img.dataset.lazyLoading = 'false';
+          task.img.dataset.lazyLoaded = 'true';
+          task.img.dataset.compressed = 'true';
+        } else {
+          // 压缩失败或不值得压缩，回退到原图
+          task.img.src = task.src;
+          task.img.dataset.lazyLoading = 'false';
+          task.img.dataset.lazyLoaded = 'true';
         }
-      } catch {}
+      } catch {
+        // 异常时回退到原图
+        task.img.src = task.src;
+        task.img.dataset.lazyLoading = 'false';
+        task.img.dataset.lazyLoaded = 'true';
+      }
       state.compressingCount--;
       processCompressQueue();
     }
