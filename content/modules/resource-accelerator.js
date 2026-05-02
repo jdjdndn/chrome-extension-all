@@ -54,6 +54,29 @@
     dedupSet: new Set()
   };
 
+  // ========== 统计持久化（防抖）==========
+
+  let _statsTimer = null;
+  function _persistStats() {
+    if (_statsTimer) return;
+    _statsTimer = setTimeout(async () => {
+      _statsTimer = null;
+      try {
+        const result = await chrome.storage.local.get(STATS_KEY);
+        const stored = result[STATS_KEY] || {};
+        const merged = {
+          totalJsReplaced: (stored.totalJsReplaced || 0) + state.stats.jsReplaced,
+          totalFontsReplaced: (stored.totalFontsReplaced || 0) + state.stats.fontsReplaced,
+          totalCssReplaced: (stored.totalCssReplaced || 0) + (state.stats.cssReplaced || 0),
+          totalImagesOptimized: (stored.totalImagesOptimized || 0) + state.stats.imagesLazy,
+          totalImagesCompressed: (stored.totalImagesCompressed || 0) + state.stats.imagesCompressed,
+          totalBytesSaved: (stored.totalBytesSaved || 0) + state.stats.imagesCompressBytesSaved,
+        };
+        await chrome.storage.local.set({ [STATS_KEY]: merged });
+      } catch {}
+    }, 2000);
+  }
+
   // ========== 工具方法（同步）==========
 
   function isExcluded(url) {
@@ -118,6 +141,7 @@
     };
 
     state.stats.jsReplaced++;
+    _persistStats();
     if (state.config.dedupEnabled) state.dedupSet.add(originalSrc);
     console.log(`${LOG_PREFIX} JS: ${match.name} → ${match.cdnName}`);
   }
@@ -165,6 +189,7 @@
     };
 
     state.stats.fontsReplaced++;
+    _persistStats();
     if (state.config.dedupEnabled) state.dedupSet.add(originalHref);
     console.log(`${LOG_PREFIX} Font/CSS: ${match.name} → ${match.cdnName}`);
   }
@@ -192,7 +217,7 @@
       img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
       img.dataset.lazyLoading = 'true';
       state.stats.imagesLazy++;
-    }
+      _persistStats();
   }
 
   // ========== 图片压缩 ==========
@@ -279,6 +304,7 @@
             if (blob && blob.size < bytes) {
               state.stats.imagesCompressed++;
               state.stats.imagesCompressBytesSaved += (bytes - blob.size);
+              _persistStats();
               resolve(URL.createObjectURL(blob));
             } else {
               resolve(null);
