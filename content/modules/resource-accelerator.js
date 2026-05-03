@@ -90,6 +90,8 @@
     // 字体预加载候选队列（weight-based priority）
     _fontCandidates: [],
     _fontPreloadedUrls: new Set(),
+    // LCP 指标
+    lcp: null,
     // 性能指标
     performance: null,
   };
@@ -1118,7 +1120,22 @@
     // 7. 消息监听
     _initMessageListener();
 
-    // 8. 页面加载后收集性能指标
+    // 8. LCP 指标收集（需要尽早启动观察）
+    try {
+      if (typeof PerformanceObserver !== 'undefined') {
+        const lcpObserver = new PerformanceObserver((entryList) => {
+          const entries = entryList.getEntries();
+          if (entries.length > 0) {
+            state.lcp = entries[entries.length - 1].startTime;
+          }
+        });
+        lcpObserver.observe({ type: 'largest-contentful-paint', buffered: true });
+      }
+    } catch {
+      // 部分浏览器不支持 largest-contentful-paint 类型
+    }
+
+    // 9. 页面加载后收集性能指标
     window.addEventListener('load', () => {
       state.performance = collectPerformanceMetrics();
     }, { once: true });
@@ -1230,6 +1247,7 @@
         ttfb: Math.round(nav.responseStart - nav.requestStart),
         domContentLoaded: Math.round(nav.domContentLoadedEventEnd - nav.startTime),
         loadEvent: Math.round(nav.loadEventEnd - nav.startTime),
+        lcp: state.lcp != null ? Math.round(state.lcp) : null,
         totalResources: resEntries.length,
         totalDuration: Math.round(totalDuration),
         replacedJs: state.stats.jsReplaced,
@@ -1301,6 +1319,7 @@
       ttfb: state.performance.ttfb,
       domContentLoaded: state.performance.domContentLoaded,
       loadEvent: state.performance.loadEvent,
+      lcp: state.performance.lcp,
       totalResources: state.performance.totalResources,
       totalTransferSize: state.performance.totalTransferSize || 0,
       timestamp: Date.now()
@@ -1333,11 +1352,20 @@
         ? Math.round((transferSizeSaved / baseline.totalTransferSize) * 100)
         : 0;
 
+      // 计算 LCP 改善
+      const lcpSaved = (baseline.lcp != null && current.lcp != null)
+        ? baseline.lcp - current.lcp
+        : null;
+      const lcpPercent = (lcpSaved != null && baseline.lcp > 0)
+        ? Math.round((lcpSaved / baseline.lcp) * 100)
+        : null;
+
       return {
         baseline: {
           ttfb: baseline.ttfb,
           domContentLoaded: baseline.domContentLoaded,
           loadEvent: baseline.loadEvent,
+          lcp: baseline.lcp,
           totalResources: baseline.totalResources,
           totalTransferSize: baseline.totalTransferSize
         },
@@ -1345,12 +1373,15 @@
           ttfb: current.ttfb,
           domContentLoaded: current.domContentLoaded,
           loadEvent: current.loadEvent,
+          lcp: current.lcp,
           totalResources: current.totalResources,
           totalTransferSize: current.totalTransferSize || 0
         },
         savings: {
           loadTimeSaved: Math.max(0, loadTimeSaved),
           loadTimePercent: Math.max(0, loadTimePercent),
+          lcpSaved: lcpSaved != null ? Math.max(0, lcpSaved) : null,
+          lcpPercent: lcpPercent != null ? Math.max(0, lcpPercent) : null,
           transferSizeSaved: Math.max(0, transferSizeSaved),
           transferSizePercent: Math.max(0, transferSizePercent),
           resourcesReplaced: Math.max(0, baseline.totalResources - current.totalResources)
