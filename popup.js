@@ -2419,6 +2419,14 @@ async function initPerformanceCharts() {
     exportBtn.addEventListener('click', exportChartAsImage);
   }
 
+  // 监听窗口大小变化，重新绘制图表（防抖处理）
+  window.addEventListener('resize', () => {
+    clearTimeout(window._chartResizeTimer);
+    window._chartResizeTimer = setTimeout(() => {
+      switchChart(currentChartType);
+    }, 200);
+  });
+
   // 默认绘制对比图
   await drawCompareChart();
 }
