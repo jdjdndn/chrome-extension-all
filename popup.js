@@ -1779,6 +1779,8 @@ function initStatsButtons() {
     refreshBtn.addEventListener('click', () => {
       loadStatsData();
       drawStatsChart();
+      // 刷新性能图表
+      switchChart(currentChartType);
     });
   }
 
@@ -1788,6 +1790,8 @@ function initStatsButtons() {
         await chrome.storage.local.remove('usageStats');
         loadStatsData();
         drawStatsChart();
+        // 刷新性能图表
+        switchChart(currentChartType);
       }
     });
   }
@@ -1795,6 +1799,9 @@ function initStatsButtons() {
   if (exportCsvBtn) {
     exportCsvBtn.addEventListener('click', exportStatsToCSV);
   }
+
+  // 初始化性能图表
+  initPerformanceCharts();
 }
 
 async function initNotificationPanel() {
@@ -2388,6 +2395,427 @@ function drawStatsChart() {
     ctx.textAlign = 'center';
     ctx.fillText(days[i], x + barWidth / 2, height - 10);
   });
+}
+
+// ========== 性能图表绘制 ==========
+
+// 当前图表类型
+let currentChartType = 'compare';
+
+// 初始化性能图表
+async function initPerformanceCharts() {
+  // 绑定图表切换按钮
+  const chartTabs = document.querySelectorAll('.ra-chart-tab');
+  chartTabs.forEach(tab => {
+    tab.addEventListener('click', (e) => {
+      const type = e.target.id.replace('ra-chart-', '');
+      switchChart(type);
+    });
+  });
+
+  // 绑定导出按钮
+  const exportBtn = document.getElementById('ra-chart-export');
+  if (exportBtn) {
+    exportBtn.addEventListener('click', exportChartAsImage);
+  }
+
+  // 默认绘制对比图
+  await drawCompareChart();
+}
+
+// 切换图表类型
+async function switchChart(type) {
+  currentChartType = type;
+
+  // 更新按钮样式
+  document.querySelectorAll('.ra-chart-tab').forEach(btn => {
+    btn.style.background = '#e9ecef';
+    btn.style.color = '#666';
+  });
+  const activeBtn = document.getElementById(`ra-chart-${type}`);
+  if (activeBtn) {
+    activeBtn.style.background = '#007bff';
+    activeBtn.style.color = 'white';
+  }
+
+  // 切换 canvas 显示
+  document.getElementById('ra-chart-compare-canvas').style.display = type === 'compare' ? 'block' : 'none';
+  document.getElementById('ra-chart-distribution-canvas').style.display = type === 'distribution' ? 'block' : 'none';
+  document.getElementById('ra-chart-trend-canvas').style.display = type === 'trend' ? 'block' : 'none';
+
+  // 绘制对应图表
+  switch (type) {
+    case 'compare':
+      await drawCompareChart();
+      break;
+    case 'distribution':
+      await drawDistributionChart();
+      break;
+    case 'trend':
+      await drawTrendChart();
+      break;
+  }
+}
+
+// 绘制加速前后对比柱状图
+async function drawCompareChart() {
+  const canvas = document.getElementById('ra-chart-compare-canvas');
+  if (!canvas) return;
+
+  const ctx = canvas.getContext('2d');
+  const width = canvas.offsetWidth;
+  const height = canvas.offsetHeight;
+
+  // 设置canvas实际尺寸（支持高清屏）
+  canvas.width = width * 2;
+  canvas.height = height * 2;
+  ctx.scale(2, 2);
+
+  // 清空画布
+  ctx.clearRect(0, 0, width, height);
+
+  // 获取对比数据
+  let comparison = null;
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab?.id) {
+      const response = await chrome.tabs.sendMessage(tab.id, { type: 'RESOURCE_ACCELERATOR_GET_COMPARISON' });
+      if (response?.success && response.data) {
+        comparison = response.data;
+      }
+    }
+  } catch {}
+
+  if (!comparison) {
+    // 无数据时显示提示
+    ctx.fillStyle = '#999';
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('暂无对比数据，请先保存基线', width / 2, height / 2);
+    return;
+  }
+
+  const padding = { top: 20, right: 15, bottom: 30, left: 45 };
+  const chartWidth = width - padding.left - padding.right;
+  const chartHeight = height - padding.top - padding.bottom;
+
+  // 数据准备
+  const metrics = [
+    { label: '页面加载', before: comparison.baseline.loadEvent, after: comparison.current.loadEvent, unit: 'ms' },
+    { label: '资源请求', before: comparison.baseline.totalResources, after: comparison.current.totalResources, unit: '' },
+    { label: '传输体积', before: comparison.baseline.totalTransferSize / 1024, after: comparison.current.totalTransferSize / 1024, unit: 'KB' },
+  ];
+
+  const maxVal = Math.max(...metrics.map(m => Math.max(m.before, m.after)), 1);
+  const barGroupWidth = chartWidth / metrics.length;
+  const barWidth = barGroupWidth * 0.3;
+  const barGap = barGroupWidth * 0.1;
+
+  // 绘制背景网格
+  ctx.strokeStyle = '#e9ecef';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 4; i++) {
+    const y = padding.top + (chartHeight / 4) * i;
+    ctx.beginPath();
+    ctx.moveTo(padding.left, y);
+    ctx.lineTo(width - padding.right, y);
+    ctx.stroke();
+
+    // Y轴标签
+    ctx.fillStyle = '#999';
+    ctx.font = '9px sans-serif';
+    ctx.textAlign = 'right';
+    const val = Math.round(maxVal * (1 - i / 4));
+    ctx.fillText(val + '', padding.left - 4, y + 3);
+  }
+
+  // 绘制柱状图
+  const beforeColor = '#ff7043';
+  const afterColor = '#4caf50';
+
+  metrics.forEach((m, i) => {
+    const groupX = padding.left + i * barGroupWidth + barGap;
+    const beforeHeight = (m.before / maxVal) * chartHeight;
+    const afterHeight = (m.after / maxVal) * chartHeight;
+
+    // 加速前柱子
+    ctx.fillStyle = beforeColor;
+    ctx.fillRect(groupX, padding.top + chartHeight - beforeHeight, barWidth, beforeHeight);
+
+    // 加速后柱子
+    ctx.fillStyle = afterColor;
+    ctx.fillRect(groupX + barWidth + 2, padding.top + chartHeight - afterHeight, barWidth, afterHeight);
+
+    // X轴标签
+    ctx.fillStyle = '#666';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(m.label, groupX + barWidth, height - padding.bottom + 15);
+  });
+
+  // 绘制图例
+  ctx.fillStyle = beforeColor;
+  ctx.fillRect(padding.left, 5, 10, 10);
+  ctx.fillStyle = '#666';
+  ctx.font = '9px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('加速前', padding.left + 14, 14);
+
+  ctx.fillStyle = afterColor;
+  ctx.fillRect(padding.left + 60, 5, 10, 10);
+  ctx.fillStyle = '#666';
+  ctx.fillText('加速后', padding.left + 74, 14);
+}
+
+// 绘制替换类型分布饼图
+async function drawDistributionChart() {
+  const canvas = document.getElementById('ra-chart-distribution-canvas');
+  if (!canvas) return;
+
+  const ctx = canvas.getContext('2d');
+  const width = canvas.offsetWidth;
+  const height = canvas.offsetHeight;
+
+  canvas.width = width * 2;
+  canvas.height = height * 2;
+  ctx.scale(2, 2);
+
+  ctx.clearRect(0, 0, width, height);
+
+  // 获取分布数据
+  let distribution = null;
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab?.id) {
+      const response = await chrome.tabs.sendMessage(tab.id, { type: 'RESOURCE_ACCELERATOR_GET_DISTRIBUTION' });
+      if (response?.success && response.data) {
+        distribution = response.data;
+      }
+    }
+  } catch {}
+
+  if (!distribution) {
+    ctx.fillStyle = '#999';
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('暂无分布数据', width / 2, height / 2);
+    return;
+  }
+
+  const total = distribution.js + distribution.css + distribution.fonts + distribution.images;
+  if (total === 0) {
+    ctx.fillStyle = '#999';
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('暂无替换记录', width / 2, height / 2);
+    return;
+  }
+
+  const centerX = width * 0.35;
+  const centerY = height / 2;
+  const radius = Math.min(width * 0.25, height * 0.4);
+
+  const data = [
+    { label: 'JS', value: distribution.js, color: '#007bff' },
+    { label: 'CSS', value: distribution.css, color: '#17a2b8' },
+    { label: '字体', value: distribution.fonts, color: '#6f42c1' },
+    { label: '图片', value: distribution.images, color: '#fd7e14' },
+  ].filter(d => d.value > 0);
+
+  let startAngle = -Math.PI / 2;
+  data.forEach(d => {
+    const sliceAngle = (d.value / total) * 2 * Math.PI;
+
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY);
+    ctx.arc(centerX, centerY, radius, startAngle, startAngle + sliceAngle);
+    ctx.closePath();
+    ctx.fillStyle = d.color;
+    ctx.fill();
+
+    startAngle += sliceAngle;
+  });
+
+  // 绘制图例
+  const legendX = width * 0.7;
+  let legendY = height * 0.2;
+  data.forEach(d => {
+    ctx.fillStyle = d.color;
+    ctx.fillRect(legendX, legendY, 12, 12);
+
+    ctx.fillStyle = '#666';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'left';
+    const percent = Math.round((d.value / total) * 100);
+    ctx.fillText(`${d.label}: ${d.value} (${percent}%)`, legendX + 16, legendY + 10);
+
+    legendY += 18;
+  });
+}
+
+// 绘制近7天趋势折线图
+async function drawTrendChart() {
+  const canvas = document.getElementById('ra-chart-trend-canvas');
+  if (!canvas) return;
+
+  const ctx = canvas.getContext('2d');
+  const width = canvas.offsetWidth;
+  const height = canvas.offsetHeight;
+
+  canvas.width = width * 2;
+  canvas.height = height * 2;
+  ctx.scale(2, 2);
+
+  ctx.clearRect(0, 0, width, height);
+
+  // 获取趋势数据
+  let trendData = null;
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab?.id) {
+      const response = await chrome.tabs.sendMessage(tab.id, { type: 'RESOURCE_ACCELERATOR_GET_TREND' });
+      if (response?.success && response.data) {
+        trendData = response.data;
+      }
+    }
+  } catch {}
+
+  if (!trendData || trendData.length === 0) {
+    ctx.fillStyle = '#999';
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('暂无趋势数据', width / 2, height / 2);
+    return;
+  }
+
+  const padding = { top: 20, right: 15, bottom: 30, left: 40 };
+  const chartWidth = width - padding.left - padding.right;
+  const chartHeight = height - padding.top - padding.bottom;
+
+  // 数据
+  const labels = trendData.map(d => d.dayLabel);
+  const replacedData = trendData.map(d => d.totalReplaced);
+  const bytesData = trendData.map(d => Math.round(d.bytesSaved / 1024)); // 转换为KB
+
+  const maxReplaced = Math.max(...replacedData, 1);
+  const maxBytes = Math.max(...bytesData, 1);
+
+  // 绘制背景网格
+  ctx.strokeStyle = '#e9ecef';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 4; i++) {
+    const y = padding.top + (chartHeight / 4) * i;
+    ctx.beginPath();
+    ctx.moveTo(padding.left, y);
+    ctx.lineTo(width - padding.right, y);
+    ctx.stroke();
+  }
+
+  // 绘制折线（替换数量）
+  const lineColor = '#007bff';
+  ctx.strokeStyle = lineColor;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+
+  replacedData.forEach((val, i) => {
+    const x = padding.left + (i / (labels.length - 1)) * chartWidth;
+    const y = padding.top + chartHeight - (val / maxReplaced) * chartHeight;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // 绘制数据点
+  replacedData.forEach((val, i) => {
+    const x = padding.left + (i / (labels.length - 1)) * chartWidth;
+    const y = padding.top + chartHeight - (val / maxReplaced) * chartHeight;
+
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, 2 * Math.PI);
+    ctx.fillStyle = lineColor;
+    ctx.fill();
+
+    // 数据标签
+    ctx.fillStyle = '#666';
+    ctx.font = '8px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(val + '', x, y - 6);
+  });
+
+  // 绘制柱状图（节省流量）
+  const barColor = 'rgba(76, 175, 80, 0.5)';
+  const barWidth = chartWidth / labels.length * 0.4;
+  bytesData.forEach((val, i) => {
+    const x = padding.left + (i / labels.length) * chartWidth + (chartWidth / labels.length - barWidth) / 2;
+    const barHeight = (val / maxBytes) * chartHeight * 0.3; // 柱子高度为图表高度的30%
+    ctx.fillStyle = barColor;
+    ctx.fillRect(x, padding.top + chartHeight - barHeight, barWidth, barHeight);
+  });
+
+  // X轴标签
+  labels.forEach((label, i) => {
+    const x = padding.left + (i / (labels.length - 1)) * chartWidth;
+    ctx.fillStyle = '#666';
+    ctx.font = '9px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, x, height - padding.bottom + 15);
+  });
+
+  // 绘制图例
+  ctx.strokeStyle = lineColor;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(padding.left, 8);
+  ctx.lineTo(padding.left + 20, 8);
+  ctx.stroke();
+  ctx.fillStyle = '#666';
+  ctx.font = '9px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('替换数量', padding.left + 24, 12);
+
+  ctx.fillStyle = barColor;
+  ctx.fillRect(padding.left + 80, 3, 12, 10);
+  ctx.fillStyle = '#666';
+  ctx.fillText('节省流量(KB)', padding.left + 96, 12);
+}
+
+// 导出图表为图片
+function exportChartAsImage() {
+  let canvas;
+  switch (currentChartType) {
+    case 'compare':
+      canvas = document.getElementById('ra-chart-compare-canvas');
+      break;
+    case 'distribution':
+      canvas = document.getElementById('ra-chart-distribution-canvas');
+      break;
+    case 'trend':
+      canvas = document.getElementById('ra-chart-trend-canvas');
+      break;
+    default:
+      canvas = document.getElementById('ra-chart-compare-canvas');
+  }
+
+  if (!canvas) return;
+
+  // 创建临时canvas用于导出（合并2倍分辨率）
+  const exportCanvas = document.createElement('canvas');
+  exportCanvas.width = canvas.width;
+  exportCanvas.height = canvas.height;
+  const exportCtx = exportCanvas.getContext('2d');
+
+  // 白色背景
+  exportCtx.fillStyle = 'white';
+  exportCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+
+  // 绘制图表
+  exportCtx.drawImage(canvas, 0, 0);
+
+  // 下载图片
+  const link = document.createElement('a');
+  link.download = `performance-chart-${currentChartType}-${new Date().toISOString().split('T')[0]}.png`;
+  link.href = exportCanvas.toDataURL('image/png');
+  link.click();
 }
 
 // ========== 导出统计CSV ==========

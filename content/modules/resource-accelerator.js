@@ -1370,6 +1370,8 @@
         lcpObserver.disconnect();
       }
       state.performance = collectPerformanceMetrics();
+      // 保存每日统计数据用于趋势图表
+      saveDailyStats();
     }, { once: true });
 
     console.log(`${LOG_PREFIX} 初始化完成`);
@@ -1464,6 +1466,16 @@
       if (message.type === 'RESOURCE_ACCELERATOR_CLEAR_LOGS') {
         clearLogs();
         sendResponse({ success: true });
+        return true;
+      }
+      if (message.type === 'RESOURCE_ACCELERATOR_GET_DISTRIBUTION') {
+        sendResponse({ success: true, data: getStatsDistribution() });
+        return true;
+      }
+      if (message.type === 'RESOURCE_ACCELERATOR_GET_TREND') {
+        aggregateDailyStats(message.days || 7).then(data => {
+          sendResponse({ success: true, data });
+        });
         return true;
       }
     });
@@ -1638,6 +1650,86 @@
     chrome.storage.local.remove(PERFORMANCE_BASELINE_KEY);
   }
 
+  // ========== 每日统计与数据聚合 ==========
+
+  const DAILY_STATS_KEY = 'resourceAcceleratorDailyStats';
+
+  // 保存当日统计数据
+  function saveDailyStats() {
+    if (!state.performance) return;
+
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const dailyData = {
+      date: today,
+      timestamp: Date.now(),
+      replacedJs: state.stats.jsReplaced,
+      replacedCss: state.stats.cssReplaced || 0,
+      replacedFonts: state.stats.fontsReplaced,
+      imagesCompressed: state.stats.imagesCompressed,
+      bytesSaved: state.stats.imagesCompressBytesSaved,
+      loadEvent: state.performance.loadEvent,
+      totalResources: state.performance.totalResources,
+      lcp: state.performance.lcp,
+    };
+
+    chrome.storage.local.get(DAILY_STATS_KEY).then(result => {
+      const allDaily = result[DAILY_STATS_KEY] || {};
+      allDaily[today] = dailyData;
+
+      // 保留最近30天数据
+      const keys = Object.keys(allDaily).sort().slice(-30);
+      const trimmed = {};
+      keys.forEach(k => { trimmed[k] = allDaily[k]; });
+
+      chrome.storage.local.set({ [DAILY_STATS_KEY]: trimmed });
+    });
+  }
+
+  // 聚合近 N 天统计数据
+  async function aggregateDailyStats(days = 7) {
+    try {
+      const result = await chrome.storage.local.get(DAILY_STATS_KEY);
+      const allDaily = result[DAILY_STATS_KEY] || {};
+
+      const today = new Date();
+      const stats = [];
+
+      for (let i = days - 1; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(d.getDate() - i);
+        const dateStr = d.toISOString().split('T')[0];
+        const dayData = allDaily[dateStr];
+
+        stats.push({
+          date: dateStr,
+          dayLabel: `${d.getMonth() + 1}/${d.getDate()}`,
+          replacedJs: dayData?.replacedJs || 0,
+          replacedCss: dayData?.replacedCss || 0,
+          replacedFonts: dayData?.replacedFonts || 0,
+          imagesCompressed: dayData?.imagesCompressed || 0,
+          bytesSaved: dayData?.bytesSaved || 0,
+          loadEvent: dayData?.loadEvent || 0,
+          totalResources: dayData?.totalResources || 0,
+          totalReplaced: (dayData?.replacedJs || 0) + (dayData?.replacedCss || 0) + (dayData?.replacedFonts || 0) + (dayData?.imagesCompressed || 0),
+        });
+      }
+
+      return stats;
+    } catch {
+      return [];
+    }
+  }
+
+  // 获取替换类型分布
+  function getStatsDistribution() {
+    return {
+      js: state.stats.jsReplaced || 0,
+      css: state.stats.cssReplaced || 0,
+      fonts: state.stats.fontsReplaced || 0,
+      images: state.stats.imagesCompressed || 0,
+    };
+  }
+
   // ========== 导出 API ==========
 
   window.ResourceAccelerator = {
@@ -1649,6 +1741,9 @@
     savePerformanceBaseline,
     getPerformanceComparison,
     resetPerformanceBaseline,
+    saveDailyStats,
+    aggregateDailyStats,
+    getStatsDistribution,
     getStats: () => ({
       ...state.stats,
       cspRestricted: state.cspRestricted,
