@@ -1,5 +1,58 @@
 // Popup script runs in the context of the popup window
 
+// ========== 图表常量 ==========
+const CHART_COLORS = {
+  // 对比图颜色
+  beforeColor: '#ff7043',  // 加速前（橙色）
+  afterColor: '#4caf50',   // 加速后（绿色）
+  lineColor: '#007bff',    // 折线颜色
+  barColor: 'rgba(76, 175, 80, 0.5)', // 柱状图颜色（半透明绿色）
+
+  // 分布图颜色
+  distribution: {
+    js: '#007bff',
+    css: '#17a2b8',
+    fonts: '#6f42c1',
+    images: '#fd7e14'
+  },
+
+  // 通用颜色
+  gridLine: '#e9ecef',
+  textPrimary: '#666',
+  textSecondary: '#999',
+  background: 'white'
+};
+
+const CHART_LAYOUT = {
+  // 对比图布局
+  compare: {
+    padding: { top: 20, right: 15, bottom: 30, left: 45 },
+    barGroupRatio: 0.3,    // 柱状图宽度比例
+    barGapRatio: 0.1,      // 柱状图间距比例
+    lineWidth: 0.5
+  },
+
+  // 趋势图布局
+  trend: {
+    padding: { top: 20, right: 15, bottom: 30, left: 40 },
+    barHeightRatio: 0.3,   // 柱子高度占图表高度比例
+    lineWidth: 0.5,
+    pointRadius: 3
+  },
+
+  // 分布图布局
+  distribution: {
+    centerXRatio: 0.35,
+    radiusRatio: 0.25,
+    legendXRatio: 0.7,
+    legendYRatio: 0.2,
+    legendSpacing: 18
+  },
+
+  // 通用布局
+  gridLines: 4
+};
+
 // ========== 消息通信层 ==========
 // Popup 与 content script 运行在隔离的上下文中，必须使用 Chrome Extension API 通信
 
@@ -2435,15 +2488,13 @@ async function initPerformanceCharts() {
 async function switchChart(type) {
   currentChartType = type;
 
-  // 更新按钮样式
+  // 更新按钮样式 - 使用CSS class而非内联样式
   document.querySelectorAll('.ra-chart-tab').forEach(btn => {
-    btn.style.background = '#e9ecef';
-    btn.style.color = '#666';
+    btn.classList.remove('active');
   });
   const activeBtn = document.getElementById(`ra-chart-${type}`);
   if (activeBtn) {
-    activeBtn.style.background = '#007bff';
-    activeBtn.style.color = 'white';
+    activeBtn.classList.add('active');
   }
 
   // 切换 canvas 显示
@@ -2492,7 +2543,9 @@ async function drawCompareChart() {
         comparison = response.data;
       }
     }
-  } catch {}
+  } catch (error) {
+    console.warn('[drawCompareChart] 获取对比数据失败:', error);
+  }
 
   if (!comparison) {
     // 无数据时显示提示
@@ -2503,7 +2556,7 @@ async function drawCompareChart() {
     return;
   }
 
-  const padding = { top: 20, right: 15, bottom: 30, left: 45 };
+  const padding = CHART_LAYOUT.compare.padding;
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
 
@@ -2516,13 +2569,13 @@ async function drawCompareChart() {
 
   const maxVal = Math.max(...metrics.map(m => Math.max(m.before, m.after)), 1);
   const barGroupWidth = chartWidth / metrics.length;
-  const barWidth = barGroupWidth * 0.3;
-  const barGap = barGroupWidth * 0.1;
+  const barWidth = barGroupWidth * CHART_LAYOUT.compare.barGroupRatio;
+  const barGap = barGroupWidth * CHART_LAYOUT.compare.barGapRatio;
 
   // 绘制背景网格
-  ctx.strokeStyle = '#e9ecef';
-  ctx.lineWidth = 0.5;
-  for (let i = 0; i <= 4; i++) {
+  ctx.strokeStyle = CHART_COLORS.gridLine;
+  ctx.lineWidth = CHART_LAYOUT.compare.lineWidth;
+  for (let i = 0; i <= CHART_LAYOUT.gridLines; i++) {
     const y = padding.top + (chartHeight / 4) * i;
     ctx.beginPath();
     ctx.moveTo(padding.left, y);
@@ -2530,16 +2583,16 @@ async function drawCompareChart() {
     ctx.stroke();
 
     // Y轴标签
-    ctx.fillStyle = '#999';
+    ctx.fillStyle = CHART_COLORS.textSecondary;
     ctx.font = '9px sans-serif';
     ctx.textAlign = 'right';
-    const val = Math.round(maxVal * (1 - i / 4));
+    const val = Math.round(maxVal * (1 - i / CHART_LAYOUT.gridLines));
     ctx.fillText(val + '', padding.left - 4, y + 3);
   }
 
   // 绘制柱状图
-  const beforeColor = '#ff7043';
-  const afterColor = '#4caf50';
+  const beforeColor = CHART_COLORS.beforeColor;
+  const afterColor = CHART_COLORS.afterColor;
 
   metrics.forEach((m, i) => {
     const groupX = padding.left + i * barGroupWidth + barGap;
@@ -2555,7 +2608,7 @@ async function drawCompareChart() {
     ctx.fillRect(groupX + barWidth + 2, padding.top + chartHeight - afterHeight, barWidth, afterHeight);
 
     // X轴标签
-    ctx.fillStyle = '#666';
+    ctx.fillStyle = CHART_COLORS.textPrimary;
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(m.label, groupX + barWidth, height - padding.bottom + 15);
@@ -2564,14 +2617,14 @@ async function drawCompareChart() {
   // 绘制图例
   ctx.fillStyle = beforeColor;
   ctx.fillRect(padding.left, 5, 10, 10);
-  ctx.fillStyle = '#666';
+  ctx.fillStyle = CHART_COLORS.textPrimary;
   ctx.font = '9px sans-serif';
   ctx.textAlign = 'left';
   ctx.fillText('加速前', padding.left + 14, 14);
 
   ctx.fillStyle = afterColor;
   ctx.fillRect(padding.left + 60, 5, 10, 10);
-  ctx.fillStyle = '#666';
+  ctx.fillStyle = CHART_COLORS.textPrimary;
   ctx.fillText('加速后', padding.left + 74, 14);
 }
 
@@ -2600,7 +2653,9 @@ async function drawDistributionChart() {
         distribution = response.data;
       }
     }
-  } catch {}
+  } catch (error) {
+    console.warn('[drawDistributionChart] 获取分布数据失败:', error);
+  }
 
   if (!distribution) {
     ctx.fillStyle = '#999';
@@ -2619,15 +2674,15 @@ async function drawDistributionChart() {
     return;
   }
 
-  const centerX = width * 0.35;
+  const centerX = width * CHART_LAYOUT.distribution.centerXRatio;
   const centerY = height / 2;
-  const radius = Math.min(width * 0.25, height * 0.4);
+  const radius = Math.min(width * CHART_LAYOUT.distribution.radiusRatio, height * 0.4);
 
   const data = [
-    { label: 'JS', value: distribution.js, color: '#007bff' },
-    { label: 'CSS', value: distribution.css, color: '#17a2b8' },
-    { label: '字体', value: distribution.fonts, color: '#6f42c1' },
-    { label: '图片', value: distribution.images, color: '#fd7e14' },
+    { label: 'JS', value: distribution.js, color: CHART_COLORS.distribution.js },
+    { label: 'CSS', value: distribution.css, color: CHART_COLORS.distribution.css },
+    { label: '字体', value: distribution.fonts, color: CHART_COLORS.distribution.fonts },
+    { label: '图片', value: distribution.images, color: CHART_COLORS.distribution.images },
   ].filter(d => d.value > 0);
 
   let startAngle = -Math.PI / 2;
@@ -2645,19 +2700,19 @@ async function drawDistributionChart() {
   });
 
   // 绘制图例
-  const legendX = width * 0.7;
-  let legendY = height * 0.2;
+  const legendX = width * CHART_LAYOUT.distribution.legendXRatio;
+  let legendY = height * CHART_LAYOUT.distribution.legendYRatio;
   data.forEach(d => {
     ctx.fillStyle = d.color;
     ctx.fillRect(legendX, legendY, 12, 12);
 
-    ctx.fillStyle = '#666';
+    ctx.fillStyle = CHART_COLORS.textPrimary;
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'left';
     const percent = Math.round((d.value / total) * 100);
     ctx.fillText(`${d.label}: ${d.value} (${percent}%)`, legendX + 16, legendY + 10);
 
-    legendY += 18;
+    legendY += CHART_LAYOUT.distribution.legendSpacing;
   });
 }
 
@@ -2686,7 +2741,9 @@ async function drawTrendChart() {
         trendData = response.data;
       }
     }
-  } catch {}
+  } catch (error) {
+    console.warn('[drawTrendChart] 获取趋势数据失败:', error);
+  }
 
   if (!trendData || trendData.length === 0) {
     ctx.fillStyle = '#999';
@@ -2696,7 +2753,7 @@ async function drawTrendChart() {
     return;
   }
 
-  const padding = { top: 20, right: 15, bottom: 30, left: 40 };
+  const padding = CHART_LAYOUT.trend.padding;
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
 
@@ -2709,10 +2766,10 @@ async function drawTrendChart() {
   const maxBytes = Math.max(...bytesData, 1);
 
   // 绘制背景网格
-  ctx.strokeStyle = '#e9ecef';
-  ctx.lineWidth = 0.5;
-  for (let i = 0; i <= 4; i++) {
-    const y = padding.top + (chartHeight / 4) * i;
+  ctx.strokeStyle = CHART_COLORS.gridLine;
+  ctx.lineWidth = CHART_LAYOUT.trend.lineWidth;
+  for (let i = 0; i <= CHART_LAYOUT.gridLines; i++) {
+    const y = padding.top + (chartHeight / CHART_LAYOUT.gridLines) * i;
     ctx.beginPath();
     ctx.moveTo(padding.left, y);
     ctx.lineTo(width - padding.right, y);
@@ -2720,13 +2777,21 @@ async function drawTrendChart() {
   }
 
   // 绘制折线（替换数量）
-  const lineColor = '#007bff';
+  const lineColor = CHART_COLORS.lineColor;
   ctx.strokeStyle = lineColor;
   ctx.lineWidth = 2;
   ctx.beginPath();
 
+  // 处理只有一个数据点的情况，避免除零错误
+  const calculateX = (index) => {
+    if (labels.length === 1) {
+      return padding.left + chartWidth / 2; // 居中显示
+    }
+    return padding.left + (index / (labels.length - 1)) * chartWidth;
+  };
+
   replacedData.forEach((val, i) => {
-    const x = padding.left + (i / (labels.length - 1)) * chartWidth;
+    const x = calculateX(i);
     const y = padding.top + chartHeight - (val / maxReplaced) * chartHeight;
     if (i === 0) ctx.moveTo(x, y);
     else ctx.lineTo(x, y);
@@ -2735,35 +2800,35 @@ async function drawTrendChart() {
 
   // 绘制数据点
   replacedData.forEach((val, i) => {
-    const x = padding.left + (i / (labels.length - 1)) * chartWidth;
+    const x = calculateX(i);
     const y = padding.top + chartHeight - (val / maxReplaced) * chartHeight;
 
     ctx.beginPath();
-    ctx.arc(x, y, 3, 0, 2 * Math.PI);
+    ctx.arc(x, y, CHART_LAYOUT.trend.pointRadius, 0, 2 * Math.PI);
     ctx.fillStyle = lineColor;
     ctx.fill();
 
     // 数据标签
-    ctx.fillStyle = '#666';
+    ctx.fillStyle = CHART_COLORS.textPrimary;
     ctx.font = '8px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(val + '', x, y - 6);
   });
 
   // 绘制柱状图（节省流量）
-  const barColor = 'rgba(76, 175, 80, 0.5)';
+  const barColor = CHART_COLORS.barColor;
   const barWidth = chartWidth / labels.length * 0.4;
   bytesData.forEach((val, i) => {
     const x = padding.left + (i / labels.length) * chartWidth + (chartWidth / labels.length - barWidth) / 2;
-    const barHeight = (val / maxBytes) * chartHeight * 0.3; // 柱子高度为图表高度的30%
+    const barHeight = (val / maxBytes) * chartHeight * CHART_LAYOUT.trend.barHeightRatio;
     ctx.fillStyle = barColor;
     ctx.fillRect(x, padding.top + chartHeight - barHeight, barWidth, barHeight);
   });
 
   // X轴标签
   labels.forEach((label, i) => {
-    const x = padding.left + (i / (labels.length - 1)) * chartWidth;
-    ctx.fillStyle = '#666';
+    const x = calculateX(i);
+    ctx.fillStyle = CHART_COLORS.textPrimary;
     ctx.font = '9px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(label, x, height - padding.bottom + 15);
@@ -2776,54 +2841,62 @@ async function drawTrendChart() {
   ctx.moveTo(padding.left, 8);
   ctx.lineTo(padding.left + 20, 8);
   ctx.stroke();
-  ctx.fillStyle = '#666';
+  ctx.fillStyle = CHART_COLORS.textPrimary;
   ctx.font = '9px sans-serif';
   ctx.textAlign = 'left';
   ctx.fillText('替换数量', padding.left + 24, 12);
 
   ctx.fillStyle = barColor;
   ctx.fillRect(padding.left + 80, 3, 12, 10);
-  ctx.fillStyle = '#666';
+  ctx.fillStyle = CHART_COLORS.textPrimary;
   ctx.fillText('节省流量(KB)', padding.left + 96, 12);
 }
 
 // 导出图表为图片
 function exportChartAsImage() {
-  let canvas;
-  switch (currentChartType) {
-    case 'compare':
-      canvas = document.getElementById('ra-chart-compare-canvas');
-      break;
-    case 'distribution':
-      canvas = document.getElementById('ra-chart-distribution-canvas');
-      break;
-    case 'trend':
-      canvas = document.getElementById('ra-chart-trend-canvas');
-      break;
-    default:
-      canvas = document.getElementById('ra-chart-compare-canvas');
+  try {
+    let canvas;
+    switch (currentChartType) {
+      case 'compare':
+        canvas = document.getElementById('ra-chart-compare-canvas');
+        break;
+      case 'distribution':
+        canvas = document.getElementById('ra-chart-distribution-canvas');
+        break;
+      case 'trend':
+        canvas = document.getElementById('ra-chart-trend-canvas');
+        break;
+      default:
+        canvas = document.getElementById('ra-chart-compare-canvas');
+    }
+
+    if (!canvas) {
+      console.warn('[exportChartAsImage] 未找到画布元素');
+      return;
+    }
+
+    // 创建临时canvas用于导出（合并2倍分辨率）
+    const exportCanvas = document.createElement('canvas');
+    exportCanvas.width = canvas.width;
+    exportCanvas.height = canvas.height;
+    const exportCtx = exportCanvas.getContext('2d');
+
+    // 白色背景
+    exportCtx.fillStyle = CHART_COLORS.background;
+    exportCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+
+    // 绘制图表
+    exportCtx.drawImage(canvas, 0, 0);
+
+    // 下载图片
+    const link = document.createElement('a');
+    link.download = `performance-chart-${currentChartType}-${new Date().toISOString().split('T')[0]}.png`;
+    link.href = exportCanvas.toDataURL('image/png');
+    link.click();
+  } catch (error) {
+    console.error('[exportChartAsImage] 导出图表失败:', error);
+    alert('导出图表失败: ' + error.message);
   }
-
-  if (!canvas) return;
-
-  // 创建临时canvas用于导出（合并2倍分辨率）
-  const exportCanvas = document.createElement('canvas');
-  exportCanvas.width = canvas.width;
-  exportCanvas.height = canvas.height;
-  const exportCtx = exportCanvas.getContext('2d');
-
-  // 白色背景
-  exportCtx.fillStyle = 'white';
-  exportCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
-
-  // 绘制图表
-  exportCtx.drawImage(canvas, 0, 0);
-
-  // 下载图片
-  const link = document.createElement('a');
-  link.download = `performance-chart-${currentChartType}-${new Date().toISOString().split('T')[0]}.png`;
-  link.href = exportCanvas.toDataURL('image/png');
-  link.click();
 }
 
 // ========== 导出统计CSV ==========
@@ -3389,7 +3462,11 @@ async function initResourceAccelerator() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   let currentHost = '';
   if (tab?.url) {
-    try { currentHost = new URL(tab.url).hostname; } catch {}
+    try {
+      currentHost = new URL(tab.url).hostname;
+    } catch (error) {
+      console.warn('[updateSiteExclude] 解析URL失败:', error);
+    }
   }
   const isSiteExcluded = config.excludeDomains?.some(d =>
     currentHost === d || currentHost.endsWith('.' + d)
