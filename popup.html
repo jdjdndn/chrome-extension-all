@@ -74,6 +74,9 @@
       body.dark-mode .info-box strong { color: #e2e8f0; }
       body.dark-mode .info-box small { color: #a0aec0; }
       body.dark-mode #local-server-status { background: #2d3748; }
+      body.dark-mode #ra-charts-section { background: #2d3748; }
+      body.dark-mode .ra-chart-tab { background: #4a5568 !important; color: #a0aec0 !important; }
+      body.dark-mode .ra-chart-tab.active { background: #3182ce !important; color: white !important; }
 
       .header {
         margin-bottom: 16px;
@@ -162,6 +165,21 @@
 
       .nav-btn:hover:not(.active) {
         background: #e9ecef;
+      }
+
+      /* 图表标签页 */
+      .ra-chart-tab {
+        background: #e9ecef;
+        color: #666;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .ra-chart-tab.active {
+        background: #007bff;
+        color: white;
       }
 
       #toggle-btn {
@@ -623,6 +641,12 @@
         </div>
         <div class="setting-item">
           <div class="toggle-container">
+            <label for="ra-svg-optimize">SVG优化 <span id="ra-svg-count" style="color: #666; font-size: 11px;"></span></label>
+            <input type="checkbox" id="ra-svg-optimize" />
+          </div>
+        </div>
+        <div class="setting-item">
+          <div class="toggle-container">
             <label for="ra-preload">资源预加载</label>
             <input type="checkbox" id="ra-preload" />
           </div>
@@ -672,6 +696,7 @@
             <div style="padding: 4px 6px; background: white; border-radius: 4px; border-left: 3px solid #17a2b8;">字体: <span id="ra-font-count-session">0</span></div>
             <div style="padding: 4px 6px; background: white; border-radius: 4px; border-left: 3px solid #ffc107;">图片: <span id="ra-image-count-session">0</span></div>
             <div style="padding: 4px 6px; background: white; border-radius: 4px; border-left: 3px solid #dc3545;">压缩: <span id="ra-compress-count-session">0</span></div>
+            <div style="padding: 4px 6px; background: white; border-radius: 4px; border-left: 3px solid #20c997;">SVG: <span id="ra-svg-count-session">0</span></div>
             <div style="padding: 4px 6px; background: white; border-radius: 4px; border-left: 3px solid #6f42c1;">节省: <span id="ra-bytes-saved">0</span> KB</div>
           </div>
           <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e9ecef;">
@@ -700,6 +725,9 @@
           <div style="margin-top: 2px; font-size: 11px; color: #555;">
             图片压缩: <span id="ra-perf-img">0</span> 张，节省 <span id="ra-perf-bytes">0</span>
           </div>
+          <div style="margin-top: 2px; font-size: 11px; color: #555;">
+            SVG优化: <span id="ra-perf-svg">0</span> 个
+          </div>
           <div style="margin-top: 4px; font-size: 12px; color: #1b5e20; font-weight: 500;">
             预估节省: ~<span id="ra-perf-time">0</span>s
           </div>
@@ -724,6 +752,27 @@
             </div>
             <div style="font-size: 11px; color: #1b5e20;">
               节省流量: <span id="ra-comp-size-saved">0</span> (<span id="ra-comp-size-percent">0</span>%)
+            </div>
+          </div>
+
+          <!-- 性能图表区域 -->
+          <div id="ra-charts-section" style="margin-top: 8px; padding: 8px; background: white; border-radius: 4px;">
+            <div style="font-size: 11px; color: #666; margin-bottom: 6px; font-weight: 500;">性能图表</div>
+            <!-- 图表切换按钮 -->
+            <div style="display: flex; gap: 4px; margin-bottom: 8px;">
+              <button id="ra-chart-compare" class="ra-chart-tab active" style="flex: 1; font-size: 10px; padding: 4px 6px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer;">对比图</button>
+              <button id="ra-chart-distribution" class="ra-chart-tab" style="flex: 1; font-size: 10px; padding: 4px 6px; background: #e9ecef; color: #666; border: none; border-radius: 3px; cursor: pointer;">分布图</button>
+              <button id="ra-chart-trend" class="ra-chart-tab" style="flex: 1; font-size: 10px; padding: 4px 6px; background: #e9ecef; color: #666; border: none; border-radius: 3px; cursor: pointer;">趋势图</button>
+            </div>
+            <!-- 图表容器 -->
+            <div id="ra-chart-container" style="position: relative; width: 100%; height: 160px;">
+              <canvas id="ra-chart-compare-canvas" style="width: 100%; height: 100%; display: block;"></canvas>
+              <canvas id="ra-chart-distribution-canvas" style="width: 100%; height: 100%; display: none;"></canvas>
+              <canvas id="ra-chart-trend-canvas" style="width: 100%; height: 100%; display: none;"></canvas>
+            </div>
+            <!-- 导出按钮 -->
+            <div style="margin-top: 6px; text-align: right;">
+              <button id="ra-chart-export" style="font-size: 10px; padding: 3px 8px; background: #17a2b8; color: white; border: none; border-radius: 3px; cursor: pointer;">导出图片</button>
             </div>
           </div>
           <div style="margin-top: 6px; display: flex; gap: 4px;">
@@ -1270,6 +1319,38 @@
           <button id="refresh-stats" style="flex: 1;">刷新</button>
           <button id="export-stats-csv" style="flex: 1; background: #17a2b8;">导出CSV</button>
           <button id="reset-stats" style="flex: 1; background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);">重置</button>
+        </div>
+      </div>
+
+      <!-- 运行日志 -->
+      <div class="settings" style="margin-top: 12px;">
+        <h2 style="font-size: 16px; margin: 0 0 12px 0">运行日志</h2>
+        <div style="margin-bottom: 8px;">
+          <div style="display: flex; gap: 4px; margin-bottom: 8px;">
+            <select id="ra-log-level-filter" style="flex: 1; padding: 4px; font-size: 11px; border: 1px solid #dee2e6; border-radius: 4px;">
+              <option value="all">全部级别</option>
+              <option value="info">Info</option>
+              <option value="warn">Warn</option>
+              <option value="error">Error</option>
+            </select>
+            <select id="ra-log-module-filter" style="flex: 1; padding: 4px; font-size: 11px; border: 1px solid #dee2e6; border-radius: 4px;">
+              <option value="all">全部模块</option>
+              <option value="script">JS</option>
+              <option value="style">CSS/字体</option>
+              <option value="image">图片</option>
+              <option value="svg">SVG</option>
+              <option value="deferral">延迟加载</option>
+              <option value="system">系统</option>
+            </select>
+          </div>
+          <div id="ra-log-list" style="max-height: 200px; overflow-y: auto; font-size: 11px; background: #f8f9fa; border-radius: 6px; padding: 8px; font-family: monospace;">
+            <div style="color: #999; text-align: center; padding: 12px;">暂无日志</div>
+          </div>
+          <div style="display: flex; gap: 4px; margin-top: 8px;">
+            <button id="ra-log-refresh" style="flex: 1; font-size: 11px; padding: 4px 8px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer;">刷新</button>
+            <button id="ra-log-export" style="flex: 1; font-size: 11px; padding: 4px 8px; background: #17a2b8; color: white; border: none; border-radius: 3px; cursor: pointer;">导出</button>
+            <button id="ra-log-clear" style="flex: 1; font-size: 11px; padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 3px; cursor: pointer;">清空</button>
+          </div>
         </div>
       </div>
     </div><!-- End stats-view -->

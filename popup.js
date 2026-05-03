@@ -1,5 +1,59 @@
 // Popup script runs in the context of the popup window
 
+// ========== 图表常量 ==========
+const CHART_COLORS = {
+  // 对比图颜色
+  beforeColor: '#ff7043',  // 加速前（橙色）
+  afterColor: '#4caf50',   // 加速后（绿色）
+  lineColor: '#007bff',    // 折线颜色
+  barColor: 'rgba(76, 175, 80, 0.5)', // 柱状图颜色（半透明绿色）
+
+  // 分布图颜色
+  distribution: {
+    js: '#007bff',
+    css: '#17a2b8',
+    fonts: '#6f42c1',
+    images: '#fd7e14',
+    svg: '#20c997'
+  },
+
+  // 通用颜色
+  gridLine: '#e9ecef',
+  textPrimary: '#666',
+  textSecondary: '#999',
+  background: 'white'
+};
+
+const CHART_LAYOUT = {
+  // 对比图布局
+  compare: {
+    padding: { top: 20, right: 15, bottom: 30, left: 45 },
+    barGroupRatio: 0.3,    // 柱状图宽度比例
+    barGapRatio: 0.1,      // 柱状图间距比例
+    lineWidth: 0.5
+  },
+
+  // 趋势图布局
+  trend: {
+    padding: { top: 20, right: 15, bottom: 30, left: 40 },
+    barHeightRatio: 0.3,   // 柱子高度占图表高度比例
+    lineWidth: 0.5,
+    pointRadius: 3
+  },
+
+  // 分布图布局
+  distribution: {
+    centerXRatio: 0.35,
+    radiusRatio: 0.25,
+    legendXRatio: 0.7,
+    legendYRatio: 0.2,
+    legendSpacing: 18
+  },
+
+  // 通用布局
+  gridLines: 4
+};
+
 // ========== 消息通信层 ==========
 // Popup 与 content script 运行在隔离的上下文中，必须使用 Chrome Extension API 通信
 
@@ -1779,6 +1833,8 @@ function initStatsButtons() {
     refreshBtn.addEventListener('click', () => {
       loadStatsData();
       drawStatsChart();
+      // 刷新性能图表
+      switchChart(currentChartType);
     });
   }
 
@@ -1788,6 +1844,8 @@ function initStatsButtons() {
         await chrome.storage.local.remove('usageStats');
         loadStatsData();
         drawStatsChart();
+        // 刷新性能图表
+        switchChart(currentChartType);
       }
     });
   }
@@ -1795,6 +1853,9 @@ function initStatsButtons() {
   if (exportCsvBtn) {
     exportCsvBtn.addEventListener('click', exportStatsToCSV);
   }
+
+  // 初始化性能图表
+  initPerformanceCharts();
 }
 
 async function initNotificationPanel() {
@@ -2390,6 +2451,456 @@ function drawStatsChart() {
   });
 }
 
+// ========== 性能图表绘制 ==========
+
+// 当前图表类型
+let currentChartType = 'compare';
+
+// 初始化性能图表
+async function initPerformanceCharts() {
+  // 绑定图表切换按钮
+  const chartTabs = document.querySelectorAll('.ra-chart-tab');
+  chartTabs.forEach(tab => {
+    tab.addEventListener('click', (e) => {
+      const type = e.target.id.replace('ra-chart-', '');
+      switchChart(type);
+    });
+  });
+
+  // 绑定导出按钮
+  const exportBtn = document.getElementById('ra-chart-export');
+  if (exportBtn) {
+    exportBtn.addEventListener('click', exportChartAsImage);
+  }
+
+  // 监听窗口大小变化，重新绘制图表（防抖处理）
+  window.addEventListener('resize', () => {
+    clearTimeout(window._chartResizeTimer);
+    window._chartResizeTimer = setTimeout(() => {
+      switchChart(currentChartType);
+    }, 200);
+  });
+
+  // 默认绘制对比图
+  await drawCompareChart();
+}
+
+// 切换图表类型
+async function switchChart(type) {
+  currentChartType = type;
+
+  // 更新按钮样式 - 使用CSS class而非内联样式
+  document.querySelectorAll('.ra-chart-tab').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  const activeBtn = document.getElementById(`ra-chart-${type}`);
+  if (activeBtn) {
+    activeBtn.classList.add('active');
+  }
+
+  // 切换 canvas 显示
+  document.getElementById('ra-chart-compare-canvas').style.display = type === 'compare' ? 'block' : 'none';
+  document.getElementById('ra-chart-distribution-canvas').style.display = type === 'distribution' ? 'block' : 'none';
+  document.getElementById('ra-chart-trend-canvas').style.display = type === 'trend' ? 'block' : 'none';
+
+  // 绘制对应图表
+  switch (type) {
+    case 'compare':
+      await drawCompareChart();
+      break;
+    case 'distribution':
+      await drawDistributionChart();
+      break;
+    case 'trend':
+      await drawTrendChart();
+      break;
+  }
+}
+
+// 绘制加速前后对比柱状图
+async function drawCompareChart() {
+  const canvas = document.getElementById('ra-chart-compare-canvas');
+  if (!canvas) return;
+
+  const ctx = canvas.getContext('2d');
+  const width = canvas.offsetWidth;
+  const height = canvas.offsetHeight;
+
+  // 设置canvas实际尺寸（支持高清屏）
+  canvas.width = width * 2;
+  canvas.height = height * 2;
+  ctx.scale(2, 2);
+
+  // 清空画布
+  ctx.clearRect(0, 0, width, height);
+
+  // 获取对比数据
+  let comparison = null;
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab?.id) {
+      const response = await chrome.tabs.sendMessage(tab.id, { type: 'RESOURCE_ACCELERATOR_GET_COMPARISON' });
+      if (response?.success && response.data) {
+        comparison = response.data;
+      }
+    }
+  } catch (error) {
+    console.warn('[drawCompareChart] 获取对比数据失败:', error);
+  }
+
+  if (!comparison) {
+    // 无数据时显示提示
+    ctx.fillStyle = '#999';
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('暂无对比数据，请先保存基线', width / 2, height / 2);
+    return;
+  }
+
+  const padding = CHART_LAYOUT.compare.padding;
+  const chartWidth = width - padding.left - padding.right;
+  const chartHeight = height - padding.top - padding.bottom;
+
+  // 数据准备
+  const metrics = [
+    { label: '页面加载', before: comparison.baseline.loadEvent, after: comparison.current.loadEvent, unit: 'ms' },
+    { label: '资源请求', before: comparison.baseline.totalResources, after: comparison.current.totalResources, unit: '' },
+    { label: '传输体积', before: comparison.baseline.totalTransferSize / 1024, after: comparison.current.totalTransferSize / 1024, unit: 'KB' },
+  ];
+
+  const maxVal = Math.max(...metrics.map(m => Math.max(m.before, m.after)), 1);
+  const barGroupWidth = chartWidth / metrics.length;
+  const barWidth = barGroupWidth * CHART_LAYOUT.compare.barGroupRatio;
+  const barGap = barGroupWidth * CHART_LAYOUT.compare.barGapRatio;
+
+  // 绘制背景网格
+  ctx.strokeStyle = CHART_COLORS.gridLine;
+  ctx.lineWidth = CHART_LAYOUT.compare.lineWidth;
+  for (let i = 0; i <= CHART_LAYOUT.gridLines; i++) {
+    const y = padding.top + (chartHeight / 4) * i;
+    ctx.beginPath();
+    ctx.moveTo(padding.left, y);
+    ctx.lineTo(width - padding.right, y);
+    ctx.stroke();
+
+    // Y轴标签
+    ctx.fillStyle = CHART_COLORS.textSecondary;
+    ctx.font = '9px sans-serif';
+    ctx.textAlign = 'right';
+    const val = Math.round(maxVal * (1 - i / CHART_LAYOUT.gridLines));
+    ctx.fillText(val + '', padding.left - 4, y + 3);
+  }
+
+  // 绘制柱状图
+  const beforeColor = CHART_COLORS.beforeColor;
+  const afterColor = CHART_COLORS.afterColor;
+
+  metrics.forEach((m, i) => {
+    const groupX = padding.left + i * barGroupWidth + barGap;
+    const beforeHeight = (m.before / maxVal) * chartHeight;
+    const afterHeight = (m.after / maxVal) * chartHeight;
+
+    // 加速前柱子
+    ctx.fillStyle = beforeColor;
+    ctx.fillRect(groupX, padding.top + chartHeight - beforeHeight, barWidth, beforeHeight);
+
+    // 加速后柱子
+    ctx.fillStyle = afterColor;
+    ctx.fillRect(groupX + barWidth + 2, padding.top + chartHeight - afterHeight, barWidth, afterHeight);
+
+    // X轴标签
+    ctx.fillStyle = CHART_COLORS.textPrimary;
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(m.label, groupX + barWidth, height - padding.bottom + 15);
+  });
+
+  // 绘制图例
+  ctx.fillStyle = beforeColor;
+  ctx.fillRect(padding.left, 5, 10, 10);
+  ctx.fillStyle = CHART_COLORS.textPrimary;
+  ctx.font = '9px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('加速前', padding.left + 14, 14);
+
+  ctx.fillStyle = afterColor;
+  ctx.fillRect(padding.left + 60, 5, 10, 10);
+  ctx.fillStyle = CHART_COLORS.textPrimary;
+  ctx.fillText('加速后', padding.left + 74, 14);
+}
+
+// 绘制替换类型分布饼图
+async function drawDistributionChart() {
+  const canvas = document.getElementById('ra-chart-distribution-canvas');
+  if (!canvas) return;
+
+  const ctx = canvas.getContext('2d');
+  const width = canvas.offsetWidth;
+  const height = canvas.offsetHeight;
+
+  canvas.width = width * 2;
+  canvas.height = height * 2;
+  ctx.scale(2, 2);
+
+  ctx.clearRect(0, 0, width, height);
+
+  // 获取分布数据
+  let distribution = null;
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab?.id) {
+      const response = await chrome.tabs.sendMessage(tab.id, { type: 'RESOURCE_ACCELERATOR_GET_DISTRIBUTION' });
+      if (response?.success && response.data) {
+        distribution = response.data;
+      }
+    }
+  } catch (error) {
+    console.warn('[drawDistributionChart] 获取分布数据失败:', error);
+  }
+
+  if (!distribution) {
+    ctx.fillStyle = '#999';
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('暂无分布数据', width / 2, height / 2);
+    return;
+  }
+
+  const total = distribution.js + distribution.css + distribution.fonts + distribution.images;
+  if (total === 0) {
+    ctx.fillStyle = '#999';
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('暂无替换记录', width / 2, height / 2);
+    return;
+  }
+
+  const centerX = width * CHART_LAYOUT.distribution.centerXRatio;
+  const centerY = height / 2;
+  const radius = Math.min(width * CHART_LAYOUT.distribution.radiusRatio, height * 0.4);
+
+  const data = [
+    { label: 'JS', value: distribution.js, color: CHART_COLORS.distribution.js },
+    { label: 'CSS', value: distribution.css, color: CHART_COLORS.distribution.css },
+    { label: '字体', value: distribution.fonts, color: CHART_COLORS.distribution.fonts },
+    { label: '图片', value: distribution.images, color: CHART_COLORS.distribution.images },
+    { label: 'SVG', value: distribution.svg || 0, color: CHART_COLORS.distribution.svg },
+  ].filter(d => d.value > 0);
+
+  let startAngle = -Math.PI / 2;
+  data.forEach(d => {
+    const sliceAngle = (d.value / total) * 2 * Math.PI;
+
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY);
+    ctx.arc(centerX, centerY, radius, startAngle, startAngle + sliceAngle);
+    ctx.closePath();
+    ctx.fillStyle = d.color;
+    ctx.fill();
+
+    startAngle += sliceAngle;
+  });
+
+  // 绘制图例
+  const legendX = width * CHART_LAYOUT.distribution.legendXRatio;
+  let legendY = height * CHART_LAYOUT.distribution.legendYRatio;
+  data.forEach(d => {
+    ctx.fillStyle = d.color;
+    ctx.fillRect(legendX, legendY, 12, 12);
+
+    ctx.fillStyle = CHART_COLORS.textPrimary;
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'left';
+    const percent = Math.round((d.value / total) * 100);
+    ctx.fillText(`${d.label}: ${d.value} (${percent}%)`, legendX + 16, legendY + 10);
+
+    legendY += CHART_LAYOUT.distribution.legendSpacing;
+  });
+}
+
+// 绘制近7天趋势折线图
+async function drawTrendChart() {
+  const canvas = document.getElementById('ra-chart-trend-canvas');
+  if (!canvas) return;
+
+  const ctx = canvas.getContext('2d');
+  const width = canvas.offsetWidth;
+  const height = canvas.offsetHeight;
+
+  canvas.width = width * 2;
+  canvas.height = height * 2;
+  ctx.scale(2, 2);
+
+  ctx.clearRect(0, 0, width, height);
+
+  // 获取趋势数据
+  let trendData = null;
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab?.id) {
+      const response = await chrome.tabs.sendMessage(tab.id, { type: 'RESOURCE_ACCELERATOR_GET_TREND' });
+      if (response?.success && response.data) {
+        trendData = response.data;
+      }
+    }
+  } catch (error) {
+    console.warn('[drawTrendChart] 获取趋势数据失败:', error);
+  }
+
+  if (!trendData || trendData.length === 0) {
+    ctx.fillStyle = '#999';
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('暂无趋势数据', width / 2, height / 2);
+    return;
+  }
+
+  const padding = CHART_LAYOUT.trend.padding;
+  const chartWidth = width - padding.left - padding.right;
+  const chartHeight = height - padding.top - padding.bottom;
+
+  // 数据
+  const labels = trendData.map(d => d.dayLabel);
+  const replacedData = trendData.map(d => d.totalReplaced);
+  const bytesData = trendData.map(d => Math.round(d.bytesSaved / 1024)); // 转换为KB
+
+  const maxReplaced = Math.max(...replacedData, 1);
+  const maxBytes = Math.max(...bytesData, 1);
+
+  // 绘制背景网格
+  ctx.strokeStyle = CHART_COLORS.gridLine;
+  ctx.lineWidth = CHART_LAYOUT.trend.lineWidth;
+  for (let i = 0; i <= CHART_LAYOUT.gridLines; i++) {
+    const y = padding.top + (chartHeight / CHART_LAYOUT.gridLines) * i;
+    ctx.beginPath();
+    ctx.moveTo(padding.left, y);
+    ctx.lineTo(width - padding.right, y);
+    ctx.stroke();
+  }
+
+  // 绘制折线（替换数量）
+  const lineColor = CHART_COLORS.lineColor;
+  ctx.strokeStyle = lineColor;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+
+  // 处理只有一个数据点的情况，避免除零错误
+  const calculateX = (index) => {
+    if (labels.length === 1) {
+      return padding.left + chartWidth / 2; // 居中显示
+    }
+    return padding.left + (index / (labels.length - 1)) * chartWidth;
+  };
+
+  replacedData.forEach((val, i) => {
+    const x = calculateX(i);
+    const y = padding.top + chartHeight - (val / maxReplaced) * chartHeight;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // 绘制数据点
+  replacedData.forEach((val, i) => {
+    const x = calculateX(i);
+    const y = padding.top + chartHeight - (val / maxReplaced) * chartHeight;
+
+    ctx.beginPath();
+    ctx.arc(x, y, CHART_LAYOUT.trend.pointRadius, 0, 2 * Math.PI);
+    ctx.fillStyle = lineColor;
+    ctx.fill();
+
+    // 数据标签
+    ctx.fillStyle = CHART_COLORS.textPrimary;
+    ctx.font = '8px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(val + '', x, y - 6);
+  });
+
+  // 绘制柱状图（节省流量）
+  const barColor = CHART_COLORS.barColor;
+  const barWidth = chartWidth / labels.length * 0.4;
+  bytesData.forEach((val, i) => {
+    const x = padding.left + (i / labels.length) * chartWidth + (chartWidth / labels.length - barWidth) / 2;
+    const barHeight = (val / maxBytes) * chartHeight * CHART_LAYOUT.trend.barHeightRatio;
+    ctx.fillStyle = barColor;
+    ctx.fillRect(x, padding.top + chartHeight - barHeight, barWidth, barHeight);
+  });
+
+  // X轴标签
+  labels.forEach((label, i) => {
+    const x = calculateX(i);
+    ctx.fillStyle = CHART_COLORS.textPrimary;
+    ctx.font = '9px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, x, height - padding.bottom + 15);
+  });
+
+  // 绘制图例
+  ctx.strokeStyle = lineColor;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(padding.left, 8);
+  ctx.lineTo(padding.left + 20, 8);
+  ctx.stroke();
+  ctx.fillStyle = CHART_COLORS.textPrimary;
+  ctx.font = '9px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('替换数量', padding.left + 24, 12);
+
+  ctx.fillStyle = barColor;
+  ctx.fillRect(padding.left + 80, 3, 12, 10);
+  ctx.fillStyle = CHART_COLORS.textPrimary;
+  ctx.fillText('节省流量(KB)', padding.left + 96, 12);
+}
+
+// 导出图表为图片
+function exportChartAsImage() {
+  try {
+    let canvas;
+    switch (currentChartType) {
+      case 'compare':
+        canvas = document.getElementById('ra-chart-compare-canvas');
+        break;
+      case 'distribution':
+        canvas = document.getElementById('ra-chart-distribution-canvas');
+        break;
+      case 'trend':
+        canvas = document.getElementById('ra-chart-trend-canvas');
+        break;
+      default:
+        canvas = document.getElementById('ra-chart-compare-canvas');
+    }
+
+    if (!canvas) {
+      console.warn('[exportChartAsImage] 未找到画布元素');
+      return;
+    }
+
+    // 创建临时canvas用于导出（合并2倍分辨率）
+    const exportCanvas = document.createElement('canvas');
+    exportCanvas.width = canvas.width;
+    exportCanvas.height = canvas.height;
+    const exportCtx = exportCanvas.getContext('2d');
+
+    // 白色背景
+    exportCtx.fillStyle = CHART_COLORS.background;
+    exportCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+
+    // 绘制图表
+    exportCtx.drawImage(canvas, 0, 0);
+
+    // 下载图片
+    const link = document.createElement('a');
+    link.download = `performance-chart-${currentChartType}-${new Date().toISOString().split('T')[0]}.png`;
+    link.href = exportCanvas.toDataURL('image/png');
+    link.click();
+  } catch (error) {
+    console.error('[exportChartAsImage] 导出图表失败:', error);
+    alert('导出图表失败: ' + error.message);
+  }
+}
+
 // ========== 导出统计CSV ==========
 async function exportStatsToCSV() {
   try {
@@ -2953,7 +3464,11 @@ async function initResourceAccelerator() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   let currentHost = '';
   if (tab?.url) {
-    try { currentHost = new URL(tab.url).hostname; } catch {}
+    try {
+      currentHost = new URL(tab.url).hostname;
+    } catch (error) {
+      console.warn('[updateSiteExclude] 解析URL失败:', error);
+    }
   }
   const isSiteExcluded = config.excludeDomains?.some(d =>
     currentHost === d || currentHost.endsWith('.' + d)
@@ -3050,6 +3565,19 @@ async function initResourceAccelerator() {
     config.imageCompress = e.target.checked;
     await saveAndNotify();
   });
+
+  // SVG 优化开关
+  const svgOptimizeEl = document.getElementById('ra-svg-optimize');
+  if (svgOptimizeEl) {
+    if (!config.svgOptimize) {
+      config.svgOptimize = { enabled: true, maxInlineSize: 10240, removeComments: true, removeMetadata: true, minify: true };
+    }
+    svgOptimizeEl.checked = config.svgOptimize.enabled !== false;
+    svgOptimizeEl.addEventListener('change', async (e) => {
+      config.svgOptimize.enabled = e.target.checked;
+      await saveAndNotify();
+    });
+  }
 
   if (preloadEl) {
     preloadEl.addEventListener('change', async (e) => {
@@ -3652,7 +4180,12 @@ async function loadResourceAcceleratorStats() {
         if (fontSessionEl) fontSessionEl.textContent = sessionStats.fontsReplaced || 0;
         if (imageSessionEl) imageSessionEl.textContent = (sessionStats.imagesLazy || 0) + (sessionStats.imagesCompressed || 0);
         if (compressSessionEl) compressSessionEl.textContent = sessionStats.imagesCompressed || 0;
-        if (bytesSavedEl) bytesSavedEl.textContent = Math.round((sessionStats.imagesCompressBytesSaved || 0) / 1024);
+        if (bytesSavedEl) bytesSavedEl.textContent = Math.round(((sessionStats.imagesCompressBytesSaved || 0) + (sessionStats.svgBytesSaved || 0)) / 1024);
+        // SVG 优化统计
+        const svgSessionEl = document.getElementById('ra-svg-count-session');
+        const svgCountEl = document.getElementById('ra-svg-count');
+        if (svgSessionEl) svgSessionEl.textContent = sessionStats.svgOptimized || 0;
+        if (svgCountEl) svgCountEl.textContent = sessionStats.svgOptimized ? `(${sessionStats.svgOptimized})` : '';
         // Performance metrics display
         if (sessionStats?.performance) {
           const perf = sessionStats.performance;
@@ -3670,6 +4203,7 @@ async function loadResourceAcceleratorStats() {
             if (el('ra-perf-font')) el('ra-perf-font').textContent = perf.replacedFonts || 0;
             if (el('ra-perf-img')) el('ra-perf-img').textContent = perf.imagesCompressed || 0;
             if (el('ra-perf-bytes')) el('ra-perf-bytes').textContent = perf.bytesSaved ? fmtBytes(perf.bytesSaved) : '0';
+            if (el('ra-perf-svg')) el('ra-perf-svg').textContent = perf.svgOptimized || 0;
             if (el('ra-perf-time')) el('ra-perf-time').textContent = perf.estimatedTimeSaved ? (perf.estimatedTimeSaved / 1000).toFixed(1) : '0';
           }
 
@@ -3776,3 +4310,183 @@ function notifyResourceAccelerator(config) {
     }
   });
 }
+
+// ========== 资源加速器日志系统 ==========
+
+let _raLogFilter = { level: 'all', module: 'all' };
+
+/**
+ * 加载并渲染日志
+ */
+async function loadResourceAcceleratorLogs() {
+  const logListEl = document.getElementById('ra-log-list');
+  if (!logListEl) return;
+
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) {
+      logListEl.innerHTML = '<div style="color: #999; text-align: center; padding: 12px;">无法获取当前标签页</div>';
+      return;
+    }
+
+    const response = await chrome.tabs.sendMessage(tab.id, {
+      type: 'RESOURCE_ACCELERATOR_GET_LOGS',
+      filter: _raLogFilter
+    });
+
+    if (!response?.success || !response.data) {
+      logListEl.innerHTML = '<div style="color: #999; text-align: center; padding: 12px;">暂无日志</div>';
+      return;
+    }
+
+    const logs = response.data;
+    if (logs.length === 0) {
+      logListEl.innerHTML = '<div style="color: #999; text-align: center; padding: 12px;">暂无日志</div>';
+      return;
+    }
+
+    // 渲染日志列表（最新的在前）
+    const logsHtml = logs.reverse().map(log => {
+      const time = new Date(log.timestamp).toLocaleTimeString('zh-CN', { hour12: false });
+      const levelColor = log.level === 'error' ? '#dc3545' : log.level === 'warn' ? '#ffc107' : '#28a745';
+      const moduleLabel = {
+        script: 'JS',
+        style: 'CSS',
+        image: 'IMG',
+        deferral: 'DEF',
+        system: 'SYS',
+        cdn: 'CDN'
+      }[log.module] || log.module;
+
+      const actionLabel = {
+        replace: '替换',
+        compress: '压缩',
+        lazy: '懒加载',
+        defer: '延迟',
+        skip: '跳过',
+        block: '阻止',
+        error: '错误',
+        init: '初始化'
+      }[log.action] || log.action;
+
+      let detail = '';
+      if (log.details?.url) {
+        const url = log.details.url;
+        detail = url.length > 40 ? url.substring(0, 40) + '...' : url;
+      }
+      if (log.details?.reason) {
+        detail += ` (${log.details.reason})`;
+      }
+
+      return `<div style="padding: 3px 0; border-bottom: 1px solid #e9ecef;">
+        <span style="color: #666;">${time}</span>
+        <span style="color: ${levelColor}; font-weight: 500;">[${log.level.toUpperCase()}]</span>
+        <span style="color: #007bff;">${moduleLabel}</span>
+        <span style="color: #495057;">${actionLabel}</span>
+        <div style="color: #666; font-size: 10px; margin-top: 2px; word-break: break-all;">${escapeHtml(detail)}</div>
+      </div>`;
+    }).join('');
+
+    logListEl.innerHTML = logsHtml;
+  } catch (error) {
+    logListEl.innerHTML = '<div style="color: #999; text-align: center; padding: 12px;">加载日志失败</div>';
+  }
+}
+
+/**
+ * 导出日志为文件
+ */
+async function exportResourceAcceleratorLogs() {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) return;
+
+    const response = await chrome.tabs.sendMessage(tab.id, {
+      type: 'RESOURCE_ACCELERATOR_GET_LOGS',
+      filter: { level: 'all', module: 'all' }
+    });
+
+    if (!response?.success || !response.data) {
+      alert('暂无日志可导出');
+      return;
+    }
+
+    const logs = response.data;
+    const exportData = {
+      exportTime: new Date().toISOString(),
+      url: tab.url,
+      totalLogs: logs.length,
+      logs: logs.map(log => ({
+        time: new Date(log.timestamp).toISOString(),
+        level: log.level,
+        module: log.module,
+        action: log.action,
+        ...log.details
+      }))
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ra-logs-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    alert('导出日志失败');
+  }
+}
+
+/**
+ * 清空日志
+ */
+async function clearResourceAcceleratorLogs() {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) return;
+
+    await chrome.tabs.sendMessage(tab.id, { type: 'RESOURCE_ACCELERATOR_CLEAR_LOGS' });
+    loadResourceAcceleratorLogs();
+  } catch (error) {
+    alert('清空日志失败');
+  }
+}
+
+// 初始化日志面板事件监听
+document.addEventListener('DOMContentLoaded', () => {
+  const logLevelFilter = document.getElementById('ra-log-level-filter');
+  const logModuleFilter = document.getElementById('ra-log-module-filter');
+  const logRefreshBtn = document.getElementById('ra-log-refresh');
+  const logExportBtn = document.getElementById('ra-log-export');
+  const logClearBtn = document.getElementById('ra-log-clear');
+
+  if (logLevelFilter) {
+    logLevelFilter.addEventListener('change', (e) => {
+      _raLogFilter.level = e.target.value;
+      loadResourceAcceleratorLogs();
+    });
+  }
+
+  if (logModuleFilter) {
+    logModuleFilter.addEventListener('change', (e) => {
+      _raLogFilter.module = e.target.value;
+      loadResourceAcceleratorLogs();
+    });
+  }
+
+  if (logRefreshBtn) {
+    logRefreshBtn.addEventListener('click', loadResourceAcceleratorLogs);
+  }
+
+  if (logExportBtn) {
+    logExportBtn.addEventListener('click', exportResourceAcceleratorLogs);
+  }
+
+  if (logClearBtn) {
+    logClearBtn.addEventListener('click', () => {
+      if (confirm('确定要清空所有日志吗？')) {
+        clearResourceAcceleratorLogs();
+      }
+    });
+  }
+});

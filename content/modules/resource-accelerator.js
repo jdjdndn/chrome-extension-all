@@ -1,11 +1,12 @@
 /**
- * 资源加速器主模块 (v4)
+ * 资源加速器主模块 (v8)
  * 核心优化：
  * 1. 同步启动 - 不等待配置加载
  * 2. API拦截 - 拦截 createElement/appendChild 等原生方法
  * 3. 即时处理 - 在元素创建时就拦截，而非等待 DOM 插入
  * 4. 图片压缩 - Canvas重绘导出WebP/JPEG
  * 5. CDN健康探测 - 启动时探测CDN可用性
+ * 6. 智能调度 - 优先级队列、动态批量处理、CDN探测优先级
  */
 
 (function () {
@@ -61,14 +62,134 @@
       enabled: false,
       rules: [],  // [{ type: 'exclude'|'include', match: 'extension'|'path'|'domain'|'query'|'regex', value: string, action: 'skipAll'|'skipCompress'|'skipReplace'|'forceReplace', description: string }]
     },
+    // SVG 优化
+    svgOptimize: {
+      enabled: true,
+      maxInlineSize: 10240,  // 10KB 以下内联为 data URI
+      removeComments: true,
+      removeMetadata: true,
+      minify: true,
+    },
   };
+
+  // ========== 日志系统 ==========
+  const MAX_LOG_SIZE = 200;
+  const LOG_ERROR_PERSIST_KEY = 'resourceAcceleratorErrorLogs';
+  const MAX_PERSISTED_ERROR_LOGS = 50;
+  let _logBuffer = [];
+  let _logPersistTimer = null;
+
+  /**
+   * 添加日志记录
+   * @param {'info'|'warn'|'error'} level - 日志级别
+   * @param {'script'|'style'|'image'|'svg'|'cdn'|'deferral'|'system'} module - 模块
+   * @param {'replace'|'compress'|'lazy'|'defer'|'skip'|'block'|'error'|'init'|'probe'} action - 操作
+   * @param {object} details - 详情
+   */
+  function addLog(level, module, action, details = {}) {
+    const logEntry = {
+      timestamp: Date.now(),
+      level,
+      module,
+      action,
+      details: {
+        url: details.url || '',
+        original: details.original || '',
+        cdn: details.cdn || '',
+        reason: details.reason || '',
+        duration: details.duration || 0,
+        size: details.size || 0,
+        compressedSize: details.compressedSize || 0,
+        ...details
+      }
+    };
+
+    _logBuffer.push(logEntry);
+
+    // 保持环形缓冲区大小
+    if (_logBuffer.length > MAX_LOG_SIZE) {
+      _logBuffer.shift();
+    }
+
+    // error 级别日志持久化到 storage
+    if (level === 'error') {
+      _scheduleErrorLogPersist();
+    }
+  }
+
+  /**
+   * 调度错误日志持久化（防抖）
+   */
+  function _scheduleErrorLogPersist() {
+    if (_logPersistTimer) return;
+    _logPersistTimer = setTimeout(async () => {
+      _logPersistTimer = null;
+      try {
+        const errorLogs = _logBuffer.filter(l => l.level === 'error').slice(-MAX_PERSISTED_ERROR_LOGS);
+        await chrome.storage.local.set({ [LOG_ERROR_PERSIST_KEY]: errorLogs });
+      } catch (e) {
+        console.error(`${LOG_PREFIX} 持久化错误日志失败:`, e);
+      }
+    }, 1000);
+  }
+
+  /**
+   * 从 storage 恢复错误日志
+   */
+  async function _restoreErrorLogs() {
+    try {
+      const result = await chrome.storage.local.get(LOG_ERROR_PERSIST_KEY);
+      const storedLogs = result[LOG_ERROR_PERSIST_KEY];
+      if (Array.isArray(storedLogs) && storedLogs.length > 0) {
+        // 将历史错误日志添加到缓冲区开头，确保最新的日志在后面
+        const historicalLogs = storedLogs.filter(l =>
+          l.timestamp && l.level === 'error' && l.module && l.action
+        );
+        _logBuffer = [...historicalLogs, ..._logBuffer].slice(-MAX_LOG_SIZE);
+        console.log(`${LOG_PREFIX} 已恢复 ${historicalLogs.length} 条历史错误日志`);
+      }
+    } catch (e) {
+      console.error(`${LOG_PREFIX} 恢复历史错误日志失败:`, e);
+    }
+  }
+
+  /**
+   * 获取日志缓冲区
+   */
+  function getLogs(filter = {}) {
+    let logs = [..._logBuffer];
+
+    // 按级别筛选
+    if (filter.level && filter.level !== 'all') {
+      logs = logs.filter(l => l.level === filter.level);
+    }
+
+    // 按模块筛选
+    if (filter.module && filter.module !== 'all') {
+      logs = logs.filter(l => l.module === filter.module);
+    }
+
+    // 按时间范围筛选
+    if (filter.since) {
+      logs = logs.filter(l => l.timestamp >= filter.since);
+    }
+
+    return logs;
+  }
+
+  /**
+   * 清空日志缓冲区
+   */
+  function clearLogs() {
+    _logBuffer = [];
+  }
 
   // ========== 全局状态（同步初始化）==========
   const state = {
     config: { ...DEFAULT_CONFIG },
     cspRestricted: false,
     initialized: false,
-    stats: { jsReplaced: 0, jsErrors: 0, fontsReplaced: 0, fontErrors: 0, cssReplaced: 0, cssErrors: 0, imagesLazy: 0, imagesCompressed: 0, imagesCompressBytesSaved: 0, videosLazy: 0, preloadHints: 0, cdnLoadMs: 0, cdnLoadCount: 0, thirdPartyDeferred: 0, thirdPartyBlocked: 0 },
+    stats: { jsReplaced: 0, jsErrors: 0, fontsReplaced: 0, fontErrors: 0, cssReplaced: 0, cssErrors: 0, imagesLazy: 0, imagesCompressed: 0, imagesCompressBytesSaved: 0, svgOptimized: 0, svgInlined: 0, svgBytesSaved: 0, videosLazy: 0, preloadHints: 0, cdnLoadMs: 0, cdnLoadCount: 0, thirdPartyDeferred: 0, thirdPartyBlocked: 0 },
     // 图片压缩
     compressQueue: [],
     compressingCount: 0,
@@ -80,6 +201,8 @@
     _isProcessingBatch: false,
     // 压缩结果缓存（同一页面会话内避免重复压缩）
     _compressCache: new Map(),
+    // SVG 优化缓存
+    _svgCache: new Map(),
     // 去重集合
     dedupSet: new Set(),
     // 最近50条替换记录
@@ -89,6 +212,8 @@
     // 字体预加载候选队列（weight-based priority）
     _fontCandidates: [],
     _fontPreloadedUrls: new Set(),
+    // LCP 指标
+    lcp: null,
     // 性能指标
     performance: null,
   };
@@ -96,7 +221,7 @@
   // ========== 统计持久化（防抖 + 增量）==========
 
   let _statsTimer = null;
-  const _lastPersisted = { jsReplaced: 0, fontsReplaced: 0, cssReplaced: 0, imagesLazy: 0, imagesCompressed: 0, imagesCompressBytesSaved: 0 };
+  const _lastPersisted = { jsReplaced: 0, fontsReplaced: 0, cssReplaced: 0, imagesLazy: 0, imagesCompressed: 0, imagesCompressBytesSaved: 0, svgOptimized: 0, svgBytesSaved: 0 };
 
   function _persistStats() {
     if (_statsTimer) return;
@@ -112,7 +237,8 @@
           totalCssReplaced: (stored.totalCssReplaced || 0) + ((state.stats.cssReplaced || 0) - _lastPersisted.cssReplaced),
           totalImagesOptimized: (stored.totalImagesOptimized || 0) + (state.stats.imagesLazy - _lastPersisted.imagesLazy),
           totalImagesCompressed: (stored.totalImagesCompressed || 0) + (state.stats.imagesCompressed - _lastPersisted.imagesCompressed),
-          totalBytesSaved: (stored.totalBytesSaved || 0) + (state.stats.imagesCompressBytesSaved - _lastPersisted.imagesCompressBytesSaved),
+          totalBytesSaved: (stored.totalBytesSaved || 0) + (state.stats.imagesCompressBytesSaved - _lastPersisted.imagesCompressBytesSaved) + (state.stats.svgBytesSaved - _lastPersisted.svgBytesSaved),
+          totalSvgOptimized: (stored.totalSvgOptimized || 0) + (state.stats.svgOptimized - _lastPersisted.svgOptimized),
         };
         await chrome.storage.local.set({ [STATS_KEY]: delta });
         // 更新快照
@@ -122,7 +248,11 @@
         _lastPersisted.imagesLazy = state.stats.imagesLazy;
         _lastPersisted.imagesCompressed = state.stats.imagesCompressed;
         _lastPersisted.imagesCompressBytesSaved = state.stats.imagesCompressBytesSaved;
-      } catch {}
+        _lastPersisted.svgOptimized = state.stats.svgOptimized;
+        _lastPersisted.svgBytesSaved = state.stats.svgBytesSaved;
+      } catch (error) {
+        console.warn('[persistStats] 持久化统计失败:', error);
+      }
     }, 2000);
   }
 
@@ -330,7 +460,9 @@
           state._imageFormat = fmt;
           return fmt;
         }
-      } catch {}
+      } catch (error) {
+        console.warn('[detectImageFormat] 检测图片格式失败:', error);
+      }
     }
     state._imageFormat = IMAGE_FORMAT_PRIORITY[2];
     return state._imageFormat;
@@ -367,7 +499,9 @@
         if (new RegExp(rule.pattern, 'i').test(url)) {
           return { pattern: rule.pattern, strategy: rule.strategy, name: rule.pattern };
         }
-      } catch {}
+      } catch (error) {
+        console.warn('[getThirdPartyDeferral] 正则表达式匹配失败:', error);
+      }
     }
 
     // 2. Built-in rules (string includes match)
@@ -452,18 +586,27 @@
 
     script.dataset._raProcessed = '1';
 
-    if (isExcluded(url) || isCDNUrl(url)) return;
+    if (isExcluded(url) || isCDNUrl(url)) {
+      addLog('info', 'script', 'skip', { url, reason: isExcluded(url) ? 'excluded' : 'cdn_url' });
+      return;
+    }
 
     // 高级过滤检查
     const filterResult = matchAdvancedFilter(url);
     if (filterResult.matched) {
       if (filterResult.action === 'skipAll' || filterResult.action === 'skipReplace') {
+        addLog('info', 'script', 'skip', { url, reason: 'filter_rule' });
         return;
       }
     }
 
     // 去重检查：同一原始URL不重复替换
-    if (state.config.dedupEnabled && state.dedupSet.has(url)) return;
+    if (state.config.dedupEnabled && state.dedupSet.has(url)) {
+      addLog('info', 'script', 'skip', { url, reason: 'deduplicated' });
+      return;
+    }
+
+    const startTime = performance.now();
 
     // 使用异步匹配（支持 jsDelivr API 动态查询）
     const match = await window.CDNMappings?.matchJSLibraryAsync?.(url);
@@ -484,9 +627,16 @@
           });
           if (state.recentReplacements.length > 50) state.recentReplacements.shift();
           _persistStats();
+          addLog('info', 'deferral', 'defer', {
+            url,
+            reason: deferralRule.pattern,
+            strategy: deferralRule.strategy,
+            duration: Math.round(performance.now() - startTime)
+          });
           return;
         }
       }
+      addLog('info', 'script', 'skip', { url, reason: 'no_cdn_match' });
       return;
     }
 
@@ -505,6 +655,11 @@
       } else {
         script.src = originalSrc;
         state.stats.jsErrors++;
+        addLog('error', 'script', 'error', {
+          url: originalSrc,
+          cdn: match.cdnUrl,
+          reason: 'all_fallbacks_failed'
+        });
       }
     };
 
@@ -523,6 +678,15 @@
     }
     _persistStats();
     if (state.config.dedupEnabled) state.dedupSet.add(originalSrc);
+
+    addLog('info', 'script', 'replace', {
+      url: originalSrc,
+      original: originalSrc,
+      cdn: match.cdnUrl,
+      reason: match.name,
+      duration: Math.round(performance.now() - startTime)
+    });
+
     console.log(`${LOG_PREFIX} JS: ${match.name} → ${match.cdnName}${match.isDynamic ? ' (dynamic)' : ''}`);
   }
 
@@ -536,29 +700,47 @@
 
     link.dataset._raProcessed = '1';
 
-    if (isExcluded(url) || isCDNUrl(url)) return;
+    if (isExcluded(url) || isCDNUrl(url)) {
+      addLog('info', 'style', 'skip', { url, reason: isExcluded(url) ? 'excluded' : 'cdn_url' });
+      return;
+    }
 
     // 高级过滤检查
     const filterResult = matchAdvancedFilter(url);
     if (filterResult.matched) {
       if (filterResult.action === 'skipAll' || filterResult.action === 'skipReplace') {
+        addLog('info', 'style', 'skip', { url, reason: 'filter_rule' });
         return;
       }
     }
 
     // 去重检查：同一原始URL不重复替换
-    if (state.config.dedupEnabled && state.dedupSet.has(url)) return;
+    if (state.config.dedupEnabled && state.dedupSet.has(url)) {
+      addLog('info', 'style', 'skip', { url, reason: 'deduplicated' });
+      return;
+    }
+
+    const startTime = performance.now();
 
     // 先尝试字体匹配，再尝试CSS匹配
     const fontMatch = window.CDNMappings?.matchFont(url);
     const cssMatch = !fontMatch ? window.CDNMappings?.matchCSS(url) : null;
 
     // 检查各自的开关
-    if (fontMatch && !state.config.fontReplace) return;
-    if (cssMatch && !state.config.cssReplace) return;
+    if (fontMatch && !state.config.fontReplace) {
+      addLog('info', 'style', 'skip', { url, reason: 'font_replace_disabled' });
+      return;
+    }
+    if (cssMatch && !state.config.cssReplace) {
+      addLog('info', 'style', 'skip', { url, reason: 'css_replace_disabled' });
+      return;
+    }
 
     const match = fontMatch || cssMatch;
-    if (!match) return;
+    if (!match) {
+      addLog('info', 'style', 'skip', { url, reason: 'no_cdn_match' });
+      return;
+    }
 
     const originalHref = link.href;
     link.dataset._originalHref = originalHref;
@@ -582,6 +764,11 @@
         } else {
           state.stats.cssErrors = (state.stats.cssErrors || 0) + 1;
         }
+        addLog('error', 'style', 'error', {
+          url: originalHref,
+          cdn: match.cdnUrl,
+          reason: 'all_fallbacks_failed'
+        });
       }
     };
 
@@ -602,12 +789,31 @@
     }
     _persistStats();
     if (state.config.dedupEnabled) state.dedupSet.add(originalHref);
+
+    addLog('info', fontMatch ? 'style' : 'style', 'replace', {
+      url: originalHref,
+      original: originalHref,
+      cdn: match.cdnUrl,
+      reason: `${fontMatch ? 'font' : 'css'}: ${match.name}`,
+      duration: Math.round(performance.now() - startTime)
+    });
+
     console.log(`${LOG_PREFIX} ${fontMatch ? 'Font' : 'CSS'}: ${match.name} → ${match.cdnName}`);
   }
 
   // ========== 核心拦截：图片懒加载 ==========
 
   function processImage(img) {
+    // SVG 优化：与图片懒加载独立，优先处理
+    if (img.src && !img.dataset._raSvgProcessed && !img.dataset._raProcessed) {
+      if (/\.svg(\?|#|$)/i.test(img.src) || /\/svg\+xml/i.test(img.src)) {
+        if (isSiteEnabled('svgOptimize') && !state.cspRestricted) {
+          processSVG(img);
+          return;
+        }
+      }
+    }
+
     if (!isSiteEnabled('imageLazyLoad')) return;
     if (img.dataset._raProcessed || !img.src || img.dataset.src || img.src.startsWith('data:')) return;
     if (img.loading === 'eager' || img.hasAttribute('data-no-lazy')) return;
@@ -617,6 +823,7 @@
     const filterResult = matchAdvancedFilter(img.src);
     if (filterResult.matched) {
       if (filterResult.action === 'skipAll' || filterResult.action === 'skipReplace') {
+        addLog('info', 'image', 'skip', { url: img.src, reason: 'filter_rule' });
         return;
       }
     }
@@ -637,10 +844,163 @@
       img.dataset.lazyLoading = 'true';
       state.stats.imagesLazy++;
       _persistStats();
+      addLog('info', 'image', 'lazy', {
+        url: originalSrc,
+        reason: 'lazy_load_only'
+      });
+    }
+  }
+
+  // ========== 核心拦截：SVG 优化 ==========
+
+  /**
+   * 处理 SVG 图片：优化内容并内联小 SVG
+   * @param {HTMLImageElement} img - 图片元素
+   */
+  async function processSVG(img) {
+    if (state.cspRestricted) return;
+    if (!isSiteEnabled('svgOptimize')) return;
+
+    const url = img.src;
+    if (!url || img.dataset._raSvgProcessed) return;
+
+    // 已经是 data URI，跳过
+    if (url.startsWith('data:')) return;
+
+    // 判断是否为 SVG
+    if (!/\.svg(\?|#|$)/i.test(url) && !/\/svg\+xml/i.test(url)) return;
+
+    img.dataset._raSvgProcessed = '1';
+
+    // 高级过滤检查
+    const filterResult = matchAdvancedFilter(url);
+    if (filterResult.matched) {
+      if (filterResult.action === 'skipAll' || filterResult.action === 'skipReplace') {
+        addLog('info', 'svg', 'skip', { url, reason: 'filter_rule' });
+        return;
+      }
+    }
+
+    // 缓存命中
+    if (state._svgCache.has(url)) {
+      const cached = state._svgCache.get(url);
+      if (cached) img.src = cached;
+      return;
+    }
+
+    // 域名排除
+    try {
+      const urlObj = new URL(url, location.href);
+      if (state.config.excludeDomains.some(d => urlObj.hostname.includes(d))) {
+        addLog('info', 'svg', 'skip', { url, reason: 'domain_excluded' });
+        return;
+      }
+    } catch {
+      return;
+    }
+
+    const startTime = performance.now();
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) return;
+      const text = await response.text();
+      const originalSize = new Blob([text]).size;
+
+      const config = state.config.svgOptimize;
+      let optimized = text;
+
+      // 移除注释
+      if (config.removeComments) {
+        optimized = optimized.replace(/<!--[\s\S]*?-->/g, '');
+      }
+
+      // 移除元数据（Inkscape / sodipodi 等编辑器生成的非必要元素）
+      if (config.removeMetadata) {
+        optimized = optimized.replace(/<metadata[\s\S]*?<\/metadata>/gi, '');
+        optimized = optimized.replace(/<sodipodi:[\s\S]*?\/>/gi, '');
+        optimized = optimized.replace(/<inkscape:[\s\S]*?\/>/gi, '');
+      }
+
+      // 压缩空白
+      if (config.minify) {
+        optimized = optimized
+          .replace(/\s+/g, ' ')
+          .replace(/>\s+</g, '><')
+          .trim();
+      }
+
+      const optimizedSize = new Blob([optimized]).size;
+
+      // 小 SVG：内联为 data URI
+      if (optimizedSize <= config.maxInlineSize) {
+        const dataUri = `data:image/svg+xml,${encodeURIComponent(optimized)}`;
+        img.src = dataUri;
+        img.dataset._raSvgInlined = 'true';
+
+        state.stats.svgOptimized++;
+        state.stats.svgInlined++;
+        state.stats.svgBytesSaved += Math.max(0, originalSize - optimizedSize);
+        _persistStats();
+
+        addLog('info', 'svg', 'inline', {
+          url,
+          size: originalSize,
+          compressedSize: optimizedSize,
+          reason: 'small_svg_inlined',
+          duration: Math.round(performance.now() - startTime)
+        });
+        return;
+      }
+
+      // 大 SVG：优化后替换（需有 5% 以上收益）
+      if (optimizedSize < originalSize * 0.95) {
+        const blob = new Blob([optimized], { type: 'image/svg+xml' });
+        const blobUrl = URL.createObjectURL(blob);
+        img.src = blobUrl;
+        state._svgCache.set(url, blobUrl);
+
+        state.stats.svgOptimized++;
+        state.stats.svgBytesSaved += (originalSize - optimizedSize);
+        _persistStats();
+
+        addLog('info', 'svg', 'replace', {
+          url,
+          size: originalSize,
+          compressedSize: optimizedSize,
+          reason: 'large_svg_optimized',
+          duration: Math.round(performance.now() - startTime)
+        });
+      }
+      // 优化收益不足，保持原图
+    } catch (error) {
+      addLog('error', 'svg', 'error', { url, reason: 'svg_optimize_failed' });
     }
   }
 
   // ========== 图片压缩 ==========
+
+  // 图片压缩优先级与阈值常量
+  const COMPRESS_PRIORITY = { IN_VIEW: 0, SMALL: 1, LARGE: 2 };
+  const SMALL_IMAGE_PIXEL_THRESHOLD = 100000;
+
+  // 获取图片压缩优先级：可视区域 > 小图 > 大图
+  function _getCompressPriority(img) {
+    try {
+      const rect = img.getBoundingClientRect();
+      // 可视区域最高优先级
+      if (rect.top < window.innerHeight && rect.bottom > 0) {
+        return COMPRESS_PRIORITY.IN_VIEW;
+      }
+    } catch (error) {
+      console.warn('[_getCompressPriority] 获取图片边界失败:', error);
+    }
+
+    // 根据图片大小判断优先级
+    const size = (img.naturalWidth || 0) * (img.naturalHeight || 0);
+    if (size < SMALL_IMAGE_PIXEL_THRESHOLD) return COMPRESS_PRIORITY.SMALL;  // 小图次之
+    return COMPRESS_PRIORITY.LARGE;  // 大图最低
+  }
 
   function enqueueCompress(img, src) {
     // 限制队列大小，避免内存溢出
@@ -649,35 +1009,66 @@
       img.src = src;
       img.dataset.lazyLoading = 'false';
       img.dataset.lazyLoaded = 'true';
+      addLog('warn', 'image', 'skip', { url: src, reason: 'compress_queue_full' });
       return;
     }
-    state.compressQueue.push({ img, src });
+
+    // 计算优先级并插入到队列的合适位置
+    const priority = _getCompressPriority(img);
+    let insertIndex = state.compressQueue.length;
+
+    // 找到第一个优先级比当前低（数值更大）的位置
+    for (let i = 0; i < state.compressQueue.length; i++) {
+      if (state.compressQueue[i].priority < priority) {
+        insertIndex = i;
+        break;
+      }
+    }
+
+    state.compressQueue.splice(insertIndex, 0, { img, src, priority });
     processCompressQueue();
   }
 
   async function processCompressQueue() {
     while (state.compressingCount < state.config.imageMaxConcurrency && state.compressQueue.length > 0) {
+      // 按优先级取任务：总是取第一个（最高优先级）
       const task = state.compressQueue.shift();
       state.compressingCount++;
+      const startTime = performance.now();
       try {
         const compressed = await compressImage(task.src);
+        const duration = Math.round(performance.now() - startTime);
         if (compressed) {
           // 压缩成功，直接加载压缩版本
           task.img.src = compressed;
           task.img.dataset.lazyLoading = 'false';
           task.img.dataset.lazyLoaded = 'true';
           task.img.dataset.compressed = 'true';
+          addLog('info', 'image', 'compress', {
+            url: task.src,
+            reason: 'success',
+            duration
+          });
         } else {
           // 压缩失败或不值得压缩，回退到原图
           task.img.src = task.src;
           task.img.dataset.lazyLoading = 'false';
           task.img.dataset.lazyLoaded = 'true';
+          addLog('info', 'image', 'skip', {
+            url: task.src,
+            reason: 'not_worth_compressing',
+            duration
+          });
         }
       } catch {
         // 异常时回退到原图
         task.img.src = task.src;
         task.img.dataset.lazyLoading = 'false';
         task.img.dataset.lazyLoaded = 'true';
+        addLog('error', 'image', 'error', {
+          url: task.src,
+          reason: 'compress_exception'
+        });
       }
       state.compressingCount--;
       processCompressQueue();
@@ -685,12 +1076,16 @@
   }
 
   async function compressImage(url) {
-    if (!isSiteEnabled('imageCompress')) return null;
+    if (!isSiteEnabled('imageCompress')) {
+      addLog('info', 'image', 'skip', { url, reason: 'compress_disabled' });
+      return null;
+    }
 
     // 高级过滤检查
     const filterResult = matchAdvancedFilter(url);
     if (filterResult.matched) {
       if (filterResult.action === 'skipAll' || filterResult.action === 'skipCompress') {
+        addLog('info', 'image', 'skip', { url, reason: 'filter_rule' });
         return null;
       }
     }
@@ -706,6 +1101,7 @@
       const urlObj = new URL(url, location.href);
       if (state.config.excludeDomains.some(d => urlObj.hostname.includes(d))) {
         state._compressCache.set(url, { skip: true });
+        addLog('info', 'image', 'skip', { url, reason: 'domain_excluded' });
         return null;
       }
     } catch {
@@ -716,6 +1112,7 @@
     // 非图片类型不压缩
     if (/\.(webp|svg|gif|avif)$/i.test(url)) {
       state._compressCache.set(url, { skip: true });
+      addLog('info', 'image', 'skip', { url, reason: 'unsupported_format' });
       return null;
     }
 
@@ -730,6 +1127,7 @@
         const bytes = actualSize || (img.naturalWidth * img.naturalHeight * 4);
         if (bytes < state.config.imageMinSize) {
           state._compressCache.set(url, { skip: true });
+          addLog('info', 'image', 'skip', { url, reason: 'below_min_size', size: bytes });
           resolve(null);
           return;
         }
@@ -770,6 +1168,7 @@
       };
       img.onerror = () => {
         state._compressCache.set(url, { skip: true });
+        addLog('error', 'image', 'error', { url, reason: 'load_failed' });
         resolve(null);
       };
       img.src = url;
@@ -929,6 +1328,28 @@
 
   // ========== MutationObserver（兜底）==========
 
+  // 批量处理阈值与参数常量
+  const BATCH_THRESHOLDS = { HIGH: 500, MEDIUM: 100 };
+  const BATCH_SIZES = { HIGH: 200, MEDIUM: 100, LOW: 50 };
+  const INTERVAL_THRESHOLDS = { HIGH: 200, MEDIUM: 50 };
+  const BATCH_INTERVALS = { HIGH: 30, MEDIUM: 50, LOW: 100 };
+
+  // 根据页面负载动态调整批量大小
+  function _getBatchSize() {
+    const pending = state._mutationBatch.length;
+    if (pending > BATCH_THRESHOLDS.HIGH) return BATCH_SIZES.HIGH;   // 高负载：大批次
+    if (pending > BATCH_THRESHOLDS.MEDIUM) return BATCH_SIZES.MEDIUM;   // 中负载：中批次
+    return BATCH_SIZES.LOW;                       // 低负载：小批次
+  }
+
+  // 根据页面负载动态调整批量处理间隔
+  function _getBatchInterval() {
+    const pending = state._mutationBatch.length;
+    if (pending > INTERVAL_THRESHOLDS.HIGH) return BATCH_INTERVALS.HIGH;    // 高负载：更快处理
+    if (pending > INTERVAL_THRESHOLDS.MEDIUM) return BATCH_INTERVALS.MEDIUM;     // 中负载：正常
+    return BATCH_INTERVALS.LOW;                      // 低负载：节省资源
+  }
+
   const _observer = new MutationObserver(mutations => {
     if (!state.config.enableBatchProcessing) {
       // 不启用批量处理时，直接处理
@@ -944,12 +1365,13 @@
       }
     }
 
-    // 设置定时器，批量处理
+    // 设置定时器，使用动态间隔
     if (!state._mutationTimer) {
+      const interval = _getBatchInterval();
       state._mutationTimer = setTimeout(() => {
         state._mutationTimer = null;
         _processBatch();
-      }, state.config.mutationBatchInterval);
+      }, interval);
     }
   });
 
@@ -957,7 +1379,9 @@
     if (state._isProcessingBatch || state._mutationBatch.length === 0) return;
 
     state._isProcessingBatch = true;
-    const batch = state._mutationBatch.splice(0, 100); // 每次处理100个节点
+    // 使用动态批量大小
+    const batchSize = _getBatchSize();
+    const batch = state._mutationBatch.splice(0, batchSize);
 
     batch.forEach(node => {
       if (!node.tagName) return;
@@ -974,9 +1398,10 @@
 
     state._isProcessingBatch = false;
 
-    // 如果还有剩余节点，继续处理
+    // 如果还有剩余节点，使用动态间隔继续处理
     if (state._mutationBatch.length > 0) {
-      setTimeout(_processBatch, 0);
+      const interval = _getBatchInterval();
+      setTimeout(_processBatch, interval);
     }
   }
 
@@ -999,12 +1424,67 @@
 
   // ========== 初始化（异步但不阻塞）==========
 
+  // 获取页面使用的 CDN 优先级
+  function _getCDNPriorities() {
+    const pageCDNs = new Set();
+
+    // 扫描页面中的 script 和 link 元素
+    const elements = document.querySelectorAll('script[src], link[href]');
+    elements.forEach(el => {
+      const url = el.src || el.href;
+      if (isCDNUrl(url)) {
+        const cdnInfo = _getCDNInfo(url);
+        if (cdnInfo) {
+          pageCDNs.add(cdnInfo.id);
+        }
+      }
+    });
+
+    return Array.from(pageCDNs);
+  }
+
+  // 获取 URL 对应的 CDN 信息
+  function _getCDNInfo(url) {
+    if (!window.CDNMappings?.CDN_SOURCES) return null;
+
+    for (const cdn of window.CDNMappings.CDN_SOURCES) {
+      try {
+        const cdnUrl = new URL(cdn.baseUrl);
+        if (url.includes(cdnUrl.hostname)) {
+          return { id: cdn.id, name: cdn.name || cdn.id };
+        }
+      } catch (error) {
+        console.warn('[_getCDNInfo] 解析CDN URL失败:', error);
+      }
+    }
+    return null;
+  }
+
   async function init() {
     if (state.initialized) return;
     state.initialized = true;
 
+    // 0. LCP 指标收集（需要尽早启动观察）
+    let lcpObserver = null;
+    try {
+      if (typeof PerformanceObserver !== 'undefined') {
+        lcpObserver = new PerformanceObserver((entryList) => {
+          const entries = entryList.getEntries();
+          if (entries.length > 0) {
+            state.lcp = entries[entries.length - 1].startTime;
+          }
+        });
+        lcpObserver.observe({ type: 'largest-contentful-paint', buffered: true });
+      }
+    } catch {
+      // 部分浏览器不支持 largest-contentful-paint 类型
+    }
+
     // 1. 加载配置（异步，不阻塞）
     _loadConfig();
+
+    // 1.1 恢复历史错误日志（异步，不阻塞）
+    _restoreErrorLogs();
 
     // 2. CSP 预检（异步，不阻塞）
     _precheckCSP();
@@ -1012,8 +1492,28 @@
     // 3. CDN preconnect
     _addCDNPreconnect();
 
-    // 4. CDN健康探测（异步，不阻塞）
-    window.CDNMappings?.probeAllCDNs?.();
+    // 4. CDN健康探测（异步，不阻塞）- 优先探测页面使用的 CDN
+    if (window.CDNMappings?.probeAllCDNs) {
+      const pageCDNs = _getCDNPriorities();
+      let probePromise;
+      if (pageCDNs.length > 0) {
+        console.log(`${LOG_PREFIX} 优先探测页面使用的 CDN: ${pageCDNs.join(', ')}`);
+        // 先探测页面使用的 CDN，再探测其他 CDN
+        probePromise = window.CDNMappings.probeAllCDNs({ priorityIds: pageCDNs });
+      } else {
+        probePromise = window.CDNMappings.probeAllCDNs();
+      }
+      // 探测完成后记录健康状态到日志缓冲区
+      probePromise?.then?.(() => {
+        const cdnHealth = window.CDNMappings?.getCDNHealth?.() || {};
+        Object.entries(cdnHealth).forEach(([cdnId, health]) => {
+          addLog('info', 'cdn', 'probe', {
+            cdn: cdnId,
+            reason: health.healthy ? `RTT: ${health.rtt}ms` : '探测失败'
+          });
+        });
+      });
+    }
 
     // 5. 启动 MutationObserver（兜底）
     _observer.observe(document.documentElement, { childList: true, subtree: true });
@@ -1026,9 +1526,14 @@
     // 7. 消息监听
     _initMessageListener();
 
-    // 8. 页面加载后收集性能指标
+    // 8. 页面加载后收集性能指标并停止 LCP 观察
     window.addEventListener('load', () => {
+      if (lcpObserver) {
+        lcpObserver.disconnect();
+      }
       state.performance = collectPerformanceMetrics();
+      // 保存每日统计数据用于趋势图表
+      saveDailyStats();
     }, { once: true });
 
     console.log(`${LOG_PREFIX} 初始化完成`);
@@ -1043,7 +1548,9 @@
           _observer.disconnect();
         }
       }
-    } catch {}
+    } catch (error) {
+      console.warn('[_loadConfig] 加载配置失败:', error);
+    }
   }
 
   async function _precheckCSP() {
@@ -1076,7 +1583,9 @@
         link.href = origin;
         if (link.rel === 'preconnect') link.crossOrigin = 'anonymous';
         head.insertBefore(link, head.firstChild);
-      } catch {}
+      } catch (error) {
+        console.warn('[_addCDNPreconnect] 添加CDN预连接失败:', error);
+      }
     });
   }
 
@@ -1115,6 +1624,26 @@
         sendResponse({ success: true });
         return true;
       }
+      if (message.type === 'RESOURCE_ACCELERATOR_GET_LOGS') {
+        const logs = getLogs(message.filter || {});
+        sendResponse({ success: true, data: logs });
+        return true;
+      }
+      if (message.type === 'RESOURCE_ACCELERATOR_CLEAR_LOGS') {
+        clearLogs();
+        sendResponse({ success: true });
+        return true;
+      }
+      if (message.type === 'RESOURCE_ACCELERATOR_GET_DISTRIBUTION') {
+        sendResponse({ success: true, data: getStatsDistribution() });
+        return true;
+      }
+      if (message.type === 'RESOURCE_ACCELERATOR_GET_TREND') {
+        aggregateDailyStats(message.days || 7).then(data => {
+          sendResponse({ success: true, data });
+        });
+        return true;
+      }
     });
   }
 
@@ -1138,6 +1667,7 @@
         ttfb: Math.round(nav.responseStart - nav.requestStart),
         domContentLoaded: Math.round(nav.domContentLoadedEventEnd - nav.startTime),
         loadEvent: Math.round(nav.loadEventEnd - nav.startTime),
+        lcp: state.lcp != null ? Math.round(state.lcp) : null,
         totalResources: resEntries.length,
         totalDuration: Math.round(totalDuration),
         replacedJs: state.stats.jsReplaced,
@@ -1145,6 +1675,8 @@
         replacedFonts: state.stats.fontsReplaced,
         imagesCompressed: state.stats.imagesCompressed,
         bytesSaved: state.stats.imagesCompressBytesSaved,
+        svgOptimized: state.stats.svgOptimized,
+        svgBytesSaved: state.stats.svgBytesSaved,
         estimatedTimeSaved
       };
     } catch {
@@ -1209,6 +1741,7 @@
       ttfb: state.performance.ttfb,
       domContentLoaded: state.performance.domContentLoaded,
       loadEvent: state.performance.loadEvent,
+      lcp: state.performance.lcp,
       totalResources: state.performance.totalResources,
       totalTransferSize: state.performance.totalTransferSize || 0,
       timestamp: Date.now()
@@ -1241,11 +1774,20 @@
         ? Math.round((transferSizeSaved / baseline.totalTransferSize) * 100)
         : 0;
 
+      // 计算 LCP 改善
+      const lcpSaved = (baseline.lcp != null && current.lcp != null)
+        ? baseline.lcp - current.lcp
+        : null;
+      const lcpPercent = (lcpSaved != null && baseline.lcp > 0)
+        ? Math.round((lcpSaved / baseline.lcp) * 100)
+        : null;
+
       return {
         baseline: {
           ttfb: baseline.ttfb,
           domContentLoaded: baseline.domContentLoaded,
           loadEvent: baseline.loadEvent,
+          lcp: baseline.lcp,
           totalResources: baseline.totalResources,
           totalTransferSize: baseline.totalTransferSize
         },
@@ -1253,12 +1795,15 @@
           ttfb: current.ttfb,
           domContentLoaded: current.domContentLoaded,
           loadEvent: current.loadEvent,
+          lcp: current.lcp,
           totalResources: current.totalResources,
           totalTransferSize: current.totalTransferSize || 0
         },
         savings: {
           loadTimeSaved: Math.max(0, loadTimeSaved),
           loadTimePercent: Math.max(0, loadTimePercent),
+          lcpSaved: lcpSaved != null ? Math.max(0, lcpSaved) : null,
+          lcpPercent: lcpPercent != null ? Math.max(0, lcpPercent) : null,
           transferSizeSaved: Math.max(0, transferSizeSaved),
           transferSizePercent: Math.max(0, transferSizePercent),
           resourcesReplaced: Math.max(0, baseline.totalResources - current.totalResources)
@@ -1273,6 +1818,87 @@
     chrome.storage.local.remove(PERFORMANCE_BASELINE_KEY);
   }
 
+  // ========== 每日统计与数据聚合 ==========
+
+  const DAILY_STATS_KEY = 'resourceAcceleratorDailyStats';
+
+  // 保存当日统计数据
+  function saveDailyStats() {
+    if (!state.performance) return;
+
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const dailyData = {
+      date: today,
+      timestamp: Date.now(),
+      replacedJs: state.stats.jsReplaced,
+      replacedCss: state.stats.cssReplaced || 0,
+      replacedFonts: state.stats.fontsReplaced,
+      imagesCompressed: state.stats.imagesCompressed,
+      bytesSaved: state.stats.imagesCompressBytesSaved,
+      loadEvent: state.performance.loadEvent,
+      totalResources: state.performance.totalResources,
+      lcp: state.performance.lcp,
+    };
+
+    chrome.storage.local.get(DAILY_STATS_KEY).then(result => {
+      const allDaily = result[DAILY_STATS_KEY] || {};
+      allDaily[today] = dailyData;
+
+      // 保留最近30天数据
+      const keys = Object.keys(allDaily).sort().slice(-30);
+      const trimmed = {};
+      keys.forEach(k => { trimmed[k] = allDaily[k]; });
+
+      chrome.storage.local.set({ [DAILY_STATS_KEY]: trimmed });
+    });
+  }
+
+  // 聚合近 N 天统计数据
+  async function aggregateDailyStats(days = 7) {
+    try {
+      const result = await chrome.storage.local.get(DAILY_STATS_KEY);
+      const allDaily = result[DAILY_STATS_KEY] || {};
+
+      const today = new Date();
+      const stats = [];
+
+      for (let i = days - 1; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(d.getDate() - i);
+        const dateStr = d.toISOString().split('T')[0];
+        const dayData = allDaily[dateStr];
+
+        stats.push({
+          date: dateStr,
+          dayLabel: `${d.getMonth() + 1}/${d.getDate()}`,
+          replacedJs: dayData?.replacedJs || 0,
+          replacedCss: dayData?.replacedCss || 0,
+          replacedFonts: dayData?.replacedFonts || 0,
+          imagesCompressed: dayData?.imagesCompressed || 0,
+          bytesSaved: dayData?.bytesSaved || 0,
+          loadEvent: dayData?.loadEvent || 0,
+          totalResources: dayData?.totalResources || 0,
+          totalReplaced: (dayData?.replacedJs || 0) + (dayData?.replacedCss || 0) + (dayData?.replacedFonts || 0) + (dayData?.imagesCompressed || 0),
+        });
+      }
+
+      return stats;
+    } catch {
+      return [];
+    }
+  }
+
+  // 获取替换类型分布
+  function getStatsDistribution() {
+    return {
+      js: state.stats.jsReplaced || 0,
+      css: state.stats.cssReplaced || 0,
+      fonts: state.stats.fontsReplaced || 0,
+      images: state.stats.imagesCompressed || 0,
+      svg: state.stats.svgOptimized || 0,
+    };
+  }
+
   // ========== 导出 API ==========
 
   window.ResourceAccelerator = {
@@ -1284,20 +1910,29 @@
     savePerformanceBaseline,
     getPerformanceComparison,
     resetPerformanceBaseline,
+    saveDailyStats,
+    aggregateDailyStats,
+    getStatsDistribution,
     getStats: () => ({
       ...state.stats,
       cspRestricted: state.cspRestricted,
       recentReplacements: state.recentReplacements.slice(-50),
       performance: state.performance,
       thirdPartyDeferralEnabled: state.config.thirdPartyDeferral?.enabled || false,
+      svgOptimizeEnabled: state.config.svgOptimize?.enabled || false,
     }),
     getConfig: () => ({ ...state.config }),
+    getLogs,
+    clearLogs,
+    addLog,
     destroy: () => {
       _observer.disconnect();
       state.compressQueue = [];
       state.recentReplacements = [];
       state.dedupSet.clear();
       state._compressCache.clear();
+      state._svgCache.clear();
+      _logBuffer = [];
       document.createElement = _createElement;
       Element.prototype.appendChild = _appendChild;
       Element.prototype.insertBefore = _insertBefore;
