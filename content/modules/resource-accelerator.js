@@ -237,7 +237,9 @@
         _lastPersisted.imagesLazy = state.stats.imagesLazy;
         _lastPersisted.imagesCompressed = state.stats.imagesCompressed;
         _lastPersisted.imagesCompressBytesSaved = state.stats.imagesCompressBytesSaved;
-      } catch {}
+      } catch (error) {
+        console.warn('[persistStats] 持久化统计失败:', error);
+      }
     }, 2000);
   }
 
@@ -445,7 +447,9 @@
           state._imageFormat = fmt;
           return fmt;
         }
-      } catch {}
+      } catch (error) {
+        console.warn('[detectImageFormat] 检测图片格式失败:', error);
+      }
     }
     state._imageFormat = IMAGE_FORMAT_PRIORITY[2];
     return state._imageFormat;
@@ -482,7 +486,9 @@
         if (new RegExp(rule.pattern, 'i').test(url)) {
           return { pattern: rule.pattern, strategy: rule.strategy, name: rule.pattern };
         }
-      } catch {}
+      } catch (error) {
+        console.warn('[getThirdPartyDeferral] 正则表达式匹配失败:', error);
+      }
     }
 
     // 2. Built-in rules (string includes match)
@@ -836,7 +842,9 @@
       if (rect.top < window.innerHeight && rect.bottom > 0) {
         return COMPRESS_PRIORITY.IN_VIEW;
       }
-    } catch {}
+    } catch (error) {
+      console.warn('[_getCompressPriority] 获取图片边界失败:', error);
+    }
 
     // 根据图片大小判断优先级
     const size = (img.naturalWidth || 0) * (img.naturalHeight || 0);
@@ -1293,7 +1301,9 @@
         if (url.includes(cdnUrl.hostname)) {
           return { id: cdn.id, name: cdn.name || cdn.id };
         }
-      } catch {}
+      } catch (error) {
+        console.warn('[_getCDNInfo] 解析CDN URL失败:', error);
+      }
     }
     return null;
   }
@@ -1386,7 +1396,9 @@
           _observer.disconnect();
         }
       }
-    } catch {}
+    } catch (error) {
+      console.warn('[_loadConfig] 加载配置失败:', error);
+    }
   }
 
   async function _precheckCSP() {
@@ -1419,7 +1431,9 @@
         link.href = origin;
         if (link.rel === 'preconnect') link.crossOrigin = 'anonymous';
         head.insertBefore(link, head.firstChild);
-      } catch {}
+      } catch (error) {
+        console.warn('[_addCDNPreconnect] 添加CDN预连接失败:', error);
+      }
     });
   }
 
