@@ -13,7 +13,8 @@ const CHART_COLORS = {
     js: '#007bff',
     css: '#17a2b8',
     fonts: '#6f42c1',
-    images: '#fd7e14'
+    images: '#fd7e14',
+    svg: '#20c997'
   },
 
   // 通用颜色
@@ -2683,6 +2684,7 @@ async function drawDistributionChart() {
     { label: 'CSS', value: distribution.css, color: CHART_COLORS.distribution.css },
     { label: '字体', value: distribution.fonts, color: CHART_COLORS.distribution.fonts },
     { label: '图片', value: distribution.images, color: CHART_COLORS.distribution.images },
+    { label: 'SVG', value: distribution.svg || 0, color: CHART_COLORS.distribution.svg },
   ].filter(d => d.value > 0);
 
   let startAngle = -Math.PI / 2;
@@ -3564,6 +3566,19 @@ async function initResourceAccelerator() {
     await saveAndNotify();
   });
 
+  // SVG 优化开关
+  const svgOptimizeEl = document.getElementById('ra-svg-optimize');
+  if (svgOptimizeEl) {
+    if (!config.svgOptimize) {
+      config.svgOptimize = { enabled: true, maxInlineSize: 10240, removeComments: true, removeMetadata: true, minify: true };
+    }
+    svgOptimizeEl.checked = config.svgOptimize.enabled !== false;
+    svgOptimizeEl.addEventListener('change', async (e) => {
+      config.svgOptimize.enabled = e.target.checked;
+      await saveAndNotify();
+    });
+  }
+
   if (preloadEl) {
     preloadEl.addEventListener('change', async (e) => {
       config.preloadEnabled = e.target.checked;
@@ -4165,7 +4180,12 @@ async function loadResourceAcceleratorStats() {
         if (fontSessionEl) fontSessionEl.textContent = sessionStats.fontsReplaced || 0;
         if (imageSessionEl) imageSessionEl.textContent = (sessionStats.imagesLazy || 0) + (sessionStats.imagesCompressed || 0);
         if (compressSessionEl) compressSessionEl.textContent = sessionStats.imagesCompressed || 0;
-        if (bytesSavedEl) bytesSavedEl.textContent = Math.round((sessionStats.imagesCompressBytesSaved || 0) / 1024);
+        if (bytesSavedEl) bytesSavedEl.textContent = Math.round(((sessionStats.imagesCompressBytesSaved || 0) + (sessionStats.svgBytesSaved || 0)) / 1024);
+        // SVG 优化统计
+        const svgSessionEl = document.getElementById('ra-svg-count-session');
+        const svgCountEl = document.getElementById('ra-svg-count');
+        if (svgSessionEl) svgSessionEl.textContent = sessionStats.svgOptimized || 0;
+        if (svgCountEl) svgCountEl.textContent = sessionStats.svgOptimized ? `(${sessionStats.svgOptimized})` : '';
         // Performance metrics display
         if (sessionStats?.performance) {
           const perf = sessionStats.performance;
@@ -4183,6 +4203,7 @@ async function loadResourceAcceleratorStats() {
             if (el('ra-perf-font')) el('ra-perf-font').textContent = perf.replacedFonts || 0;
             if (el('ra-perf-img')) el('ra-perf-img').textContent = perf.imagesCompressed || 0;
             if (el('ra-perf-bytes')) el('ra-perf-bytes').textContent = perf.bytesSaved ? fmtBytes(perf.bytesSaved) : '0';
+            if (el('ra-perf-svg')) el('ra-perf-svg').textContent = perf.svgOptimized || 0;
             if (el('ra-perf-time')) el('ra-perf-time').textContent = perf.estimatedTimeSaved ? (perf.estimatedTimeSaved / 1000).toFixed(1) : '0';
           }
 

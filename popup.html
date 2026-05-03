@@ -641,6 +641,12 @@
         </div>
         <div class="setting-item">
           <div class="toggle-container">
+            <label for="ra-svg-optimize">SVG优化 <span id="ra-svg-count" style="color: #666; font-size: 11px;"></span></label>
+            <input type="checkbox" id="ra-svg-optimize" />
+          </div>
+        </div>
+        <div class="setting-item">
+          <div class="toggle-container">
             <label for="ra-preload">资源预加载</label>
             <input type="checkbox" id="ra-preload" />
           </div>
@@ -690,6 +696,7 @@
             <div style="padding: 4px 6px; background: white; border-radius: 4px; border-left: 3px solid #17a2b8;">字体: <span id="ra-font-count-session">0</span></div>
             <div style="padding: 4px 6px; background: white; border-radius: 4px; border-left: 3px solid #ffc107;">图片: <span id="ra-image-count-session">0</span></div>
             <div style="padding: 4px 6px; background: white; border-radius: 4px; border-left: 3px solid #dc3545;">压缩: <span id="ra-compress-count-session">0</span></div>
+            <div style="padding: 4px 6px; background: white; border-radius: 4px; border-left: 3px solid #20c997;">SVG: <span id="ra-svg-count-session">0</span></div>
             <div style="padding: 4px 6px; background: white; border-radius: 4px; border-left: 3px solid #6f42c1;">节省: <span id="ra-bytes-saved">0</span> KB</div>
           </div>
           <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e9ecef;">
@@ -717,6 +724,9 @@
           </div>
           <div style="margin-top: 2px; font-size: 11px; color: #555;">
             图片压缩: <span id="ra-perf-img">0</span> 张，节省 <span id="ra-perf-bytes">0</span>
+          </div>
+          <div style="margin-top: 2px; font-size: 11px; color: #555;">
+            SVG优化: <span id="ra-perf-svg">0</span> 个
           </div>
           <div style="margin-top: 4px; font-size: 12px; color: #1b5e20; font-weight: 500;">
             预估节省: ~<span id="ra-perf-time">0</span>s
@@ -1328,6 +1338,7 @@
               <option value="script">JS</option>
               <option value="style">CSS/字体</option>
               <option value="image">图片</option>
+              <option value="svg">SVG</option>
               <option value="deferral">延迟加载</option>
               <option value="system">系统</option>
             </select>

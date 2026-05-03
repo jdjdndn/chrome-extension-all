@@ -62,6 +62,14 @@
       enabled: false,
       rules: [],  // [{ type: 'exclude'|'include', match: 'extension'|'path'|'domain'|'query'|'regex', value: string, action: 'skipAll'|'skipCompress'|'skipReplace'|'forceReplace', description: string }]
     },
+    // SVG 优化
+    svgOptimize: {
+      enabled: true,
+      maxInlineSize: 10240,  // 10KB 以下内联为 data URI
+      removeComments: true,
+      removeMetadata: true,
+      minify: true,
+    },
   };
 
   // ========== 日志系统 ==========
@@ -74,7 +82,7 @@
   /**
    * 添加日志记录
    * @param {'info'|'warn'|'error'} level - 日志级别
-   * @param {'script'|'style'|'image'|'cdn'|'deferral'|'system'} module - 模块
+   * @param {'script'|'style'|'image'|'svg'|'cdn'|'deferral'|'system'} module - 模块
    * @param {'replace'|'compress'|'lazy'|'defer'|'skip'|'block'|'error'|'init'|'probe'} action - 操作
    * @param {object} details - 详情
    */
@@ -181,7 +189,7 @@
     config: { ...DEFAULT_CONFIG },
     cspRestricted: false,
     initialized: false,
-    stats: { jsReplaced: 0, jsErrors: 0, fontsReplaced: 0, fontErrors: 0, cssReplaced: 0, cssErrors: 0, imagesLazy: 0, imagesCompressed: 0, imagesCompressBytesSaved: 0, videosLazy: 0, preloadHints: 0, cdnLoadMs: 0, cdnLoadCount: 0, thirdPartyDeferred: 0, thirdPartyBlocked: 0 },
+    stats: { jsReplaced: 0, jsErrors: 0, fontsReplaced: 0, fontErrors: 0, cssReplaced: 0, cssErrors: 0, imagesLazy: 0, imagesCompressed: 0, imagesCompressBytesSaved: 0, svgOptimized: 0, svgInlined: 0, svgBytesSaved: 0, videosLazy: 0, preloadHints: 0, cdnLoadMs: 0, cdnLoadCount: 0, thirdPartyDeferred: 0, thirdPartyBlocked: 0 },
     // 图片压缩
     compressQueue: [],
     compressingCount: 0,
@@ -193,6 +201,8 @@
     _isProcessingBatch: false,
     // 压缩结果缓存（同一页面会话内避免重复压缩）
     _compressCache: new Map(),
+    // SVG 优化缓存
+    _svgCache: new Map(),
     // 去重集合
     dedupSet: new Set(),
     // 最近50条替换记录
@@ -211,7 +221,7 @@
   // ========== 统计持久化（防抖 + 增量）==========
 
   let _statsTimer = null;
-  const _lastPersisted = { jsReplaced: 0, fontsReplaced: 0, cssReplaced: 0, imagesLazy: 0, imagesCompressed: 0, imagesCompressBytesSaved: 0 };
+  const _lastPersisted = { jsReplaced: 0, fontsReplaced: 0, cssReplaced: 0, imagesLazy: 0, imagesCompressed: 0, imagesCompressBytesSaved: 0, svgOptimized: 0, svgBytesSaved: 0 };
 
   function _persistStats() {
     if (_statsTimer) return;
@@ -227,7 +237,8 @@
           totalCssReplaced: (stored.totalCssReplaced || 0) + ((state.stats.cssReplaced || 0) - _lastPersisted.cssReplaced),
           totalImagesOptimized: (stored.totalImagesOptimized || 0) + (state.stats.imagesLazy - _lastPersisted.imagesLazy),
           totalImagesCompressed: (stored.totalImagesCompressed || 0) + (state.stats.imagesCompressed - _lastPersisted.imagesCompressed),
-          totalBytesSaved: (stored.totalBytesSaved || 0) + (state.stats.imagesCompressBytesSaved - _lastPersisted.imagesCompressBytesSaved),
+          totalBytesSaved: (stored.totalBytesSaved || 0) + (state.stats.imagesCompressBytesSaved - _lastPersisted.imagesCompressBytesSaved) + (state.stats.svgBytesSaved - _lastPersisted.svgBytesSaved),
+          totalSvgOptimized: (stored.totalSvgOptimized || 0) + (state.stats.svgOptimized - _lastPersisted.svgOptimized),
         };
         await chrome.storage.local.set({ [STATS_KEY]: delta });
         // 更新快照
@@ -237,6 +248,8 @@
         _lastPersisted.imagesLazy = state.stats.imagesLazy;
         _lastPersisted.imagesCompressed = state.stats.imagesCompressed;
         _lastPersisted.imagesCompressBytesSaved = state.stats.imagesCompressBytesSaved;
+        _lastPersisted.svgOptimized = state.stats.svgOptimized;
+        _lastPersisted.svgBytesSaved = state.stats.svgBytesSaved;
       } catch (error) {
         console.warn('[persistStats] 持久化统计失败:', error);
       }
@@ -791,6 +804,16 @@
   // ========== 核心拦截：图片懒加载 ==========
 
   function processImage(img) {
+    // SVG 优化：与图片懒加载独立，优先处理
+    if (img.src && !img.dataset._raSvgProcessed && !img.dataset._raProcessed) {
+      if (/\.svg(\?|#|$)/i.test(img.src) || /\/svg\+xml/i.test(img.src)) {
+        if (isSiteEnabled('svgOptimize') && !state.cspRestricted) {
+          processSVG(img);
+          return;
+        }
+      }
+    }
+
     if (!isSiteEnabled('imageLazyLoad')) return;
     if (img.dataset._raProcessed || !img.src || img.dataset.src || img.src.startsWith('data:')) return;
     if (img.loading === 'eager' || img.hasAttribute('data-no-lazy')) return;
@@ -825,6 +848,133 @@
         url: originalSrc,
         reason: 'lazy_load_only'
       });
+    }
+  }
+
+  // ========== 核心拦截：SVG 优化 ==========
+
+  /**
+   * 处理 SVG 图片：优化内容并内联小 SVG
+   * @param {HTMLImageElement} img - 图片元素
+   */
+  async function processSVG(img) {
+    if (state.cspRestricted) return;
+    if (!isSiteEnabled('svgOptimize')) return;
+
+    const url = img.src;
+    if (!url || img.dataset._raSvgProcessed) return;
+
+    // 已经是 data URI，跳过
+    if (url.startsWith('data:')) return;
+
+    // 判断是否为 SVG
+    if (!/\.svg(\?|#|$)/i.test(url) && !/\/svg\+xml/i.test(url)) return;
+
+    img.dataset._raSvgProcessed = '1';
+
+    // 高级过滤检查
+    const filterResult = matchAdvancedFilter(url);
+    if (filterResult.matched) {
+      if (filterResult.action === 'skipAll' || filterResult.action === 'skipReplace') {
+        addLog('info', 'svg', 'skip', { url, reason: 'filter_rule' });
+        return;
+      }
+    }
+
+    // 缓存命中
+    if (state._svgCache.has(url)) {
+      const cached = state._svgCache.get(url);
+      if (cached) img.src = cached;
+      return;
+    }
+
+    // 域名排除
+    try {
+      const urlObj = new URL(url, location.href);
+      if (state.config.excludeDomains.some(d => urlObj.hostname.includes(d))) {
+        addLog('info', 'svg', 'skip', { url, reason: 'domain_excluded' });
+        return;
+      }
+    } catch {
+      return;
+    }
+
+    const startTime = performance.now();
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) return;
+      const text = await response.text();
+      const originalSize = new Blob([text]).size;
+
+      const config = state.config.svgOptimize;
+      let optimized = text;
+
+      // 移除注释
+      if (config.removeComments) {
+        optimized = optimized.replace(/<!--[\s\S]*?-->/g, '');
+      }
+
+      // 移除元数据（Inkscape / sodipodi 等编辑器生成的非必要元素）
+      if (config.removeMetadata) {
+        optimized = optimized.replace(/<metadata[\s\S]*?<\/metadata>/gi, '');
+        optimized = optimized.replace(/<sodipodi:[\s\S]*?\/>/gi, '');
+        optimized = optimized.replace(/<inkscape:[\s\S]*?\/>/gi, '');
+      }
+
+      // 压缩空白
+      if (config.minify) {
+        optimized = optimized
+          .replace(/\s+/g, ' ')
+          .replace(/>\s+</g, '><')
+          .trim();
+      }
+
+      const optimizedSize = new Blob([optimized]).size;
+
+      // 小 SVG：内联为 data URI
+      if (optimizedSize <= config.maxInlineSize) {
+        const dataUri = `data:image/svg+xml,${encodeURIComponent(optimized)}`;
+        img.src = dataUri;
+        img.dataset._raSvgInlined = 'true';
+
+        state.stats.svgOptimized++;
+        state.stats.svgInlined++;
+        state.stats.svgBytesSaved += Math.max(0, originalSize - optimizedSize);
+        _persistStats();
+
+        addLog('info', 'svg', 'inline', {
+          url,
+          size: originalSize,
+          compressedSize: optimizedSize,
+          reason: 'small_svg_inlined',
+          duration: Math.round(performance.now() - startTime)
+        });
+        return;
+      }
+
+      // 大 SVG：优化后替换（需有 5% 以上收益）
+      if (optimizedSize < originalSize * 0.95) {
+        const blob = new Blob([optimized], { type: 'image/svg+xml' });
+        const blobUrl = URL.createObjectURL(blob);
+        img.src = blobUrl;
+        state._svgCache.set(url, blobUrl);
+
+        state.stats.svgOptimized++;
+        state.stats.svgBytesSaved += (originalSize - optimizedSize);
+        _persistStats();
+
+        addLog('info', 'svg', 'replace', {
+          url,
+          size: originalSize,
+          compressedSize: optimizedSize,
+          reason: 'large_svg_optimized',
+          duration: Math.round(performance.now() - startTime)
+        });
+      }
+      // 优化收益不足，保持原图
+    } catch (error) {
+      addLog('error', 'svg', 'error', { url, reason: 'svg_optimize_failed' });
     }
   }
 
@@ -1523,6 +1673,8 @@
         replacedFonts: state.stats.fontsReplaced,
         imagesCompressed: state.stats.imagesCompressed,
         bytesSaved: state.stats.imagesCompressBytesSaved,
+        svgOptimized: state.stats.svgOptimized,
+        svgBytesSaved: state.stats.svgBytesSaved,
         estimatedTimeSaved
       };
     } catch {
@@ -1741,6 +1893,7 @@
       css: state.stats.cssReplaced || 0,
       fonts: state.stats.fontsReplaced || 0,
       images: state.stats.imagesCompressed || 0,
+      svg: state.stats.svgOptimized || 0,
     };
   }
 
@@ -1764,6 +1917,7 @@
       recentReplacements: state.recentReplacements.slice(-50),
       performance: state.performance,
       thirdPartyDeferralEnabled: state.config.thirdPartyDeferral?.enabled || false,
+      svgOptimizeEnabled: state.config.svgOptimize?.enabled || false,
     }),
     getConfig: () => ({ ...state.config }),
     getLogs,
@@ -1775,6 +1929,7 @@
       state.recentReplacements = [];
       state.dedupSet.clear();
       state._compressCache.clear();
+      state._svgCache.clear();
       _logBuffer = [];
       document.createElement = _createElement;
       Element.prototype.appendChild = _appendChild;
