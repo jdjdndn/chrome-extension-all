@@ -645,20 +645,24 @@
 
   // ========== 图片压缩 ==========
 
+  // 图片压缩优先级与阈值常量
+  const COMPRESS_PRIORITY = { IN_VIEW: 0, SMALL: 1, LARGE: 2 };
+  const SMALL_IMAGE_PIXEL_THRESHOLD = 100000;
+
   // 获取图片压缩优先级：可视区域 > 小图 > 大图
-  function getCompressPriority(img) {
+  function _getCompressPriority(img) {
     try {
       const rect = img.getBoundingClientRect();
       // 可视区域最高优先级
       if (rect.top < window.innerHeight && rect.bottom > 0) {
-        return 0;
+        return COMPRESS_PRIORITY.IN_VIEW;
       }
     } catch {}
 
     // 根据图片大小判断优先级
     const size = (img.naturalWidth || 0) * (img.naturalHeight || 0);
-    if (size < 100000) return 1;  // 小图次之
-    return 2;  // 大图最低
+    if (size < SMALL_IMAGE_PIXEL_THRESHOLD) return COMPRESS_PRIORITY.SMALL;  // 小图次之
+    return COMPRESS_PRIORITY.LARGE;  // 大图最低
   }
 
   function enqueueCompress(img, src) {
@@ -672,7 +676,7 @@
     }
 
     // 计算优先级并插入到队列的合适位置
-    const priority = getCompressPriority(img);
+    const priority = _getCompressPriority(img);
     let insertIndex = state.compressQueue.length;
 
     // 找到第一个优先级比当前低（数值更大）的位置
@@ -960,20 +964,26 @@
 
   // ========== MutationObserver（兜底）==========
 
+  // 批量处理阈值与参数常量
+  const BATCH_THRESHOLDS = { HIGH: 500, MEDIUM: 100 };
+  const BATCH_SIZES = { HIGH: 200, MEDIUM: 100, LOW: 50 };
+  const INTERVAL_THRESHOLDS = { HIGH: 200, MEDIUM: 50 };
+  const BATCH_INTERVALS = { HIGH: 30, MEDIUM: 50, LOW: 100 };
+
   // 根据页面负载动态调整批量大小
-  function getBatchSize() {
+  function _getBatchSize() {
     const pending = state._mutationBatch.length;
-    if (pending > 500) return 200;   // 高负载：大批次
-    if (pending > 100) return 100;   // 中负载：中批次
-    return 50;                       // 低负载：小批次
+    if (pending > BATCH_THRESHOLDS.HIGH) return BATCH_SIZES.HIGH;   // 高负载：大批次
+    if (pending > BATCH_THRESHOLDS.MEDIUM) return BATCH_SIZES.MEDIUM;   // 中负载：中批次
+    return BATCH_SIZES.LOW;                       // 低负载：小批次
   }
 
   // 根据页面负载动态调整批量处理间隔
-  function getBatchInterval() {
+  function _getBatchInterval() {
     const pending = state._mutationBatch.length;
-    if (pending > 200) return 30;    // 高负载：更快处理
-    if (pending > 50) return 50;     // 中负载：正常
-    return 100;                      // 低负载：节省资源
+    if (pending > INTERVAL_THRESHOLDS.HIGH) return BATCH_INTERVALS.HIGH;    // 高负载：更快处理
+    if (pending > INTERVAL_THRESHOLDS.MEDIUM) return BATCH_INTERVALS.MEDIUM;     // 中负载：正常
+    return BATCH_INTERVALS.LOW;                      // 低负载：节省资源
   }
 
   const _observer = new MutationObserver(mutations => {
@@ -993,7 +1003,7 @@
 
     // 设置定时器，使用动态间隔
     if (!state._mutationTimer) {
-      const interval = getBatchInterval();
+      const interval = _getBatchInterval();
       state._mutationTimer = setTimeout(() => {
         state._mutationTimer = null;
         _processBatch();
@@ -1006,7 +1016,7 @@
 
     state._isProcessingBatch = true;
     // 使用动态批量大小
-    const batchSize = getBatchSize();
+    const batchSize = _getBatchSize();
     const batch = state._mutationBatch.splice(0, batchSize);
 
     batch.forEach(node => {
@@ -1026,7 +1036,7 @@
 
     // 如果还有剩余节点，使用动态间隔继续处理
     if (state._mutationBatch.length > 0) {
-      const interval = getBatchInterval();
+      const interval = _getBatchInterval();
       setTimeout(_processBatch, interval);
     }
   }
@@ -1051,7 +1061,7 @@
   // ========== 初始化（异步但不阻塞）==========
 
   // 获取页面使用的 CDN 优先级
-  function getCDNPriorities() {
+  function _getCDNPriorities() {
     const pageCDNs = new Set();
 
     // 扫描页面中的 script 和 link 元素
@@ -1088,6 +1098,22 @@
     if (state.initialized) return;
     state.initialized = true;
 
+    // 0. LCP 指标收集（需要尽早启动观察）
+    let lcpObserver = null;
+    try {
+      if (typeof PerformanceObserver !== 'undefined') {
+        lcpObserver = new PerformanceObserver((entryList) => {
+          const entries = entryList.getEntries();
+          if (entries.length > 0) {
+            state.lcp = entries[entries.length - 1].startTime;
+          }
+        });
+        lcpObserver.observe({ type: 'largest-contentful-paint', buffered: true });
+      }
+    } catch {
+      // 部分浏览器不支持 largest-contentful-paint 类型
+    }
+
     // 1. 加载配置（异步，不阻塞）
     _loadConfig();
 
@@ -1099,7 +1125,7 @@
 
     // 4. CDN健康探测（异步，不阻塞）- 优先探测页面使用的 CDN
     if (window.CDNMappings?.probeAllCDNs) {
-      const pageCDNs = getCDNPriorities();
+      const pageCDNs = _getCDNPriorities();
       if (pageCDNs.length > 0) {
         console.log(`${LOG_PREFIX} 优先探测页面使用的 CDN: ${pageCDNs.join(', ')}`);
         // 先探测页面使用的 CDN，再探测其他 CDN
@@ -1120,23 +1146,11 @@
     // 7. 消息监听
     _initMessageListener();
 
-    // 8. LCP 指标收集（需要尽早启动观察）
-    try {
-      if (typeof PerformanceObserver !== 'undefined') {
-        const lcpObserver = new PerformanceObserver((entryList) => {
-          const entries = entryList.getEntries();
-          if (entries.length > 0) {
-            state.lcp = entries[entries.length - 1].startTime;
-          }
-        });
-        lcpObserver.observe({ type: 'largest-contentful-paint', buffered: true });
-      }
-    } catch {
-      // 部分浏览器不支持 largest-contentful-paint 类型
-    }
-
-    // 9. 页面加载后收集性能指标
+    // 8. 页面加载后收集性能指标并停止 LCP 观察
     window.addEventListener('load', () => {
+      if (lcpObserver) {
+        lcpObserver.disconnect();
+      }
       state.performance = collectPerformanceMetrics();
     }, { once: true });
 

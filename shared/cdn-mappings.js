@@ -1137,7 +1137,7 @@
     }
   }
 
-  async function probeAllCDNs() {
+  async function probeAllCDNs(options = {}) {
     // 读取缓存
     try {
       const cached = await chrome.storage.local.get(HEALTH_KEY);
@@ -1147,11 +1147,36 @@
       }
     } catch {}
 
-    const probes = CDN_SOURCES.filter(c => !c._disabled).map(async cdn => {
+    const enabledCDNs = CDN_SOURCES.filter(c => !c._disabled);
+    const priorityIds = options.priorityIds || [];
+
+    // 将 CDN 按优先级排序：priorityIds 中的排在前面
+    const sortedCDNs = enabledCDNs.sort((a, b) => {
+      const aIdx = priorityIds.indexOf(a.id);
+      const bIdx = priorityIds.indexOf(b.id);
+      // 优先级列表中的 CDN 排在前面，按列表顺序排序；不在列表中的保持原顺序
+      if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+      if (aIdx !== -1) return -1;
+      if (bIdx !== -1) return 1;
+      return 0;
+    });
+
+    // 按顺序串行探测优先 CDN，并行探测其余 CDN
+    const priorityCDNs = sortedCDNs.filter(c => priorityIds.includes(c.id));
+    const otherCDNs = sortedCDNs.filter(c => !priorityIds.includes(c.id));
+
+    // 先探测优先 CDN（串行，确保优先级生效）
+    for (const cdn of priorityCDNs) {
+      _cdnHealth[cdn.id] = await probeCDN(cdn);
+      _cdnHealth[cdn.id].lastProbe = Date.now();
+    }
+
+    // 并行探测其余 CDN
+    const otherProbes = otherCDNs.map(async cdn => {
       _cdnHealth[cdn.id] = await probeCDN(cdn);
       _cdnHealth[cdn.id].lastProbe = Date.now();
     });
-    await Promise.allSettled(probes);
+    await Promise.allSettled(otherProbes);
 
     // 缓存结果
     try {
