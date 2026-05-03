@@ -875,9 +875,11 @@
           get() { return _href; },
           set(val) {
             _href = val;
-            if (val && el.rel === 'stylesheet') {
+            if (val) {
               el.setAttribute('href', val);
-              Promise.resolve().then(() => processLink(el));
+              if (el.rel === 'stylesheet') {
+                Promise.resolve().then(() => processLink(el));
+              }
             }
           }
         });
