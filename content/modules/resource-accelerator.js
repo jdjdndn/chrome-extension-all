@@ -1,11 +1,12 @@
 /**
- * 资源加速器主模块 (v4)
+ * 资源加速器主模块 (v8)
  * 核心优化：
  * 1. 同步启动 - 不等待配置加载
  * 2. API拦截 - 拦截 createElement/appendChild 等原生方法
  * 3. 即时处理 - 在元素创建时就拦截，而非等待 DOM 插入
  * 4. 图片压缩 - Canvas重绘导出WebP/JPEG
  * 5. CDN健康探测 - 启动时探测CDN可用性
+ * 6. 智能调度 - 优先级队列、动态批量处理、CDN探测优先级
  */
 
 (function () {
@@ -642,6 +643,22 @@
 
   // ========== 图片压缩 ==========
 
+  // 获取图片压缩优先级：可视区域 > 小图 > 大图
+  function getCompressPriority(img) {
+    try {
+      const rect = img.getBoundingClientRect();
+      // 可视区域最高优先级
+      if (rect.top < window.innerHeight && rect.bottom > 0) {
+        return 0;
+      }
+    } catch {}
+
+    // 根据图片大小判断优先级
+    const size = (img.naturalWidth || 0) * (img.naturalHeight || 0);
+    if (size < 100000) return 1;  // 小图次之
+    return 2;  // 大图最低
+  }
+
   function enqueueCompress(img, src) {
     // 限制队列大小，避免内存溢出
     if (state.compressQueue.length >= state.config.maxCompressQueueSize) {
@@ -651,12 +668,26 @@
       img.dataset.lazyLoaded = 'true';
       return;
     }
-    state.compressQueue.push({ img, src });
+
+    // 计算优先级并插入到队列的合适位置
+    const priority = getCompressPriority(img);
+    let insertIndex = state.compressQueue.length;
+
+    // 找到第一个优先级比当前低（数值更大）的位置
+    for (let i = 0; i < state.compressQueue.length; i++) {
+      if (state.compressQueue[i].priority < priority) {
+        insertIndex = i;
+        break;
+      }
+    }
+
+    state.compressQueue.splice(insertIndex, 0, { img, src, priority });
     processCompressQueue();
   }
 
   async function processCompressQueue() {
     while (state.compressingCount < state.config.imageMaxConcurrency && state.compressQueue.length > 0) {
+      // 按优先级取任务：总是取第一个（最高优先级）
       const task = state.compressQueue.shift();
       state.compressingCount++;
       try {
@@ -927,6 +958,22 @@
 
   // ========== MutationObserver（兜底）==========
 
+  // 根据页面负载动态调整批量大小
+  function getBatchSize() {
+    const pending = state._mutationBatch.length;
+    if (pending > 500) return 200;   // 高负载：大批次
+    if (pending > 100) return 100;   // 中负载：中批次
+    return 50;                       // 低负载：小批次
+  }
+
+  // 根据页面负载动态调整批量处理间隔
+  function getBatchInterval() {
+    const pending = state._mutationBatch.length;
+    if (pending > 200) return 30;    // 高负载：更快处理
+    if (pending > 50) return 50;     // 中负载：正常
+    return 100;                      // 低负载：节省资源
+  }
+
   const _observer = new MutationObserver(mutations => {
     if (!state.config.enableBatchProcessing) {
       // 不启用批量处理时，直接处理
@@ -942,12 +989,13 @@
       }
     }
 
-    // 设置定时器，批量处理
+    // 设置定时器，使用动态间隔
     if (!state._mutationTimer) {
+      const interval = getBatchInterval();
       state._mutationTimer = setTimeout(() => {
         state._mutationTimer = null;
         _processBatch();
-      }, state.config.mutationBatchInterval);
+      }, interval);
     }
   });
 
@@ -955,7 +1003,9 @@
     if (state._isProcessingBatch || state._mutationBatch.length === 0) return;
 
     state._isProcessingBatch = true;
-    const batch = state._mutationBatch.splice(0, 100); // 每次处理100个节点
+    // 使用动态批量大小
+    const batchSize = getBatchSize();
+    const batch = state._mutationBatch.splice(0, batchSize);
 
     batch.forEach(node => {
       if (!node.tagName) return;
@@ -972,9 +1022,10 @@
 
     state._isProcessingBatch = false;
 
-    // 如果还有剩余节点，继续处理
+    // 如果还有剩余节点，使用动态间隔继续处理
     if (state._mutationBatch.length > 0) {
-      setTimeout(_processBatch, 0);
+      const interval = getBatchInterval();
+      setTimeout(_processBatch, interval);
     }
   }
 
@@ -997,6 +1048,40 @@
 
   // ========== 初始化（异步但不阻塞）==========
 
+  // 获取页面使用的 CDN 优先级
+  function getCDNPriorities() {
+    const pageCDNs = new Set();
+
+    // 扫描页面中的 script 和 link 元素
+    const elements = document.querySelectorAll('script[src], link[href]');
+    elements.forEach(el => {
+      const url = el.src || el.href;
+      if (isCDNUrl(url)) {
+        const cdnInfo = _getCDNInfo(url);
+        if (cdnInfo) {
+          pageCDNs.add(cdnInfo.id);
+        }
+      }
+    });
+
+    return Array.from(pageCDNs);
+  }
+
+  // 获取 URL 对应的 CDN 信息
+  function _getCDNInfo(url) {
+    if (!window.CDNMappings?.CDN_SOURCES) return null;
+
+    for (const cdn of window.CDNMappings.CDN_SOURCES) {
+      try {
+        const cdnUrl = new URL(cdn.baseUrl);
+        if (url.includes(cdnUrl.hostname)) {
+          return { id: cdn.id, name: cdn.name || cdn.id };
+        }
+      } catch {}
+    }
+    return null;
+  }
+
   async function init() {
     if (state.initialized) return;
     state.initialized = true;
@@ -1010,8 +1095,17 @@
     // 3. CDN preconnect
     _addCDNPreconnect();
 
-    // 4. CDN健康探测（异步，不阻塞）
-    window.CDNMappings?.probeAllCDNs?.();
+    // 4. CDN健康探测（异步，不阻塞）- 优先探测页面使用的 CDN
+    if (window.CDNMappings?.probeAllCDNs) {
+      const pageCDNs = getCDNPriorities();
+      if (pageCDNs.length > 0) {
+        console.log(`${LOG_PREFIX} 优先探测页面使用的 CDN: ${pageCDNs.join(', ')}`);
+        // 先探测页面使用的 CDN，再探测其他 CDN
+        window.CDNMappings.probeAllCDNs({ priorityIds: pageCDNs });
+      } else {
+        window.CDNMappings.probeAllCDNs();
+      }
+    }
 
     // 5. 启动 MutationObserver（兜底）
     _observer.observe(document.documentElement, { childList: true, subtree: true });
