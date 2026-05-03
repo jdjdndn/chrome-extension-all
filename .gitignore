@@ -40,3 +40,6 @@ coverage/
 
 # Test temp files
 test-*.html
+
+# Worktrees
+.worktrees/
