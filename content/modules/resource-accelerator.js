@@ -74,7 +74,7 @@
    * 添加日志记录
    * @param {'info'|'warn'|'error'} level - 日志级别
    * @param {'script'|'style'|'image'|'cdn'|'deferral'|'system'} module - 模块
-   * @param {'replace'|'compress'|'lazy'|'defer'|'skip'|'block'|'error'|'init'} action - 操作
+   * @param {'replace'|'compress'|'lazy'|'defer'|'skip'|'block'|'error'|'init'|'probe'} action - 操作
    * @param {object} details - 详情
    */
   function addLog(level, module, action, details = {}) {
@@ -1307,13 +1307,24 @@
     // 4. CDN健康探测（异步，不阻塞）- 优先探测页面使用的 CDN
     if (window.CDNMappings?.probeAllCDNs) {
       const pageCDNs = _getCDNPriorities();
+      let probePromise;
       if (pageCDNs.length > 0) {
         console.log(`${LOG_PREFIX} 优先探测页面使用的 CDN: ${pageCDNs.join(', ')}`);
         // 先探测页面使用的 CDN，再探测其他 CDN
-        window.CDNMappings.probeAllCDNs({ priorityIds: pageCDNs });
+        probePromise = window.CDNMappings.probeAllCDNs({ priorityIds: pageCDNs });
       } else {
-        window.CDNMappings.probeAllCDNs();
+        probePromise = window.CDNMappings.probeAllCDNs();
       }
+      // 探测完成后记录健康状态到日志缓冲区
+      probePromise?.then?.(() => {
+        const cdnHealth = window.CDNMappings?.getCDNHealth?.() || {};
+        Object.entries(cdnHealth).forEach(([cdnId, health]) => {
+          addLog('info', 'cdn', 'probe', {
+            cdn: cdnId,
+            reason: health.healthy ? `RTT: ${health.rtt}ms` : '探测失败'
+          });
+        });
+      });
     }
 
     // 5. 启动 MutationObserver（兜底）
