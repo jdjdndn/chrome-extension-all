@@ -335,11 +335,33 @@ if (window.KeyboardClickLoaded) {
 
     /** 判断元素是否为交互元素（按钮/链接等），交互元素应保留原始点击目标 */
     _isInteractiveElement(el) {
+      if (!el) return false;
+
+      // 检查元素本身及其祖先元素（向上查找5层）
+      let current = el;
+      const maxDepth = 5;
       const tags = ['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA', 'LABEL'];
-      if (tags.includes(el.tagName)) return true;
-      if (el.isContentEditable) return true;
-      const role = el.getAttribute('role');
-      if (['button', 'link', 'tab', 'menuitem', 'checkbox', 'radio', 'switch'].includes(role)) return true;
+      const roles = ['button', 'link', 'tab', 'menuitem', 'checkbox', 'radio', 'switch'];
+
+      for (let i = 0; i < maxDepth && current && current !== document.body; i++) {
+        // 检查标签
+        if (tags.includes(current.tagName)) return true;
+        // 检查 contentEditable
+        if (current.isContentEditable) return true;
+        // 检查 role 属性
+        const role = current.getAttribute('role');
+        if (role && roles.includes(role)) return true;
+        // 检查 SVG 内部元素
+        if (current.tagName === 'SVG' || current.closest?.('svg')) return true;
+        // 检查常见的可点击 CSS 类
+        if (current.classList?.toString().match(/(btn|button|close|cancel|dismiss|icon)/i)) return true;
+        // 检查 onclick 属性
+        if (current.hasAttribute?.('onclick')) return true;
+        // 检查 tabindex（可聚焦元素通常可交互）
+        if (current.hasAttribute?.('tabindex') && current.getAttribute('tabindex') !== '-1') return true;
+
+        current = current.parentElement;
+      }
       return false;
     }
 
