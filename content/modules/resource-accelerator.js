@@ -67,6 +67,7 @@
   // ========== 日志系统 ==========
   const MAX_LOG_SIZE = 200;
   const LOG_ERROR_PERSIST_KEY = 'resourceAcceleratorErrorLogs';
+  const MAX_PERSISTED_ERROR_LOGS = 50;
   let _logBuffer = [];
   let _logPersistTimer = null;
 
@@ -116,10 +117,32 @@
     _logPersistTimer = setTimeout(async () => {
       _logPersistTimer = null;
       try {
-        const errorLogs = _logBuffer.filter(l => l.level === 'error').slice(-50);
+        const errorLogs = _logBuffer.filter(l => l.level === 'error').slice(-MAX_PERSISTED_ERROR_LOGS);
         await chrome.storage.local.set({ [LOG_ERROR_PERSIST_KEY]: errorLogs });
-      } catch {}
+      } catch (e) {
+        console.error(`${LOG_PREFIX} 持久化错误日志失败:`, e);
+      }
     }, 1000);
+  }
+
+  /**
+   * 从 storage 恢复错误日志
+   */
+  async function _restoreErrorLogs() {
+    try {
+      const result = await chrome.storage.local.get(LOG_ERROR_PERSIST_KEY);
+      const storedLogs = result[LOG_ERROR_PERSIST_KEY];
+      if (Array.isArray(storedLogs) && storedLogs.length > 0) {
+        // 将历史错误日志添加到缓冲区开头，确保最新的日志在后面
+        const historicalLogs = storedLogs.filter(l =>
+          l.timestamp && l.level === 'error' && l.module && l.action
+        );
+        _logBuffer = [...historicalLogs, ..._logBuffer].slice(-MAX_LOG_SIZE);
+        console.log(`${LOG_PREFIX} 已恢复 ${historicalLogs.length} 条历史错误日志`);
+      }
+    } catch (e) {
+      console.error(`${LOG_PREFIX} 恢复历史错误日志失败:`, e);
+    }
   }
 
   /**
@@ -1297,6 +1320,9 @@
 
     // 1. 加载配置（异步，不阻塞）
     _loadConfig();
+
+    // 1.1 恢复历史错误日志（异步，不阻塞）
+    _restoreErrorLogs();
 
     // 2. CSP 预检（异步，不阻塞）
     _precheckCSP();
