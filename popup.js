@@ -3776,3 +3776,183 @@ function notifyResourceAccelerator(config) {
     }
   });
 }
+
+// ========== 资源加速器日志系统 ==========
+
+let _raLogFilter = { level: 'all', module: 'all' };
+
+/**
+ * 加载并渲染日志
+ */
+async function loadResourceAcceleratorLogs() {
+  const logListEl = document.getElementById('ra-log-list');
+  if (!logListEl) return;
+
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) {
+      logListEl.innerHTML = '<div style="color: #999; text-align: center; padding: 12px;">无法获取当前标签页</div>';
+      return;
+    }
+
+    const response = await chrome.tabs.sendMessage(tab.id, {
+      type: 'RESOURCE_ACCELERATOR_GET_LOGS',
+      filter: _raLogFilter
+    });
+
+    if (!response?.success || !response.data) {
+      logListEl.innerHTML = '<div style="color: #999; text-align: center; padding: 12px;">暂无日志</div>';
+      return;
+    }
+
+    const logs = response.data;
+    if (logs.length === 0) {
+      logListEl.innerHTML = '<div style="color: #999; text-align: center; padding: 12px;">暂无日志</div>';
+      return;
+    }
+
+    // 渲染日志列表（最新的在前）
+    const logsHtml = logs.reverse().map(log => {
+      const time = new Date(log.timestamp).toLocaleTimeString('zh-CN', { hour12: false });
+      const levelColor = log.level === 'error' ? '#dc3545' : log.level === 'warn' ? '#ffc107' : '#28a745';
+      const moduleLabel = {
+        script: 'JS',
+        style: 'CSS',
+        image: 'IMG',
+        deferral: 'DEF',
+        system: 'SYS',
+        cdn: 'CDN'
+      }[log.module] || log.module;
+
+      const actionLabel = {
+        replace: '替换',
+        compress: '压缩',
+        lazy: '懒加载',
+        defer: '延迟',
+        skip: '跳过',
+        block: '阻止',
+        error: '错误',
+        init: '初始化'
+      }[log.action] || log.action;
+
+      let detail = '';
+      if (log.details?.url) {
+        const url = log.details.url;
+        detail = url.length > 40 ? url.substring(0, 40) + '...' : url;
+      }
+      if (log.details?.reason) {
+        detail += ` (${log.details.reason})`;
+      }
+
+      return `<div style="padding: 3px 0; border-bottom: 1px solid #e9ecef;">
+        <span style="color: #666;">${time}</span>
+        <span style="color: ${levelColor}; font-weight: 500;">[${log.level.toUpperCase()}]</span>
+        <span style="color: #007bff;">${moduleLabel}</span>
+        <span style="color: #495057;">${actionLabel}</span>
+        <div style="color: #666; font-size: 10px; margin-top: 2px; word-break: break-all;">${escapeHtml(detail)}</div>
+      </div>`;
+    }).join('');
+
+    logListEl.innerHTML = logsHtml;
+  } catch (error) {
+    logListEl.innerHTML = '<div style="color: #999; text-align: center; padding: 12px;">加载日志失败</div>';
+  }
+}
+
+/**
+ * 导出日志为文件
+ */
+async function exportResourceAcceleratorLogs() {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) return;
+
+    const response = await chrome.tabs.sendMessage(tab.id, {
+      type: 'RESOURCE_ACCELERATOR_GET_LOGS',
+      filter: { level: 'all', module: 'all' }
+    });
+
+    if (!response?.success || !response.data) {
+      alert('暂无日志可导出');
+      return;
+    }
+
+    const logs = response.data;
+    const exportData = {
+      exportTime: new Date().toISOString(),
+      url: tab.url,
+      totalLogs: logs.length,
+      logs: logs.map(log => ({
+        time: new Date(log.timestamp).toISOString(),
+        level: log.level,
+        module: log.module,
+        action: log.action,
+        ...log.details
+      }))
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ra-logs-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    alert('导出日志失败');
+  }
+}
+
+/**
+ * 清空日志
+ */
+async function clearResourceAcceleratorLogs() {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) return;
+
+    await chrome.tabs.sendMessage(tab.id, { type: 'RESOURCE_ACCELERATOR_CLEAR_LOGS' });
+    loadResourceAcceleratorLogs();
+  } catch (error) {
+    alert('清空日志失败');
+  }
+}
+
+// 初始化日志面板事件监听
+document.addEventListener('DOMContentLoaded', () => {
+  const logLevelFilter = document.getElementById('ra-log-level-filter');
+  const logModuleFilter = document.getElementById('ra-log-module-filter');
+  const logRefreshBtn = document.getElementById('ra-log-refresh');
+  const logExportBtn = document.getElementById('ra-log-export');
+  const logClearBtn = document.getElementById('ra-log-clear');
+
+  if (logLevelFilter) {
+    logLevelFilter.addEventListener('change', (e) => {
+      _raLogFilter.level = e.target.value;
+      loadResourceAcceleratorLogs();
+    });
+  }
+
+  if (logModuleFilter) {
+    logModuleFilter.addEventListener('change', (e) => {
+      _raLogFilter.module = e.target.value;
+      loadResourceAcceleratorLogs();
+    });
+  }
+
+  if (logRefreshBtn) {
+    logRefreshBtn.addEventListener('click', loadResourceAcceleratorLogs);
+  }
+
+  if (logExportBtn) {
+    logExportBtn.addEventListener('click', exportResourceAcceleratorLogs);
+  }
+
+  if (logClearBtn) {
+    logClearBtn.addEventListener('click', () => {
+      if (confirm('确定要清空所有日志吗？')) {
+        clearResourceAcceleratorLogs();
+      }
+    });
+  }
+});

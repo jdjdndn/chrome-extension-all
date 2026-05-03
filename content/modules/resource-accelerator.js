@@ -64,6 +64,95 @@
     },
   };
 
+  // ========== 日志系统 ==========
+  const MAX_LOG_SIZE = 200;
+  const LOG_ERROR_PERSIST_KEY = 'resourceAcceleratorErrorLogs';
+  let _logBuffer = [];
+  let _logPersistTimer = null;
+
+  /**
+   * 添加日志记录
+   * @param {'info'|'warn'|'error'} level - 日志级别
+   * @param {'script'|'style'|'image'|'cdn'|'deferral'|'system'} module - 模块
+   * @param {'replace'|'compress'|'lazy'|'defer'|'skip'|'block'|'error'|'init'} action - 操作
+   * @param {object} details - 详情
+   */
+  function addLog(level, module, action, details = {}) {
+    const logEntry = {
+      timestamp: Date.now(),
+      level,
+      module,
+      action,
+      details: {
+        url: details.url || '',
+        original: details.original || '',
+        cdn: details.cdn || '',
+        reason: details.reason || '',
+        duration: details.duration || 0,
+        size: details.size || 0,
+        compressedSize: details.compressedSize || 0,
+        ...details
+      }
+    };
+
+    _logBuffer.push(logEntry);
+
+    // 保持环形缓冲区大小
+    if (_logBuffer.length > MAX_LOG_SIZE) {
+      _logBuffer.shift();
+    }
+
+    // error 级别日志持久化到 storage
+    if (level === 'error') {
+      _scheduleErrorLogPersist();
+    }
+  }
+
+  /**
+   * 调度错误日志持久化（防抖）
+   */
+  function _scheduleErrorLogPersist() {
+    if (_logPersistTimer) return;
+    _logPersistTimer = setTimeout(async () => {
+      _logPersistTimer = null;
+      try {
+        const errorLogs = _logBuffer.filter(l => l.level === 'error').slice(-50);
+        await chrome.storage.local.set({ [LOG_ERROR_PERSIST_KEY]: errorLogs });
+      } catch {}
+    }, 1000);
+  }
+
+  /**
+   * 获取日志缓冲区
+   */
+  function getLogs(filter = {}) {
+    let logs = [..._logBuffer];
+
+    // 按级别筛选
+    if (filter.level && filter.level !== 'all') {
+      logs = logs.filter(l => l.level === filter.level);
+    }
+
+    // 按模块筛选
+    if (filter.module && filter.module !== 'all') {
+      logs = logs.filter(l => l.module === filter.module);
+    }
+
+    // 按时间范围筛选
+    if (filter.since) {
+      logs = logs.filter(l => l.timestamp >= filter.since);
+    }
+
+    return logs;
+  }
+
+  /**
+   * 清空日志缓冲区
+   */
+  function clearLogs() {
+    _logBuffer = [];
+  }
+
   // ========== 全局状态（同步初始化）==========
   const state = {
     config: { ...DEFAULT_CONFIG },
@@ -455,18 +544,27 @@
 
     script.dataset._raProcessed = '1';
 
-    if (isExcluded(url) || isCDNUrl(url)) return;
+    if (isExcluded(url) || isCDNUrl(url)) {
+      addLog('info', 'script', 'skip', { url, reason: isExcluded(url) ? 'excluded' : 'cdn_url' });
+      return;
+    }
 
     // 高级过滤检查
     const filterResult = matchAdvancedFilter(url);
     if (filterResult.matched) {
       if (filterResult.action === 'skipAll' || filterResult.action === 'skipReplace') {
+        addLog('info', 'script', 'skip', { url, reason: 'filter_rule' });
         return;
       }
     }
 
     // 去重检查：同一原始URL不重复替换
-    if (state.config.dedupEnabled && state.dedupSet.has(url)) return;
+    if (state.config.dedupEnabled && state.dedupSet.has(url)) {
+      addLog('info', 'script', 'skip', { url, reason: 'deduplicated' });
+      return;
+    }
+
+    const startTime = performance.now();
 
     // 使用异步匹配（支持 jsDelivr API 动态查询）
     const match = await window.CDNMappings?.matchJSLibraryAsync?.(url);
@@ -487,9 +585,16 @@
           });
           if (state.recentReplacements.length > 50) state.recentReplacements.shift();
           _persistStats();
+          addLog('info', 'deferral', 'defer', {
+            url,
+            reason: deferralRule.pattern,
+            strategy: deferralRule.strategy,
+            duration: Math.round(performance.now() - startTime)
+          });
           return;
         }
       }
+      addLog('info', 'script', 'skip', { url, reason: 'no_cdn_match' });
       return;
     }
 
@@ -508,6 +613,11 @@
       } else {
         script.src = originalSrc;
         state.stats.jsErrors++;
+        addLog('error', 'script', 'error', {
+          url: originalSrc,
+          cdn: match.cdnUrl,
+          reason: 'all_fallbacks_failed'
+        });
       }
     };
 
@@ -526,6 +636,15 @@
     }
     _persistStats();
     if (state.config.dedupEnabled) state.dedupSet.add(originalSrc);
+
+    addLog('info', 'script', 'replace', {
+      url: originalSrc,
+      original: originalSrc,
+      cdn: match.cdnUrl,
+      reason: match.name,
+      duration: Math.round(performance.now() - startTime)
+    });
+
     console.log(`${LOG_PREFIX} JS: ${match.name} → ${match.cdnName}${match.isDynamic ? ' (dynamic)' : ''}`);
   }
 
@@ -539,29 +658,47 @@
 
     link.dataset._raProcessed = '1';
 
-    if (isExcluded(url) || isCDNUrl(url)) return;
+    if (isExcluded(url) || isCDNUrl(url)) {
+      addLog('info', 'style', 'skip', { url, reason: isExcluded(url) ? 'excluded' : 'cdn_url' });
+      return;
+    }
 
     // 高级过滤检查
     const filterResult = matchAdvancedFilter(url);
     if (filterResult.matched) {
       if (filterResult.action === 'skipAll' || filterResult.action === 'skipReplace') {
+        addLog('info', 'style', 'skip', { url, reason: 'filter_rule' });
         return;
       }
     }
 
     // 去重检查：同一原始URL不重复替换
-    if (state.config.dedupEnabled && state.dedupSet.has(url)) return;
+    if (state.config.dedupEnabled && state.dedupSet.has(url)) {
+      addLog('info', 'style', 'skip', { url, reason: 'deduplicated' });
+      return;
+    }
+
+    const startTime = performance.now();
 
     // 先尝试字体匹配，再尝试CSS匹配
     const fontMatch = window.CDNMappings?.matchFont(url);
     const cssMatch = !fontMatch ? window.CDNMappings?.matchCSS(url) : null;
 
     // 检查各自的开关
-    if (fontMatch && !state.config.fontReplace) return;
-    if (cssMatch && !state.config.cssReplace) return;
+    if (fontMatch && !state.config.fontReplace) {
+      addLog('info', 'style', 'skip', { url, reason: 'font_replace_disabled' });
+      return;
+    }
+    if (cssMatch && !state.config.cssReplace) {
+      addLog('info', 'style', 'skip', { url, reason: 'css_replace_disabled' });
+      return;
+    }
 
     const match = fontMatch || cssMatch;
-    if (!match) return;
+    if (!match) {
+      addLog('info', 'style', 'skip', { url, reason: 'no_cdn_match' });
+      return;
+    }
 
     const originalHref = link.href;
     link.dataset._originalHref = originalHref;
@@ -585,6 +722,11 @@
         } else {
           state.stats.cssErrors = (state.stats.cssErrors || 0) + 1;
         }
+        addLog('error', 'style', 'error', {
+          url: originalHref,
+          cdn: match.cdnUrl,
+          reason: 'all_fallbacks_failed'
+        });
       }
     };
 
@@ -605,6 +747,15 @@
     }
     _persistStats();
     if (state.config.dedupEnabled) state.dedupSet.add(originalHref);
+
+    addLog('info', fontMatch ? 'style' : 'style', 'replace', {
+      url: originalHref,
+      original: originalHref,
+      cdn: match.cdnUrl,
+      reason: `${fontMatch ? 'font' : 'css'}: ${match.name}`,
+      duration: Math.round(performance.now() - startTime)
+    });
+
     console.log(`${LOG_PREFIX} ${fontMatch ? 'Font' : 'CSS'}: ${match.name} → ${match.cdnName}`);
   }
 
@@ -620,6 +771,7 @@
     const filterResult = matchAdvancedFilter(img.src);
     if (filterResult.matched) {
       if (filterResult.action === 'skipAll' || filterResult.action === 'skipReplace') {
+        addLog('info', 'image', 'skip', { url: img.src, reason: 'filter_rule' });
         return;
       }
     }
@@ -640,6 +792,10 @@
       img.dataset.lazyLoading = 'true';
       state.stats.imagesLazy++;
       _persistStats();
+      addLog('info', 'image', 'lazy', {
+        url: originalSrc,
+        reason: 'lazy_load_only'
+      });
     }
   }
 
@@ -672,6 +828,7 @@
       img.src = src;
       img.dataset.lazyLoading = 'false';
       img.dataset.lazyLoaded = 'true';
+      addLog('warn', 'image', 'skip', { url: src, reason: 'compress_queue_full' });
       return;
     }
 
@@ -696,25 +853,41 @@
       // 按优先级取任务：总是取第一个（最高优先级）
       const task = state.compressQueue.shift();
       state.compressingCount++;
+      const startTime = performance.now();
       try {
         const compressed = await compressImage(task.src);
+        const duration = Math.round(performance.now() - startTime);
         if (compressed) {
           // 压缩成功，直接加载压缩版本
           task.img.src = compressed;
           task.img.dataset.lazyLoading = 'false';
           task.img.dataset.lazyLoaded = 'true';
           task.img.dataset.compressed = 'true';
+          addLog('info', 'image', 'compress', {
+            url: task.src,
+            reason: 'success',
+            duration
+          });
         } else {
           // 压缩失败或不值得压缩，回退到原图
           task.img.src = task.src;
           task.img.dataset.lazyLoading = 'false';
           task.img.dataset.lazyLoaded = 'true';
+          addLog('info', 'image', 'skip', {
+            url: task.src,
+            reason: 'not_worth_compressing',
+            duration
+          });
         }
       } catch {
         // 异常时回退到原图
         task.img.src = task.src;
         task.img.dataset.lazyLoading = 'false';
         task.img.dataset.lazyLoaded = 'true';
+        addLog('error', 'image', 'error', {
+          url: task.src,
+          reason: 'compress_exception'
+        });
       }
       state.compressingCount--;
       processCompressQueue();
@@ -722,12 +895,16 @@
   }
 
   async function compressImage(url) {
-    if (!isSiteEnabled('imageCompress')) return null;
+    if (!isSiteEnabled('imageCompress')) {
+      addLog('info', 'image', 'skip', { url, reason: 'compress_disabled' });
+      return null;
+    }
 
     // 高级过滤检查
     const filterResult = matchAdvancedFilter(url);
     if (filterResult.matched) {
       if (filterResult.action === 'skipAll' || filterResult.action === 'skipCompress') {
+        addLog('info', 'image', 'skip', { url, reason: 'filter_rule' });
         return null;
       }
     }
@@ -743,6 +920,7 @@
       const urlObj = new URL(url, location.href);
       if (state.config.excludeDomains.some(d => urlObj.hostname.includes(d))) {
         state._compressCache.set(url, { skip: true });
+        addLog('info', 'image', 'skip', { url, reason: 'domain_excluded' });
         return null;
       }
     } catch {
@@ -753,6 +931,7 @@
     // 非图片类型不压缩
     if (/\.(webp|svg|gif|avif)$/i.test(url)) {
       state._compressCache.set(url, { skip: true });
+      addLog('info', 'image', 'skip', { url, reason: 'unsupported_format' });
       return null;
     }
 
@@ -767,6 +946,7 @@
         const bytes = actualSize || (img.naturalWidth * img.naturalHeight * 4);
         if (bytes < state.config.imageMinSize) {
           state._compressCache.set(url, { skip: true });
+          addLog('info', 'image', 'skip', { url, reason: 'below_min_size', size: bytes });
           resolve(null);
           return;
         }
@@ -807,6 +987,7 @@
       };
       img.onerror = () => {
         state._compressCache.set(url, { skip: true });
+        addLog('error', 'image', 'error', { url, reason: 'load_failed' });
         resolve(null);
       };
       img.src = url;
@@ -1238,6 +1419,16 @@
         sendResponse({ success: true });
         return true;
       }
+      if (message.type === 'RESOURCE_ACCELERATOR_GET_LOGS') {
+        const logs = getLogs(message.filter || {});
+        sendResponse({ success: true, data: logs });
+        return true;
+      }
+      if (message.type === 'RESOURCE_ACCELERATOR_CLEAR_LOGS') {
+        clearLogs();
+        sendResponse({ success: true });
+        return true;
+      }
     });
   }
 
@@ -1429,12 +1620,16 @@
       thirdPartyDeferralEnabled: state.config.thirdPartyDeferral?.enabled || false,
     }),
     getConfig: () => ({ ...state.config }),
+    getLogs,
+    clearLogs,
+    addLog,
     destroy: () => {
       _observer.disconnect();
       state.compressQueue = [];
       state.recentReplacements = [];
       state.dedupSet.clear();
       state._compressCache.clear();
+      _logBuffer = [];
       document.createElement = _createElement;
       Element.prototype.appendChild = _appendChild;
       Element.prototype.insertBefore = _insertBefore;

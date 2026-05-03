@@ -1272,6 +1272,37 @@
           <button id="reset-stats" style="flex: 1; background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);">重置</button>
         </div>
       </div>
+
+      <!-- 运行日志 -->
+      <div class="settings" style="margin-top: 12px;">
+        <h2 style="font-size: 16px; margin: 0 0 12px 0">运行日志</h2>
+        <div style="margin-bottom: 8px;">
+          <div style="display: flex; gap: 4px; margin-bottom: 8px;">
+            <select id="ra-log-level-filter" style="flex: 1; padding: 4px; font-size: 11px; border: 1px solid #dee2e6; border-radius: 4px;">
+              <option value="all">全部级别</option>
+              <option value="info">Info</option>
+              <option value="warn">Warn</option>
+              <option value="error">Error</option>
+            </select>
+            <select id="ra-log-module-filter" style="flex: 1; padding: 4px; font-size: 11px; border: 1px solid #dee2e6; border-radius: 4px;">
+              <option value="all">全部模块</option>
+              <option value="script">JS</option>
+              <option value="style">CSS/字体</option>
+              <option value="image">图片</option>
+              <option value="deferral">延迟加载</option>
+              <option value="system">系统</option>
+            </select>
+          </div>
+          <div id="ra-log-list" style="max-height: 200px; overflow-y: auto; font-size: 11px; background: #f8f9fa; border-radius: 6px; padding: 8px; font-family: monospace;">
+            <div style="color: #999; text-align: center; padding: 12px;">暂无日志</div>
+          </div>
+          <div style="display: flex; gap: 4px; margin-top: 8px;">
+            <button id="ra-log-refresh" style="flex: 1; font-size: 11px; padding: 4px 8px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer;">刷新</button>
+            <button id="ra-log-export" style="flex: 1; font-size: 11px; padding: 4px 8px; background: #17a2b8; color: white; border: none; border-radius: 3px; cursor: pointer;">导出</button>
+            <button id="ra-log-clear" style="flex: 1; font-size: 11px; padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 3px; cursor: pointer;">清空</button>
+          </div>
+        </div>
+      </div>
     </div><!-- End stats-view -->
     </div><!-- End stats-tab -->
     </div><!-- End tab-content -->
