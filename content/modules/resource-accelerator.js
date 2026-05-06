@@ -49,6 +49,12 @@
       selectors: ['article', 'section', 'aside', '.sidebar', '.footer', '.comments'],
       excludeSelectors: ['nav', 'header', '.above-fold'],
     },
+    // 第三方iframe懒加载
+    iframeLazyLoad: {
+      enabled: true,
+      threshold: 200,
+      excludePatterns: [],
+    },
     // 第三方脚本延迟加载
     thirdPartyDeferral: {
       enabled: true,
@@ -1050,6 +1056,44 @@
     }
   }
 
+  // ========== 第三方iframe懒加载 ==========
+  function processIframeLazyLoad() {
+    if (!isSiteEnabled('iframeLazyLoad')) return;
+    const config = state.config.iframeLazyLoad;
+    const threshold = config.threshold || 200;
+
+    const iframes = document.querySelectorAll('iframe[src]');
+    iframes.forEach(iframe => {
+      try {
+        const url = new URL(iframe.src, location.href);
+        if (url.hostname === location.hostname) return;
+        if (config.excludePatterns?.some(p => url.hostname.includes(p))) return;
+        if (iframe.dataset._raIframeProcessed) return;
+
+        iframe.dataset._raIframeProcessed = '1';
+        iframe.dataset.src = iframe.src;
+        iframe.removeAttribute('src');
+        iframe.loading = 'lazy';
+
+        const observer = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              const el = entry.target;
+              if (el.dataset.src) {
+                el.src = el.dataset.src;
+                delete el.dataset.src;
+              }
+              observer.unobserve(el);
+            }
+          });
+        }, { rootMargin: `0px 0px ${threshold}px 0px` });
+        observer.observe(iframe);
+      } catch {
+        // URL 解析失败，跳过
+      }
+    });
+  }
+
   // ========== 核心拦截：SVG 优化 ==========
 
   /**
@@ -1599,11 +1643,13 @@
       if (node.tagName === 'SCRIPT' && node.src) processScript(node);
       else if (node.tagName === 'LINK' && node.rel === 'stylesheet') processLink(node);
       else if (node.tagName === 'IMG') processImage(node);
+      else if (node.tagName === 'IFRAME') processIframeLazyLoad();
 
       if (node.querySelectorAll) {
         node.querySelectorAll('script[src]').forEach(processScript);
         node.querySelectorAll('link[rel="stylesheet"]').forEach(processLink);
         node.querySelectorAll('img[src]').forEach(processImage);
+        node.querySelectorAll('iframe[src]').forEach(processIframeLazyLoad);
       }
     });
 
@@ -1623,11 +1669,13 @@
         if (node.tagName === 'SCRIPT' && node.src) processScript(node);
         else if (node.tagName === 'LINK' && node.rel === 'stylesheet') processLink(node);
         else if (node.tagName === 'IMG') processImage(node);
+        else if (node.tagName === 'IFRAME') processIframeLazyLoad();
 
         if (node.querySelectorAll) {
           node.querySelectorAll('script[src]').forEach(processScript);
           node.querySelectorAll('link[rel="stylesheet"]').forEach(processLink);
           node.querySelectorAll('img[src]').forEach(processImage);
+          node.querySelectorAll('iframe[src]').forEach(processIframeLazyLoad);
         }
       }
     }
@@ -2938,6 +2986,8 @@
     document.querySelectorAll('script[src]').forEach(processScript);
     document.querySelectorAll('link[rel="stylesheet"]').forEach(processLink);
     document.querySelectorAll('img[src]').forEach(processImage);
+    // 处理已有iframe
+    processIframeLazyLoad();
 
     // 7. 消息监听
     _initMessageListener();
