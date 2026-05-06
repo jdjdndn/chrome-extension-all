@@ -55,6 +55,11 @@
       threshold: 200,
       excludePatterns: [],
     },
+    // 全站DNS prefetch
+    dnsPrefetch: {
+      enabled: true,
+      maxDomains: 15,
+    },
     // 第三方脚本延迟加载
     thirdPartyDeferral: {
       enabled: true,
@@ -1091,6 +1096,39 @@
       } catch {
         // URL 解析失败，跳过
       }
+    });
+  }
+
+  // ========== 全站DNS prefetch ==========
+  function _addGlobalDnsPrefetch() {
+    if (!isSiteEnabled('dnsPrefetch')) return;
+    const config = state.config.dnsPrefetch;
+    const maxDomains = config.maxDomains || 15;
+    const origins = new Set();
+    const head = document.head || document.documentElement;
+
+    document.querySelectorAll('script[src], link[href], img[src], iframe[src]').forEach(el => {
+      const url = el.src || el.href;
+      if (!url) return;
+      try {
+        const origin = new URL(url, location.href).origin;
+        if (origin !== location.origin) {
+          origins.add(origin);
+        }
+      } catch {}
+    });
+
+    let count = 0;
+    origins.forEach(origin => {
+      if (count >= maxDomains) return;
+      if (head.querySelector(`link[rel="preconnect"][href="${origin}"]`)) return;
+      if (head.querySelector(`link[rel="dns-prefetch"][href="${origin}"]`)) return;
+
+      const link = document.createElement('link');
+      link.rel = 'dns-prefetch';
+      link.href = origin;
+      head.appendChild(link);
+      count++;
     });
   }
 
@@ -2955,6 +2993,9 @@
 
     // 3. CDN preconnect
     _addCDNPreconnect();
+
+    // 全站DNS prefetch
+    _addGlobalDnsPrefetch();
 
     // 4. CDN健康探测（异步，不阻塞）- 优先探测页面使用的 CDN
     if (window.CDNMappings?.probeAllCDNs) {
