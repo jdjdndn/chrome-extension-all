@@ -120,6 +120,11 @@
           medium: { qualityMultiplier: 1.0 },
           slow: { qualityMultiplier: 0.7 },
         },
+        deviceAdjustments: {
+          high: { maxWidthMultiplier: 1.0 },
+          medium: { maxWidthMultiplier: 0.85 },
+          low: { maxWidthMultiplier: 0.7 },
+        },
       },
       sizeAdaptive: {
         enabled: true,
@@ -471,6 +476,26 @@
     // 更新全局状态
     state._lastNetworkQuality = quality;
     return quality;
+  }
+
+  /**
+   * 检测设备性能等级
+   * @returns {'high'|'medium'|'low'}
+   */
+  function detectDeviceTier() {
+    // 优先使用 deviceMemory API
+    if (navigator.deviceMemory) {
+      if (navigator.deviceMemory >= 8) return 'high';
+      if (navigator.deviceMemory >= 4) return 'medium';
+      return 'low';
+    }
+    // 回退：根据硬件并发数判断
+    if (navigator.hardwareConcurrency) {
+      if (navigator.hardwareConcurrency >= 8) return 'high';
+      if (navigator.hardwareConcurrency >= 4) return 'medium';
+      return 'low';
+    }
+    return 'medium'; // 默认中端
   }
 
   /**
@@ -2813,6 +2838,7 @@
 
       let quality = baseParams.quality;
       let maxWidth = baseParams.maxWidth;
+      let deviceTier = detectDeviceTier();  // 设备等级检测
 
       // 网络感知调整
       if (this.config.networkAdaptive.enabled) {
@@ -2820,6 +2846,15 @@
         const adjustment = this.config.networkAdaptive.adjustments[networkQuality];
         if (adjustment) {
           quality = Math.min(1, quality * adjustment.qualityMultiplier);
+        }
+
+        // 设备感知调整
+        const deviceAdjustments = this.config.networkAdaptive.deviceAdjustments;
+        if (deviceAdjustments) {
+          const deviceAdjustment = deviceAdjustments[deviceTier];
+          if (deviceAdjustment) {
+            maxWidth = Math.floor(maxWidth * deviceAdjustment.maxWidthMultiplier);
+          }
         }
       }
 
@@ -2832,6 +2867,19 @@
           maxWidth = Math.floor(maxWidth * 0.7);
         }
       }
+
+      // 设置最低质量阈值
+      quality = Math.max(0.5, quality);
+
+      // 调试日志
+      addLog('debug', 'image', 'adaptive_params', {
+        url,
+        imageType,
+        network: state._lastNetworkQuality,
+        device: deviceTier,
+        quality: quality.toFixed(2),
+        maxWidth,
+      });
 
       return {
         quality,
