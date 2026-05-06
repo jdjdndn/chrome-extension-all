@@ -1017,8 +1017,8 @@
     const originalSrc = img.src;
     img.dataset.src = originalSrc;
 
-    // LQIP：在压缩/懒加载之前设置占位
-    if (state.config.lqip?.enabled) {
+    // LQIP：仅在启用压缩时设置占位（非压缩路径无过渡触发点）
+    if (state.config.lqip?.enabled && state.config.imageCompress) {
       img.dataset.lqip = '1';
       img.style.backgroundColor = state.config.lqip.placeholderColor || '#f0f0f0';
       img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
@@ -2344,6 +2344,9 @@
       img.dataset.lqipLoaded = '1';
     } else {
       img.addEventListener('load', () => {
+        img.dataset.lqipLoaded = '1';
+      }, { once: true });
+      img.addEventListener('error', () => {
         img.dataset.lqipLoaded = '1';
       }, { once: true });
     }
