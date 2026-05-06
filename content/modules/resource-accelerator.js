@@ -17,6 +17,7 @@
   const STATS_KEY = 'resourceAcceleratorStats';
 
   const DEFAULT_CONFIG = {
+    version: '2.0.0',  // 配置版本号，用于迁移
     enabled: true,
     jsReplace: true,
     fontReplace: true,
@@ -404,6 +405,8 @@
     lcp: null,
     // 性能指标
     performance: null,
+    // 页面跳转状态
+    _isNavigating: false,
   };
 
   // ========== 统计持久化（防抖 + 增量）==========
@@ -445,6 +448,105 @@
   }
 
   // ========== 工具方法（同步）==========
+
+  /**
+   * 检测网络质量（共享函数）
+   * @returns {'fast'|'medium'|'slow'}
+   */
+  function detectNetworkQuality() {
+    if (!navigator.connection) return state._lastNetworkQuality || 'medium';
+
+    const effectiveType = navigator.connection.effectiveType;
+    const downlink = navigator.connection.downlink;
+
+    let quality = 'medium';
+    if (effectiveType === '4g' && downlink > 10) {
+      quality = 'fast';
+    } else if (effectiveType === '4g' || effectiveType === '3g') {
+      quality = 'medium';
+    } else {
+      quality = 'slow';
+    }
+
+    // 更新全局状态
+    state._lastNetworkQuality = quality;
+    return quality;
+  }
+
+  /**
+   * 增强的可视区检测
+   * @param {Element} element - 要检测的元素
+   * @param {Object} options - 配置选项
+   * @returns {{inViewport: boolean, aboveFold: boolean, visible: boolean, priority: 'high'|'auto'|'low'}}
+   */
+  function detectViewportState(element, options = {}) {
+    const {
+      topThreshold = 0.5,      // 首屏顶部区域比例
+      bottomBuffer = 100,      // 底部缓冲区
+      minVisibleArea = 0.1,    // 最小可见面积比例
+    } = options;
+
+    // 基础检查：元素是否存在
+    if (!element || !element.isConnected) {
+      return { inViewport: false, aboveFold: false, visible: false, priority: 'low' };
+    }
+
+    // 检查元素可见性
+    const style = window.getComputedStyle(element);
+    const isVisible = style.display !== 'none' &&
+                      style.visibility !== 'hidden' &&
+                      parseFloat(style.opacity) > 0;
+
+    if (!isVisible) {
+      return { inViewport: false, aboveFold: false, visible: false, priority: 'low' };
+    }
+
+    // 获取元素边界
+    const rect = element.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    // 检查元素尺寸
+    const elementArea = rect.width * rect.height;
+    if (elementArea < 10) { // 小于10像素的元素
+      return { inViewport: false, aboveFold: false, visible: true, priority: 'low' };
+    }
+
+    // 检查是否在可视区内（考虑水平和垂直）
+    const inViewportX = rect.right > 0 && rect.left < viewportWidth;
+    const inViewportY = rect.bottom > 0 && rect.top < viewportHeight + bottomBuffer;
+    const inViewport = inViewportX && inViewportY;
+
+    if (!inViewport) {
+      return { inViewport: false, aboveFold: false, visible: true, priority: 'low' };
+    }
+
+    // 计算可见面积比例
+    const visibleWidth = Math.min(rect.right, viewportWidth) - Math.max(rect.left, 0);
+    const visibleHeight = Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0);
+    const visibleArea = visibleWidth * visibleHeight;
+    const visibleRatio = visibleArea / elementArea;
+
+    // 可见面积太小
+    if (visibleRatio < minVisibleArea) {
+      return { inViewport: true, aboveFold: false, visible: true, priority: 'low' };
+    }
+
+    // 检查是否在首屏顶部
+    const aboveFold = rect.top < viewportHeight * topThreshold;
+
+    // 确定优先级
+    let priority = 'auto';
+    if (aboveFold && rect.top < viewportHeight * 0.3) {
+      // 首屏前30%区域，高优先级
+      priority = 'high';
+    } else if (rect.top > viewportHeight) {
+      // 完全在可视区下方
+      priority = 'low';
+    }
+
+    return { inViewport, aboveFold, visible: true, priority, visibleRatio };
+  }
 
   function isExcluded(url) {
     if (!url || typeof url !== 'string') return true;
@@ -1027,10 +1129,51 @@
     }
 
     img.dataset._raProcessed = '1';
+
+    // 增强的可视区检测
+    const viewportState = detectViewportState(img, {
+      topThreshold: 0.5,
+      bottomBuffer: 100,
+      minVisibleArea: 0.1
+    });
+
+    // 可视区图片：立即加载，不延迟
+    if (viewportState.inViewport && viewportState.visible) {
+      img.loading = 'eager';
+      if ('fetchPriority' in img) img.fetchPriority = viewportState.priority;
+
+      if (_priorityOptimizer) {
+        _priorityOptimizer.applyPriorityToResource(img, img.src, 'image');
+      }
+
+      // 可视区图片：后台压缩，前台立即显示原图
+      if (state.config.imageCompress) {
+        img.dataset.src = img.src;
+        addLog('info', 'image', 'viewport', {
+          url: img.src,
+          reason: 'viewport_immediate',
+          priority: viewportState.priority,
+          visibleRatio: viewportState.visibleRatio?.toFixed(2)
+        });
+
+        // 后台压缩（低优先级）
+        if (state.compressQueue.length < 3) {
+          compressImage(img.src).then(compressed => {
+            if (compressed && !state._isNavigating) {
+              img.src = compressed;
+              img.dataset.compressed = 'true';
+            }
+          });
+        }
+      }
+      return;
+    }
+
+    // 非可视区或不可见图片：懒加载处理
     img.loading = 'lazy';
     if ('fetchPriority' in img) img.fetchPriority = 'low';
+    img.dataset._raLazyLoad = '1';
 
-    // Apply priority optimization
     if (_priorityOptimizer) {
       _priorityOptimizer.applyPriorityToResource(img, img.src, 'image');
     }
@@ -1038,8 +1181,8 @@
     const originalSrc = img.src;
     img.dataset.src = originalSrc;
 
-    // LQIP：仅在启用压缩时设置占位（非压缩路径无过渡触发点）
-    if (state.config.lqip?.enabled && state.config.imageCompress) {
+    // LQIP：设置渐进式占位
+    if (state.config.lqip?.enabled) {
       img.dataset.lqip = '1';
       img.style.backgroundColor = state.config.lqip.placeholderColor || '#f0f0f0';
       img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
@@ -1049,14 +1192,18 @@
     if (state.config.imageCompress) {
       enqueueCompress(img, originalSrc);
     } else {
-      // 仅懒加载，设置占位图
-      img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-      img.dataset.lazyLoading = 'true';
+      // 非压缩路径：如果 LQIP 启用，触发过渡；否则仅懒加载
+      if (state.config.lqip?.enabled) {
+        _triggerLqipTransition(img);
+      } else {
+        img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+        img.dataset.lazyLoading = 'true';
+      }
       state.stats.imagesLazy++;
       _persistStats();
       addLog('info', 'image', 'lazy', {
         url: originalSrc,
-        reason: 'lazy_load_only'
+        reason: state.config.lqip?.enabled ? 'lqip_lazy' : 'lazy_load_only'
       });
     }
   }
@@ -1311,7 +1458,19 @@
   }
 
   async function processCompressQueue() {
+    // 页面跳转时停止处理
+    if (state._isNavigating) {
+      state.compressQueue = [];
+      return;
+    }
+
     while (state.compressingCount < state.config.imageMaxConcurrency && state.compressQueue.length > 0) {
+      // 页面跳转时停止处理
+      if (state._isNavigating) {
+        state.compressQueue = [];
+        return;
+      }
+
       // 按优先级取任务：总是取第一个（最高优先级）
       const task = state.compressQueue.shift();
       state.compressingCount++;
@@ -1400,13 +1559,33 @@
       return null;
     }
 
+    // 页面跳转时跳过压缩
+    if (state._isNavigating || false) {
+      return null;
+    }
+
     // 优先获取实际文件大小
     const actualSize = await getImageActualSize(url);
 
+    // 再次检查跳转状态
+    if (state._isNavigating) {
+      return null;
+    }
+
     return new Promise(resolve => {
+      // 跳转检查函数
+      const checkAborted = () => {
+        if (state._isNavigating) {
+          resolve(null);
+          return true;
+        }
+        return false;
+      };
+
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = () => {
+        if (checkAborted()) return;
         // 使用实际大小（如果获取到）；否则用像素估算降级
         const bytes = actualSize || (img.naturalWidth * img.naturalHeight * 4);
         if (bytes < state.config.imageMinSize) {
@@ -1442,6 +1621,11 @@
           const mimeType = format.mime;
 
           canvas.toBlob(blob => {
+            // 跳转时放弃结果
+            if (state._isNavigating) {
+              resolve(null);
+              return;
+            }
             if (blob && blob.size < bytes) {
               state.stats.imagesCompressed++;
               state.stats.imagesCompressBytesSaved += (bytes - blob.size);
@@ -1464,6 +1648,11 @@
         addLog('error', 'image', 'error', { url, reason: 'load_failed' });
         resolve(null);
       };
+      // 设置 src 前再次检查
+      if (state._isNavigating) {
+        resolve(null);
+        return;
+      }
       img.src = url;
     });
   }
@@ -1718,6 +1907,66 @@
       }
     }
   }
+
+  // ========== 共享网络状态模块 ==========
+  // 单例模式：避免 PriorityOptimizer 和 AdaptiveCompressor 重复检测
+  const NetworkState = {
+    quality: 'medium',
+    _listeners: new Set(),
+    _handleNetworkChange: null,
+
+    init() {
+      this.detect();
+      this.listen();
+    },
+
+    detect() {
+      if (!navigator.connection) return;
+
+      const effectiveType = navigator.connection.effectiveType;
+      const downlink = navigator.connection.downlink;
+
+      if (effectiveType === '4g' && downlink > 10) {
+        this.quality = 'fast';
+      } else if (effectiveType === '4g' || effectiveType === '3g') {
+        this.quality = 'medium';
+      } else {
+        this.quality = 'slow';
+      }
+
+      state._lastNetworkQuality = this.quality;
+    },
+
+    listen() {
+      if (!navigator.connection) return;
+
+      this._handleNetworkChange = () => {
+        const oldQuality = this.quality;
+        this.detect();
+        if (oldQuality !== this.quality) {
+          this._notifyListeners();
+        }
+      };
+
+      navigator.connection.addEventListener('change', this._handleNetworkChange);
+    },
+
+    subscribe(callback) {
+      this._listeners.add(callback);
+      return () => this._listeners.delete(callback);
+    },
+
+    _notifyListeners() {
+      this._listeners.forEach(cb => cb(this.quality));
+    },
+
+    destroy() {
+      if (this._handleNetworkChange && navigator.connection) {
+        navigator.connection.removeEventListener('change', this._handleNetworkChange);
+      }
+      this._listeners.clear();
+    }
+  };
 
   // ========== 性能监控 ==========
   class PerformanceMonitor {
@@ -1977,24 +2226,8 @@
 
     detectNetworkQuality() {
       if (!this.config.networkAware.enabled) return;
-
-      if (navigator.connection) {
-        const effectiveType = navigator.connection.effectiveType;
-        const downlink = navigator.connection.downlink;
-
-        if (effectiveType === '4g' && downlink > 10) {
-          this.networkQuality = 'fast';
-        } else if (effectiveType === '4g' || effectiveType === '3g') {
-          this.networkQuality = 'medium';
-        } else {
-          this.networkQuality = 'slow';
-        }
-      }
-
-      // 更新全局网络质量状态
-      if (typeof state !== 'undefined') {
-        state._lastNetworkQuality = this.networkQuality;
-      }
+      // 使用共享函数，统一网络质量检测
+      this.networkQuality = detectNetworkQuality();
     }
 
     detectPageType() {
@@ -2511,11 +2744,34 @@
     constructor(config) {
       this.config = config;
       this.typeCache = new Map();
+      this.networkQuality = 'medium';  // 独立的网络质量状态
+      this._handleNetworkChange = null;
     }
 
     init() {
       if (!this.config.enabled) return;
+
+      // 独立检测网络质量，不依赖 PriorityOptimizer
+      this.detectNetworkQuality();
+      this.listenNetworkChanges();
+
       console.log(`${LOG_PREFIX} [AdaptiveCompressor] 初始化完成`);
+    }
+
+    detectNetworkQuality() {
+      if (!this.config.networkAdaptive.enabled) return;
+      // 使用共享函数，统一网络质量检测
+      this.networkQuality = detectNetworkQuality();
+    }
+
+    listenNetworkChanges() {
+      if (!navigator.connection) return;
+
+      this._handleNetworkChange = () => {
+        this.detectNetworkQuality();
+      };
+
+      navigator.connection.addEventListener('change', this._handleNetworkChange);
     }
 
     detectImageType(url, element) {
@@ -2918,6 +3174,27 @@
     _smartPreloadV2.init();
   }
 
+  // ========== 页面跳转资源清理 ==========
+  /**
+   * 监听页面跳转，取消非可视区资源加载
+   * 使用 requestIdleCallback 延迟清理，不阻塞页面跳转
+   */
+  function _initNavigationListener() {
+    window.addEventListener('pagehide', () => {
+      // 标记跳转状态，立即返回让页面跳转
+      state._isNavigating = true;
+
+      // 使用 requestIdleCallback 延迟清理，不阻塞
+      requestIdleCallback?.(() => {
+        state.compressQueue = [];
+        state._deferredScripts = [];
+      }, { timeout: 100 }) || setTimeout(() => {
+        state.compressQueue = [];
+        state._deferredScripts = [];
+      }, 0);
+    }, { once: true });
+  }
+
   // ========== 初始化（异步但不阻塞）==========
 
   // 获取页面使用的 CDN 优先级
@@ -3048,6 +3325,9 @@
     // 1.18 初始化智能预加载 v2
     _initSmartPreloadV2();
 
+    // 1.19 初始化页面跳转监听
+    _initNavigationListener();
+
     // 8. 页面加载后收集性能指标并停止 LCP 观察
     window.addEventListener('load', () => {
       if (lcpObserver) {
@@ -3058,26 +3338,55 @@
       saveDailyStats();
     }, { once: true });
 
+    // 9. 点击预览立即加载原图
+    document.addEventListener('click', (e) => {
+      const img = e.target.closest('img[data-_raLazyLoad="1"]');
+      if (!img) return;
+
+      const originalSrc = img.dataset.src;
+      if (!originalSrc || img.dataset.lazyLoaded === 'true') return;
+
+      // 立即加载原图
+      img.src = originalSrc;
+      img.dataset.lazyLoaded = 'true';
+      img.loading = 'eager';
+      if ('fetchPriority' in img) img.fetchPriority = 'high';
+
+      // 触发 LQIP 过渡
+      _triggerLqipTransition(img);
+
+      addLog('info', 'image', 'click_load', { url: originalSrc, reason: 'user_click_preview' });
+    }, { capture: true });
+
     console.log(`${LOG_PREFIX} 初始化完成`);
   }
 
   async function _loadConfig() {
     try {
       const result = await chrome.storage.local.get(CONFIG_KEY);
-      if (result[CONFIG_KEY]) {
-        const userConfig = result[CONFIG_KEY];
-        // Deep merge for nested config objects
-        state.config = { ...DEFAULT_CONFIG };
-        for (const key of Object.keys(userConfig)) {
-          if (typeof userConfig[key] === 'object' && userConfig[key] !== null && !Array.isArray(userConfig[key])) {
-            state.config[key] = { ...DEFAULT_CONFIG[key], ...userConfig[key] };
-          } else {
-            state.config[key] = userConfig[key];
-          }
+      let userConfig = result[CONFIG_KEY] || {};
+
+      // 配置迁移：自动升级旧版本配置
+      if (window.ConfigMigrator && userConfig.version !== DEFAULT_CONFIG.version) {
+        const migrationResult = await ConfigMigrator.migrate(userConfig);
+        if (migrationResult?.config) {
+          userConfig = migrationResult.config;
+          console.log(`${LOG_PREFIX} 配置迁移完成: ${migrationResult.fromVersion} -> ${migrationResult.toVersion}`);
         }
-        if (!state.config.enabled) {
-          _observer.disconnect();
+      }
+
+      // Deep merge for nested config objects
+      state.config = { ...DEFAULT_CONFIG };
+      for (const key of Object.keys(userConfig)) {
+        if (typeof userConfig[key] === 'object' && userConfig[key] !== null && !Array.isArray(userConfig[key])) {
+          state.config[key] = { ...DEFAULT_CONFIG[key], ...userConfig[key] };
+        } else {
+          state.config[key] = userConfig[key];
         }
+      }
+
+      if (!state.config.enabled) {
+        _observer.disconnect();
       }
     } catch (error) {
       console.warn('[_loadConfig] 加载配置失败:', error);

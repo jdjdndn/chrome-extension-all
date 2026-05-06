@@ -2,7 +2,7 @@
 // 自动迁移旧版本配置到新版本
 
 (function () {
-  'cerable';
+  'use strict';
 
   if (window.ConfigMigrator) {
     console.log('[ConfigMigrator] 已存在，跳过初始化');
