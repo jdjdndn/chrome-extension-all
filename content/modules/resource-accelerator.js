@@ -2643,14 +2643,16 @@
       }
       link.dataset.preloadReason = reason;
 
-      const done = () => {
+      let _done = false;
+      const finish = () => {
+        if (_done) return;
+        _done = true;
         this.activePreloads--;
         this.processQueue();
       };
-      link.onload = done;
-      link.onerror = done;
-      // 安全超时：防止 onload/onerror 不触发导致计数器泄漏
-      setTimeout(done, 3000);
+      link.onload = finish;
+      link.onerror = finish;
+      setTimeout(finish, 3000);
 
       document.head.appendChild(link);
     }
