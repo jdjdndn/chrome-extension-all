@@ -205,6 +205,10 @@
         smallResourceThreshold: 10000,
         largeResourceThreshold: 100000,
       },
+      scanExisting: {
+        enabled: true,
+        maxElements: 50,
+      },
     },
     // 内存优化
     memoryOptimizer: {
@@ -1879,6 +1883,7 @@
       this.detectNetworkQuality();
       this.detectPageType();
       this.calculatePriority();
+      this.applyToExistingElements();
       this.listenNetworkChanges();
 
       console.log(`${LOG_PREFIX} [PriorityOptimizer] 初始化完成`);
@@ -2019,6 +2024,39 @@
       if (element.loading) {
         element.loading = priority <= 1 ? 'eager' : 'lazy';
       }
+    }
+
+    applyToExistingElements() {
+      if (!this.config.scanExisting?.enabled) return;
+
+      const viewportHeight = window.innerHeight;
+      let count = 0;
+      const max = this.config.scanExisting.maxElements || 50;
+
+      document.querySelectorAll('script[src]').forEach(script => {
+        if (count >= max) return;
+        this.applyPriorityToResource(script, script.src, 'script');
+        count++;
+      });
+
+      document.querySelectorAll('link[rel="stylesheet"]').forEach(link => {
+        if (count >= max) return;
+        this.applyPriorityToResource(link, link.href, 'style');
+        count++;
+      });
+
+      document.querySelectorAll('img[src]').forEach(img => {
+        if (count >= max) return;
+        const rect = img.getBoundingClientRect();
+        const isInViewport = rect.top < viewportHeight;
+        this.applyPriorityToResource(img, img.src, 'image');
+        if (!isInViewport && img.loading !== 'lazy') {
+          img.loading = 'lazy';
+        }
+        count++;
+      });
+
+      console.log(`${LOG_PREFIX} [PriorityOptimizer] 扫描已有资源: ${count} 个`);
     }
 
     getPriorityInfo() {
