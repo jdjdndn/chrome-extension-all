@@ -145,6 +145,7 @@
         maxConcurrent: 3,
         priorityQueue: true,
         abortOnNavigate: true,
+        maxPreloads: 6,  // 新增：最大preload元素数
       },
     },
     // 性能监控
@@ -2406,6 +2407,7 @@
       if (!this.config.enabled) return;
 
       this.analyzePageStructure();
+      this.preloadCriticalResources();  // 新增
       this.initScrollListener();
       this.initMouseListener();
       this.initDwellTimeTracker();
@@ -2458,6 +2460,14 @@
       }
 
       return resources;
+    }
+
+    preloadCriticalResources() {
+      if (!this.criticalResources || this.criticalResources.length === 0) return;
+      this.criticalResources
+        .filter(r => r.type === 'image' && r.priority === 0)
+        .slice(0, this.config.priorityScheduling.maxPreloads || 6)
+        .forEach(r => this._executePreload(r.url, 'aboveFold'));
     }
 
     initScrollListener() {
@@ -2555,14 +2565,24 @@
         return;
       }
 
-      this.executePreload(url, reason);
+      this._executePreload(url, reason);
     }
 
-    executePreload(url, reason) {
+    _executePreload(url, reason) {
       this.activePreloads++;
+      const isCritical = reason === 'aboveFold' || reason === 'hover' || reason === 'scroll-predict';
       const link = document.createElement('link');
-      link.rel = 'prefetch';
+      link.rel = isCritical ? 'preload' : 'prefetch';
       link.href = url;
+      if (isCritical) {
+        link.as = 'image';
+        // Check BEFORE append to avoid off-by-one
+        const preloadCount = document.querySelectorAll('link[rel="preload"][data-preload-reason]').length;
+        if (preloadCount >= (this.config.priorityScheduling.maxPreloads || 6)) {
+          link.rel = 'prefetch';
+          delete link.as;
+        }
+      }
       link.dataset.preloadReason = reason;
       document.head.appendChild(link);
       setTimeout(() => {
@@ -2575,7 +2595,7 @@
       while (this.preloadQueue.length > 0 &&
              this.activePreloads < this.config.priorityScheduling.maxConcurrent) {
         const item = this.preloadQueue.shift();
-        this.executePreload(item.url, item.reason);
+        this._executePreload(item.url, item.reason);
       }
     }
 
