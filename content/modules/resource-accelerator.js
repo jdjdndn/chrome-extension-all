@@ -70,6 +70,83 @@
       removeMetadata: true,
       minify: true,
     },
+    // 自适应压缩
+    adaptiveCompress: {
+      enabled: true,
+      typeDetection: {
+        enabled: true,
+        patterns: {
+          photo: [/\.(jpg|jpeg|png|webp)$/i, /photo|image|pic/i],
+          icon: [/icon|logo|avatar|emoji/i, /\.(svg|ico)$/i],
+          screenshot: [/screenshot|capture|snap/i],
+          diagram: [/chart|graph|diagram|flow/i],
+        },
+      },
+      typeStrategies: {
+        photo: { quality: 0.82, maxWidth: 1920 },
+        icon: { quality: 0.95, maxWidth: 512 },
+        screenshot: { quality: 0.78, maxWidth: 2560 },
+        diagram: { quality: 0.85, maxWidth: 1200 },
+      },
+      networkAdaptive: {
+        enabled: true,
+        adjustments: {
+          fast: { qualityMultiplier: 1.1 },
+          medium: { qualityMultiplier: 1.0 },
+          slow: { qualityMultiplier: 0.7 },
+        },
+      },
+      sizeAdaptive: {
+        enabled: true,
+        smallImageThreshold: 50000,
+        largeImageThreshold: 500000,
+      },
+    },
+    // 智能预加载 v2
+    smartPreloadV2: {
+      enabled: true,
+      pageStructure: {
+        enabled: true,
+        criticalRegions: {
+          aboveFold: true,
+          navigation: true,
+          mainContent: true,
+          sidebar: false,
+        },
+        contentTypes: {
+          article: { patterns: [/article/i, /post/i, /blog/i], preloadImages: 3 },
+          ecommerce: { patterns: [/product/i, /item/i, /shop/i], preloadImages: 5 },
+          video: { patterns: [/video/i, /watch/i, /player/i], preloadVideo: true },
+          gallery: { patterns: [/gallery/i, /album/i, /photo/i], preloadImages: 8 },
+        },
+      },
+      intentPrediction: {
+        enabled: true,
+        scrollSpeed: {
+          fastThreshold: 1000,
+          slowThreshold: 200,
+          fastBehavior: 'preload-more',
+          slowBehavior: 'preload-details',
+        },
+        dwellTime: {
+          shortThreshold: 2000,
+          longThreshold: 10000,
+          shortBehavior: 'preload-next',
+          longBehavior: 'preload-related',
+        },
+        mouseMovement: {
+          enabled: true,
+          hoverPreload: true,
+          hoverDelay: 300,
+        },
+      },
+      priorityScheduling: {
+        enabled: true,
+        maxConcurrent: 3,
+        priorityQueue: true,
+        abortOnNavigate: true,
+      },
+    },
     // 性能监控
     perfMonitor: {
       enabled: true,
@@ -1230,7 +1307,15 @@
         }
 
         try {
-          const MAX_DIMENSION = state.config.imageMaxDimension || 2048;
+          let MAX_DIMENSION = state.config.imageMaxDimension || 2048;
+          let quality = state.config.imageQuality;
+
+          if (_adaptiveCompressor) {
+            const params = _adaptiveCompressor.getCompressParams(url, img, actualSize);
+            quality = params.quality;
+            MAX_DIMENSION = params.maxWidth;
+          }
+
           let { naturalWidth: w, naturalHeight: h } = img;
           if (MAX_DIMENSION > 0 && (w > MAX_DIMENSION || h > MAX_DIMENSION)) {
             const scale = MAX_DIMENSION / Math.max(w, h);
@@ -1245,6 +1330,7 @@
 
           const format = getSupportedImageFormat();
           const mimeType = format.mime;
+
           canvas.toBlob(blob => {
             if (blob && blob.size < bytes) {
               state.stats.imagesCompressed++;
@@ -1257,7 +1343,7 @@
               state._compressCache.set(url, { skip: true });
               resolve(null);
             }
-          }, mimeType, state.config.imageQuality);
+          }, mimeType, quality);
         } catch {
           state._compressCache.set(url, { skip: true });
           resolve(null);
@@ -1789,6 +1875,11 @@
           this.networkQuality = 'slow';
         }
       }
+
+      // 更新全局网络质量状态
+      if (typeof state !== 'undefined') {
+        state._lastNetworkQuality = this.networkQuality;
+      }
     }
 
     detectPageType() {
@@ -2204,6 +2295,388 @@
     _memoryOptimizer.init();
   }
 
+  // ========== 自适应压缩 ==========
+  class AdaptiveCompressor {
+    constructor(config) {
+      this.config = config;
+      this.typeCache = new Map();
+    }
+
+    init() {
+      if (!this.config.enabled) return;
+      console.log(`${LOG_PREFIX} [AdaptiveCompressor] 初始化完成`);
+    }
+
+    detectImageType(url, element) {
+      if (!this.config.typeDetection.enabled) return 'photo';
+
+      const cacheKey = url;
+      if (this.typeCache.has(cacheKey)) {
+        return this.typeCache.get(cacheKey);
+      }
+
+      let detectedType = 'photo';
+
+      for (const [type, patterns] of Object.entries(this.config.typeDetection.patterns)) {
+        const matches = patterns.some(pattern =>
+          pattern.test(url) || pattern.test(element?.className || '')
+        );
+        if (matches) {
+          detectedType = type;
+          break;
+        }
+      }
+
+      this.typeCache.set(cacheKey, detectedType);
+
+      // 限制缓存大小，删除最旧的1000条而非全部清除
+      if (this.typeCache.size > 5000) {
+        const iter = this.typeCache.keys();
+        for (let i = 0; i < 1000; i++) {
+          this.typeCache.delete(iter.next().value);
+        }
+      }
+
+      return detectedType;
+    }
+
+    getCompressParams(url, element, originalSize) {
+      const imageType = this.detectImageType(url, element);
+      const baseParams = this.config.typeStrategies[imageType] || this.config.typeStrategies.photo;
+
+      let quality = baseParams.quality;
+      let maxWidth = baseParams.maxWidth;
+
+      // 网络感知调整
+      if (this.config.networkAdaptive.enabled) {
+        const networkQuality = state._lastNetworkQuality || 'medium';
+        const adjustment = this.config.networkAdaptive.adjustments[networkQuality];
+        if (adjustment) {
+          quality = Math.min(1, quality * adjustment.qualityMultiplier);
+        }
+      }
+
+      // 尺寸感知调整
+      if (this.config.sizeAdaptive.enabled && originalSize) {
+        if (originalSize < this.config.sizeAdaptive.smallImageThreshold) {
+          quality = Math.min(1, quality * 1.1);
+        } else if (originalSize > this.config.sizeAdaptive.largeImageThreshold) {
+          quality = Math.max(0.3, quality * 0.7);
+          maxWidth = Math.floor(maxWidth * 0.7);
+        }
+      }
+
+      return {
+        quality,
+        maxWidth,
+        imageType,
+      };
+    }
+
+    destroy() {
+      this.typeCache.clear();
+    }
+  }
+
+  let _adaptiveCompressor = null;
+
+  function _initAdaptiveCompressor() {
+    if (!state.config.adaptiveCompress?.enabled) return;
+    _adaptiveCompressor = new AdaptiveCompressor(state.config.adaptiveCompress);
+    _adaptiveCompressor.init();
+  }
+
+  // ========== 智能预加载 v2 ==========
+  class SmartPreloadV2 {
+    constructor(config) {
+      this.config = config;
+      this.pageType = 'default';
+      this.preloadQueue = [];
+      this.activePreloads = 0;
+      this.scrollSpeed = 0;
+      this.lastScrollY = 0;
+      this.lastScrollTime = Date.now();
+      this.dwellTime = 0;
+      this.pageLoadTime = Date.now();
+      this._longBehaviorTriggered = false;
+      this._shortBehaviorTriggered = false;
+    }
+
+    init() {
+      if (!this.config.enabled) return;
+
+      this.analyzePageStructure();
+      this.initScrollListener();
+      this.initMouseListener();
+      this.initDwellTimeTracker();
+
+      console.log(`${LOG_PREFIX} [SmartPreloadV2] 初始化完成`);
+    }
+
+    analyzePageStructure() {
+      if (!this.config.pageStructure.enabled) return;
+
+      const url = location.href;
+      for (const [type, rules] of Object.entries(this.config.pageStructure.contentTypes)) {
+        const matches = rules.patterns.some(pattern => pattern.test(url));
+        if (matches) {
+          this.pageType = type;
+          break;
+        }
+      }
+
+      this.criticalResources = this.detectCriticalResources();
+    }
+
+    detectCriticalResources() {
+      const resources = [];
+
+      if (this.config.pageStructure.criticalRegions.aboveFold) {
+        const viewportHeight = window.innerHeight;
+        document.querySelectorAll('img[src]').forEach(img => {
+          const rect = img.getBoundingClientRect();
+          if (rect.top < viewportHeight) {
+            resources.push({
+              url: img.src,
+              type: 'image',
+              priority: 0,
+              region: 'aboveFold',
+            });
+          }
+        });
+      }
+
+      if (this.config.pageStructure.criticalRegions.navigation) {
+        document.querySelectorAll('nav a[href], .nav a[href], header a[href]').forEach(link => {
+          resources.push({
+            url: link.href,
+            type: 'link',
+            priority: 1,
+            region: 'navigation',
+          });
+        });
+      }
+
+      return resources;
+    }
+
+    initScrollListener() {
+      if (!this.config.intentPrediction.enabled) return;
+
+      this._scrollTimer = null;
+      this._scrollHandler = () => {
+        const now = Date.now();
+        const deltaY = Math.abs(window.scrollY - this.lastScrollY);
+        const deltaTime = now - this.lastScrollTime;
+
+        if (deltaTime > 0) {
+          this.scrollSpeed = deltaY / (deltaTime / 1000);
+        }
+
+        this.lastScrollY = window.scrollY;
+        this.lastScrollTime = now;
+
+        clearTimeout(this._scrollTimer);
+        this._scrollTimer = setTimeout(() => {
+          this.onScrollEnd();
+        }, 150);
+      };
+      window.addEventListener('scroll', this._scrollHandler, { passive: true });
+    }
+
+    onScrollEnd() {
+      const { fastThreshold, slowThreshold, fastBehavior, slowBehavior } =
+        this.config.intentPrediction.scrollSpeed;
+
+      if (this.scrollSpeed > fastThreshold) {
+        this.executeStrategy(fastBehavior);
+      } else if (this.scrollSpeed < slowThreshold) {
+        this.executeStrategy(slowBehavior);
+      }
+    }
+
+    initMouseListener() {
+      if (!this.config.intentPrediction.mouseMovement.enabled) return;
+
+      this._mouseHandler = (e) => {
+        const target = e.target.closest('a[href], img[src]');
+        if (!target) return;
+
+        const url = target.href || target.src;
+        if (!url) return;
+
+        clearTimeout(this._mouseTimeout);
+        this._mouseTimeout = setTimeout(() => {
+          this.schedulePreload(url, 'hover', 2);
+        }, this.config.intentPrediction.mouseMovement.hoverDelay);
+      };
+      document.addEventListener('mouseover', this._mouseHandler, { passive: true });
+    }
+
+    initDwellTimeTracker() {
+      if (!this.config.intentPrediction.enabled) return;
+
+      this._dwellTimer = setInterval(() => {
+        this.dwellTime = Date.now() - this.pageLoadTime;
+        const { shortThreshold, longThreshold, shortBehavior, longBehavior } =
+          this.config.intentPrediction.dwellTime;
+
+        if (this.dwellTime > longThreshold && !this._longBehaviorTriggered) {
+          this._longBehaviorTriggered = true;
+          this.executeStrategy(longBehavior);
+        } else if (this.dwellTime > shortThreshold && this.dwellTime <= longThreshold && !this._shortBehaviorTriggered) {
+          this._shortBehaviorTriggered = true;
+          this.executeStrategy(shortBehavior);
+        }
+      }, 5000);
+    }
+
+    executeStrategy(strategy) {
+      switch (strategy) {
+        case 'preload-more':
+          this.preloadNextResources(3);
+          break;
+        case 'preload-details':
+          this.preloadCurrentContentDetails();
+          break;
+        case 'preload-next':
+          this.preloadNextPage();
+          break;
+        case 'preload-related':
+          this.preloadRelatedContent();
+          break;
+      }
+    }
+
+    schedulePreload(url, reason, priority) {
+      if (this.activePreloads >= this.config.priorityScheduling.maxConcurrent) {
+        this.preloadQueue.push({ url, reason, priority });
+        this.preloadQueue.sort((a, b) => a.priority - b.priority);
+        return;
+      }
+
+      this.executePreload(url, reason);
+    }
+
+    executePreload(url, reason) {
+      this.activePreloads++;
+      const link = document.createElement('link');
+      link.rel = 'prefetch';
+      link.href = url;
+      link.dataset.preloadReason = reason;
+      document.head.appendChild(link);
+      setTimeout(() => {
+        this.activePreloads--;
+        this.processQueue();
+      }, 50);
+    }
+
+    processQueue() {
+      while (this.preloadQueue.length > 0 &&
+             this.activePreloads < this.config.priorityScheduling.maxConcurrent) {
+        const item = this.preloadQueue.shift();
+        this.executePreload(item.url, item.reason);
+      }
+    }
+
+    preloadNextResources(count) {
+      const viewportHeight = window.innerHeight;
+      const images = document.querySelectorAll('img[data-src], img[src]');
+      let preloaded = 0;
+
+      for (const img of images) {
+        if (preloaded >= count) break;
+
+        const rect = img.getBoundingClientRect();
+        if (rect.top > viewportHeight && rect.top < viewportHeight + 500) {
+          const url = img.dataset.src || img.src;
+          if (url && !url.startsWith('data:') && !img.complete && img.naturalWidth === 0) {
+            this.schedulePreload(url, 'scroll-predict', 1);
+            preloaded++;
+          }
+        }
+      }
+    }
+
+    preloadCurrentContentDetails() {
+      const article = document.querySelector('article, .article, .post-content, .entry-content');
+      if (!article) return;
+
+      let count = 0;
+      const images = article.querySelectorAll('img[data-src], img[src]');
+      images.forEach(img => {
+        if (count >= 10) return;
+        const url = img.dataset.src || img.src;
+        if (url && !url.startsWith('data:')) {
+          this.schedulePreload(url, 'content-detail', 2);
+          count++;
+        }
+      });
+
+      const links = article.querySelectorAll('a[href]');
+      links.forEach(link => {
+        if (count >= 10) return;
+        if (link.hostname === location.hostname) {
+          this.schedulePreload(link.href, 'related-link', 3);
+          count++;
+        }
+      });
+    }
+
+    preloadNextPage() {
+      const nextLink = document.querySelector('a[rel="next"], .next-page, .pagination .next a');
+      if (nextLink) {
+        this.schedulePreload(nextLink.href, 'next-page', 1);
+      }
+    }
+
+    preloadRelatedContent() {
+      const relatedSections = document.querySelectorAll(
+        '.related-posts, .recommended, .similar-articles, aside'
+      );
+
+      let count = 0;
+      relatedSections.forEach(section => {
+        const links = section.querySelectorAll('a[href]');
+        links.forEach(link => {
+          if (count >= 10) return;
+          if (link.hostname === location.hostname) {
+            this.schedulePreload(link.href, 'related-content', 2);
+            count++;
+          }
+        });
+      });
+    }
+
+    destroy() {
+      if (this._scrollHandler) {
+        window.removeEventListener('scroll', this._scrollHandler);
+      }
+      if (this._scrollTimer) {
+        clearTimeout(this._scrollTimer);
+      }
+      if (this._mouseHandler) {
+        document.removeEventListener('mouseover', this._mouseHandler);
+      }
+      if (this._mouseTimeout) {
+        clearTimeout(this._mouseTimeout);
+      }
+      if (this._dwellTimer) {
+        clearInterval(this._dwellTimer);
+      }
+      document.querySelectorAll('link[data-preload-reason]').forEach(el => el.remove());
+      this.preloadQueue = [];
+    }
+  }
+
+  let _smartPreloadV2 = null;
+
+  function _initSmartPreloadV2() {
+    if (!state.config.smartPreloadV2?.enabled) return;
+    _smartPreloadV2 = new SmartPreloadV2(state.config.smartPreloadV2);
+    _smartPreloadV2.init();
+  }
+
   // ========== 初始化（异步但不阻塞）==========
 
   // 获取页面使用的 CDN 优先级
@@ -2316,6 +2789,12 @@
 
     // 1.16 初始化内存优化
     _initMemoryOptimizer();
+
+    // 1.17 初始化自适应压缩
+    _initAdaptiveCompressor();
+
+    // 1.18 初始化智能预加载 v2
+    _initSmartPreloadV2();
 
     // 8. 页面加载后收集性能指标并停止 LCP 观察
     window.addEventListener('load', () => {
@@ -2732,6 +3211,8 @@
       _perfMonitor?.destroy();
       _priorityOptimizer?.destroy?.();
       _memoryOptimizer?.destroy?.();
+      _adaptiveCompressor?.destroy();
+      _smartPreloadV2?.destroy();
       state.compressQueue = [];
       state.recentReplacements = [];
       state.dedupSet.clear();
