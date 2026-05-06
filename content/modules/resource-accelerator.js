@@ -36,6 +36,13 @@
     enableBatchProcessing: true,  // 启用批量处理
     dedupEnabled: true,  // 资源去重
     imageMaxDimension: 2048,  // 最大输出尺寸，0=不限制
+    // 渐进式图片占位
+    lqip: {
+      enabled: true,
+      blurRadius: 8,
+      transitionDuration: 300,
+      placeholderColor: '#f0f0f0',
+    },
     // 第三方脚本延迟加载
     thirdPartyDeferral: {
       enabled: true,
@@ -1010,6 +1017,13 @@
     const originalSrc = img.src;
     img.dataset.src = originalSrc;
 
+    // LQIP：在压缩/懒加载之前设置占位
+    if (state.config.lqip?.enabled) {
+      img.dataset.lqip = '1';
+      img.style.backgroundColor = state.config.lqip.placeholderColor || '#f0f0f0';
+      img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+    }
+
     // 图片压缩：预压缩后直接加载
     if (state.config.imageCompress) {
       enqueueCompress(img, originalSrc);
@@ -1219,6 +1233,7 @@
           task.img.dataset.lazyLoading = 'false';
           task.img.dataset.lazyLoaded = 'true';
           task.img.dataset.compressed = 'true';
+          _triggerLqipTransition(task.img);
           addLog('info', 'image', 'compress', {
             url: task.src,
             reason: 'success',
@@ -1229,6 +1244,7 @@
           task.img.src = task.src;
           task.img.dataset.lazyLoading = 'false';
           task.img.dataset.lazyLoaded = 'true';
+          _triggerLqipTransition(task.img);
           addLog('info', 'image', 'skip', {
             url: task.src,
             reason: 'not_worth_compressing',
@@ -1240,6 +1256,7 @@
         task.img.src = task.src;
         task.img.dataset.lazyLoading = 'false';
         task.img.dataset.lazyLoaded = 'true';
+        _triggerLqipTransition(task.img);
         addLog('error', 'image', 'error', {
           url: task.src,
           reason: 'compress_exception'
@@ -2296,6 +2313,42 @@
     _memoryOptimizer.init();
   }
 
+  // ========== LQIP 渐进式占位 ==========
+  let _lqipStyleInjected = false;
+
+  function _injectLqipCSS() {
+    if (_lqipStyleInjected) return;
+    const config = state.config.lqip;
+    if (!config?.enabled) return;
+
+    const style = document.createElement('style');
+    style.textContent = `
+      img[data-lqip] {
+        filter: blur(${config.blurRadius}px);
+        transition: filter ${config.transitionDuration}ms ease-out, opacity ${config.transitionDuration}ms ease-out;
+        opacity: 0.6;
+        background-color: ${config.placeholderColor};
+      }
+      img[data-lqip-loaded] {
+        filter: blur(0);
+        opacity: 1;
+      }
+    `;
+    document.head.appendChild(style);
+    _lqipStyleInjected = true;
+  }
+
+  function _triggerLqipTransition(img) {
+    if (!img.dataset.lqip) return;
+    if (img.complete) {
+      img.dataset.lqipLoaded = '1';
+    } else {
+      img.addEventListener('load', () => {
+        img.dataset.lqipLoaded = '1';
+      }, { once: true });
+    }
+  }
+
   // ========== 自适应压缩 ==========
   class AdaptiveCompressor {
     constructor(config) {
@@ -2766,6 +2819,9 @@
 
     // 1. 加载配置（异步，不阻塞）
     _loadConfig();
+
+    // 注入LQIP样式
+    _injectLqipCSS();
 
     // 1.1 恢复历史错误日志（异步，不阻塞）
     _restoreErrorLogs();
