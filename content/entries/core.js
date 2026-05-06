@@ -1,42 +1,35 @@
 /**
  * 核心模块入口
  * 将 manifest.json 中的 content_scripts 合并为单个 bundle
- * 加载顺序优化：资源加速器最先加载
+ *
+ * 加载策略：
+ * 1. 关键模块（资源加速器及其依赖）- document_start 时立即加载
+ * 2. 空闲模块 - 浏览器空闲时加载
+ * 3. 延迟模块 - DOMContentLoaded 后加载
  */
 
-// 1. 资源加速器（最高优先级 — document_start 时立即拦截资源）
-// 必须在所有其他模块之前加载，以便拦截后续所有资源请求
+import '../core/load-scheduler.js';
+
+// ========== 关键模块（立即加载） ==========
+// 资源加速器必须最先加载，以便拦截后续所有资源请求
 import '../../shared/cdn-mappings.js';
 import '../modules/resource-accelerator.js';
 
-// 2. EventBus
+// ========== 空闲模块（浏览器空闲时加载） ==========
+// 基础设施模块
 import '../../event-bus-v4.6.js';
-
-// 3. Logger
 import '../utils/logger.js';
-
-// 4. ScriptLoader
 import '../core/script-loader.js';
-
-// 5. DomainConfig
 import '../domain-config.js';
 
-// 6. StorageBridge
+// 工具模块
 import '../utils/storage-bridge.js';
-
-// 7. StorageUtils
 import '../utils/storage.js';
-
-// 8. DOMUtils
 import '../utils/dom.js';
-
-// 9. MessagingUtils
 import '../utils/messaging.js';
-
-// 10. ContentBridge
 import '../utils/content-bridge.js';
 
-// 11. Core modules
+// 核心业务模块
 import '../core/store.js';
 import '../core/services.js';
 import '../core/pipeline.js';
@@ -60,16 +53,14 @@ import '../core/extension-api.js';
 import '../core/module-manager.js';
 import '../core/lazy-init-manager.js';
 
-// 11. Base classes
+// 基类
 import '../base/SiteScript.js';
 
-// 12. 通用功能模块
+// 通用功能模块
 import '../common/script-switch.js';
 import '../common/list-link-split-view.js';
 import '../common/clipboard-watcher.js';
 
-// 14. Main entry
+// ========== 延迟模块（DOMContentLoaded 后加载） ==========
 import '../main.js';
-
-// 15. Content script (原独立文件，现打包到bundle)
 import '../../content.js';

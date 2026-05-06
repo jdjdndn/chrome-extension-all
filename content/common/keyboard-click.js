@@ -365,6 +365,16 @@ if (window.KeyboardClickLoaded) {
       return false;
     }
 
+    /** 判断元素是否在 Shadow DOM 内部 */
+    _isInShadowDOM(el) {
+      let current = el;
+      while (current && current !== document.body) {
+        if (current.parentNode?.host) return true; // parentNode.host 表示当前元素在 shadow root 内
+        current = current.parentNode;
+      }
+      return false;
+    }
+
     // ========== Space 短按点击 ==========
     _doClick(e) {
       // 使用 _findClickTarget 查找真实点击目标（穿透覆盖层找到被遮挡的媒体元素）
@@ -383,26 +393,31 @@ if (window.KeyboardClickLoaded) {
       const offsetX = clientX - rect.left;
       const offsetY = clientY - rect.top;
 
-      // 1. mousedown
-      el.dispatchEvent(new MouseEvent('mousedown', {
-        bubbles: true, cancelable: true,
-        clientX, clientY, offsetX, offsetY,
-        button: 0, buttons: 1,
-      }));
+      // Shadow DOM 内部元素使用 el.click()，确保原生点击行为正确触发
+      if (this._isInShadowDOM(el)) {
+        el.click();
+      } else {
+        // 1. mousedown
+        el.dispatchEvent(new MouseEvent('mousedown', {
+          bubbles: true, cancelable: true,
+          clientX, clientY, offsetX, offsetY,
+          button: 0, buttons: 1,
+        }));
 
-      // 2. mouseup
-      el.dispatchEvent(new MouseEvent('mouseup', {
-        bubbles: true, cancelable: true,
-        clientX, clientY, offsetX, offsetY,
-        button: 0, buttons: 0,
-      }));
+        // 2. mouseup
+        el.dispatchEvent(new MouseEvent('mouseup', {
+          bubbles: true, cancelable: true,
+          clientX, clientY, offsetX, offsetY,
+          button: 0, buttons: 0,
+        }));
 
-      // 3. click（带完整坐标信息）
-      el.dispatchEvent(new MouseEvent('click', {
-        bubbles: true, cancelable: true,
-        clientX, clientY, offsetX, offsetY,
-        button: 0, buttons: 0,
-      }));
+        // 3. click（带完整坐标信息）
+        el.dispatchEvent(new MouseEvent('click', {
+          bubbles: true, cancelable: true,
+          clientX, clientY, offsetX, offsetY,
+          button: 0, buttons: 0,
+        }));
+      }
     }
 
     // ========== X 右击 ==========

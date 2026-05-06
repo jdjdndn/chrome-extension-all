@@ -2,14 +2,15 @@
  * 主入口脚本
  * 统一脚本加载入口，根据域名配置动态加载所需脚本
  *
- * 加载顺序：
+ * 加载策略：
  * 1. 核心模块（manifest document_start）- 已完成
- * 2. 域名脚本（document_start 类型）
+ * 2. 域名脚本（document_start 类型）- 立即加载
  * 3. DOM 就绪后：
  *    - 通用脚本
  *    - 域名脚本（默认类型）
  *    - EventBus 集成
- *    - content.js
+ * 4. 浏览器空闲时：
+ *    - 非关键模块
  */
 
 (function () {
@@ -131,9 +132,18 @@
     }
   }
 
-  // 启动初始化
-  init().catch(err => {
-    console.error('[Main] 初始化失败:', err);
-  });
+  // 启动初始化（使用 LoadScheduler 在空闲时执行）
+  if (window.LoadScheduler) {
+    window.LoadScheduler.registerIdle('main-init', () => {
+      init().catch(err => {
+        console.error('[Main] 初始化失败:', err);
+      });
+    }, { priority: 10 });
+  } else {
+    // 降级：直接执行
+    init().catch(err => {
+      console.error('[Main] 初始化失败:', err);
+    });
+  }
 
 })();

@@ -43,6 +43,12 @@
       transitionDuration: 300,
       placeholderColor: '#f0f0f0',
     },
+    // content-visibility 渲染优化
+    contentVisibility: {
+      enabled: true,
+      selectors: ['article', 'section', 'aside', '.sidebar', '.footer', '.comments'],
+      excludeSelectors: ['nav', 'header', '.above-fold'],
+    },
     // 第三方脚本延迟加载
     thirdPartyDeferral: {
       enabled: true,
@@ -2334,8 +2340,32 @@
         opacity: 1;
       }
     `;
-    document.head.appendChild(style);
+    const head = document.head || document.documentElement;
+    head.appendChild(style);
     _lqipStyleInjected = true;
+  }
+
+  // ========== content-visibility 渲染优化 ==========
+  let _contentVisibilityInjected = false;
+
+  function _injectContentVisibilityCSS() {
+    if (_contentVisibilityInjected) return;
+    const config = state.config.contentVisibility;
+    if (!config?.enabled) return;
+
+    const includeSelector = config.selectors.join(', ');
+    const excludeSelector = config.excludeSelectors.map(s => `:not(${s})`).join('');
+
+    const style = document.createElement('style');
+    style.textContent = `
+      ${includeSelector}${excludeSelector} {
+        content-visibility: auto;
+        contain-intrinsic-size: 0 500px;
+      }
+    `;
+    const head = document.head || document.documentElement;
+    head.appendChild(style);
+    _contentVisibilityInjected = true;
   }
 
   function _triggerLqipTransition(img) {
@@ -2827,6 +2857,9 @@
 
     // 注入LQIP样式
     _injectLqipCSS();
+
+    // 注入 content-visibility 样式
+    _injectContentVisibilityCSS();
 
     // 1.1 恢复历史错误日志（异步，不阻塞）
     _restoreErrorLogs();

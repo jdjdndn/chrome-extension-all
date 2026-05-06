@@ -744,12 +744,22 @@ function processCurrentVideo() {
     return;
   }
 
-  // 下滑方向时，开启连播（用户从上滑返回后下滑回来）
+  // 下滑方向时，需要区分新视频和返回的视频
   if (lastNavigationDirection === 'down') {
     if (currentVideoId !== videoId) {
-      currentVideoId = videoId;
-      logger.debug(`[手动导航] 检测到下滑方向，视频 ${videoId.substring(0, 8)} 开启连播`);
-      setTimeout(() => enableAutoPlay(), 500);
+      // 检查是否是返回到之前的视频
+      if (isManualNavigation(videoId)) {
+        // 返回到之前的视频，记录该视频，不开启连播
+        logger.debug(`[手动导航] 检测到下滑返回，视频 ${videoId.substring(0, 8)} 跳过自动处理`);
+        currentVideoId = videoId;
+        updateVideoHistory(videoId);
+        returnedVideosThisSession.add(videoId);
+      } else {
+        // 下滑到新视频，开启连播
+        logger.debug(`[手动导航] 检测到下滑方向，新视频 ${videoId.substring(0, 8)} 开启连播`);
+        currentVideoId = videoId;
+        setTimeout(() => enableAutoPlay(), 500);
+      }
     }
     // 重置方向，避免后续误判
     lastNavigationDirection = null;

@@ -40,6 +40,7 @@
     {
       "matches": ["<all_urls>"],
       "js": [
+        "content/core/load-scheduler.js",
         "content/core-bundle.js"
       ],
       "css": ["styles.css"],
@@ -65,7 +66,8 @@
         "content/base/*.js",
         "content/modules/*.js",
         "content/devtools/*.js",
-        "shared/*.js"
+        "shared/*.js",
+        "content/core/load-sampler.js"
       ],
       "matches": ["<all_urls>"]
     }
