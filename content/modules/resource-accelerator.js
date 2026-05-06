@@ -2401,6 +2401,7 @@
       this.pageLoadTime = Date.now();
       this._longBehaviorTriggered = false;
       this._shortBehaviorTriggered = false;
+      this._preloadUrls = new Set();
     }
 
     init() {
@@ -2569,6 +2570,8 @@
     }
 
     _executePreload(url, reason) {
+      if (this._preloadUrls.has(url)) return;  // 去重
+      this._preloadUrls.add(url);
       this.activePreloads++;
       const isCritical = reason === 'aboveFold' || reason === 'hover' || reason === 'scroll-predict';
       const link = document.createElement('link');
@@ -2576,7 +2579,6 @@
       link.href = url;
       if (isCritical) {
         link.as = 'image';
-        // Check BEFORE append to avoid off-by-one
         const preloadCount = document.querySelectorAll('link[rel="preload"][data-preload-reason]').length;
         if (preloadCount >= (this.config.priorityScheduling.maxPreloads || 6)) {
           link.rel = 'prefetch';
@@ -2584,11 +2586,17 @@
         }
       }
       link.dataset.preloadReason = reason;
-      document.head.appendChild(link);
-      setTimeout(() => {
+
+      const done = () => {
         this.activePreloads--;
         this.processQueue();
-      }, 50);
+      };
+      link.onload = done;
+      link.onerror = done;
+      // 安全超时：防止 onload/onerror 不触发导致计数器泄漏
+      setTimeout(done, 3000);
+
+      document.head.appendChild(link);
     }
 
     processQueue() {
@@ -2685,6 +2693,7 @@
         clearInterval(this._dwellTimer);
       }
       document.querySelectorAll('link[data-preload-reason]').forEach(el => el.remove());
+      this._preloadUrls.clear();
       this.preloadQueue = [];
     }
   }
