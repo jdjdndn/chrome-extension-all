@@ -70,6 +70,88 @@
       removeMetadata: true,
       minify: true,
     },
+    // 性能监控
+    perfMonitor: {
+      enabled: true,
+      metrics: {
+        lcp: true,
+        fid: true,
+        cls: true,
+        ttfb: true,
+        fcp: true,
+        resourceTiming: true,
+        resourceSize: true,
+        resourceCount: true,
+        memoryUsage: true,
+        memoryPressure: true,
+      },
+      sampleRate: 0.1,
+      reportInterval: 60000,
+      storageKey: 'resourceAcceleratorPerfData',
+      maxEntries: 1000,
+    },
+    // 优先级优化
+    priorityOptimizer: {
+      enabled: true,
+      networkAware: {
+        enabled: true,
+        adjustments: {
+          fast: { script: 0, style: 1, image: 2, font: 3 },
+          medium: { script: 0, style: 0, image: 1, font: 2 },
+          slow: { script: 0, style: 0, image: 0, font: 1 },
+        },
+      },
+      pageTypeAware: {
+        enabled: true,
+        rules: {
+          ecommerce: { image: 0, script: 1, style: 2, font: 3 },
+          news: { script: 0, style: 1, image: 2, font: 3 },
+          video: { video: 0, script: 1, style: 2, image: 3 },
+        },
+      },
+      sizeAware: {
+        enabled: true,
+        smallResourceThreshold: 10000,
+        largeResourceThreshold: 100000,
+      },
+    },
+    // 内存优化
+    memoryOptimizer: {
+      enabled: true,
+      monitoring: {
+        enabled: true,
+        checkInterval: 5000,
+        thresholds: {
+          warning: 100,
+          critical: 200,
+        },
+      },
+      caching: {
+        enabled: true,
+        maxSize: 50 * 1024 * 1024,  // 50MB
+        ttl: 7 * 24 * 60 * 60 * 1000,  // 7天
+        evictionPolicy: 'lru',  // lru | lfu | fifo
+        prewarm: {
+          enabled: true,
+          types: ['css', 'js', 'fonts'],
+        },
+      },
+      pressureResponse: {
+        enabled: true,
+        strategies: {
+          warning: {
+            disableImageCompress: false,
+            reduceCacheSize: true,
+            pauseBackgroundTasks: false,
+          },
+          critical: {
+            disableImageCompress: true,
+            reduceCacheSize: true,
+            pauseBackgroundTasks: true,
+          },
+        },
+      },
+    },
   };
 
   // ========== 日志系统 ==========
@@ -687,6 +769,11 @@
       duration: Math.round(performance.now() - startTime)
     });
 
+    // Apply priority optimization
+    if (_priorityOptimizer) {
+      _priorityOptimizer.applyPriorityToResource(script, url, 'script');
+    }
+
     console.log(`${LOG_PREFIX} JS: ${match.name} → ${match.cdnName}${match.isDynamic ? ' (dynamic)' : ''}`);
   }
 
@@ -798,6 +885,11 @@
       duration: Math.round(performance.now() - startTime)
     });
 
+    // Apply priority optimization
+    if (_priorityOptimizer) {
+      _priorityOptimizer.applyPriorityToResource(link, url, 'style');
+    }
+
     console.log(`${LOG_PREFIX} ${fontMatch ? 'Font' : 'CSS'}: ${match.name} → ${match.cdnName}`);
   }
 
@@ -831,6 +923,11 @@
     img.dataset._raProcessed = '1';
     img.loading = 'lazy';
     if ('fetchPriority' in img) img.fetchPriority = 'low';
+
+    // Apply priority optimization
+    if (_priorityOptimizer) {
+      _priorityOptimizer.applyPriorityToResource(img, img.src, 'image');
+    }
 
     const originalSrc = img.src;
     img.dataset.src = originalSrc;
@@ -1422,6 +1519,691 @@
     }
   }
 
+  // ========== 性能监控 ==========
+  class PerformanceMonitor {
+    constructor(config) {
+      this.config = config;
+      this.metrics = {};
+      this.observers = [];
+      this.sampled = Math.random() < config.sampleRate;
+      this._reportTimer = null;
+    }
+
+    init() {
+      if (!this.config.enabled || !this.sampled) return;
+
+      this.initCoreWebVitals();
+      this.initResourceTiming();
+      this.initMemoryMonitoring();
+      this.startReporting();
+
+      console.log(`${LOG_PREFIX} [PerfMonitor] 初始化完成`);
+    }
+
+    initCoreWebVitals() {
+      // LCP 已在 init() 中通过 state.lcp 收集，此处不再重复创建 observer
+
+      try {
+        if (this.config.metrics.fid && typeof PerformanceObserver !== 'undefined') {
+          const fidObserver = new PerformanceObserver((entryList) => {
+            const entries = entryList.getEntries();
+            entries.forEach(entry => {
+              if (entry.processingStart) {
+                this.metrics.fid = entry.processingStart - entry.startTime;
+              }
+            });
+          });
+          fidObserver.observe({ type: 'first-input', buffered: true });
+          this.observers.push(fidObserver);
+        }
+      } catch (e) { console.warn(`${LOG_PREFIX} [PerfMonitor] 指标收集失败:`, e); }
+
+      try {
+        if (this.config.metrics.cls && typeof PerformanceObserver !== 'undefined') {
+          let clsValue = 0;
+          const clsObserver = new PerformanceObserver((entryList) => {
+            const entries = entryList.getEntries();
+            entries.forEach(entry => {
+              if (!entry.hadRecentInput) {
+                clsValue += entry.value;
+              }
+            });
+            this.metrics.cls = clsValue;
+          });
+          clsObserver.observe({ type: 'layout-shift', buffered: true });
+          this.observers.push(clsObserver);
+        }
+      } catch (e) { console.warn(`${LOG_PREFIX} [PerfMonitor] 指标收集失败:`, e); }
+
+      try {
+        if (this.config.metrics.fcp && typeof PerformanceObserver !== 'undefined') {
+          const fcpObserver = new PerformanceObserver((entryList) => {
+            const entries = entryList.getEntries();
+            entries.forEach(entry => {
+              if (entry.name === 'first-contentful-paint') {
+                this.metrics.fcp = entry.startTime;
+              }
+            });
+          });
+          fcpObserver.observe({ type: 'paint', buffered: true });
+          this.observers.push(fcpObserver);
+        }
+      } catch (e) { console.warn(`${LOG_PREFIX} [PerfMonitor] 指标收集失败:`, e); }
+
+      if (this.config.metrics.ttfb) {
+        const navEntry = performance.getEntriesByType('navigation')[0];
+        if (navEntry) {
+          this.metrics.ttfb = navEntry.responseStart - navEntry.requestStart;
+        }
+      }
+    }
+
+    initResourceTiming() {
+      if (!this.config.metrics.resourceTiming) return;
+
+      try {
+        const resourceObserver = new PerformanceObserver((entryList) => {
+          const entries = entryList.getEntries();
+          entries.forEach(entry => {
+            this.processResourceTiming(entry);
+          });
+        });
+        resourceObserver.observe({ type: 'resource', buffered: true });
+        this.observers.push(resourceObserver);
+      } catch (e) { console.warn(`${LOG_PREFIX} [PerfMonitor] 指标收集失败:`, e); }
+    }
+
+    processResourceTiming(entry) {
+      const url = entry.name;
+      const duration = entry.duration;
+      const size = entry.transferSize || 0;
+
+      if (!this.metrics.resources) {
+        this.metrics.resources = [];
+      }
+
+      this.metrics.resources.push({
+        url,
+        duration,
+        size,
+        type: this.getResourceType(url),
+        timestamp: Date.now(),
+      });
+
+      if (this.metrics.resources.length > 100) {
+        this.metrics.resources = this.metrics.resources.slice(-100);
+      }
+    }
+
+    getResourceType(url) {
+      if (url.endsWith('.js')) return 'script';
+      if (url.endsWith('.css')) return 'style';
+      if (url.match(/\.(png|jpg|jpeg|gif|webp|svg)$/)) return 'image';
+      if (url.match(/\.(woff|woff2|ttf|otf)$/)) return 'font';
+      return 'other';
+    }
+
+    initMemoryMonitoring() {
+      if (!this.config.metrics.memoryUsage) return;
+
+      this._memoryTimer = setInterval(() => {
+        if (performance.memory) {
+          this.metrics.memoryUsage = {
+            usedJSHeapSize: performance.memory.usedJSHeapSize,
+            totalJSHeapSize: performance.memory.totalJSHeapSize,
+            jsHeapSizeLimit: performance.memory.jsHeapSizeLimit,
+          };
+        }
+      }, 5000);
+    }
+
+    startReporting() {
+      this._reportTimer = setInterval(() => {
+        this.reportMetrics();
+      }, this.config.reportInterval);
+    }
+
+    async reportMetrics() {
+      if (Object.keys(this.metrics).length === 0) return;
+
+      const report = {
+        timestamp: Date.now(),
+        url: location.href,
+        userAgent: navigator.userAgent,
+        connection: this.getConnectionInfo(),
+        metrics: {
+        ...this.metrics,
+        resources: this.metrics.resources ? this.metrics.resources.map(r => ({...r})) : [],
+      },
+      };
+
+      await this.saveMetrics(report);
+      this.metrics.resources = [];
+    }
+
+    getConnectionInfo() {
+      if (navigator.connection) {
+        return {
+          effectiveType: navigator.connection.effectiveType,
+          downlink: navigator.connection.downlink,
+          rtt: navigator.connection.rtt,
+        };
+      }
+      return null;
+    }
+
+    async saveMetrics(report) {
+      try {
+        const result = await chrome.storage.local.get(this.config.storageKey);
+        const metrics = result[this.config.storageKey] || [];
+
+        metrics.push(report);
+
+        if (metrics.length > this.config.maxEntries) {
+          metrics.splice(0, metrics.length - this.config.maxEntries);
+        }
+
+        await chrome.storage.local.set({ [this.config.storageKey]: metrics });
+      } catch (e) {
+        console.warn(`${LOG_PREFIX} [PerfMonitor] 保存指标失败:`, e);
+      }
+    }
+
+    getOptimizationSuggestions() {
+      const suggestions = [];
+
+      if (state.lcp != null && state.lcp > 2500) {
+        suggestions.push({
+          type: 'lcp',
+          severity: 'high',
+          message: 'LCP 时间过长，建议优化关键资源加载',
+          actions: ['启用关键资源优先加载', '优化图片加载', '减少渲染阻塞资源'],
+        });
+      }
+
+      if (this.metrics.cls > 0.1) {
+        suggestions.push({
+          type: 'cls',
+          severity: 'medium',
+          message: '布局偏移过大，建议稳定页面布局',
+          actions: ['为图片设置尺寸', '避免动态插入内容', '使用 CSS containment'],
+        });
+      }
+
+      if (this.metrics.resources) {
+        const slowResources = this.metrics.resources.filter(r => r.duration > 1000);
+        if (slowResources.length > 0) {
+          suggestions.push({
+            type: 'resource',
+            severity: 'medium',
+            message: `发现 ${slowResources.length} 个慢加载资源`,
+            actions: ['启用 CDN 加速', '优化资源大小', '使用懒加载'],
+          });
+        }
+      }
+
+      return suggestions;
+    }
+
+    destroy() {
+      this.observers.forEach(observer => observer.disconnect());
+      this.observers = [];
+      if (this._reportTimer) clearInterval(this._reportTimer);
+      if (this._memoryTimer) clearInterval(this._memoryTimer);
+    }
+  }
+
+  // ========== 优先级优化 ==========
+  class PriorityOptimizer {
+    constructor(config) {
+      this.config = config;
+      this.currentPriority = {};
+      this.networkQuality = 'medium';
+      this.pageType = 'default';
+      this._handleNetworkChange = null;
+    }
+
+    init() {
+      if (!this.config.enabled) return;
+
+      this.detectNetworkQuality();
+      this.detectPageType();
+      this.calculatePriority();
+      this.listenNetworkChanges();
+
+      console.log(`${LOG_PREFIX} [PriorityOptimizer] 初始化完成`);
+    }
+
+    detectNetworkQuality() {
+      if (!this.config.networkAware.enabled) return;
+
+      if (navigator.connection) {
+        const effectiveType = navigator.connection.effectiveType;
+        const downlink = navigator.connection.downlink;
+
+        if (effectiveType === '4g' && downlink > 10) {
+          this.networkQuality = 'fast';
+        } else if (effectiveType === '4g' || effectiveType === '3g') {
+          this.networkQuality = 'medium';
+        } else {
+          this.networkQuality = 'slow';
+        }
+      }
+    }
+
+    detectPageType() {
+      if (!this.config.pageTypeAware.enabled) return;
+
+      const url = location.href;
+      const hostname = location.hostname;
+
+      for (const [type, rules] of Object.entries(this.config.pageTypeAware.rules)) {
+        const patterns = this.getPageTypePatterns(type);
+        const matches = patterns.some(pattern => pattern.test(url) || pattern.test(hostname));
+
+        if (matches) {
+          this.pageType = type;
+          return;
+        }
+      }
+
+      this.pageType = 'default';
+    }
+
+    getPageTypePatterns(type) {
+      const patterns = {
+        ecommerce: [/product/i, /item/i, /shop/i, /cart/i],
+        news: [/article/i, /news/i, /post/i, /blog/i],
+        video: [/video/i, /watch/i, /player/i, /stream/i],
+      };
+
+      return patterns[type] || [];
+    }
+
+    calculatePriority() {
+      const basePriority = this.getBasePriority();
+      const networkAdjustment = this.getNetworkAdjustment();
+      const pageTypeAdjustment = this.getPageTypeAdjustment();
+
+      this.currentPriority = { ...basePriority };
+
+      if (this.config.networkAware.enabled && networkAdjustment) {
+        Object.keys(this.currentPriority).forEach(type => {
+          if (networkAdjustment[type] !== undefined) {
+            this.currentPriority[type] = networkAdjustment[type];
+          }
+        });
+      }
+
+      if (this.config.pageTypeAware.enabled && pageTypeAdjustment) {
+        Object.keys(this.currentPriority).forEach(type => {
+          if (pageTypeAdjustment[type] !== undefined) {
+            this.currentPriority[type] = pageTypeAdjustment[type];
+          }
+        });
+      }
+    }
+
+    getBasePriority() {
+      return { script: 0, style: 1, image: 2, font: 3, video: 4 };
+    }
+
+    getNetworkAdjustment() {
+      return this.config.networkAware.adjustments[this.networkQuality];
+    }
+
+    getPageTypeAdjustment() {
+      return this.config.pageTypeAware.rules[this.pageType];
+    }
+
+    listenNetworkChanges() {
+      if (!navigator.connection) return;
+
+      this._handleNetworkChange = () => {
+        this.detectNetworkQuality();
+        this.calculatePriority();
+      };
+
+      navigator.connection.addEventListener('change', this._handleNetworkChange);
+    }
+
+    getResourcePriority(url, type) {
+      let priority = this.currentPriority[type] ?? 2;
+
+      if (this.config.sizeAware.enabled) {
+        const size = this.estimateResourceSize(url, type);
+        if (size < this.config.sizeAware.smallResourceThreshold) {
+          priority = Math.max(0, priority - 1);
+        } else if (size > this.config.sizeAware.largeResourceThreshold) {
+          priority = Math.min(4, priority + 1);
+        }
+      }
+
+      return priority;
+    }
+
+    estimateResourceSize(url, type) {
+      const sizeEstimates = {
+        script: 50000,
+        style: 20000,
+        image: 100000,
+        font: 30000,
+        video: 1000000,
+      };
+
+      return sizeEstimates[type] || 50000;
+    }
+
+    applyPriorityToResource(element, url, type) {
+      const priority = this.getResourcePriority(url, type);
+
+      if (element.fetchPriority) {
+        element.fetchPriority = priority <= 1 ? 'high' : priority >= 3 ? 'low' : 'auto';
+      }
+
+      if (element.loading) {
+        element.loading = priority <= 1 ? 'eager' : 'lazy';
+      }
+    }
+
+    getPriorityInfo() {
+      return {
+        networkQuality: this.networkQuality,
+        pageType: this.pageType,
+        currentPriority: { ...this.currentPriority },
+      };
+    }
+
+    destroy() {
+      // 移除网络变化监听器
+      if (navigator.connection) {
+        navigator.connection.removeEventListener('change', this._handleNetworkChange);
+      }
+    }
+  }
+
+  // ========== 内存优化 ==========
+  class MemoryOptimizer {
+    constructor(config) {
+      this.config = config;
+      this.cache = new Map();
+      this.cacheStats = { hits: 0, misses: 0, evictions: 0 };
+      this.memoryPressure = 'normal';
+      this._checkTimer = null;
+      this._saveTimer = null;
+    }
+
+    async init() {
+      if (!this.config.enabled) return;
+
+      this.initMemoryMonitoring();
+      this.initCache();
+      await this.loadCacheData();
+      await this.prewarmCache();
+
+      console.log(`${LOG_PREFIX} [MemoryOptimizer] 初始化完成`);
+    }
+
+    initMemoryMonitoring() {
+      if (!this.config.monitoring.enabled) return;
+
+      this._checkTimer = setInterval(() => {
+        this.checkMemoryPressure();
+      }, this.config.monitoring.checkInterval);
+    }
+
+    checkMemoryPressure() {
+      if (!performance.memory) return;
+
+      const usedMB = performance.memory.usedJSHeapSize / 1024 / 1024;
+
+      if (usedMB > this.config.monitoring.thresholds.critical) {
+        this.memoryPressure = 'critical';
+        this.applyPressureResponse('critical');
+      } else if (usedMB > this.config.monitoring.thresholds.warning) {
+        this.memoryPressure = 'warning';
+        this.applyPressureResponse('warning');
+      } else {
+        this.memoryPressure = 'normal';
+      }
+    }
+
+    applyPressureResponse(pressure) {
+      const strategy = this.config.pressureResponse.strategies[pressure];
+      if (!strategy) return;
+
+      if (strategy.disableImageCompress && typeof state !== 'undefined') {
+        state.config.imageCompress = false;
+      }
+
+      if (strategy.reduceCacheSize) {
+        this.reduceCacheSize();
+      }
+
+      if (strategy.pauseBackgroundTasks) {
+        this.pauseBackgroundTasks();
+      }
+    }
+
+    reduceCacheSize() {
+      const currentSize = this.getCacheSize();
+      const targetSize = this.config.caching.maxSize * 0.5;
+
+      if (currentSize > targetSize) {
+        this.evictCacheEntries(currentSize - targetSize);
+      }
+    }
+
+    pauseBackgroundTasks() {
+      // Worker pool pause not implemented in current architecture
+    }
+
+    initCache() {
+      this.cache = new Map();
+    }
+
+    async loadCacheData() {
+      try {
+        const result = await chrome.storage.local.get('resourceAcceleratorCacheData');
+        const cachedData = result.resourceAcceleratorCacheData || {};
+
+        for (const [key, value] of Object.entries(cachedData)) {
+          if (this.isCacheEntryValid(value)) {
+            this.cache.set(key, value);
+          }
+        }
+      } catch (e) {
+        console.warn(`${LOG_PREFIX} [MemoryOptimizer] 加载缓存数据失败:`, e);
+      }
+    }
+
+    async prewarmCache() {
+      if (!this.config.caching.prewarm?.enabled) return;
+
+      const types = this.config.caching.prewarm.types || [];
+      const resources = document.querySelectorAll('link[rel="stylesheet"], script[src], style');
+
+      for (const resource of resources) {
+        let url = '';
+        let type = '';
+
+        if (resource.tagName === 'LINK' && resource.rel === 'stylesheet') {
+          url = resource.href;
+          type = 'css';
+        } else if (resource.tagName === 'SCRIPT' && resource.src) {
+          url = resource.src;
+          type = 'js';
+        } else if (resource.tagName === 'STYLE') {
+          type = 'css';
+        }
+
+        if (url && types.includes(type)) {
+          const cacheKey = `prewarm:${url}`;
+          const existing = await this.getFromCache(cacheKey);
+          if (!existing) {
+            this.cache.set(cacheKey, {
+              value: { url, type, prewarmed: true },
+              timestamp: Date.now(),
+              lastAccess: Date.now(),
+              accessCount: 0,
+            });
+          }
+        }
+      }
+
+      console.log(`${LOG_PREFIX} [MemoryOptimizer] 缓存预热完成，当前缓存 ${this.cache.size} 项`);
+    }
+
+    isCacheEntryValid(entry) {
+      if (!entry || !entry.timestamp) return false;
+      const now = Date.now();
+      return now - entry.timestamp < this.config.caching.ttl;
+    }
+
+    async saveCacheData() {
+      try {
+        const cacheData = Object.fromEntries(this.cache);
+        await chrome.storage.local.set({ resourceAcceleratorCacheData: cacheData });
+      } catch (e) {
+        console.warn(`${LOG_PREFIX} [MemoryOptimizer] 保存缓存数据失败:`, e);
+      }
+    }
+
+    getCacheSize() {
+      let size = 0;
+      for (const [key, value] of this.cache.entries()) {
+        size += this.estimateSize(value.value);
+      }
+      return size;
+    }
+
+    estimateSize(value) {
+      if (typeof value === 'string') {
+        return value.length * 2;
+      }
+      return JSON.stringify(value).length * 2;
+    }
+
+    evictCacheEntries(targetSize) {
+      let evictedSize = 0;
+      const entries = Array.from(this.cache.entries());
+
+      switch (this.config.caching.evictionPolicy) {
+        case 'lru':
+          entries.sort((a, b) => (a[1].lastAccess || 0) - (b[1].lastAccess || 0));
+          break;
+        case 'lfu':
+          entries.sort((a, b) => (a[1].accessCount || 0) - (b[1].accessCount || 0));
+          break;
+        case 'fifo':
+          entries.sort((a, b) => (a[1].timestamp || 0) - (b[1].timestamp || 0));
+          break;
+      }
+
+      for (const [key, value] of entries) {
+        if (evictedSize >= targetSize) break;
+        const size = this.estimateSize(value);
+        this.cache.delete(key);
+        evictedSize += size;
+        this.cacheStats.evictions++;
+      }
+    }
+
+    async getFromCache(key) {
+      if (!this.config.caching.enabled) return null;
+
+      const entry = this.cache.get(key);
+      if (!entry) {
+        this.cacheStats.misses++;
+        return null;
+      }
+
+      if (!this.isCacheEntryValid(entry)) {
+        this.cache.delete(key);
+        this.cacheStats.misses++;
+        return null;
+      }
+
+      entry.lastAccess = Date.now();
+      entry.accessCount = (entry.accessCount || 0) + 1;
+      this.cacheStats.hits++;
+      return entry.value;
+    }
+
+    async setCache(key, value) {
+      if (!this.config.caching.enabled) return;
+
+      const currentSize = this.getCacheSize();
+      const entrySize = this.estimateSize(value);
+
+      if (currentSize + entrySize > this.config.caching.maxSize) {
+        this.evictCacheEntries(entrySize);
+      }
+
+      this.cache.set(key, {
+        value,
+        timestamp: Date.now(),
+        lastAccess: Date.now(),
+        accessCount: 1,
+      });
+
+      this.scheduleSaveCacheData();
+    }
+
+    scheduleSaveCacheData() {
+      if (this._saveTimer) return;
+      this._saveTimer = setTimeout(() => {
+        this._saveTimer = null;
+        this.saveCacheData();
+      }, 5000);
+    }
+
+    getCacheStats() {
+      return {
+        ...this.cacheStats,
+        size: this.getCacheSize(),
+        entries: this.cache.size,
+        memoryPressure: this.memoryPressure,
+      };
+    }
+
+    clearCache() {
+      this.cache.clear();
+      this.cacheStats = { hits: 0, misses: 0, evictions: 0 };
+      this.saveCacheData();
+    }
+
+    destroy() {
+      if (this._checkTimer) clearInterval(this._checkTimer);
+      if (this._saveTimer) clearTimeout(this._saveTimer);
+      this.saveCacheData();
+    }
+  }
+
+  let _perfMonitor = null;
+
+  function _initPerfMonitor() {
+    if (!state.config.perfMonitor?.enabled) return;
+    _perfMonitor = new PerformanceMonitor(state.config.perfMonitor);
+    _perfMonitor.init();
+  }
+
+  let _priorityOptimizer = null;
+
+  function _initPriorityOptimizer() {
+    if (!state.config.priorityOptimizer?.enabled) return;
+    _priorityOptimizer = new PriorityOptimizer(state.config.priorityOptimizer);
+    _priorityOptimizer.init();
+  }
+
+  let _memoryOptimizer = null;
+
+  function _initMemoryOptimizer() {
+    if (!state.config.memoryOptimizer?.enabled) return;
+    _memoryOptimizer = new MemoryOptimizer(state.config.memoryOptimizer);
+    _memoryOptimizer.init();
+  }
+
   // ========== 初始化（异步但不阻塞）==========
 
   // 获取页面使用的 CDN 优先级
@@ -1460,7 +2242,7 @@
     return null;
   }
 
-  async function init() {
+  function init() {
     if (state.initialized) return;
     state.initialized = true;
 
@@ -1526,6 +2308,15 @@
     // 7. 消息监听
     _initMessageListener();
 
+    // 1.14 初始化性能监控
+    _initPerfMonitor();
+
+    // 1.15 初始化优先级优化
+    _initPriorityOptimizer();
+
+    // 1.16 初始化内存优化
+    _initMemoryOptimizer();
+
     // 8. 页面加载后收集性能指标并停止 LCP 观察
     window.addEventListener('load', () => {
       if (lcpObserver) {
@@ -1543,7 +2334,16 @@
     try {
       const result = await chrome.storage.local.get(CONFIG_KEY);
       if (result[CONFIG_KEY]) {
-        state.config = { ...DEFAULT_CONFIG, ...result[CONFIG_KEY] };
+        const userConfig = result[CONFIG_KEY];
+        // Deep merge for nested config objects
+        state.config = { ...DEFAULT_CONFIG };
+        for (const key of Object.keys(userConfig)) {
+          if (typeof userConfig[key] === 'object' && userConfig[key] !== null && !Array.isArray(userConfig[key])) {
+            state.config[key] = { ...DEFAULT_CONFIG[key], ...userConfig[key] };
+          } else {
+            state.config[key] = userConfig[key];
+          }
+        }
         if (!state.config.enabled) {
           _observer.disconnect();
         }
@@ -1925,8 +2725,13 @@
     getLogs,
     clearLogs,
     addLog,
+    getPriorityInfo: () => _priorityOptimizer?.getPriorityInfo(),
+    getCacheStats: () => _memoryOptimizer?.getCacheStats(),
     destroy: () => {
       _observer.disconnect();
+      _perfMonitor?.destroy();
+      _priorityOptimizer?.destroy?.();
+      _memoryOptimizer?.destroy?.();
       state.compressQueue = [];
       state.recentReplacements = [];
       state.dedupSet.clear();
