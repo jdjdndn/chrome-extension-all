@@ -2,8 +2,8 @@
  * Web Worker 选择器计算模块
  * 在独立线程中进行复杂的选择器计算，避免阻塞主线程
  */
-(function() {
-  'use strict';
+;(function () {
+  'use strict'
 
   // Worker 代码（将被转换为 Blob URL）
   const workerCode = `
@@ -266,42 +266,42 @@
 
       return common;
     }
-  `;
+  `
 
   class SelectorWorker {
     constructor() {
-      this.worker = null;
-      this.pendingTasks = new Map();
-      this.taskIdCounter = 0;
-      this.init();
+      this.worker = null
+      this.pendingTasks = new Map()
+      this.taskIdCounter = 0
+      this.init()
     }
 
     init() {
       // 创建 Worker Blob
-      const blob = new Blob([workerCode], { type: 'application/javascript' });
-      const url = URL.createObjectURL(blob);
+      const blob = new Blob([workerCode], { type: 'application/javascript' })
+      const url = URL.createObjectURL(blob)
 
-      this.worker = new Worker(url);
+      this.worker = new Worker(url)
       this.worker.onmessage = (e) => {
-        const { type, taskId, result, error } = e.data;
+        const { type, taskId, result, error } = e.data
 
-        const task = this.pendingTasks.get(taskId);
+        const task = this.pendingTasks.get(taskId)
         if (task) {
-          this.pendingTasks.delete(taskId);
+          this.pendingTasks.delete(taskId)
 
           if (type === 'RESULT') {
-            task.resolve(result);
+            task.resolve(result)
           } else if (type === 'ERROR') {
-            task.reject(new Error(error));
+            task.reject(new Error(error))
           }
         }
-      };
+      }
 
       this.worker.onerror = (e) => {
-        console.error('[SelectorWorker] Worker error:', e);
-      };
+        console.error('[SelectorWorker] Worker error:', e)
+      }
 
-      URL.revokeObjectURL(url);
+      URL.revokeObjectURL(url)
     }
 
     /**
@@ -309,16 +309,16 @@
      */
     generateSelector(element) {
       return new Promise((resolve, reject) => {
-        const taskId = ++this.taskIdCounter;
-        const data = this._extractElementData(element);
+        const taskId = ++this.taskIdCounter
+        const data = this._extractElementData(element)
 
-        this.pendingTasks.set(taskId, { resolve, reject });
+        this.pendingTasks.set(taskId, { resolve, reject })
         this.worker.postMessage({
           type: 'GENERATE_SELECTOR',
           data,
-          taskId
-        });
-      });
+          taskId,
+        })
+      })
     }
 
     /**
@@ -326,16 +326,16 @@
      */
     batchGenerate(elements) {
       return new Promise((resolve, reject) => {
-        const taskId = ++this.taskIdCounter;
-        const data = elements.map(el => this._extractElementData(el));
+        const taskId = ++this.taskIdCounter
+        const data = elements.map((el) => this._extractElementData(el))
 
-        this.pendingTasks.set(taskId, { resolve, reject });
+        this.pendingTasks.set(taskId, { resolve, reject })
         this.worker.postMessage({
           type: 'BATCH_GENERATE',
           data: { elements: data },
-          taskId
-        });
-      });
+          taskId,
+        })
+      })
     }
 
     /**
@@ -343,16 +343,16 @@
      */
     generateMergedSelector(elements) {
       return new Promise((resolve, reject) => {
-        const taskId = ++this.taskIdCounter;
-        const data = elements.map(el => this._extractElementData(el));
+        const taskId = ++this.taskIdCounter
+        const data = elements.map((el) => this._extractElementData(el))
 
-        this.pendingTasks.set(taskId, { resolve, reject });
+        this.pendingTasks.set(taskId, { resolve, reject })
         this.worker.postMessage({
           type: 'GENERATE_MERGED_SELECTOR',
           data: { elements: data },
-          taskId
-        });
-      });
+          taskId,
+        })
+      })
     }
 
     /**
@@ -360,75 +360,84 @@
      */
     analyzeQuality(selector) {
       return new Promise((resolve, reject) => {
-        const taskId = ++this.taskIdCounter;
+        const taskId = ++this.taskIdCounter
 
-        this.pendingTasks.set(taskId, { resolve, reject });
+        this.pendingTasks.set(taskId, { resolve, reject })
         this.worker.postMessage({
           type: 'ANALYZE_QUALITY',
           data: { selector },
-          taskId
-        });
-      });
+          taskId,
+        })
+      })
     }
 
     /**
      * 提取元素数据（用于传递给 Worker）
      */
     _extractElementData(element) {
-      if (!element || !element.tagName) return null;
+      if (!element || !element.tagName) return null
 
-      const tag = element.tagName.toLowerCase();
-      const id = element.id || null;
+      const tag = element.tagName.toLowerCase()
+      const id = element.id || null
 
       // 提取 class
-      const classes = [];
+      const classes = []
       if (element.className && typeof element.className === 'string') {
-        const allClasses = element.className.trim().split(' ');
+        const allClasses = element.className.trim().split(' ')
         for (const c of allClasses) {
           if (c && !/^(css-|styled-|sc-|js-|_|__|Mui|jss|css_|data-|ep-)/.test(c)) {
-            classes.push(c);
+            classes.push(c)
           }
         }
       }
 
       // 提取属性
-      const attributes = [];
+      const attributes = []
       if (element.attributes) {
         for (const attr of element.attributes) {
-          if (STABLE_ATTRIBUTES.has(attr.name) && attr.value && attr.value.length < 50 && !/^\d+$/.test(attr.value)) {
-            attributes.push({ name: attr.name, value: attr.value });
+          if (
+            STABLE_ATTRIBUTES.has(attr.name) &&
+            attr.value &&
+            attr.value.length < 50 &&
+            !/^\d+$/.test(attr.value)
+          ) {
+            attributes.push({ name: attr.name, value: attr.value })
           }
         }
       }
 
       // 构建路径
-      const path = [];
-      let current = element.parentElement;
+      const path = []
+      let current = element.parentElement
       while (current && current !== document.documentElement && path.length < 4) {
-        const t = current.tagName.toLowerCase();
-        const c = current.className && typeof current.className === 'string'
-          ? current.className.trim().split(' ').find(c => !/^(css-|styled-|sc-|js-|_)/.test(c))
-          : null;
+        const t = current.tagName.toLowerCase()
+        const c =
+          current.className && typeof current.className === 'string'
+            ? current.className
+                .trim()
+                .split(' ')
+                .find((c) => !/^(css-|styled-|sc-|js-|_)/.test(c))
+            : null
 
         if (c) {
-          path.unshift(t + '.' + c);
+          path.unshift(t + '.' + c)
         } else {
-          path.unshift(t);
+          path.unshift(t)
         }
-        current = current.parentElement;
+        current = current.parentElement
       }
 
       // 计算 nth-of-type
-      let nthOfType = 0;
-      const parent = element.parentElement;
+      let nthOfType = 0
+      const parent = element.parentElement
       if (parent) {
-        const siblings = Array.from(parent.children).filter(c => c.tagName === element.tagName);
+        const siblings = Array.from(parent.children).filter((c) => c.tagName === element.tagName)
         if (siblings.length > 1) {
-          nthOfType = siblings.indexOf(element) + 1;
+          nthOfType = siblings.indexOf(element) + 1
         }
       }
 
-      return { tag, id, classes, attributes, path, nthOfType };
+      return { tag, id, classes, attributes, path, nthOfType }
     }
 
     /**
@@ -436,13 +445,13 @@
      */
     destroy() {
       if (this.worker) {
-        this.worker.terminate();
-        this.worker = null;
+        this.worker.terminate()
+        this.worker = null
       }
-      this.pendingTasks.clear();
+      this.pendingTasks.clear()
     }
   }
 
   // 导出
-  window.SelectorWorker = SelectorWorker;
-})();
+  window.SelectorWorker = SelectorWorker
+})()

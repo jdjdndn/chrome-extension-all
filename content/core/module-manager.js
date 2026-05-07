@@ -1,12 +1,12 @@
 // ========== 模块热插拔管理 ==========
 // 支持动态加载/卸载模块
 
-(function () {
-  'use strict';
+;(function () {
+  'use strict'
 
   if (window.ModuleManager) {
-    console.log('[ModuleManager] 已存在，跳过初始化');
-    return;
+    console.log('[ModuleManager] 已存在，跳过初始化')
+    return
   }
 
   /**
@@ -31,18 +31,11 @@
      * @param {object} moduleConfig - 模块配置
      */
     register(moduleConfig) {
-      const {
-        id,
-        name,
-        path,
-        dependencies = [],
-        priority = 0,
-        autoLoad = true
-      } = moduleConfig;
+      const { id, name, path, dependencies = [], priority = 0, autoLoad = true } = moduleConfig
 
       if (this.registry[id]) {
-        console.warn(`[ModuleManager] 模块已注册: ${id}`);
-        return false;
+        console.warn(`[ModuleManager] 模块已注册: ${id}`)
+        return false
       }
 
       this.registry[id] = {
@@ -52,11 +45,11 @@
         dependencies,
         priority,
         autoLoad,
-        loaded: false
-      };
+        loaded: false,
+      }
 
-      console.log(`[ModuleManager] 注册模块: ${name} (${id})`);
-      return true;
+      console.log(`[ModuleManager] 注册模块: ${name} (${id})`)
+      return true
     },
 
     /**
@@ -65,7 +58,7 @@
      */
     registerAll(modules) {
       for (const module of modules) {
-        this.register(module);
+        this.register(module)
       }
     },
 
@@ -75,54 +68,54 @@
      * @param {object} options - 选项
      */
     async load(moduleId, options = {}) {
-      const config = this.registry[moduleId];
+      const config = this.registry[moduleId]
       if (!config) {
-        console.error(`[ModuleManager] 模块未注册: ${moduleId}`);
-        return { success: false, error: '模块未注册' };
+        console.error(`[ModuleManager] 模块未注册: ${moduleId}`)
+        return { success: false, error: '模块未注册' }
       }
 
       if (this.modules.has(moduleId)) {
-        return { success: true, message: '模块已加载' };
+        return { success: true, message: '模块已加载' }
       }
 
       if (this.loading.has(moduleId)) {
-        console.warn(`[ModuleManager] 模块正在加载: ${moduleId}`);
-        return { success: false, error: '模块正在加载' };
+        console.warn(`[ModuleManager] 模块正在加载: ${moduleId}`)
+        return { success: false, error: '模块正在加载' }
       }
 
-      this.loading.add(moduleId);
+      this.loading.add(moduleId)
 
       try {
         // 1. 加载依赖
         for (const depId of config.dependencies) {
-          const depResult = await this.load(depId);
+          const depResult = await this.load(depId)
           if (!depResult.success) {
-            throw new Error(`依赖加载失败: ${depId}`);
+            throw new Error(`依赖加载失败: ${depId}`)
           }
         }
 
         // 2. 加载模块脚本
-        await this._loadScript(config.path);
+        await this._loadScript(config.path)
 
         // 3. 初始化模块
-        const moduleInstance = await this._initializeModule(moduleId, options);
+        const moduleInstance = await this._initializeModule(moduleId, options)
 
         // 4. 保存实例
         this.modules.set(moduleId, {
           config,
           instance: moduleInstance,
-          loadedAt: Date.now()
-        });
+          loadedAt: Date.now(),
+        })
 
-        config.loaded = true;
-        this.loading.delete(moduleId);
+        config.loaded = true
+        this.loading.delete(moduleId)
 
-        console.log(`[ModuleManager] 模块加载完成: ${config.name}`);
-        return { success: true, module: moduleInstance };
+        console.log(`[ModuleManager] 模块加载完成: ${config.name}`)
+        return { success: true, module: moduleInstance }
       } catch (error) {
-        this.loading.delete(moduleId);
-        console.error(`[ModuleManager] 模块加载失败: ${moduleId}`, error);
-        return { success: false, error: error.message };
+        this.loading.delete(moduleId)
+        console.error(`[ModuleManager] 模块加载失败: ${moduleId}`, error)
+        return { success: false, error: error.message }
       }
     },
 
@@ -131,35 +124,35 @@
      * @param {string} moduleId - 模块ID
      */
     async unload(moduleId) {
-      const module = this.modules.get(moduleId);
+      const module = this.modules.get(moduleId)
       if (!module) {
-        console.warn(`[ModuleManager] 模块未加载: ${moduleId}`);
-        return { success: false, error: '模块未加载' };
+        console.warn(`[ModuleManager] 模块未加载: ${moduleId}`)
+        return { success: false, error: '模块未加载' }
       }
 
       try {
         // 1. 检查是否有其他模块依赖此模块
         for (const [id, m] of this.modules) {
           if (m.config.dependencies.includes(moduleId)) {
-            console.warn(`[ModuleManager] 模块 ${id} 依赖 ${moduleId}，无法卸载`);
-            return { success: false, error: `模块 ${id} 依赖此模块` };
+            console.warn(`[ModuleManager] 模块 ${id} 依赖 ${moduleId}，无法卸载`)
+            return { success: false, error: `模块 ${id} 依赖此模块` }
           }
         }
 
         // 2. 调用销毁方法
         if (module.instance && typeof module.instance.destroy === 'function') {
-          await module.instance.destroy();
+          await module.instance.destroy()
         }
 
         // 3. 移除模块
-        this.modules.delete(moduleId);
-        module.config.loaded = false;
+        this.modules.delete(moduleId)
+        module.config.loaded = false
 
-        console.log(`[ModuleManager] 模块已卸载: ${module.config.name}`);
-        return { success: true };
+        console.log(`[ModuleManager] 模块已卸载: ${module.config.name}`)
+        return { success: true }
       } catch (error) {
-        console.error(`[ModuleManager] 模块卸载失败: ${moduleId}`, error);
-        return { success: false, error: error.message };
+        console.error(`[ModuleManager] 模块卸载失败: ${moduleId}`, error)
+        return { success: false, error: error.message }
       }
     },
 
@@ -168,10 +161,10 @@
      * @param {string} moduleId - 模块ID
      */
     async reload(moduleId) {
-      console.log(`[ModuleManager] 重新加载模块: ${moduleId}`);
+      console.log(`[ModuleManager] 重新加载模块: ${moduleId}`)
 
-      await this.unload(moduleId);
-      return await this.load(moduleId);
+      await this.unload(moduleId)
+      return await this.load(moduleId)
     },
 
     /**
@@ -181,26 +174,25 @@
     async _loadScript(path) {
       return new Promise((resolve, reject) => {
         // 检查脚本是否已存在
-        const existingScript = document.querySelector(`script[src="${path}"]`);
+        const existingScript = document.querySelector(`script[src="${path}"]`)
         if (existingScript) {
-          resolve();
-          return;
+          resolve()
+          return
         }
 
-        const script = document.createElement('script');
-        script.src = chrome.runtime.getURL(path);
-        script.type = 'text/javascript';
+        const script = document.createElement('script')
+        script.src = chrome.runtime.getURL(path)
+        script.type = 'text/javascript'
 
         script.onload = () => {
-          resolve();
-        };
+          resolve()
+        }
 
         script.onerror = () => {
-          reject(new Error(`脚本加载失败: ${path}`));
-        };
-
-        (document.head || document.documentElement).appendChild(script);
-      });
+          reject(new Error(`脚本加载失败: ${path}`))
+        }
+        ;(document.head || document.documentElement).appendChild(script)
+      })
     },
 
     /**
@@ -209,9 +201,9 @@
     async _initializeModule(moduleId, options) {
       // 查找全局对象
       const globalMap = {
-        'store': 'AppStore',
-        'services': 'Services',
-        'pipeline': 'Pipeline',
+        store: 'AppStore',
+        services: 'Services',
+        pipeline: 'Pipeline',
         'site-factory': 'SiteFactory',
         'plugin-system': 'PluginSystem',
         'config-manager': 'ConfigManager',
@@ -219,7 +211,7 @@
         'keyword-manager': 'KeywordManager',
         'rule-manager': 'RuleManager',
         'cache-manager': 'CacheManager',
-        'batch': 'BatchOps',
+        batch: 'BatchOps',
         'history-manager': 'HistoryManager',
         'rule-conflict': 'RuleConflictDetector',
         'debug-panel': 'DebugPanel',
@@ -227,19 +219,19 @@
         'input-validator': 'InputValidator',
         'security-manager': 'SecurityManager',
         'config-migrator': 'ConfigMigrator',
-        'extension-api': 'ExtensionAPI'
-      };
-
-      const globalName = globalMap[moduleId];
-      if (globalName && window[globalName]) {
-        const instance = window[globalName];
-        if (typeof instance.init === 'function') {
-          await instance.init(options);
-        }
-        return instance;
+        'extension-api': 'ExtensionAPI',
       }
 
-      return null;
+      const globalName = globalMap[moduleId]
+      if (globalName && window[globalName]) {
+        const instance = window[globalName]
+        if (typeof instance.init === 'function') {
+          await instance.init(options)
+        }
+        return instance
+      }
+
+      return null
     },
 
     /**
@@ -247,7 +239,7 @@
      * @param {string} moduleId - 模块ID
      */
     get(moduleId) {
-      return this.modules.get(moduleId)?.instance || null;
+      return this.modules.get(moduleId)?.instance || null
     },
 
     /**
@@ -255,7 +247,7 @@
      * @param {string} moduleId - 模块ID
      */
     isLoaded(moduleId) {
-      return this.modules.has(moduleId);
+      return this.modules.has(moduleId)
     },
 
     /**
@@ -265,8 +257,8 @@
       return Array.from(this.modules.entries()).map(([id, m]) => ({
         id,
         name: m.config.name,
-        loadedAt: m.loadedAt
-      }));
+        loadedAt: m.loadedAt,
+      }))
     },
 
     /**
@@ -274,16 +266,16 @@
      */
     async loadAll() {
       const autoLoadModules = Object.values(this.registry)
-        .filter(m => m.autoLoad)
-        .sort((a, b) => b.priority - a.priority);
+        .filter((m) => m.autoLoad)
+        .sort((a, b) => b.priority - a.priority)
 
-      const results = [];
+      const results = []
       for (const module of autoLoadModules) {
-        const result = await this.load(module.id);
-        results.push({ id: module.id, ...result });
+        const result = await this.load(module.id)
+        results.push({ id: module.id, ...result })
       }
 
-      return results;
+      return results
     },
 
     /**
@@ -293,13 +285,13 @@
       return {
         totalRegistered: Object.keys(this.registry).length,
         totalLoaded: this.modules.size,
-        currentlyLoading: this.loading.size
-      };
-    }
-  };
+        currentlyLoading: this.loading.size,
+      }
+    },
+  }
 
   // 导出
-  window.ModuleManager = ModuleManager;
+  window.ModuleManager = ModuleManager
 
-  console.log('[ModuleManager] 模块管理器已加载');
-})();
+  console.log('[ModuleManager] 模块管理器已加载')
+})()

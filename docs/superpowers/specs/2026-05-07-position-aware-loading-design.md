@@ -17,13 +17,14 @@
 
 当前资源加载不考虑页面位置：
 
-| 环节 | 当前逻辑 | 问题 |
-|------|---------|------|
-| 预加载 | 基于资源大小估算 | 不考虑位置，可能预加载视口外的资源 |
-| 压缩队列 | 视口内/外 + 图片大小 | 视口外所有图片优先级相同，不区分远近 |
-| 延迟加载 | 仅设置 loading="lazy" | 没有主动管理加载时机 |
+| 环节     | 当前逻辑              | 问题                                 |
+| -------- | --------------------- | ------------------------------------ |
+| 预加载   | 基于资源大小估算      | 不考虑位置，可能预加载视口外的资源   |
+| 压缩队列 | 视口内/外 + 图片大小  | 视口外所有图片优先级相同，不区分远近 |
+| 延迟加载 | 仅设置 loading="lazy" | 没有主动管理加载时机                 |
 
 **用户期望：**
+
 1. 视口内资源 → 最高优先级，立即加载
 2. 离视口近的资源（1屏内）→ 次优先级，延迟加载
 3. 距离远的资源（超出1屏）→ 不加载，滚动到范围内再加载
@@ -58,13 +59,13 @@
 
 ### 资源分类处理
 
-| 资源类型 | 处理策略 |
-|---------|---------|
-| CSS | 不受位置规则影响，正常加载 |
+| 资源类型                                   | 处理策略                   |
+| ------------------------------------------ | -------------------------- |
+| CSS                                        | 不受位置规则影响，正常加载 |
 | 关键JS（`type="module"` 或在 `<head>` 中） | 不受位置规则影响，正常加载 |
-| 非关键JS | 按位置规则处理 |
-| 图片 | 按位置规则处理 |
-| iframe | 按位置规则处理 |
+| 非关键JS                                   | 按位置规则处理             |
+| 图片                                       | 按位置规则处理             |
+| iframe                                     | 按位置规则处理             |
 
 ---
 
@@ -80,49 +81,50 @@
  */
 function _getResourcePositionPriority(element) {
   if (!element || !element.isConnected) {
-    return { zone: 'far', priority: 999, distance: Infinity };
+    return { zone: 'far', priority: 999, distance: Infinity }
   }
 
-  const rect = element.getBoundingClientRect();
-  const viewportHeight = window.innerHeight;
+  const rect = element.getBoundingClientRect()
+  const viewportHeight = window.innerHeight
 
   // 计算元素距离视口的距离
   // 负值表示在视口上方，正值表示在视口下方
-  const distanceToViewport = rect.top < 0
-    ? -rect.top  // 视口上方，取绝对值
-    : rect.top > viewportHeight
-      ? rect.top - viewportHeight  // 视口下方
-      : 0;  // 在视口内
+  const distanceToViewport =
+    rect.top < 0
+      ? -rect.top // 视口上方，取绝对值
+      : rect.top > viewportHeight
+        ? rect.top - viewportHeight // 视口下方
+        : 0 // 在视口内
 
   // 获取配置的距离阈值（屏数）
-  const nearbyThreshold = (state.config.positionAwareLoading?.nearbyThreshold || 1) * viewportHeight;
+  const nearbyThreshold = (state.config.positionAwareLoading?.nearbyThreshold || 1) * viewportHeight
 
   // 判断区域
   if (distanceToViewport === 0) {
-    return { zone: 'inViewport', priority: 0, distance: 0 };
+    return { zone: 'inViewport', priority: 0, distance: 0 }
   }
 
   if (distanceToViewport <= nearbyThreshold) {
     // nearby 区域：优先级 10-19，距离越近优先级越高
     return {
       zone: 'nearby',
-      priority: 10 + Math.floor(distanceToViewport / viewportHeight * 10),
-      distance: distanceToViewport
-    };
+      priority: 10 + Math.floor((distanceToViewport / viewportHeight) * 10),
+      distance: distanceToViewport,
+    }
   }
 
   // far 区域
-  return { zone: 'far', priority: 100, distance: distanceToViewport };
+  return { zone: 'far', priority: 100, distance: distanceToViewport }
 }
 ```
 
 **优先级数值说明：**
 
-| 区域 | priority | 说明 |
-|------|----------|------|
-| inViewport | 0 | 视口内，最高优先 |
-| nearby | 10-19 | 视口阈值内，10 + 距离比例 |
-| far | 100 | 超出阈值，不加载 |
+| 区域       | priority | 说明                      |
+| ---------- | -------- | ------------------------- |
+| inViewport | 0        | 视口内，最高优先          |
+| nearby     | 10-19    | 视口阈值内，10 + 距离比例 |
+| far        | 100      | 超出阈值，不加载          |
 
 ### 2. 已加载资源检测
 
@@ -136,19 +138,19 @@ function _getResourcePositionPriority(element) {
 function _isResourceLoaded(element, type) {
   switch (type) {
     case 'image':
-      return element.complete && element.naturalHeight > 0;
+      return element.complete && element.naturalHeight > 0
     case 'iframe':
-      if (element.dataset.loaded === 'true') return true;
+      if (element.dataset.loaded === 'true') return true
       // 跨域iframe访问contentDocument会抛出安全错误
       try {
-        return element.contentDocument !== null;
+        return element.contentDocument !== null
       } catch {
-        return false; // 跨域iframe无法判断，返回false
+        return false // 跨域iframe无法判断，返回false
       }
     case 'script':
-      return element.dataset.loaded === 'true';
+      return element.dataset.loaded === 'true'
     default:
-      return false;
+      return false
   }
 }
 ```
@@ -212,60 +214,63 @@ applyPriorityToResource(element, url, type) {
  */
 function _getCompressPriority(img) {
   // 已加载跳过
-  if (_isResourceLoaded(img, 'image')) return 999;
+  if (_isResourceLoaded(img, 'image')) return 999
 
-  const { zone, priority } = _getResourcePositionPriority(img);
+  const { zone, priority } = _getResourcePositionPriority(img)
 
   // far 区域不压缩
-  if (zone === 'far') return 999;
+  if (zone === 'far') return 999
 
   // inViewport 和 nearby 使用位置优先级
   // 小图在同级别内微调 -1
-  const size = (img.naturalWidth || 0) * (img.naturalHeight || 0);
-  const sizeBonus = size < 100000 ? -1 : 0;
+  const size = (img.naturalWidth || 0) * (img.naturalHeight || 0)
+  const sizeBonus = size < 100000 ? -1 : 0
 
-  return Math.max(0, priority + sizeBonus);
+  return Math.max(0, priority + sizeBonus)
 }
 ```
 
 ### 5. 延迟加载触发器
 
 ```javascript
-let _lazyLoadObserver = null;
+let _lazyLoadObserver = null
 
 /**
  * 设置延迟加载观察器
  */
 function _setupLazyLoadObserver() {
-  if (_lazyLoadObserver) return;
-  if (typeof IntersectionObserver === 'undefined') return;
+  if (_lazyLoadObserver) return
+  if (typeof IntersectionObserver === 'undefined') return
 
-  const nearbyThreshold = state.config.positionAwareLoading?.nearbyThreshold || 1;
-  const rootMargin = `${nearbyThreshold * 100}% 0px ${nearbyThreshold * 100}% 0px`;
+  const nearbyThreshold = state.config.positionAwareLoading?.nearbyThreshold || 1
+  const rootMargin = `${nearbyThreshold * 100}% 0px ${nearbyThreshold * 100}% 0px`
 
-  _lazyLoadObserver = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        const el = entry.target;
-        const type = el.tagName.toLowerCase();
+  _lazyLoadObserver = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          const el = entry.target
+          const type = el.tagName.toLowerCase()
 
-        // 触发加载
-        if (el.dataset.lazySrc) {
-          el.src = el.dataset.lazySrc;
-          delete el.dataset.lazySrc;
+          // 触发加载
+          if (el.dataset.lazySrc) {
+            el.src = el.dataset.lazySrc
+            delete el.dataset.lazySrc
+          }
+
+          // 图片触发压缩
+          if (type === 'img' && !el.complete) {
+            enqueueCompress(el, el.src)
+          }
+
+          _lazyLoadObserver.unobserve(el)
         }
-
-        // 图片触发压缩
-        if (type === 'img' && !el.complete) {
-          enqueueCompress(el, el.src);
-        }
-
-        _lazyLoadObserver.unobserve(el);
-      }
-    });
-  }, {
-    rootMargin: rootMargin // 上 右 下 左，视口上下各N屏
-  });
+      })
+    },
+    {
+      rootMargin: rootMargin, // 上 右 下 左，视口上下各N屏
+    }
+  )
 }
 
 /**
@@ -273,8 +278,8 @@ function _setupLazyLoadObserver() {
  * @param {Element} element - DOM元素
  */
 function _observeLazyLoad(element) {
-  if (!_lazyLoadObserver) return;
-  _lazyLoadObserver.observe(element);
+  if (!_lazyLoadObserver) return
+  _lazyLoadObserver.observe(element)
 }
 
 /**
@@ -282,8 +287,8 @@ function _observeLazyLoad(element) {
  */
 function _destroyLazyLoadObserver() {
   if (_lazyLoadObserver) {
-    _lazyLoadObserver.disconnect();
-    _lazyLoadObserver = null;
+    _lazyLoadObserver.disconnect()
+    _lazyLoadObserver = null
   }
 }
 ```
@@ -311,14 +316,14 @@ positionAwareLoading: {
 
 ```javascript
 // 初始化位置感知加载
-_initPositionAwareLoading();
+_initPositionAwareLoading()
 ```
 
 ```javascript
 function _initPositionAwareLoading() {
-  if (!state.config.positionAwareLoading?.enabled) return;
-  _setupLazyLoadObserver();
-  addLog('info', 'loader', 'init', { feature: 'positionAwareLoading' });
+  if (!state.config.positionAwareLoading?.enabled) return
+  _setupLazyLoadObserver()
+  addLog('info', 'loader', 'init', { feature: 'positionAwareLoading' })
 }
 ```
 
@@ -327,7 +332,7 @@ function _initPositionAwareLoading() {
 在 `destroy()` 函数中添加：
 
 ```javascript
-_destroyLazyLoadObserver();
+_destroyLazyLoadObserver()
 ```
 
 ### 图片处理集成
@@ -337,18 +342,18 @@ _destroyLazyLoadObserver();
 ```javascript
 function _processImage(img) {
   // 已加载跳过
-  if (_isResourceLoaded(img, 'image')) return;
+  if (_isResourceLoaded(img, 'image')) return
 
-  const { zone } = _getResourcePositionPriority(img);
+  const { zone } = _getResourcePositionPriority(img)
 
   // far 区域加入延迟加载观察
   if (zone === 'far') {
     if (img.src && !img.dataset.lazySrc) {
-      img.dataset.lazySrc = img.src;
-      img.src = ''; // 清空src，等待滚动触发
+      img.dataset.lazySrc = img.src
+      img.src = '' // 清空src，等待滚动触发
     }
-    _observeLazyLoad(img);
-    return;
+    _observeLazyLoad(img)
+    return
   }
 
   // inViewport 和 nearby 正常处理
@@ -360,9 +365,9 @@ function _processImage(img) {
 
 ## 文件变更汇总
 
-| 文件 | 变更类型 |
-|------|---------|
-| `content/modules/resource-accelerator.js` | 修改 |
+| 文件                                      | 变更类型 |
+| ----------------------------------------- | -------- |
+| `content/modules/resource-accelerator.js` | 修改     |
 
 ---
 
@@ -383,30 +388,30 @@ function _processImage(img) {
 
 ## 风险
 
-| 风险 | 影响 | 缓解 |
-|------|------|------|
-| 清空src导致布局跳动 | 用户体验差 | 使用透明1x1像素占位图或CSS aspect-ratio保持布局 |
-| IntersectionObserver不支持 | 功能失效 | 检测支持性，降级为原生lazy |
-| 滚动频繁触发 | 性能问题 | rootMargin已设置阈值，只触发一次 |
-| 跨域iframe检测失败 | 误判未加载 | 使用dataset标记加载状态，try-catch保护 |
+| 风险                       | 影响       | 缓解                                            |
+| -------------------------- | ---------- | ----------------------------------------------- |
+| 清空src导致布局跳动        | 用户体验差 | 使用透明1x1像素占位图或CSS aspect-ratio保持布局 |
+| IntersectionObserver不支持 | 功能失效   | 检测支持性，降级为原生lazy                      |
+| 滚动频繁触发               | 性能问题   | rootMargin已设置阈值，只触发一次                |
+| 跨域iframe检测失败         | 误判未加载 | 使用dataset标记加载状态，try-catch保护          |
 
 ---
 
 ## 测试用例
 
-| 场景 | 预期结果 |
-|------|---------|
-| 图片在视口内 | fetchPriority='high', loading='eager' |
-| 图片在视口下方0.5屏 | fetchPriority='auto', loading='lazy' |
-| 图片在视口下方2屏 | fetchPriority='low', loading='lazy', 加入observer |
-| 滚动到far图片位置 | 图片开始加载 |
-| 快速滚动经过far区域 | 图片不加载，直到滚动停止在范围内 |
-| 向上滚动到far图片位置 | 图片开始加载（双向滚动支持） |
-| 已加载图片 | 跳过处理 |
-| 关键JS脚本 | 不受影响，正常加载 |
-| 非关键JS在far区域 | src被清空，等待滚动触发 |
-| 跨域iframe加载检测 | try-catch保护，使用dataset判断 |
-| nearbyThreshold=2 | 视口上下2屏内都算nearby |
+| 场景                  | 预期结果                                          |
+| --------------------- | ------------------------------------------------- |
+| 图片在视口内          | fetchPriority='high', loading='eager'             |
+| 图片在视口下方0.5屏   | fetchPriority='auto', loading='lazy'              |
+| 图片在视口下方2屏     | fetchPriority='low', loading='lazy', 加入observer |
+| 滚动到far图片位置     | 图片开始加载                                      |
+| 快速滚动经过far区域   | 图片不加载，直到滚动停止在范围内                  |
+| 向上滚动到far图片位置 | 图片开始加载（双向滚动支持）                      |
+| 已加载图片            | 跳过处理                                          |
+| 关键JS脚本            | 不受影响，正常加载                                |
+| 非关键JS在far区域     | src被清空，等待滚动触发                           |
+| 跨域iframe加载检测    | try-catch保护，使用dataset判断                    |
+| nearbyThreshold=2     | 视口上下2屏内都算nearby                           |
 
 ---
 

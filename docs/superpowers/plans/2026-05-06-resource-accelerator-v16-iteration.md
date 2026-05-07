@@ -15,8 +15,8 @@
 
 ## 文件变更汇总
 
-| 文件 | 迭代1 | 迭代2 |
-|------|-------|-------|
+| 文件                                      | 迭代1   | 迭代2   |
+| ----------------------------------------- | ------- | ------- |
 | `content/modules/resource-accelerator.js` | ✅ 修改 | ✅ 修改 |
 
 ---
@@ -33,9 +33,9 @@ SmartPreloadV2的`executePreload()`对所有资源统一使用`<link rel="prefet
 
 **修改executePreload方法** — 根据reason参数决定rel类型：
 
-| reason | rel | 说明 |
-|--------|-----|------|
-| aboveFold / hover / scroll-predict | `preload` | 高优先级，立即下载 |
+| reason                                                      | rel        | 说明               |
+| ----------------------------------------------------------- | ---------- | ------------------ |
+| aboveFold / hover / scroll-predict                          | `preload`  | 高优先级，立即下载 |
 | content-detail / related-link / related-content / next-page | `prefetch` | 低优先级，空闲下载 |
 
 **修改config** — 新增maxPreloads限制preload元素数量：
@@ -146,6 +146,7 @@ preloadCriticalResources() {
 **5. 修改所有executePreload调用 — 使用新方法名**
 
 `executePreload` 重命名为 `_executePreload`，需要更新所有调用点：
+
 - `schedulePreload` 中（line ~2558）：`this._executePreload(url, reason);`
 - `processQueue` 中（line ~2578）：`this._executePreload(item.url, item.reason);`
 
@@ -160,10 +161,10 @@ preloadCriticalResources() {
 
 ### 风险
 
-| 风险 | 影响 | 缓解 |
-|------|------|------|
-| preload过多抢占带宽 | 首屏渲染变慢 | maxPreloads限制 + 降级机制 |
-| 浏览器不支持preload as=image | 降级为prefetch | 浏览器自动处理 |
+| 风险                         | 影响           | 缓解                       |
+| ---------------------------- | -------------- | -------------------------- |
+| preload过多抢占带宽          | 首屏渲染变慢   | maxPreloads限制 + 降级机制 |
+| 浏览器不支持preload as=image | 降级为prefetch | 浏览器自动处理             |
 
 ---
 
@@ -174,6 +175,7 @@ preloadCriticalResources() {
 ### 问题分析
 
 当前图片懒加载流程：
+
 1. `processImage()` → 设置`loading="lazy"` + `fetchPriority="low"` → 设置1x1透明GIF占位
 2. `enqueueCompress()` → 加入压缩队列
 3. `compressImage()` → Canvas压缩
@@ -184,16 +186,20 @@ preloadCriticalResources() {
 ### 功能设计
 
 **LQIP渐进式占位流程：**
+
 1. 图片创建时 → 设置1px浅灰色占位 + CSS模糊样式
 2. 图片进入可视区 → 浏览器开始下载原图（native lazy loading）
 3. 图片下载完成 → CSS过渡：从模糊到清晰 + 淡入动画
 4. 如果启用了压缩 → 压缩完成后同样触发过渡
 
 **CSS过渡规则：**
+
 ```css
 img[data-lqip] {
   filter: blur(8px);
-  transition: filter 0.3s ease-out, opacity 0.3s ease-out;
+  transition:
+    filter 0.3s ease-out,
+    opacity 0.3s ease-out;
   opacity: 0.6;
 }
 img[data-lqip-loaded] {
@@ -203,6 +209,7 @@ img[data-lqip-loaded] {
 ```
 
 **渐进式占位配置：**
+
 ```javascript
 imageLazyLoad: true,
 lqip: {
@@ -233,14 +240,14 @@ lqip: {
 
 ```javascript
 // ========== LQIP 渐进式占位 ==========
-let _lqipStyleInjected = false;
+let _lqipStyleInjected = false
 
 function _injectLqipCSS() {
-  if (_lqipStyleInjected) return;
-  const config = state.config.lqip;
-  if (!config?.enabled) return;
+  if (_lqipStyleInjected) return
+  const config = state.config.lqip
+  if (!config?.enabled) return
 
-  const style = document.createElement('style');
+  const style = document.createElement('style')
   style.textContent = `
     img[data-lqip] {
       filter: blur(${config.blurRadius}px);
@@ -252,9 +259,9 @@ function _injectLqipCSS() {
       filter: blur(0);
       opacity: 1;
     }
-  `;
-  document.head.appendChild(style);
-  _lqipStyleInjected = true;
+  `
+  document.head.appendChild(style)
+  _lqipStyleInjected = true
 }
 ```
 
@@ -264,26 +271,26 @@ function _injectLqipCSS() {
 
 ```javascript
 // 修改前（line ~1010-1014）：
-img.dataset.src = originalSrc;
+img.dataset.src = originalSrc
 
 // 图片压缩：预压缩后直接加载
 if (state.config.imageCompress) {
-  enqueueCompress(img, originalSrc);
+  enqueueCompress(img, originalSrc)
 }
 
 // 修改后：
-img.dataset.src = originalSrc;
+img.dataset.src = originalSrc
 
 // LQIP：在压缩/懒加载之前设置占位
 if (state.config.lqip?.enabled) {
-  img.dataset.lqip = '1';
-  img.style.backgroundColor = state.config.lqip.placeholderColor || '#f0f0f0';
-  img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+  img.dataset.lqip = '1'
+  img.style.backgroundColor = state.config.lqip.placeholderColor || '#f0f0f0'
+  img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
 }
 
 // 图片压缩：预压缩后直接加载
 if (state.config.imageCompress) {
-  enqueueCompress(img, originalSrc);
+  enqueueCompress(img, originalSrc)
 }
 ```
 
@@ -296,13 +303,17 @@ if (state.config.imageCompress) {
 ```javascript
 // ========== LQIP 过渡辅助 ==========
 function _triggerLqipTransition(img) {
-  if (!img.dataset.lqip) return;
+  if (!img.dataset.lqip) return
   if (img.complete) {
-    img.dataset.lqipLoaded = '1';
+    img.dataset.lqipLoaded = '1'
   } else {
-    img.addEventListener('load', () => {
-      img.dataset.lqipLoaded = '1';
-    }, { once: true });
+    img.addEventListener(
+      'load',
+      () => {
+        img.dataset.lqipLoaded = '1'
+      },
+      { once: true }
+    )
   }
 }
 ```
@@ -343,7 +354,7 @@ addLog('info', 'image', 'skip', { url: task.src, reason: 'not_worth_compressing'
 
 ```javascript
 // 1.19 注入LQIP样式
-_injectLqipCSS();
+_injectLqipCSS()
 ```
 
 **7. 添加destroy()清理**
@@ -364,11 +375,11 @@ _injectLqipCSS();
 
 ### 风险
 
-| 风险 | 影响 | 缓解 |
-|------|------|------|
-| CSS选择器污染 | 影响其他img元素 | 使用data属性精确匹配 |
-| 过渡期间图片闪烁 | 用户体验差 | 使用once事件监听 |
-| 内存占用 | style元素常驻 | 极小开销，可忽略 |
+| 风险             | 影响            | 缓解                 |
+| ---------------- | --------------- | -------------------- |
+| CSS选择器污染    | 影响其他img元素 | 使用data属性精确匹配 |
+| 过渡期间图片闪烁 | 用户体验差      | 使用once事件监听     |
+| 内存占用         | style元素常驻   | 极小开销，可忽略     |
 
 ---
 
@@ -381,6 +392,7 @@ _injectLqipCSS();
 **优先级**：迭代 1 > 迭代 2
 
 **理由**：
+
 - 迭代 1（预加载升级）ROI 最高：直接减少关键图片等待时间
 - 迭代 2（LQIP占位）感知提升：消除视觉闪烁，提升"秒开"感
 
@@ -390,23 +402,23 @@ _injectLqipCSS();
 
 ### 迭代 1 测试用例
 
-| 测试场景 | 预期结果 |
-|---------|---------|
-| 页面有aboveFold图片 | 生成`<link rel="preload" as="image">` |
-| 非关键图片预加载 | 生成`<link rel="prefetch">` |
-| preload数量超过maxPreloads | 降级为prefetch |
-| SmartPreloadV2 disabled | 不生成任何preload/prefetch |
-| destroy后 | 所有preload/prefetch link被移除 |
+| 测试场景                   | 预期结果                              |
+| -------------------------- | ------------------------------------- |
+| 页面有aboveFold图片        | 生成`<link rel="preload" as="image">` |
+| 非关键图片预加载           | 生成`<link rel="prefetch">`           |
+| preload数量超过maxPreloads | 降级为prefetch                        |
+| SmartPreloadV2 disabled    | 不生成任何preload/prefetch            |
+| destroy后                  | 所有preload/prefetch link被移除       |
 
 ### 迭代 2 测试用例
 
-| 测试场景 | 预期结果 |
-|---------|---------|
-| 图片加载前 | 显示模糊占位（data-lqip属性存在） |
-| 图片加载完成后 | 触发模糊到清晰过渡（data-lqip-loaded属性） |
-| LQIP disabled | 使用原始透明GIF占位 |
-| 压缩成功 | 压缩图片触发LQIP过渡 |
-| 压缩失败回退原图 | 原图触发LQIP过渡 |
+| 测试场景         | 预期结果                                   |
+| ---------------- | ------------------------------------------ |
+| 图片加载前       | 显示模糊占位（data-lqip属性存在）          |
+| 图片加载完成后   | 触发模糊到清晰过渡（data-lqip-loaded属性） |
+| LQIP disabled    | 使用原始透明GIF占位                        |
+| 压缩成功         | 压缩图片触发LQIP过渡                       |
+| 压缩失败回退原图 | 原图触发LQIP过渡                           |
 
 ### 测试命令
 

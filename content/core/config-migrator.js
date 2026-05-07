@@ -1,12 +1,12 @@
 // ========== 配置版本迁移模块 ==========
 // 自动迁移旧版本配置到新版本
 
-(function () {
-  'use strict';
+;(function () {
+  'use strict'
 
   if (window.ConfigMigrator) {
-    console.log('[ConfigMigrator] 已存在，跳过初始化');
-    return;
+    console.log('[ConfigMigrator] 已存在，跳过初始化')
+    return
   }
 
   /**
@@ -28,9 +28,9 @@
      */
     async init() {
       // 注册内置迁移
-      this._registerBuiltinMigrations();
+      this._registerBuiltinMigrations()
 
-      console.log(`[ConfigMigrator] 初始化完成，当前版本: ${this.currentVersion}`);
+      console.log(`[ConfigMigrator] 初始化完成，当前版本: ${this.currentVersion}`)
     },
 
     /**
@@ -50,17 +50,21 @@
             hideElements: config.hideElements || { enabled: false, selectors: [] },
             domains: config.domains || { blocked: [], allowed: [] },
             keywords: config.keywords || { notInterested: [], groups: {} },
-            localServer: config.localServer || { enabled: true, url: 'http://localhost:3000', timeout: 5000 },
-            ui: config.ui || { theme: 'light', language: 'zh-CN', notifications: true }
-          };
+            localServer: config.localServer || {
+              enabled: true,
+              url: 'http://localhost:3000',
+              timeout: 5000,
+            },
+            ui: config.ui || { theme: 'light', language: 'zh-CN', notifications: true },
+          }
 
-          return newConfig;
+          return newConfig
         },
 
         validate: (config) => {
-          return config && typeof config === 'object';
-        }
-      });
+          return config && typeof config === 'object'
+        },
+      })
     },
 
     /**
@@ -69,15 +73,15 @@
      */
     register(migration) {
       if (!migration.version || !migration.up) {
-        console.error('[ConfigMigrator] 无效迁移配置');
-        return false;
+        console.error('[ConfigMigrator] 无效迁移配置')
+        return false
       }
 
-      this.migrations.push(migration);
-      this._sortMigrations();
+      this.migrations.push(migration)
+      this._sortMigrations()
 
-      console.log(`[ConfigMigrator] 注册迁移: v${migration.version}`);
-      return true;
+      console.log(`[ConfigMigrator] 注册迁移: v${migration.version}`)
+      return true
     },
 
     /**
@@ -85,8 +89,8 @@
      */
     _sortMigrations() {
       this.migrations.sort((a, b) => {
-        return this._compareVersions(a.version, b.version);
-      });
+        return this._compareVersions(a.version, b.version)
+      })
     },
 
     /**
@@ -96,16 +100,16 @@
      * @returns {number} - 1, 0, 1
      */
     _compareVersions(a, b) {
-      const aParts = a.split('.').map(Number);
-      const bParts = b.split('.').map(Number);
+      const aParts = a.split('.').map(Number)
+      const bParts = b.split('.').map(Number)
 
       for (let i = 0; i < 3; i++) {
-        const aVal = aParts[i] || 0;
-        const bVal = bParts[i] || 0;
-        if (aVal > bVal) return 1;
-        if (aVal < bVal) return -1;
+        const aVal = aParts[i] || 0
+        const bVal = bParts[i] || 0
+        if (aVal > bVal) return 1
+        if (aVal < bVal) return -1
       }
-      return 0;
+      return 0
     },
 
     /**
@@ -115,63 +119,64 @@
      */
     async migrate(config) {
       if (!config || typeof config !== 'object') {
-        console.warn('[ConfigMigrator] 无效的配置');
-        return null;
+        console.warn('[ConfigMigrator] 无效的配置')
+        return null
       }
 
       // 获取配置版本
-      const fromVersion = config.version || '0.0.0';
-      const toVersion = this.currentVersion;
+      const fromVersion = config.version || '0.0.0'
+      const toVersion = this.currentVersion
 
       // 已经是最新版本
       if (this._compareVersions(fromVersion, toVersion) === 0) {
-        console.log('[ConfigMigrator] 配置已是最新版本');
-        return config;
+        console.log('[ConfigMigrator] 配置已是最新版本')
+        return config
       }
 
-      console.log(`[ConfigMigrator] 开始迁移: ${fromVersion} -> ${toVersion}`);
+      console.log(`[ConfigMigrator] 开始迁移: ${fromVersion} -> ${toVersion}`)
 
-      let currentConfig = { ...config };
-      const appliedMigrations = [];
+      let currentConfig = { ...config }
+      const appliedMigrations = []
 
       // 应用所有需要的迁移
       for (const migration of this.migrations) {
         // 检查是否需要应用此迁移
-        if (this._compareVersions(fromVersion, migration.version) < 0 &&
-            this._compareVersions(migration.version, toVersion) <= 0) {
-
+        if (
+          this._compareVersions(fromVersion, migration.version) < 0 &&
+          this._compareVersions(migration.version, toVersion) <= 0
+        ) {
           // 验证
           if (migration.validate && !migration.validate(currentConfig)) {
-            console.warn(`[ConfigMigrator] 迁移 ${migration.version} 验证失败，跳过`);
-            continue;
+            console.warn(`[ConfigMigrator] 迁移 ${migration.version} 验证失败，跳过`)
+            continue
           }
 
           try {
             // 应用迁移
-            currentConfig = migration.up(currentConfig);
-            currentConfig.version = migration.version;
-            appliedMigrations.push(migration.version);
+            currentConfig = migration.up(currentConfig)
+            currentConfig.version = migration.version
+            appliedMigrations.push(migration.version)
 
-            console.log(`[ConfigMigrator] 应用迁移: ${migration.version}`);
+            console.log(`[ConfigMigrator] 应用迁移: ${migration.version}`)
           } catch (error) {
-            console.error(`[ConfigMigrator] 迁移 ${migration.version} 失败:`, error);
+            console.error(`[ConfigMigrator] 迁移 ${migration.version} 失败:`, error)
             // 回滚
-            return { ...config, migrationError: error.message, };
+            return { ...config, migrationError: error.message }
           }
         }
       }
 
       // 设置最终版本
-      currentConfig.version = toVersion;
+      currentConfig.version = toVersion
 
-      console.log(`[ConfigMigrator] 迁移完成，应用了 ${appliedMigrations.length} 个迁移`);
+      console.log(`[ConfigMigrator] 迁移完成，应用了 ${appliedMigrations.length} 个迁移`)
 
       return {
         config: currentConfig,
         appliedMigrations,
         fromVersion,
-        toVersion
-      };
+        toVersion,
+      }
     },
 
     /**
@@ -179,33 +184,33 @@
      * @param {object} config - 配置
      */
     validate(config) {
-      const errors = [];
+      const errors = []
 
       // 检查必需字段
-      const requiredFields = ['version'];
+      const requiredFields = ['version']
       for (const field of requiredFields) {
         if (!config[field]) {
-          errors.push(`缺少必需字段: ${field}`);
+          errors.push(`缺少必需字段: ${field}`)
         }
       }
 
       // 检查配置结构
       if (config.settings && typeof config.settings !== 'object') {
-        errors.push('settings 必须是对象');
+        errors.push('settings 必须是对象')
       }
 
       if (config.hideElements && typeof config.hideElements !== 'object') {
-        errors.push('hideElements 必须是对象');
+        errors.push('hideElements 必须是对象')
       }
 
       if (config.domains && !Array.isArray(config.domains.blocked)) {
-        errors.push('domains.blocked 必须是数组');
+        errors.push('domains.blocked 必须是数组')
       }
 
       return {
         valid: errors.length === 0,
-        errors
-      };
+        errors,
+      }
     },
 
     /**
@@ -213,25 +218,27 @@
      * @param {object} config - 配置
      */
     getMigrationHistory(config) {
-      const version = config.version || '0.0.0';
-      const history = [];
+      const version = config.version || '0.0.0'
+      const history = []
 
       for (const migration of this.migrations) {
-        if (this._compareVersions('0.0.0', migration.version) <= 0 &&
-            this._compareVersions(migration.version, version) <= 0) {
+        if (
+          this._compareVersions('0.0.0', migration.version) <= 0 &&
+          this._compareVersions(migration.version, version) <= 0
+        ) {
           history.push({
             version: migration.version,
-            description: migration.description
-          });
+            description: migration.description,
+          })
         }
       }
 
-      return history;
-    }
-  };
+      return history
+    },
+  }
 
   // 导出
-  window.ConfigMigrator = ConfigMigrator;
+  window.ConfigMigrator = ConfigMigrator
 
-  console.log('[ConfigMigrator] 配置迁移模块已加载');
-})();
+  console.log('[ConfigMigrator] 配置迁移模块已加载')
+})()

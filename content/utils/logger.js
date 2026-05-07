@@ -3,7 +3,7 @@
  * 支持日志级别控制和模块过滤
  */
 
-'use strict';
+'use strict'
 
 // 日志级别
 const LOG_LEVELS = {
@@ -11,15 +11,15 @@ const LOG_LEVELS = {
   INFO: 1,
   WARN: 2,
   ERROR: 3,
-  SILENT: 4
-};
+  SILENT: 4,
+}
 
 // 默认配置
 let config = {
   level: LOG_LEVELS.INFO,
   enabledModules: new Set(),
-  disabledModules: new Set()
-};
+  disabledModules: new Set(),
+}
 
 /**
  * 设置日志级别
@@ -27,7 +27,7 @@ let config = {
  */
 export function setLogLevel(level) {
   if (Object.values(LOG_LEVELS).includes(level)) {
-    config.level = level;
+    config.level = level
   }
 }
 
@@ -36,8 +36,8 @@ export function setLogLevel(level) {
  * @param {string} module - 模块名
  */
 export function enableModule(module) {
-  config.disabledModules.delete(module);
-  config.enabledModules.add(module);
+  config.disabledModules.delete(module)
+  config.enabledModules.add(module)
 }
 
 /**
@@ -45,8 +45,8 @@ export function enableModule(module) {
  * @param {string} module - 模块名
  */
 export function disableModule(module) {
-  config.enabledModules.delete(module);
-  config.disabledModules.add(module);
+  config.enabledModules.delete(module)
+  config.disabledModules.add(module)
 }
 
 /**
@@ -56,13 +56,13 @@ export function disableModule(module) {
  */
 function shouldLog(level, module) {
   // 级别过滤
-  if (level < config.level) return false;
+  if (level < config.level) return false
 
   // 模块过滤
-  if (config.disabledModules.has(module)) return false;
-  if (config.enabledModules.size > 0 && !config.enabledModules.has(module)) return false;
+  if (config.disabledModules.has(module)) return false
+  if (config.enabledModules.size > 0 && !config.enabledModules.has(module)) return false
 
-  return true;
+  return true
 }
 
 /**
@@ -74,43 +74,49 @@ export function createLogger(module) {
   return {
     debug(...args) {
       if (shouldLog(LOG_LEVELS.DEBUG, module)) {
-        console.log(`[${module}]`, ...args);
+        console.log(`[${module}]`, ...args)
       }
     },
     info(...args) {
       if (shouldLog(LOG_LEVELS.INFO, module)) {
-        console.info(`[${module}]`, ...args);
+        console.info(`[${module}]`, ...args)
       }
     },
     warn(...args) {
       if (shouldLog(LOG_LEVELS.WARN, module)) {
-        console.warn(`[${module}]`, ...args);
+        console.warn(`[${module}]`, ...args)
       }
     },
     error(...args) {
       if (shouldLog(LOG_LEVELS.ERROR, module)) {
-        console.error(`[${module}]`, ...args);
+        console.error(`[${module}]`, ...args)
       }
-    }
-  };
+    },
+  }
 }
 
 // 兼容旧 API
-export const log = console.log.bind(console);
-export const error = console.error.bind(console);
-export const warn = console.warn.bind(console);
-export const info = console.info.bind(console);
+export const log = console.log.bind(console)
+export const error = console.error.bind(console)
+export const warn = console.warn.bind(console)
+export const info = console.info.bind(console)
 
 const LoggerUtils = {
-  log, error, warn, info,
-  setLogLevel, enableModule, disableModule, createLogger,
-  LOG_LEVELS
-};
-export default LoggerUtils;
+  log,
+  error,
+  warn,
+  info,
+  setLogLevel,
+  enableModule,
+  disableModule,
+  createLogger,
+  LOG_LEVELS,
+}
+export default LoggerUtils
 
 // 避免重复初始化
 if (typeof window !== 'undefined' && !window.LoggerUtils) {
-  window.LoggerUtils = LoggerUtils;
-  if (window.ScriptLoader) ScriptLoader.markReady('LoggerUtils');
-  console.log('[Logger] 日志模块已加载');
+  window.LoggerUtils = LoggerUtils
+  if (window.ScriptLoader) ScriptLoader.markReady('LoggerUtils')
+  console.log('[Logger] 日志模块已加载')
 }

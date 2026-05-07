@@ -1,1 +1,28 @@
-{"version":1,"timestamp":1777065713149,"rootDir":"E:/code/chrome-extension-template","testToSources":[["E:/code/chrome-extension-template/tests/dom.test.ts",[]],["E:/code/chrome-extension-template/tests/eventbus-v4.6-final.test.js",[]],["E:/code/chrome-extension-template/tests/keyword-filter.test.ts",[]],["E:/code/chrome-extension-template/tests/messaging.test.ts",[]],["E:/code/chrome-extension-template/tests/resource-accelerator.test.js",[]],["E:/code/chrome-extension-template/tests/script-guard.test.ts",[]],["E:/code/chrome-extension-template/tests/storage.test.ts",[]],["E:/code/chrome-extension-template/tests/style-injector.test.ts",[]],["E:/code/chrome-extension-template/tests/toast.test.ts",[]]],"sourceToTests":[],"allTests":["E:/code/chrome-extension-template/tests/dom.test.ts","E:/code/chrome-extension-template/tests/eventbus-v4.6-final.test.js","E:/code/chrome-extension-template/tests/keyword-filter.test.ts","E:/code/chrome-extension-template/tests/messaging.test.ts","E:/code/chrome-extension-template/tests/resource-accelerator.test.js","E:/code/chrome-extension-template/tests/script-guard.test.ts","E:/code/chrome-extension-template/tests/storage.test.ts","E:/code/chrome-extension-template/tests/style-injector.test.ts","E:/code/chrome-extension-template/tests/toast.test.ts"]}
+{
+  "version": 1,
+  "timestamp": 1777065713149,
+  "rootDir": "E:/code/chrome-extension-template",
+  "testToSources": [
+    ["E:/code/chrome-extension-template/tests/dom.test.ts", []],
+    ["E:/code/chrome-extension-template/tests/eventbus-v4.6-final.test.js", []],
+    ["E:/code/chrome-extension-template/tests/keyword-filter.test.ts", []],
+    ["E:/code/chrome-extension-template/tests/messaging.test.ts", []],
+    ["E:/code/chrome-extension-template/tests/resource-accelerator.test.js", []],
+    ["E:/code/chrome-extension-template/tests/script-guard.test.ts", []],
+    ["E:/code/chrome-extension-template/tests/storage.test.ts", []],
+    ["E:/code/chrome-extension-template/tests/style-injector.test.ts", []],
+    ["E:/code/chrome-extension-template/tests/toast.test.ts", []]
+  ],
+  "sourceToTests": [],
+  "allTests": [
+    "E:/code/chrome-extension-template/tests/dom.test.ts",
+    "E:/code/chrome-extension-template/tests/eventbus-v4.6-final.test.js",
+    "E:/code/chrome-extension-template/tests/keyword-filter.test.ts",
+    "E:/code/chrome-extension-template/tests/messaging.test.ts",
+    "E:/code/chrome-extension-template/tests/resource-accelerator.test.js",
+    "E:/code/chrome-extension-template/tests/script-guard.test.ts",
+    "E:/code/chrome-extension-template/tests/storage.test.ts",
+    "E:/code/chrome-extension-template/tests/style-injector.test.ts",
+    "E:/code/chrome-extension-template/tests/toast.test.ts"
+  ]
+}

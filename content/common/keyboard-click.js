@@ -5,39 +5,39 @@
 //   Space(长按) — 从鼠标位置开始选文本，移动鼠标扩展，松开确认复制
 //   X      — 右击悬停元素
 
-'use strict';
+'use strict'
 
 if (window.KeyboardClickLoaded) {
-  console.log('[键盘操作] 已加载，跳过');
+  console.log('[键盘操作] 已加载，跳过')
 } else if (!window.getScriptSwitch || !window.getScriptSwitch('keyboard-click')) {
-  console.log('[键盘操作] 已禁用');
+  console.log('[键盘操作] 已禁用')
 } else {
-  window.KeyboardClickLoaded = true;
+  window.KeyboardClickLoaded = true
 
   class KeyboardClicker {
     constructor() {
-      this.hoveredEl = null;
-      this.observer = null;
+      this.hoveredEl = null
+      this.observer = null
       // 鼠标精确坐标（用于文本选择）
-      this.mouseX = 0;
-      this.mouseY = 0;
+      this.mouseX = 0
+      this.mouseY = 0
       // 空格键文本选择
-      this.spaceHeld = false;
-      this.spaceDownTime = 0;
-      this.selectAnchor = null;  // Range：按住空格时的起始位置
-      this.selectTooltip = null;
-      this.spaceTimer = null;  // 长按定时器
+      this.spaceHeld = false
+      this.spaceDownTime = 0
+      this.selectAnchor = null // Range：按住空格时的起始位置
+      this.selectTooltip = null
+      this.spaceTimer = null // 长按定时器
       // 长按阈值（毫秒）
-      this.LONG_PRESS_THRESHOLD = 300;
+      this.LONG_PRESS_THRESHOLD = 300
 
-      this._init();
+      this._init()
     }
 
     _init() {
-      this._bindMouse();
-      this._bindKeyboard();
-      this._startObserver();
-      console.log('[键盘操作] 已初始化 — Space(短按):点击, Space(长按):选文本, X:右击');
+      this._bindMouse()
+      this._bindKeyboard()
+      this._startObserver()
+      console.log('[键盘操作] 已初始化 — Space(短按):点击, Space(长按):选文本, X:右击')
     }
 
     // ========== 深度元素查找（穿透 Shadow DOM）==========
@@ -46,196 +46,238 @@ if (window.KeyboardClickLoaded) {
      * document.elementFromPoint 只返回 shadow host，不会深入 shadow root 内部。
      */
     _deepElementFromPoint(x, y) {
-      let el = document.elementFromPoint(x, y);
-      if (!el) return null;
+      let el = document.elementFromPoint(x, y)
+      if (!el) return null
       // 递归穿透所有嵌套 shadow root
-      let maxDepth = 20; // 防止无限循环
+      let maxDepth = 20 // 防止无限循环
       while (el && el.shadowRoot && maxDepth-- > 0) {
-        const inner = el.shadowRoot.elementFromPoint(x, y);
-        if (!inner || inner === el) break;
-        el = inner;
+        const inner = el.shadowRoot.elementFromPoint(x, y)
+        if (!inner || inner === el) break
+        el = inner
       }
-      return el;
+      return el
     }
 
     // ========== 鼠标追踪 ==========
     _bindMouse() {
       // 追踪悬停元素
-      document.addEventListener('mouseover', (e) => {
-        this.hoveredEl = e.target;
-      }, true);
-      document.addEventListener('mouseout', (e) => {
-        if (!e.relatedTarget) this.hoveredEl = null;
-      }, true);
+      document.addEventListener(
+        'mouseover',
+        (e) => {
+          this.hoveredEl = e.target
+        },
+        true
+      )
+      document.addEventListener(
+        'mouseout',
+        (e) => {
+          if (!e.relatedTarget) this.hoveredEl = null
+        },
+        true
+      )
 
       // 追踪精确坐标（空格选择需要像素级定位）
-      document.addEventListener('mousemove', (e) => {
-        this.mouseX = e.clientX;
-        this.mouseY = e.clientY;
-        // 空格按住时实时扩展选择
-        if (this.spaceHeld) {
-          this._extendSelectionTo(e.clientX, e.clientY);
-        }
-      }, true);
+      document.addEventListener(
+        'mousemove',
+        (e) => {
+          this.mouseX = e.clientX
+          this.mouseY = e.clientY
+          // 空格按住时实时扩展选择
+          if (this.spaceHeld) {
+            this._extendSelectionTo(e.clientX, e.clientY)
+          }
+        },
+        true
+      )
     }
 
     // ========== 键盘 ==========
     _bindKeyboard() {
-      document.addEventListener('keydown', (e) => {
-        // 组合键（Ctrl+Space 等）不拦截
-        if (this._isComboKey(e)) return;
+      document.addEventListener(
+        'keydown',
+        (e) => {
+          // 组合键（Ctrl+Space 等）不拦截
+          if (this._isComboKey(e)) return
 
-        // 输入框聚焦时不拦截
-        if (this._isInputFocused()) return;
+          // 输入框聚焦时不拦截
+          if (this._isInputFocused()) return
 
-        switch (e.key) {
-          case ' ':
-            // 空格按下时完全阻止事件传播和默认行为
-            // stopImmediatePropagation 阻止同元素其他 capture 监听器触发
-            e.preventDefault();
-            e.stopImmediatePropagation();
-            if (!this.spaceHeld && !this.spaceTimer) {
-              this.spaceDownTime = Date.now();
-              // 设置长按定时器，超时后进入选择模式
-              this.spaceTimer = setTimeout(() => {
-                this._startTextSelection();
-                this.spaceTimer = null;
-              }, this.LONG_PRESS_THRESHOLD);
-            }
-            break;
+          switch (e.key) {
+            case ' ':
+              // 空格按下时完全阻止事件传播和默认行为
+              // stopImmediatePropagation 阻止同元素其他 capture 监听器触发
+              e.preventDefault()
+              e.stopImmediatePropagation()
+              if (!this.spaceHeld && !this.spaceTimer) {
+                this.spaceDownTime = Date.now()
+                // 设置长按定时器，超时后进入选择模式
+                this.spaceTimer = setTimeout(() => {
+                  this._startTextSelection()
+                  this.spaceTimer = null
+                }, this.LONG_PRESS_THRESHOLD)
+              }
+              break
 
-          case 'x':
-          case 'X':
-            if (!this.spaceHeld) this._doRightClick(e);
-            break;
+            case 'x':
+            case 'X':
+              if (!this.spaceHeld) this._doRightClick(e)
+              break
 
-          case 'Escape':
-            if (this.spaceHeld) this._cancelSelect();
-            break;
-        }
-      }, true);
+            case 'Escape':
+              if (this.spaceHeld) this._cancelSelect()
+              break
+          }
+        },
+        true
+      )
 
-      document.addEventListener('keyup', (e) => {
-        if (e.key === ' ' && !this._isComboKey(e)) {
-          // 阻止 keyup 的默认行为和传播，防止页面其他监听器二次处理空格键
-          e.preventDefault();
-          e.stopImmediatePropagation();
-          this._onSpaceUp(e);
-        }
-      }, true);
+      document.addEventListener(
+        'keyup',
+        (e) => {
+          if (e.key === ' ' && !this._isComboKey(e)) {
+            // 阻止 keyup 的默认行为和传播，防止页面其他监听器二次处理空格键
+            e.preventDefault()
+            e.stopImmediatePropagation()
+            this._onSpaceUp(e)
+          }
+        },
+        true
+      )
     }
 
     _isInputFocused() {
-      const el = document.activeElement;
-      if (!el) return false;
-      const tag = el.tagName;
+      const el = document.activeElement
+      if (!el) return false
+      const tag = el.tagName
 
       // 基本表单元素
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true
 
       // contentEditable
-      if (el.isContentEditable) return true;
+      if (el.isContentEditable) return true
 
       // ARIA 文本框 / 编辑器
-      const role = el.getAttribute('role');
-      if (role === 'textbox' || role === 'combobox' || role === 'searchbox' || role === 'editor') return true;
+      const role = el.getAttribute('role')
+      if (role === 'textbox' || role === 'combobox' || role === 'searchbox' || role === 'editor')
+        return true
 
       // 代码编辑器常见容器（CodeMirror, Monaco, ACE 等）
-      if (el.closest('.CodeMirror, .monaco-editor, .ace_editor, .cm-editor, .CodeMirror-code, [class*="editor"]')) return true;
+      if (
+        el.closest(
+          '.CodeMirror, .monaco-editor, .ace_editor, .cm-editor, .CodeMirror-code, [class*="editor"]'
+        )
+      )
+        return true
 
       // 某些 input type 不拦截（checkbox, radio, submit, button 等）
       if (tag === 'INPUT') {
-        const type = (el.type || '').toLowerCase();
-        const nonTextTypes = ['checkbox', 'radio', 'submit', 'button', 'reset', 'image', 'color', 'range', 'file'];
-        if (nonTextTypes.includes(type)) return false;
+        const type = (el.type || '').toLowerCase()
+        const nonTextTypes = [
+          'checkbox',
+          'radio',
+          'submit',
+          'button',
+          'reset',
+          'image',
+          'color',
+          'range',
+          'file',
+        ]
+        if (nonTextTypes.includes(type)) return false
       }
 
-      return false;
+      return false
     }
 
     /** 是否为组合键（Ctrl/Cmd/Alt + 字母），这些应该交给浏览器/页面处理 */
     _isComboKey(e) {
-      return e.ctrlKey || e.metaKey || e.altKey;
+      return e.ctrlKey || e.metaKey || e.altKey
     }
 
     _onSpaceUp(e) {
       // 清除长按定时器
       if (this.spaceTimer) {
-        clearTimeout(this.spaceTimer);
-        this.spaceTimer = null;
+        clearTimeout(this.spaceTimer)
+        this.spaceTimer = null
         // 定时器未触发 = 短按，执行点击
         // 先清除之前的选择
-        window.getSelection().removeAllRanges();
-        this._doClick(e);
-        return;
+        window.getSelection().removeAllRanges()
+        this._doClick(e)
+        return
       }
 
       if (this.spaceHeld) {
         // 长按松开：复制选中文本
-        this.spaceHeld = false;
-        const sel = window.getSelection();
-        const text = sel.toString().trim();
+        this.spaceHeld = false
+        const sel = window.getSelection()
+        const text = sel.toString().trim()
 
         if (text) {
-          navigator.clipboard.writeText(text).then(() => {
-            this._showHint(`已复制 ${text.length} 字`);
-            setTimeout(() => this._hideHint(), 1200);
-          }).catch(() => {
-            this._hideHint();
-          });
+          navigator.clipboard
+            .writeText(text)
+            .then(() => {
+              this._showHint(`已复制 ${text.length} 字`)
+              setTimeout(() => this._hideHint(), 1200)
+            })
+            .catch(() => {
+              this._hideHint()
+            })
         } else {
-          sel.removeAllRanges();
-          this._hideHint();
+          sel.removeAllRanges()
+          this._hideHint()
         }
 
-        this.selectAnchor = null;
+        this.selectAnchor = null
       }
     }
 
     _startTextSelection() {
       // 用 caretRangeFromPoint 获取鼠标处的精确文本位置
-      const anchor = this._rangeFromPoint(this.mouseX, this.mouseY);
+      const anchor = this._rangeFromPoint(this.mouseX, this.mouseY)
       if (!anchor) {
         // 鼠标下没有文本，不进入选择模式
-        return;
+        return
       }
 
-      this.spaceHeld = true;
-      this.selectAnchor = anchor;
+      this.spaceHeld = true
+      this.selectAnchor = anchor
 
       // 初始选中（光标位置，零宽度）
-      const sel = window.getSelection();
-      sel.removeAllRanges();
-      sel.addRange(anchor.cloneRange());
+      const sel = window.getSelection()
+      sel.removeAllRanges()
+      sel.addRange(anchor.cloneRange())
 
-      this._showHint('Space:按住移动选文本');
+      this._showHint('Space:按住移动选文本')
     }
 
     _extendSelectionTo(clientX, clientY) {
-      if (!this.selectAnchor) return;
+      if (!this.selectAnchor) return
 
-      const focus = this._rangeFromPoint(clientX, clientY);
-      if (!focus) return;
+      const focus = this._rangeFromPoint(clientX, clientY)
+      if (!focus) return
 
       try {
-        const range = document.createRange();
-        const anchor = this.selectAnchor;
+        const range = document.createRange()
+        const anchor = this.selectAnchor
 
         // 比较 anchor 和 focus 的文档位置，确保 start < end
-        const cmp = anchor.startContainer.compareDocumentPosition(focus.startContainer);
-        if (cmp & Node.DOCUMENT_POSITION_FOLLOWING || (!cmp && anchor.startOffset < focus.startOffset)) {
+        const cmp = anchor.startContainer.compareDocumentPosition(focus.startContainer)
+        if (
+          cmp & Node.DOCUMENT_POSITION_FOLLOWING ||
+          (!cmp && anchor.startOffset < focus.startOffset)
+        ) {
           // focus 在 anchor 后面（正常方向）
-          range.setStart(anchor.startContainer, anchor.startOffset);
-          range.setEnd(focus.startContainer, focus.startOffset);
+          range.setStart(anchor.startContainer, anchor.startOffset)
+          range.setEnd(focus.startContainer, focus.startOffset)
         } else {
           // focus 在 anchor 前面（反向选择）
-          range.setStart(focus.startContainer, focus.startOffset);
-          range.setEnd(anchor.startContainer, anchor.startOffset);
+          range.setStart(focus.startContainer, focus.startOffset)
+          range.setEnd(anchor.startContainer, anchor.startOffset)
         }
 
-        const sel = window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(range);
+        const sel = window.getSelection()
+        sel.removeAllRanges()
+        sel.addRange(range)
       } catch (_) {
         // 跨容器等异常，忽略
       }
@@ -245,26 +287,26 @@ if (window.KeyboardClickLoaded) {
     _rangeFromPoint(x, y) {
       // Chrome / Edge
       if (document.caretRangeFromPoint) {
-        return document.caretRangeFromPoint(x, y);
+        return document.caretRangeFromPoint(x, y)
       }
       // Firefox
       if (document.caretPositionFromPoint) {
-        const pos = document.caretPositionFromPoint(x, y);
+        const pos = document.caretPositionFromPoint(x, y)
         if (pos) {
-          const range = document.createRange();
-          range.setStart(pos.offsetNode, pos.offset);
-          range.collapse(true);
-          return range;
+          const range = document.createRange()
+          range.setStart(pos.offsetNode, pos.offset)
+          range.collapse(true)
+          return range
         }
       }
-      return null;
+      return null
     }
 
     _cancelSelect() {
-      window.getSelection().removeAllRanges();
-      this.spaceHeld = false;
-      this.selectAnchor = null;
-      this._hideHint();
+      window.getSelection().removeAllRanges()
+      this.spaceHeld = false
+      this.selectAnchor = null
+      this._hideHint()
     }
 
     // ========== 查找点击目标 ==========
@@ -274,33 +316,33 @@ if (window.KeyboardClickLoaded) {
      * 这里用 elementsFromPoint 检测是否有媒体元素被遮挡，仅在当前元素非交互元素时切换。
      */
     _findClickTarget(x, y) {
-      let el = this._deepElementFromPoint(x, y);
-      if (!el) return null;
+      let el = this._deepElementFromPoint(x, y)
+      if (!el) return null
 
       // 已经是媒体元素，直接返回
-      if (el.tagName === 'VIDEO' || el.tagName === 'AUDIO') return el;
+      if (el.tagName === 'VIDEO' || el.tagName === 'AUDIO') return el
 
       // 检查当前位置下方是否有媒体元素被遮挡
-      const all = document.elementsFromPoint(x, y);
-      let foundMedia = false;
+      const all = document.elementsFromPoint(x, y)
+      let foundMedia = false
       for (const candidate of all) {
         if (candidate.tagName === 'VIDEO' || candidate.tagName === 'AUDIO') {
-          foundMedia = true;
+          foundMedia = true
           // 只有当前元素不是交互元素（按钮/链接等）时，才切换到媒体元素
           if (!this._isInteractiveElement(el)) {
-            el = candidate;
+            el = candidate
           }
-          break;
+          break
         }
       }
 
       // 兜底：elementsFromPoint 无法找到 pointer-events:none 或 shadow DOM 内的 video
       if (!foundMedia && !this._isInteractiveElement(el)) {
-        const media = this._findMediaByRect(x, y);
-        if (media) el = media;
+        const media = this._findMediaByRect(x, y)
+        if (media) el = media
       }
 
-      return el;
+      return el
     }
 
     /**
@@ -310,175 +352,204 @@ if (window.KeyboardClickLoaded) {
      */
     _findMediaByRect(x, y) {
       const check = (video) => {
-        const rect = video.getBoundingClientRect();
-        return (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) ? video : null;
-      };
+        const rect = video.getBoundingClientRect()
+        return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom ? video : null
+      }
 
       // 文档级 video/audio
       for (const media of document.querySelectorAll('video, audio')) {
-        const found = check(media);
-        if (found) return found;
+        const found = check(media)
+        if (found) return found
       }
 
       // shadow DOM 内的 video/audio
       for (const host of document.querySelectorAll('*')) {
         if (host.shadowRoot) {
           for (const media of host.shadowRoot.querySelectorAll('video, audio')) {
-            const found = check(media);
-            if (found) return found;
+            const found = check(media)
+            if (found) return found
           }
         }
       }
 
-      return null;
+      return null
     }
 
     /** 判断元素是否为交互元素（按钮/链接等），交互元素应保留原始点击目标 */
     _isInteractiveElement(el) {
-      if (!el) return false;
+      if (!el) return false
 
       // 检查元素本身及其祖先元素（向上查找5层）
-      let current = el;
-      const maxDepth = 5;
-      const tags = ['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA', 'LABEL'];
-      const roles = ['button', 'link', 'tab', 'menuitem', 'checkbox', 'radio', 'switch'];
+      let current = el
+      const maxDepth = 5
+      const tags = ['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA', 'LABEL']
+      const roles = ['button', 'link', 'tab', 'menuitem', 'checkbox', 'radio', 'switch']
 
       for (let i = 0; i < maxDepth && current && current !== document.body; i++) {
         // 检查标签
-        if (tags.includes(current.tagName)) return true;
+        if (tags.includes(current.tagName)) return true
         // 检查 contentEditable
-        if (current.isContentEditable) return true;
+        if (current.isContentEditable) return true
         // 检查 role 属性
-        const role = current.getAttribute('role');
-        if (role && roles.includes(role)) return true;
+        const role = current.getAttribute('role')
+        if (role && roles.includes(role)) return true
         // 检查 SVG 内部元素
-        if (current.tagName === 'SVG' || current.closest?.('svg')) return true;
+        if (current.tagName === 'SVG' || current.closest?.('svg')) return true
         // 检查常见的可点击 CSS 类
-        if (current.classList?.toString().match(/(btn|button|close|cancel|dismiss|icon)/i)) return true;
+        if (current.classList?.toString().match(/(btn|button|close|cancel|dismiss|icon)/i))
+          return true
         // 检查 onclick 属性
-        if (current.hasAttribute?.('onclick')) return true;
+        if (current.hasAttribute?.('onclick')) return true
         // 检查 tabindex（可聚焦元素通常可交互）
-        if (current.hasAttribute?.('tabindex') && current.getAttribute('tabindex') !== '-1') return true;
+        if (current.hasAttribute?.('tabindex') && current.getAttribute('tabindex') !== '-1')
+          return true
 
-        current = current.parentElement;
+        current = current.parentElement
       }
-      return false;
+      return false
     }
 
     /** 判断元素是否在 Shadow DOM 内部 */
     _isInShadowDOM(el) {
-      let current = el;
+      let current = el
       while (current && current !== document.body) {
-        if (current.parentNode?.host) return true; // parentNode.host 表示当前元素在 shadow root 内
-        current = current.parentNode;
+        if (current.parentNode?.host) return true // parentNode.host 表示当前元素在 shadow root 内
+        current = current.parentNode
       }
-      return false;
+      return false
     }
 
     // ========== Space 短按点击 ==========
     _doClick(e) {
       // 使用 _findClickTarget 查找真实点击目标（穿透覆盖层找到被遮挡的媒体元素）
-      const el = this._findClickTarget(this.mouseX, this.mouseY);
-      if (!el || !el.isConnected) return;
-      e.preventDefault();
-      e.stopPropagation();
+      const el = this._findClickTarget(this.mouseX, this.mouseY)
+      if (!el || !el.isConnected) return
+      e.preventDefault()
+      e.stopPropagation()
 
       // 使用鼠标实际位置（而非元素中心），确保点击精确位置
       // 这对于进度条等需要精确点击的场景很重要
-      const clientX = this.mouseX;
-      const clientY = this.mouseY;
+      const clientX = this.mouseX
+      const clientY = this.mouseY
 
       // 计算相对于元素的偏移（进度条等控件依赖此属性）
-      const rect = el.getBoundingClientRect();
-      const offsetX = clientX - rect.left;
-      const offsetY = clientY - rect.top;
+      const rect = el.getBoundingClientRect()
+      const offsetX = clientX - rect.left
+      const offsetY = clientY - rect.top
 
       // Shadow DOM 内部元素使用 el.click()，确保原生点击行为正确触发
       if (this._isInShadowDOM(el)) {
-        el.click();
+        el.click()
       } else {
         // 1. mousedown
-        el.dispatchEvent(new MouseEvent('mousedown', {
-          bubbles: true, cancelable: true,
-          clientX, clientY, offsetX, offsetY,
-          button: 0, buttons: 1,
-        }));
+        el.dispatchEvent(
+          new MouseEvent('mousedown', {
+            bubbles: true,
+            cancelable: true,
+            clientX,
+            clientY,
+            offsetX,
+            offsetY,
+            button: 0,
+            buttons: 1,
+          })
+        )
 
         // 2. mouseup
-        el.dispatchEvent(new MouseEvent('mouseup', {
-          bubbles: true, cancelable: true,
-          clientX, clientY, offsetX, offsetY,
-          button: 0, buttons: 0,
-        }));
+        el.dispatchEvent(
+          new MouseEvent('mouseup', {
+            bubbles: true,
+            cancelable: true,
+            clientX,
+            clientY,
+            offsetX,
+            offsetY,
+            button: 0,
+            buttons: 0,
+          })
+        )
 
         // 3. click（带完整坐标信息）
-        el.dispatchEvent(new MouseEvent('click', {
-          bubbles: true, cancelable: true,
-          clientX, clientY, offsetX, offsetY,
-          button: 0, buttons: 0,
-        }));
+        el.dispatchEvent(
+          new MouseEvent('click', {
+            bubbles: true,
+            cancelable: true,
+            clientX,
+            clientY,
+            offsetX,
+            offsetY,
+            button: 0,
+            buttons: 0,
+          })
+        )
       }
     }
 
     // ========== X 右击 ==========
     _doRightClick(e) {
-      const el = this._findClickTarget(this.mouseX, this.mouseY);
-      if (!el || !el.isConnected) return;
-      e.preventDefault();
-      e.stopPropagation();
-      el.dispatchEvent(new MouseEvent('contextmenu', {
-        bubbles: true, cancelable: true,
-        clientX: this.mouseX, clientY: this.mouseY,
-        button: 2, buttons: 2,
-      }));
+      const el = this._findClickTarget(this.mouseX, this.mouseY)
+      if (!el || !el.isConnected) return
+      e.preventDefault()
+      e.stopPropagation()
+      el.dispatchEvent(
+        new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          clientX: this.mouseX,
+          clientY: this.mouseY,
+          button: 2,
+          buttons: 2,
+        })
+      )
     }
 
     // ========== 提示 ==========
     _showHint(text) {
-      this._hideHint();
-      const tip = document.createElement('div');
-      tip.textContent = text;
-      tip.style.cssText = 'position:fixed;bottom:12px;left:50%;transform:translateX(-50%);' +
+      this._hideHint()
+      const tip = document.createElement('div')
+      tip.textContent = text
+      tip.style.cssText =
+        'position:fixed;bottom:12px;left:50%;transform:translateX(-50%);' +
         'background:rgba(0,0,0,0.8);color:#fff;padding:4px 12px;border-radius:4px;' +
-        'font:12px monospace;z-index:2147483647;pointer-events:none;transition:opacity 0.3s;';
-      document.body.appendChild(tip);
-      this.selectTooltip = tip;
+        'font:12px monospace;z-index:2147483647;pointer-events:none;transition:opacity 0.3s;'
+      document.body.appendChild(tip)
+      this.selectTooltip = tip
     }
 
     _hideHint() {
       if (this.selectTooltip) {
-        this.selectTooltip.remove();
-        this.selectTooltip = null;
+        this.selectTooltip.remove()
+        this.selectTooltip = null
       }
     }
 
     // ========== DOM 变化 ==========
     _startObserver() {
-      if (typeof DOMUtils === 'undefined') return;
+      if (typeof DOMUtils === 'undefined') return
       this.observer = DOMUtils.createDebouncedObserver(() => {
         if (this.hoveredEl && !document.body.contains(this.hoveredEl)) {
-          this.hoveredEl = null;
+          this.hoveredEl = null
         }
-      }, 300);
+      }, 300)
       DOMUtils.onBodyReady(() => {
-        this.observer.observe(document.body, { childList: true, subtree: true });
-      });
+        this.observer.observe(document.body, { childList: true, subtree: true })
+      })
     }
 
     // ========== 销毁 ==========
     destroy() {
-      if (this.observer) this.observer.disconnect();
-      this._cancelSelect();
-      this.hoveredEl = null;
-      window.KeyboardClickLoaded = false;
+      if (this.observer) this.observer.disconnect()
+      this._cancelSelect()
+      this.hoveredEl = null
+      window.KeyboardClickLoaded = false
     }
   }
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
-      window.keyboardClicker = new KeyboardClicker();
-    });
+      window.keyboardClicker = new KeyboardClicker()
+    })
   } else {
-    window.keyboardClicker = new KeyboardClicker();
+    window.keyboardClicker = new KeyboardClicker()
   }
 }

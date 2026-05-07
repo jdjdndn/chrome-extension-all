@@ -11,33 +11,36 @@
 **目标**：用国内公共CDN替换常见JS库
 
 **实现方式**：
+
 - 拦截`<script>`标签和XHR请求
 - 匹配库名+版本，替换为CDN URL
 - 支持的CDN源：bootcdn、cdnjs.bytedance.com、unpkg
 
 **映射表示例**：
+
 ```javascript
 const JS_CDN_MAP = {
-  'jquery': {
+  jquery: {
     match: /jquery[-.]([\d.]+)(\.min)?\.js/i,
-    cdn: 'https://cdn.bootcdn.net/ajax/libs/jquery/$1/jquery$2.min.js'
+    cdn: 'https://cdn.bootcdn.net/ajax/libs/jquery/$1/jquery$2.min.js',
   },
-  'react': {
+  react: {
     match: /react(?:\.production)?\.min\.js/i,
-    cdn: 'https://cdn.bootcdn.net/ajax/libs/react/18.2.0/react.production.min.js'
+    cdn: 'https://cdn.bootcdn.net/ajax/libs/react/18.2.0/react.production.min.js',
   },
-  'vue': {
+  vue: {
     match: /vue(?:\.runtime)?(?:\.production)?\.min\.js/i,
-    cdn: 'https://cdn.bootcdn.net/ajax/libs/vue/3.4.21/vue.global.prod.min.js'
+    cdn: 'https://cdn.bootcdn.net/ajax/libs/vue/3.4.21/vue.global.prod.min.js',
   },
-  'lodash': {
+  lodash: {
     match: /lodash(?:[-.]([\d.]+))?(\.min)?\.js/i,
-    cdn: 'https://cdn.bootcdn.net/ajax/libs/lodash.js/4.17.21/lodash.min.js'
-  }
-};
+    cdn: 'https://cdn.bootcdn.net/ajax/libs/lodash.js/4.17.21/lodash.min.js',
+  },
+}
 ```
 
 **处理流程**：
+
 1. 监听`document.createElement('script')`和动态插入
 2. 解析src URL，匹配库名和版本
 3. 若匹配成功，替换src为CDN URL
@@ -48,15 +51,18 @@ const JS_CDN_MAP = {
 **目标**：用国内镜像替换Google Fonts等外部字体
 
 **支持的字体源**：
+
 - Google Fonts → fonts.font.im / fonts.googleapis.cn
 - FontAwesome → cdn.bytedance.com
 
 **实现方式**：
+
 - 拦截`<link rel="stylesheet">`请求
 - 替换字体CSS URL
 - 重写CSS中的`@font-face` URL
 
 **处理流程**：
+
 1. 监听`link[rel="stylesheet"]`插入
 2. 检测是否为Google Fonts URL
 3. 替换为镜像URL
@@ -67,11 +73,13 @@ const JS_CDN_MAP = {
 **3.1 懒加载**
 
 **实现方式**：
+
 - 使用IntersectionObserver API
 - 替换`src`为`data-src`
 - 进入视口时恢复`src`
 
 **配置项**：
+
 ```javascript
 {
   lazyLoad: true,
@@ -83,17 +91,20 @@ const JS_CDN_MAP = {
 **3.2 本地压缩**
 
 **实现方式**：
+
 - 拦截图片请求
 - Canvas重绘压缩（质量0.7-0.8）
 - 返回Blob URL
 
 **处理流程**：
+
 1. 监听`img`标签加载
 2. 检测图片大小（>50KB才压缩）
 3. Canvas绘制并导出为JPEG/WebP
 4. 替换src为Blob URL
 
 **配置项**：
+
 ```javascript
 {
   compress: true,
@@ -122,12 +133,12 @@ shared/
 
 ### 模块职责
 
-| 模块 | 职责 |
-|------|------|
+| 模块                    | 职责                         |
+| ----------------------- | ---------------------------- |
 | resource-accelerator.js | 统一入口、配置管理、统计收集 |
-| js-replacer.js | JS库检测、URL替换、版本匹配 |
-| font-replacer.js | 字体URL替换、CSS重写 |
-| image-optimizer.js | 懒加载、压缩处理 |
+| js-replacer.js          | JS库检测、URL替换、版本匹配  |
+| font-replacer.js        | 字体URL替换、CSS重写         |
+| image-optimizer.js      | 懒加载、压缩处理             |
 
 ### 数据流
 
@@ -232,12 +243,12 @@ ResourceAccelerator.init()
 
 ### 风险点
 
-| 风险 | 影响 | 缓解措施 |
-|------|------|---------|
-| CDN版本不匹配 | 功能异常 | 优先匹配精确版本，无匹配则跳过 |
-| 跨域CORS问题 | 字体加载失败 | 使用支持CORS的CDN源 |
-| 图片压缩失真 | 用户体验下降 | 可配置质量，提供排除规则 |
-| 动态加载资源 | 替换失败 | MutationObserver监听DOM变化 |
+| 风险          | 影响         | 缓解措施                       |
+| ------------- | ------------ | ------------------------------ |
+| CDN版本不匹配 | 功能异常     | 优先匹配精确版本，无匹配则跳过 |
+| 跨域CORS问题  | 字体加载失败 | 使用支持CORS的CDN源            |
+| 图片压缩失真  | 用户体验下降 | 可配置质量，提供排除规则       |
+| 动态加载资源  | 替换失败     | MutationObserver监听DOM变化    |
 
 ### 降级策略
 

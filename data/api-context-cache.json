@@ -1,1 +1,27 @@
-{"url":"https://qianfan.baidubce.com/anthropic/coding/v1/messages?beta=true","headers":{"Content-Type":"application/json","accept":"application/json","anthropic-beta":"claude-code-20250219,interleaved-thinking-2025-05-14,redact-thinking-2026-02-12,context-management-2025-06-27,prompt-caching-scope-2026-01-05,advanced-tool-use-2025-11-20,effort-2025-11-24","anthropic-dangerous-direct-browser-access":"true","anthropic-version":"2023-06-01","authorization":"Bearer bce-v3/ALTAKSP-t9pfIlhfxgnTxnRafWOJq/9d0f1a70b2bcb8a3acfead7c0153baedf4c03ace","content-type":"application/json","user-agent":"claude-cli/2.1.104 (external, cli)","x-app":"cli","x-claude-code-session-id":"0fd34e87-c804-46a5-9d4c-7943c0334d75","x-stainless-arch":"x64","x-stainless-lang":"js","x-stainless-os":"Windows","x-stainless-package-version":"0.81.0","x-stainless-retry-count":"0","x-stainless-runtime":"node","x-stainless-runtime-version":"v24.14.0","x-stainless-timeout":"600"},"model":"qianfan-code-latest","maxTokens":800,"tools":[],"timestamp":1777626706100}
+{
+  "url": "https://qianfan.baidubce.com/anthropic/coding/v1/messages?beta=true",
+  "headers": {
+    "Content-Type": "application/json",
+    "accept": "application/json",
+    "anthropic-beta": "claude-code-20250219,interleaved-thinking-2025-05-14,redact-thinking-2026-02-12,context-management-2025-06-27,prompt-caching-scope-2026-01-05,advanced-tool-use-2025-11-20,effort-2025-11-24",
+    "anthropic-dangerous-direct-browser-access": "true",
+    "anthropic-version": "2023-06-01",
+    "authorization": "Bearer bce-v3/ALTAKSP-t9pfIlhfxgnTxnRafWOJq/9d0f1a70b2bcb8a3acfead7c0153baedf4c03ace",
+    "content-type": "application/json",
+    "user-agent": "claude-cli/2.1.104 (external, cli)",
+    "x-app": "cli",
+    "x-claude-code-session-id": "0fd34e87-c804-46a5-9d4c-7943c0334d75",
+    "x-stainless-arch": "x64",
+    "x-stainless-lang": "js",
+    "x-stainless-os": "Windows",
+    "x-stainless-package-version": "0.81.0",
+    "x-stainless-retry-count": "0",
+    "x-stainless-runtime": "node",
+    "x-stainless-runtime-version": "v24.14.0",
+    "x-stainless-timeout": "600"
+  },
+  "model": "qianfan-code-latest",
+  "maxTokens": 800,
+  "tools": [],
+  "timestamp": 1777626706100
+}

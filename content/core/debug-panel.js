@@ -1,12 +1,12 @@
 // ========== 调试工具面板 ==========
 // 开发调试工具，方便调试和诊断
 
-(function () {
-  'use strict';
+;(function () {
+  'use strict'
 
   if (window.DebugPanel) {
-    console.log('[DebugPanel] 已存在，事件跳过初始化');
-    return;
+    console.log('[DebugPanel] 已存在，事件跳过初始化')
+    return
   }
 
   /**
@@ -32,17 +32,17 @@
      * 启用调试
      */
     enable() {
-      this.enabled = true;
-      console.log('[DebugPanel] 调试模式已启用');
-      this.log('调试模式已启用', 'info');
+      this.enabled = true
+      console.log('[DebugPanel] 调试模式已启用')
+      this.log('调试模式已启用', 'info')
     },
 
     /**
      * 灯用调试
      */
     disable() {
-      this.enabled = false;
-      console.log('[DebugPanel] 调试模式已禁用');
+      this.enabled = false
+      console.log('[DebugPanel] 调试模式已禁用')
     },
 
     /**
@@ -52,36 +52,36 @@
      * @param {object} data - 附加数据
      */
     log(message, level = 'info', data = null) {
-      if (!this.enabled && level !== 'error') return;
+      if (!this.enabled && level !== 'error') return
 
       const entry = {
         timestamp: Date.now(),
         level,
         message,
-        data
-      };
+        data,
+      }
 
-      this.logs.push(entry);
+      this.logs.push(entry)
 
       // 限制日志数量
       while (this.logs.length > this.maxLogs) {
-        this.logs.shift();
+        this.logs.shift()
       }
 
       // 控制台输出
-      const prefix = `[DebugPanel] [${level}]`;
+      const prefix = `[DebugPanel] [${level}]`
       switch (level) {
         case 'error':
-          console.error(prefix, message, data || '');
-          break;
+          console.error(prefix, message, data || '')
+          break
         case 'warn':
-          console.warn(prefix, message, data || '');
-          break;
+          console.warn(prefix, message, data || '')
+          break
         case 'debug':
-          console.debug(prefix, message, data || '');
-          break;
+          console.debug(prefix, message, data || '')
+          break
         default:
-          console.log(prefix, message, data || '');
+          console.log(prefix, message, data || '')
       }
     },
 
@@ -90,8 +90,8 @@
      * @param {string} label - 标签
      */
     time(label) {
-      this.timers[label] = performance.now();
-      this.log(`计时开始: ${label}`, 'debug');
+      this.timers[label] = performance.now()
+      this.log(`计时开始: ${label}`, 'debug')
     },
 
     /**
@@ -101,14 +101,14 @@
      */
     timeEnd(label) {
       if (!this.timers[label]) {
-        this.log(`计时器不存在: ${label}`, 'warn');
-        return 0;
+        this.log(`计时器不存在: ${label}`, 'warn')
+        return 0
       }
 
-      const elapsed = performance.now() - this.timers[label];
-      delete this.timers[label];
-      this.log(`计时结束: ${label} - ${elapsed.toFixed(2)}ms`, 'debug');
-      return elapsed;
+      const elapsed = performance.now() - this.timers[label]
+      delete this.timers[label]
+      this.log(`计时结束: ${label} - ${elapsed.toFixed(2)}ms`, 'debug')
+      return elapsed
     },
 
     /**
@@ -117,8 +117,8 @@
      * @param {any} value - 标记值
      */
     mark(name, value) {
-      this.markers[name] = { value, timestamp: Date.now() };
-      this.log(`标记: ${name} = ${JSON.stringify(value)}`, 'debug');
+      this.markers[name] = { value, timestamp: Date.now() }
+      this.log(`标记: ${name} = ${JSON.stringify(value)}`, 'debug')
     },
 
     /**
@@ -126,7 +126,7 @@
      * @param {string} name - 标记名称
      */
     getMark(name) {
-      return this.markers[name]?.value;
+      return this.markers[name]?.value
     },
 
     /**
@@ -137,8 +137,8 @@
         timestamp: Date.now(),
         system: {},
         performance: {},
-        errors: []
-      };
+        errors: [],
+      }
 
       // 系统状态
       results.system = {
@@ -147,43 +147,45 @@
         siteFactoryReady: this._checkGlobal('SiteFactory')?.listSites?.().length > 0 || false,
         pluginSystemReady: this._checkGlobal('PluginSystem')?.listPlugins?.().length > 0 || false,
         configManagerReady: this._checkGlobal('ConfigManager')?.initialized || false,
-        storageBridgeReady: this._checkGlobal('StorageBridge')?.isReady?.() || false
-      };
+        storageBridgeReady: this._checkGlobal('StorageBridge')?.isReady?.() || false,
+      }
 
       // 性能指标
       results.performance = {
         memoryUsage: this._getMemoryUsage(),
         logCount: this.logs.length,
         activeTimers: Object.keys(this.timers).length,
-        markerCount: Object.keys(this.markers).length
-      };
+        markerCount: Object.keys(this.markers).length,
+      }
 
       // 错误统计
-      results.errors = this.logs.filter(l => l.level === 'error').map(l => ({
-        timestamp: l.timestamp,
-        message: l.message,
-        data: l.data
-      }));
+      results.errors = this.logs
+        .filter((l) => l.level === 'error')
+        .map((l) => ({
+          timestamp: l.timestamp,
+          message: l.message,
+          data: l.data,
+        }))
 
-      return results;
+      return results
     },
 
     /**
      * 检查全局对象
      */
     _checkGlobal(name) {
-      return typeof window[name] !== 'undefined' ? window[name] : null;
+      return typeof window[name] !== 'undefined' ? window[name] : null
     },
 
     /**
      * 获取内存使用情况（估算）
      */
     _getMemoryUsage() {
-      const used = process.memoryUsage?.().heapUsed || 0;
+      const used = process.memoryUsage?.().heapUsed || 0
       return {
         usedMB: Math.round(used / 1024 / 1024),
-        available: true
-      };
+        available: true,
+      }
     },
 
     /**
@@ -194,67 +196,67 @@
         timestamp: Date.now(),
         diagnostics: this.runDiagnostics(),
         logs: this.logs.slice(-50),
-        markers: { ...this.markers }
-      };
+        markers: { ...this.markers },
+      }
 
-      console.log('=== 调试报告 ===');
-      console.log(JSON.stringify(report, null, 2));
-      console.log('=================');
+      console.log('=== 调试报告 ===')
+      console.log(JSON.stringify(report, null, 2))
+      console.log('=================')
 
-      return report;
+      return report
     },
 
     /**
      * 清除日志
      */
     clearLogs() {
-      this.logs = [];
-      this.log('日志已清除', 'info');
+      this.logs = []
+      this.log('日志已清除', 'info')
     },
 
     /**
      * 获取日志
      */
     getLogs(count = 20) {
-      return this.logs.slice(-count);
+      return this.logs.slice(-count)
     },
 
     /**
      * 打印系统状态
      */
     printStatus() {
-      const diag = this.runDiagnostics();
+      const diag = this.runDiagnostics()
 
-      console.log('\n=== 系统状态 ===');
-      console.log('初始化状态:');
+      console.log('\n=== 系统状态 ===')
+      console.log('初始化状态:')
       for (const [key, value] of Object.entries(diag.system)) {
-        console.log(`  ${key}: ${value ? '✓' : '✗'}`);
+        console.log(`  ${key}: ${value ? '✓' : '✗'}`)
       }
 
-      console.log('\n性能指标:');
+      console.log('\n性能指标:')
       for (const [key, value] of Object.entries(diag.performance)) {
-        console.log(`  ${key}: ${JSON.stringify(value)}`);
+        console.log(`  ${key}: ${JSON.stringify(value)}`)
       }
 
       if (diag.errors.length > 0) {
-        console.log(`\n最近 ${diag.errors.length} 个错误:`);
-        diag.errors.forEach(e => console.log(`  - ${e.message}`));
+        console.log(`\n最近 ${diag.errors.length} 个错误:`)
+        diag.errors.forEach((e) => console.log(`  - ${e.message}`))
       }
 
-      console.log('==============\n');
-    }
-  };
+      console.log('==============\n')
+    },
+  }
 
   // 导出
-  window.DebugPanel = DebugPanel;
+  window.DebugPanel = DebugPanel
 
   // 自动初始化（开发模式下）
   if (typeof chrome !== 'undefined' && chrome.runtime) {
-    const manifest = chrome.runtime.getManifest();
+    const manifest = chrome.runtime.getManifest()
     if (manifest?.name?.includes('dev') || localStorage.getItem('debugMode')) {
-      DebugPanel.enable();
+      DebugPanel.enable()
     }
   }
 
-  console.log('[DebugPanel] 调试工具面板已加载');
-})();
+  console.log('[DebugPanel] 调试工具面板已加载')
+})()

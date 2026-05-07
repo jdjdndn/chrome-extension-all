@@ -1,75 +1,75 @@
 // 控制面板逻辑
-'use strict';
+'use strict'
 
 // ========== EventBus V4.6 初始化 ==========
 // DevTools 环境中初始化 EventBus
-let eventBusReady = false;
+let eventBusReady = false
 
 async function initEventBus() {
   if (typeof EventBus === 'undefined') {
-    console.warn('[DevTools] EventBus 未加载');
-    return false;
+    console.warn('[DevTools] EventBus 未加载')
+    return false
   }
 
   try {
     // 检查是否已初始化
-    const state = EventBus.getState ? EventBus.getState() : null;
+    const state = EventBus.getState ? EventBus.getState() : null
     if (state && state.isReady) {
-      eventBusReady = true;
-      console.log('[DevTools] EventBus 已就绪');
-      return true;
+      eventBusReady = true
+      console.log('[DevTools] EventBus 已就绪')
+      return true
     }
 
     // 初始化 EventBus
-    await EventBus.init();
+    await EventBus.init()
 
     // 配置 DevTools 环境
     EventBus.configure({
       DEBUG_MODE: false,
       ENABLE_TRACKING: true,
       ENABLE_STATISTICS: false,
-      ENABLE_PERFORMANCE_MONITORING: false
-    });
+      ENABLE_PERFORMANCE_MONITORING: false,
+    })
 
-    eventBusReady = true;
-    console.log('[DevTools] EventBus V4.6 初始化完成');
-    return true;
+    eventBusReady = true
+    console.log('[DevTools] EventBus V4.6 初始化完成')
+    return true
   } catch (error) {
-    console.warn('[DevTools] EventBus 初始化失败:', error);
-    eventBusReady = false;
-    return false;
+    console.warn('[DevTools] EventBus 初始化失败:', error)
+    eventBusReady = false
+    return false
   }
 }
 
 // ========== StorageBridge 初始化 ==========
-let storageBridgeReady = false;
+let storageBridgeReady = false
 
 function initStorageBridge() {
   if (typeof StorageBridge === 'undefined') {
-    console.warn('[DevTools] StorageBridge 未加载');
-    return false;
+    console.warn('[DevTools] StorageBridge 未加载')
+    return false
   }
 
   try {
-    StorageBridge.init();
-    storageBridgeReady = true;
-    console.log('[DevTools] StorageBridge 初始化完成');
-    return true;
+    StorageBridge.init()
+    storageBridgeReady = true
+    console.log('[DevTools] StorageBridge 初始化完成')
+    return true
   } catch (error) {
-    console.warn('[DevTools] StorageBridge 初始化失败:', error);
-    storageBridgeReady = false;
-    return false;
+    console.warn('[DevTools] StorageBridge 初始化失败:', error)
+    storageBridgeReady = false
+    return false
   }
 }
 
 // 初始化
-initEventBus();
-initStorageBridge();
+initEventBus()
+initStorageBridge()
 
 // ========== Port 持久连接管理 ==========
-let backgroundPort = null;
-let portReconnectTimer = null;
-let _lastPickerMessageTimestamp = 0;
+let backgroundPort = null
+let portReconnectTimer = null
+let _lastPickerMessageTimestamp = 0
 
 /**
  * 建立 Port 持久连接
@@ -77,56 +77,56 @@ let _lastPickerMessageTimestamp = 0;
 function connectToBackground() {
   // 检查上下文是否有效
   if (!isExtensionContextValid()) {
-    console.warn('[DevTools] 扩展上下文已失效');
-    showContextInvalidatedWarning();
-    return null;
+    console.warn('[DevTools] 扩展上下文已失效')
+    showContextInvalidatedWarning()
+    return null
   }
 
-  if (backgroundPort) return backgroundPort;
+  if (backgroundPort) return backgroundPort
 
   try {
-    backgroundPort = chrome.runtime.connect({ name: 'devtools-panel' });
+    backgroundPort = chrome.runtime.connect({ name: 'devtools-panel' })
 
     backgroundPort.onMessage.addListener((message) => {
       // 处理来自 background 的消息
       if (message.type === 'PICKER_MESSAGE_PUSH') {
-        handlePickerMessage(message.data);
+        handlePickerMessage(message.data)
       }
-    });
+    })
 
     backgroundPort.onDisconnect.addListener(() => {
-      backgroundPort = null;
+      backgroundPort = null
 
       // 检查上下文是否仍然有效
       if (!isExtensionContextValid()) {
-        console.warn('[DevTools] 扩展上下文已失效，请关闭并重新打开 DevTools');
-        showContextInvalidatedWarning();
-        return;
+        console.warn('[DevTools] 扩展上下文已失效，请关闭并重新打开 DevTools')
+        showContextInvalidatedWarning()
+        return
       }
 
-      console.log('[DevTools] Port 连接断开，准备重连...');
+      console.log('[DevTools] Port 连接断开，准备重连...')
       // 延迟重连
-      if (portReconnectTimer) clearTimeout(portReconnectTimer);
-      portReconnectTimer = setTimeout(connectToBackground, 1000);
-    });
+      if (portReconnectTimer) clearTimeout(portReconnectTimer)
+      portReconnectTimer = setTimeout(connectToBackground, 1000)
+    })
 
     // 立即注册，不等待
     backgroundPort.postMessage({
       type: 'REGISTER_DEVTOOLS',
-      tabId: chrome.devtools.inspectedWindow.tabId
-    });
+      tabId: chrome.devtools.inspectedWindow.tabId,
+    })
 
     // 拉取缓冲的 picker 消息（Port 未就绪时 background 会暂存）
-    _fetchBufferedPickerMessages();
+    _fetchBufferedPickerMessages()
 
-    console.log('[DevTools] Port 连接已建立');
-    return backgroundPort;
+    console.log('[DevTools] Port 连接已建立')
+    return backgroundPort
   } catch (error) {
-    console.error('[DevTools] Port 连接失败:', error);
+    console.error('[DevTools] Port 连接失败:', error)
     // 延迟重试
-    if (portReconnectTimer) clearTimeout(portReconnectTimer);
-    portReconnectTimer = setTimeout(connectToBackground, 2000);
-    return null;
+    if (portReconnectTimer) clearTimeout(portReconnectTimer)
+    portReconnectTimer = setTimeout(connectToBackground, 2000)
+    return null
   }
 }
 
@@ -135,20 +135,20 @@ function connectToBackground() {
  */
 async function _fetchBufferedPickerMessages() {
   try {
-    const tabId = chrome.devtools.inspectedWindow.tabId;
+    const tabId = chrome.devtools.inspectedWindow.tabId
     const response = await chrome.runtime.sendMessage({
       type: 'GET_PICKER_MESSAGES',
       tabId,
-      since: _lastPickerMessageTimestamp
-    });
+      since: _lastPickerMessageTimestamp,
+    })
     if (response?.success && response.messages?.length > 0) {
-      console.log('[DevTools] 拉取到缓冲消息:', response.messages.length);
-      response.messages.forEach(msg => {
-        handlePickerMessage(msg);
+      console.log('[DevTools] 拉取到缓冲消息:', response.messages.length)
+      response.messages.forEach((msg) => {
+        handlePickerMessage(msg)
         if (msg.timestamp) {
-          _lastPickerMessageTimestamp = Math.max(_lastPickerMessageTimestamp, msg.timestamp);
+          _lastPickerMessageTimestamp = Math.max(_lastPickerMessageTimestamp, msg.timestamp)
         }
-      });
+      })
     }
   } catch (e) {
     // 忽略，连接可能尚未就绪
@@ -160,20 +160,20 @@ async function _fetchBufferedPickerMessages() {
  */
 function sendPortMessage(message) {
   if (!backgroundPort) {
-    connectToBackground();
+    connectToBackground()
   }
 
   if (backgroundPort) {
     try {
-      backgroundPort.postMessage(message);
-      return true;
+      backgroundPort.postMessage(message)
+      return true
     } catch (error) {
-      console.error('[DevTools] 发送消息失败:', error);
-      backgroundPort = null;
-      return false;
+      console.error('[DevTools] 发送消息失败:', error)
+      backgroundPort = null
+      return false
     }
   }
-  return false;
+  return false
 }
 
 /**
@@ -187,173 +187,176 @@ async function sendMessage(type, data = {}) {
   // 优先使用 EventBus（检查是否已初始化）
   if (eventBusReady && typeof EventBus !== 'undefined' && EventBus.request) {
     try {
-      return await EventBus.request(type, data, { timeout: 5000 });
+      return await EventBus.request(type, data, { timeout: 5000 })
     } catch (error) {
-      console.warn('[DevTools] EventBus 发送失败，降级原生:', error.message);
+      console.warn('[DevTools] EventBus 发送失败，降级原生:', error.message)
     }
   }
   // 降级到原生 chrome.runtime.sendMessage
-  return await chrome.runtime.sendMessage({ type, ...data });
+  return await chrome.runtime.sendMessage({ type, ...data })
 }
 
 // 立即建立连接
-connectToBackground();
+connectToBackground()
 
-const outputEl = document.getElementById('console-output');
-const notificationEl = document.getElementById('change-notification');
-const notificationTextEl = document.getElementById('notification-text');
+const outputEl = document.getElementById('console-output')
+const notificationEl = document.getElementById('change-notification')
+const notificationTextEl = document.getElementById('notification-text')
 
 // 字符串截断限制（字符数）
-const TRUNCATE_LIMIT = 200;
+const TRUNCATE_LIMIT = 200
 // 对象JSON显示行数限制
-const LINE_LIMIT = 8;
+const LINE_LIMIT = 8
 
 // 唯一ID计数器
-let itemIdCounter = 0;
+let itemIdCounter = 0
 
 // 存储数据结构
 let storageSections = {
   'storage-local': { title: '本地存储', icon: '💾', type: 'local', data: null },
   'storage-sync': { title: '同步存储', icon: '🔄', type: 'sync', data: null },
-  'storage-session': { title: '会话存储', icon: '⚡', type: 'session', data: null }
-};
+  'storage-session': { title: '会话存储', icon: '⚡', type: 'session', data: null },
+}
 
 // 通用复制函数（兼容DevTools环境）
 function copyToClipboard(text) {
   return new Promise((resolve, reject) => {
     // 优先使用Clipboard API
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(() => {
-        resolve(true);
-      }).catch(() => {
-        // Clipboard API失败，使用fallback
-        fallbackCopy(text, resolve, reject);
-      });
+      navigator.clipboard
+        .writeText(text)
+        .then(() => {
+          resolve(true)
+        })
+        .catch(() => {
+          // Clipboard API失败，使用fallback
+          fallbackCopy(text, resolve, reject)
+        })
     } else {
       // 不支持Clipboard API，直接使用fallback
-      fallbackCopy(text, resolve, reject);
+      fallbackCopy(text, resolve, reject)
     }
-  });
+  })
 }
 
 // Fallback复制方法
 function fallbackCopy(text, resolve, reject) {
   try {
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    textarea.style.position = 'fixed';
-    textarea.style.left = '-9999px';
-    textarea.style.top = '-9999px';
-    document.body.appendChild(textarea);
-    textarea.focus();
-    textarea.select();
-    const success = document.execCommand('copy');
-    document.body.removeChild(textarea);
+    const textarea = document.createElement('textarea')
+    textarea.value = text
+    textarea.style.position = 'fixed'
+    textarea.style.left = '-9999px'
+    textarea.style.top = '-9999px'
+    document.body.appendChild(textarea)
+    textarea.focus()
+    textarea.select()
+    const success = document.execCommand('copy')
+    document.body.removeChild(textarea)
     if (success) {
-      resolve(true);
+      resolve(true)
     } else {
-      reject(new Error('复制失败'));
+      reject(new Error('复制失败'))
     }
   } catch (e) {
-    reject(e);
+    reject(e)
   }
 }
 
 // 标签页切换
-document.querySelectorAll('.sidebar-tab').forEach(tab => {
+document.querySelectorAll('.sidebar-tab').forEach((tab) => {
   tab.addEventListener('click', (e) => {
-    e.preventDefault();
+    e.preventDefault()
 
     // 更新标签页激活状态
-    document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
+    document.querySelectorAll('.sidebar-tab').forEach((t) => t.classList.remove('active'))
+    tab.classList.add('active')
 
     // 更新内容可见性
-    const tabId = tab.dataset.tab;
-    document.querySelectorAll('.tab-content').forEach(content => {
-      content.classList.remove('active');
-    });
-    const targetContent = document.getElementById(`tab-${tabId}`);
+    const tabId = tab.dataset.tab
+    document.querySelectorAll('.tab-content').forEach((content) => {
+      content.classList.remove('active')
+    })
+    const targetContent = document.getElementById(`tab-${tabId}`)
     if (targetContent) {
-      targetContent.classList.add('active');
+      targetContent.classList.add('active')
 
       // Auto-load data when tab becomes active
       if (tabId === 'bookmarks') {
-        loadBookmarks();
+        loadBookmarks()
       }
       if (tabId === 'history') {
-        loadHistory();
+        loadHistory()
       }
       if (tabId === 'resources') {
-        initResourcesTab();
+        initResourcesTab()
       }
     }
-  });
-});
+  })
+})
 
 // ========== Info 子标签页切换 ==========
-document.querySelectorAll('.info-sub-tab').forEach(tab => {
+document.querySelectorAll('.info-sub-tab').forEach((tab) => {
   tab.addEventListener('click', (e) => {
-    e.preventDefault();
+    e.preventDefault()
 
     // 更新子标签页激活状态
-    document.querySelectorAll('.info-sub-tab').forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
+    document.querySelectorAll('.info-sub-tab').forEach((t) => t.classList.remove('active'))
+    tab.classList.add('active')
 
     // 更新内容可见性
-    const subtabId = tab.dataset.subtab;
-    document.querySelectorAll('.info-sub-content').forEach(content => {
-      content.classList.remove('active');
-    });
-    const targetSubContent = document.getElementById(`info-${subtabId}`);
+    const subtabId = tab.dataset.subtab
+    document.querySelectorAll('.info-sub-content').forEach((content) => {
+      content.classList.remove('active')
+    })
+    const targetSubContent = document.getElementById(`info-${subtabId}`)
     if (targetSubContent) {
-      targetSubContent.classList.add('active');
+      targetSubContent.classList.add('active')
     }
 
     // 如果切换到元素标签页
     if (subtabId === 'element') {
       // 元素标签页初始化
     }
-  });
-});
+  })
+})
 
 // 获取当前域名
 async function getCurrentDomain() {
   return new Promise((resolve) => {
     chrome.devtools.inspectedWindow.eval('window.location.hostname', (result) => {
-      resolve(result);
-    });
-  });
+      resolve(result)
+    })
+  })
 }
 
 // ========== 批量元素选择功能 ==========
-const startPickerBtn = document.getElementById('start-picker-btn');
-const clearSelectionBtn = document.getElementById('clear-selection-btn');
-const hideSelectedBtn = document.getElementById('hide-selected-btn');
-const showSelectedBtn = document.getElementById('show-selected-btn');
-const batchPickerStatus = document.getElementById('batch-picker-status');
-const batchSelectedInfo = document.getElementById('batch-selected-info');
-const batchSelectedCount = document.getElementById('batch-selected-count');
-const batchSelectedList = document.getElementById('batch-selected-list');
-const batchMergedSelectorSection = document.getElementById('batch-merged-selector-section');
-const batchMergedSelector = document.getElementById('batch-merged-selector');
-const copyMergedSelectorBtn = document.getElementById('copy-merged-selector-btn');
-const applyHideBtn = document.getElementById('apply-hide-btn');
+const startPickerBtn = document.getElementById('start-picker-btn')
+const clearSelectionBtn = document.getElementById('clear-selection-btn')
+const hideSelectedBtn = document.getElementById('hide-selected-btn')
+const showSelectedBtn = document.getElementById('show-selected-btn')
+const batchPickerStatus = document.getElementById('batch-picker-status')
+const batchSelectedInfo = document.getElementById('batch-selected-info')
+const batchSelectedCount = document.getElementById('batch-selected-count')
+const batchSelectedList = document.getElementById('batch-selected-list')
+const batchMergedSelectorSection = document.getElementById('batch-merged-selector-section')
+const batchMergedSelector = document.getElementById('batch-merged-selector')
+const copyMergedSelectorBtn = document.getElementById('copy-merged-selector-btn')
+const applyHideBtn = document.getElementById('apply-hide-btn')
 
 // 批量选择状态
 let batchPickerState = {
   isActive: false,
   selectedElements: [], // { selector, tagName, id, className }
-  mergedSelector: '',   // 匹配所有已选元素的合并选择器
+  mergedSelector: '', // 匹配所有已选元素的合并选择器
   mergedMatchCount: 0,
-  computing: false      // 是否正在计算选择器
-};
+  computing: false, // 是否正在计算选择器
+}
 
 // 注入元素拾取器脚本
 async function injectElementPicker() {
   // 使用 inspectedWindow.eval 注入脚本
   // 这种方式直接在页面世界中运行，可以与后续的命令通信
-  const scriptUrl = chrome.runtime.getURL('content/element-picker-inject.js');
+  const scriptUrl = chrome.runtime.getURL('content/element-picker-inject.js')
 
   const code = `
     (function() {
@@ -380,18 +383,18 @@ async function injectElementPicker() {
 
       return { injected: true, url: '${scriptUrl}' };
     })()
-  `;
+  `
 
   return new Promise((resolve) => {
     chrome.devtools.inspectedWindow.eval(code, (result, error) => {
       if (error) {
-        console.error('[BatchPicker] 注入脚本失败:', error);
-        resolve(false);
+        console.error('[BatchPicker] 注入脚本失败:', error)
+        resolve(false)
       } else {
-        resolve(true);
+        resolve(true)
       }
-    });
-  });
+    })
+  })
 }
 
 // 发送命令到元素拾取器
@@ -405,18 +408,18 @@ async function sendPickerCommand(action, data = {}) {
       document.dispatchEvent(event);
       return true;
     })('${action}', ${JSON.stringify(data)})
-  `;
+  `
 
   return new Promise((resolve) => {
     chrome.devtools.inspectedWindow.eval(code, (result, error) => {
       if (error) {
-        console.error('[BatchPicker] 发送命令失败:', error);
-        resolve(false);
+        console.error('[BatchPicker] 发送命令失败:', error)
+        resolve(false)
       } else {
-        resolve(result);
+        resolve(result)
       }
-    });
-  });
+    })
+  })
 }
 
 // 同步拾取器状态（用于初始化或刷新后恢复状态）
@@ -440,42 +443,41 @@ async function syncPickerState() {
       }
       return { hasInstance: false, isActive: false, elements: [], mergedSelector: '' };
     })()
-  `;
+  `
 
   return new Promise((resolve) => {
     chrome.devtools.inspectedWindow.eval(code, (result, error) => {
       if (error) {
-        resolve(false);
-        return;
+        resolve(false)
+        return
       }
 
-
       if (result && result.hasInstance) {
-        batchPickerState.isActive = result.isActive;
-        batchPickerState.selectedElements = result.elements.map(el => ({
+        batchPickerState.isActive = result.isActive
+        batchPickerState.selectedElements = result.elements.map((el) => ({
           pickerUid: el.pickerUid,
           selector: el.selector,
           tagName: el.tagName,
           id: el.id,
-          className: el.className
-        }));
-        batchPickerState.mergedSelector = result.mergedSelector || '';
-        batchPickerState.mergedMatchCount = result.mergedMatchCount || 0;
-        updatePickerStatus();
-        updateSelectedElementsUI();
+          className: el.className,
+        }))
+        batchPickerState.mergedSelector = result.mergedSelector || ''
+        batchPickerState.mergedMatchCount = result.mergedMatchCount || 0
+        updatePickerStatus()
+        updateSelectedElementsUI()
       } else {
         // 没有实例，确保状态为非活动
-        batchPickerState.isActive = false;
-        batchPickerState.selectedElements = [];
-        batchPickerState.mergedSelector = '';
-        batchPickerState.mergedMatchCount = 0;
-        updatePickerStatus();
-        updateSelectedElementsUI();
+        batchPickerState.isActive = false
+        batchPickerState.selectedElements = []
+        batchPickerState.mergedSelector = ''
+        batchPickerState.mergedMatchCount = 0
+        updatePickerStatus()
+        updateSelectedElementsUI()
       }
 
-      resolve(true);
-    });
-  });
+      resolve(true)
+    })
+  })
 }
 
 // 监听来自元素拾取器的消息
@@ -483,208 +485,228 @@ function setupPickerMessageListener() {
   // 通过 background 在 content script 世界中注入消息转发器
   // 页面世界中 element-picker-inject.js 分发的 CustomEvent 可以被
   // content script 世界的监听器捕获（DOM 事件跨隔离世界传递）
-  chrome.runtime.sendMessage({
-    type: 'INJECT_PICKER_LISTENER',
-    tabId: chrome.devtools.inspectedWindow.tabId
-  }).then(response => {
-    if (response?.success) {
-      console.log('[DevTools] 消息转发器注入成功');
-    } else {
-      console.warn('[DevTools] 消息转发器注入失败:', response?.error);
-    }
-  }).catch(e => {
-    console.warn('[DevTools] 消息转发器注入异常:', e);
-  });
+  chrome.runtime
+    .sendMessage({
+      type: 'INJECT_PICKER_LISTENER',
+      tabId: chrome.devtools.inspectedWindow.tabId,
+    })
+    .then((response) => {
+      if (response?.success) {
+        console.log('[DevTools] 消息转发器注入成功')
+      } else {
+        console.warn('[DevTools] 消息转发器注入失败:', response?.error)
+      }
+    })
+    .catch((e) => {
+      console.warn('[DevTools] 消息转发器注入异常:', e)
+    })
 }
 
 // 处理拾取器消息
 function handlePickerMessage(message) {
-  console.log('[DevTools] 收到拾取器消息:', message.type, message);
+  console.log('[DevTools] 收到拾取器消息:', message.type, message)
 
   switch (message.type) {
     case 'ELEMENT_PICKER_STARTED':
-      batchPickerState.isActive = true;
-      updatePickerStatus();
-      break;
+      batchPickerState.isActive = true
+      updatePickerStatus()
+      break
 
     case 'ELEMENT_PICKER_STOPPED':
-      batchPickerState.isActive = false;
-      updatePickerStatus();
-      break;
+      batchPickerState.isActive = false
+      updatePickerStatus()
+      break
 
     case 'ELEMENT_SELECTION_CHANGED':
-      console.log('[DevTools] 元素选择变化, 数量:', message.elements?.length || 0,
-                  '计算中:', message.computing, '合并选择器:', message.mergedSelector);
-      batchPickerState.selectedElements = message.elements || [];
+      console.log(
+        '[DevTools] 元素选择变化, 数量:',
+        message.elements?.length || 0,
+        '计算中:',
+        message.computing,
+        '合并选择器:',
+        message.mergedSelector
+      )
+      batchPickerState.selectedElements = message.elements || []
       if (message.computing) {
         // 显示 loading 状态
-        batchPickerState.mergedSelector = '';
-        batchPickerState.mergedMatchCount = 0;
-        batchPickerState.computing = true;
-        updateSelectedElementsUI();
+        batchPickerState.mergedSelector = ''
+        batchPickerState.mergedMatchCount = 0
+        batchPickerState.computing = true
+        updateSelectedElementsUI()
       } else {
-        batchPickerState.mergedSelector = message.mergedSelector || '';
-        batchPickerState.mergedMatchCount = message.mergedMatchCount || 0;
-        batchPickerState.computing = false;
-        updateSelectedElementsUI();
+        batchPickerState.mergedSelector = message.mergedSelector || ''
+        batchPickerState.mergedMatchCount = message.mergedMatchCount || 0
+        batchPickerState.computing = false
+        updateSelectedElementsUI()
       }
-      break;
+      break
 
     case 'ELEMENT_PICKER_STATE':
-      batchPickerState.isActive = message.isActive;
-      batchPickerState.selectedElements = message.elements || [];
-      batchPickerState.mergedSelector = message.mergedSelector || '';
-      batchPickerState.mergedMatchCount = message.mergedMatchCount || 0;
-      updatePickerStatus();
-      updateSelectedElementsUI();
-      break;
+      batchPickerState.isActive = message.isActive
+      batchPickerState.selectedElements = message.elements || []
+      batchPickerState.mergedSelector = message.mergedSelector || ''
+      batchPickerState.mergedMatchCount = message.mergedMatchCount || 0
+      updatePickerStatus()
+      updateSelectedElementsUI()
+      break
   }
 }
 
 // 更新拾取器状态显示
 function updatePickerStatus() {
   if (batchPickerStatus) {
-    batchPickerStatus.textContent = batchPickerState.isActive ? '选择中...' : '未启动';
-    batchPickerStatus.className = 'batch-picker-status' + (batchPickerState.isActive ? ' active' : '');
+    batchPickerStatus.textContent = batchPickerState.isActive ? '选择中...' : '未启动'
+    batchPickerStatus.className =
+      'batch-picker-status' + (batchPickerState.isActive ? ' active' : '')
   }
 
   if (startPickerBtn) {
-    startPickerBtn.textContent = batchPickerState.isActive ? '⏹️ 停止选择' : '🎯 开始选择';
+    startPickerBtn.textContent = batchPickerState.isActive ? '⏹️ 停止选择' : '🎯 开始选择'
   }
 }
 
 // 更新已选元素 UI
 function updateSelectedElementsUI() {
-  const count = batchPickerState.selectedElements.length;
+  const count = batchPickerState.selectedElements.length
 
   // 更新计数
   if (batchSelectedCount) {
-    batchSelectedCount.textContent = count;
+    batchSelectedCount.textContent = count
   }
 
   // 选择模式激活时始终显示区域
-  const shouldShow = batchPickerState.isActive || count > 0;
+  const shouldShow = batchPickerState.isActive || count > 0
   if (batchSelectedInfo) {
-    batchSelectedInfo.style.display = shouldShow ? 'block' : 'none';
+    batchSelectedInfo.style.display = shouldShow ? 'block' : 'none'
   }
   if (batchMergedSelectorSection) {
-    batchMergedSelectorSection.style.display = shouldShow ? 'block' : 'none';
+    batchMergedSelectorSection.style.display = shouldShow ? 'block' : 'none'
   }
 
   // 更新元素列表
   if (batchSelectedList) {
     if (count === 0) {
-      batchSelectedList.innerHTML = '<div class="empty-state" style="color: #999; font-size: 11px;">点击页面元素选择...</div>';
+      batchSelectedList.innerHTML =
+        '<div class="empty-state" style="color: #999; font-size: 11px;">点击页面元素选择...</div>'
     } else {
-      batchSelectedList.innerHTML = batchPickerState.selectedElements.map((el, index) => {
-        const matchCount = el.matchCount || 1;
-        const isExact = matchCount === 1;
-        const matchBadge = isExact
-          ? `<span class="match-exact" style="color: #10b981; font-size: 10px; margin-left: 4px;" title="精确匹配">✓1</span>`
-          : `<span class="match-warning" style="color: #f59e0b; font-size: 10px; margin-left: 4px;" title="选择器匹配 ${matchCount} 个元素">⚠️${matchCount}</span>`;
-        return `
+      batchSelectedList.innerHTML = batchPickerState.selectedElements
+        .map((el, index) => {
+          const matchCount = el.matchCount || 1
+          const isExact = matchCount === 1
+          const matchBadge = isExact
+            ? `<span class="match-exact" style="color: #10b981; font-size: 10px; margin-left: 4px;" title="精确匹配">✓1</span>`
+            : `<span class="match-warning" style="color: #f59e0b; font-size: 10px; margin-left: 4px;" title="选择器匹配 ${matchCount} 个元素">⚠️${matchCount}</span>`
+          return `
         <div class="batch-selected-item" data-index="${index}" title="${escapeHtml(el.selector)}">
           <input type="checkbox" class="batch-item-checkbox" checked data-index="${index}">
           <span class="item-tag">${escapeHtml(el.tagName)}${el.id ? '#' + el.id : ''}${matchBadge}</span>
           <span class="item-selector" style="color: #6b7280; font-size: 10px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(el.selector)}">${escapeHtml(el.selector)}</span>
           <span class="item-remove" data-index="${index}" title="移除">×</span>
         </div>
-      `}).join('');
+      `
+        })
+        .join('')
 
       // 添加移除事件
-      batchSelectedList.querySelectorAll('.item-remove').forEach(btn => {
+      batchSelectedList.querySelectorAll('.item-remove').forEach((btn) => {
         btn.addEventListener('click', (e) => {
-          const index = parseInt(e.target.dataset.index);
-          removeSelectedElement(index);
-        });
-      });
+          const index = parseInt(e.target.dataset.index)
+          removeSelectedElement(index)
+        })
+      })
 
       // 添加复选框事件
-      batchSelectedList.querySelectorAll('.batch-item-checkbox').forEach(checkbox => {
+      batchSelectedList.querySelectorAll('.batch-item-checkbox').forEach((checkbox) => {
         checkbox.addEventListener('change', (e) => {
-          updateSelectorOptionsDisplay();
-        });
-      });
+          updateSelectorOptionsDisplay()
+        })
+      })
     }
   }
 
   // 更新选择器选项显示
-  updateSelectorOptionsDisplay();
+  updateSelectorOptionsDisplay()
 }
 
 // 更新选择器行列表显示
 function updateSelectorOptionsDisplay() {
-  const container = document.getElementById('selector-options-container');
-  if (!container) return;
+  const container = document.getElementById('selector-options-container')
+  if (!container) return
 
-  const checkedElements = [];
-  batchSelectedList.querySelectorAll('.batch-item-checkbox:checked').forEach(checkbox => {
-    const index = parseInt(checkbox.dataset.index);
+  const checkedElements = []
+  batchSelectedList.querySelectorAll('.batch-item-checkbox:checked').forEach((checkbox) => {
+    const index = parseInt(checkbox.dataset.index)
     if (batchPickerState.selectedElements[index]) {
-      checkedElements.push(batchPickerState.selectedElements[index]);
+      checkedElements.push(batchPickerState.selectedElements[index])
     }
-  });
+  })
 
   if (checkedElements.length === 0) {
-    container.innerHTML = '<div style="color: #999; font-size: 11px; padding: 8px;">请勾选元素</div>';
-    return;
+    container.innerHTML =
+      '<div style="color: #999; font-size: 11px; padding: 8px;">请勾选元素</div>'
+    return
   }
 
-  const lines = generateSelectorLines(checkedElements);
+  const lines = generateSelectorLines(checkedElements)
   if (lines.length === 0) {
-    container.innerHTML = '<div style="color: #999; font-size: 11px; padding: 8px;">无法生成选择器</div>';
-    return;
+    container.innerHTML =
+      '<div style="color: #999; font-size: 11px; padding: 8px;">无法生成选择器</div>'
+    return
   }
 
   // 渲染行列表：一行一个选择器
-  container.innerHTML = lines.map((line, index) => `
+  container.innerHTML = lines
+    .map(
+      (line, index) => `
     <div class="selector-line" data-index="${index}">
       <span class="selector-line-type">${escapeHtml(line.type)}</span>
       <code class="selector-line-text">${escapeHtml(line.selector)}</code>
       <span class="selector-line-match" data-index="${index}">...</span>
       <button class="selector-line-copy" data-index="${index}" title="复制">📋</button>
     </div>
-  `).join('');
+  `
+    )
+    .join('')
 
   // 异步查询匹配数
-  querySelectorLineMatches(lines);
+  querySelectorLineMatches(lines)
 
   // 复制按钮事件
-  container.querySelectorAll('.selector-line-copy').forEach(btn => {
+  container.querySelectorAll('.selector-line-copy').forEach((btn) => {
     btn.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const index = parseInt(btn.dataset.index);
-      const selector = lines[index]?.selector;
+      e.stopPropagation()
+      const index = parseInt(btn.dataset.index)
+      const selector = lines[index]?.selector
       if (selector) {
-        await copyToClipboard(selector);
-        btn.textContent = '✓';
-        setTimeout(() => btn.textContent = '📋', 1000);
+        await copyToClipboard(selector)
+        btn.textContent = '✓'
+        setTimeout(() => (btn.textContent = '📋'), 1000)
       }
-    });
-  });
+    })
+  })
 
   // 点击行复制
-  container.querySelectorAll('.selector-line').forEach(el => {
+  container.querySelectorAll('.selector-line').forEach((el) => {
     el.addEventListener('click', async (e) => {
-      if (e.target.closest('.selector-line-copy')) return;
-      const index = parseInt(el.dataset.index);
-      const selector = lines[index]?.selector;
+      if (e.target.closest('.selector-line-copy')) return
+      const index = parseInt(el.dataset.index)
+      const selector = lines[index]?.selector
       if (selector) {
-        await copyToClipboard(selector);
-        const copyBtn = el.querySelector('.selector-line-copy');
+        await copyToClipboard(selector)
+        const copyBtn = el.querySelector('.selector-line-copy')
         if (copyBtn) {
-          copyBtn.textContent = '✓';
-          setTimeout(() => copyBtn.textContent = '📋', 1000);
+          copyBtn.textContent = '✓'
+          setTimeout(() => (copyBtn.textContent = '📋'), 1000)
         }
       }
-    });
-  });
+    })
+  })
 
   // 更新合并提示
-  const mergeInfo = document.getElementById('batch-merge-info');
+  const mergeInfo = document.getElementById('batch-merge-info')
   if (mergeInfo) {
-    mergeInfo.textContent = `${lines.length} 个选择器`;
-    mergeInfo.style.display = lines.length > 0 ? 'inline' : 'none';
+    mergeInfo.textContent = `${lines.length} 个选择器`
+    mergeInfo.style.display = lines.length > 0 ? 'inline' : 'none'
   }
 }
 
@@ -693,26 +715,26 @@ function updateSelectorOptionsDisplay() {
  */
 async function querySelectorLineMatches(lines) {
   for (let i = 0; i < lines.length; i++) {
-    const countEl = document.querySelector(`.selector-line-match[data-index="${i}"]`);
-    if (!countEl) continue;
+    const countEl = document.querySelector(`.selector-line-match[data-index="${i}"]`)
+    if (!countEl) continue
 
-    const count = await getSelectorMatchCount(lines[i].selector);
+    const count = await getSelectorMatchCount(lines[i].selector)
 
     if (count !== null) {
-      countEl.textContent = `(${count})`;
-      countEl.title = `匹配 ${count} 个元素`;
-      countEl.style.cursor = 'pointer';
+      countEl.textContent = `(${count})`
+      countEl.title = `匹配 ${count} 个元素`
+      countEl.style.cursor = 'pointer'
 
       // 悬停高亮
       countEl.addEventListener('mouseenter', () => {
-        highlightElements(lines[i].selector);
-      });
+        highlightElements(lines[i].selector)
+      })
       countEl.addEventListener('mouseleave', () => {
-        clearHighlight();
-      });
+        clearHighlight()
+      })
     } else {
-      countEl.textContent = '(?)';
-      countEl.style.color = '#999';
+      countEl.textContent = '(?)'
+      countEl.style.color = '#999'
     }
   }
 }
@@ -756,9 +778,9 @@ function highlightElements(selector) {
       document.body.appendChild(container);
       return elements.length;
     })(${JSON.stringify(selector)})
-  `;
+  `
 
-  chrome.devtools.inspectedWindow.eval(code);
+  chrome.devtools.inspectedWindow.eval(code)
 }
 
 /**
@@ -770,25 +792,25 @@ function clearHighlight() {
       const overlay = document.getElementById('ep-highlight-overlay');
       if (overlay) overlay.remove();
     })()
-  `;
+  `
 
-  chrome.devtools.inspectedWindow.eval(code);
+  chrome.devtools.inspectedWindow.eval(code)
 }
 
 // 监听面板切换/关闭，确保清除高亮
 function setupHighlightCleanup() {
   // 页面卸载时清理
-  window.addEventListener('beforeunload', clearHighlight);
+  window.addEventListener('beforeunload', clearHighlight)
   // 页面隐藏时清理
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) clearHighlight();
-  });
+    if (document.hidden) clearHighlight()
+  })
   // 失去焦点时清理
-  window.addEventListener('blur', clearHighlight);
+  window.addEventListener('blur', clearHighlight)
 }
 
 // 初始化清理监听
-setupHighlightCleanup();
+setupHighlightCleanup()
 
 /**
  * 获取选择器匹配的元素数量
@@ -802,17 +824,17 @@ async function getSelectorMatchCount(selector) {
         return -1;
       }
     })(${JSON.stringify(selector)})
-  `;
+  `
 
   return new Promise((resolve) => {
     chrome.devtools.inspectedWindow.eval(code, (result, error) => {
       if (error || result === undefined || result < 0) {
-        resolve(null);
+        resolve(null)
       } else {
-        resolve(result);
+        resolve(result)
       }
-    });
-  });
+    })
+  })
 }
 
 /**
@@ -820,7 +842,10 @@ async function getSelectorMatchCount(selector) {
  */
 function removeStatePseudoClasses(selector) {
   // 移除 :hover, :focus, :active, :visited, :target, :focus-within, :focus-visible 等状态伪类
-  return selector.replace(/:(hover|focus|active|visited|target|focus-within|focus-visible|checked|enabled|disabled|read-only|read-write|placeholder-shown|default|valid|invalid|in-range|out-of-range|required|optional)(?=[^a-z-]|$)/gi, '');
+  return selector.replace(
+    /:(hover|focus|active|visited|target|focus-within|focus-visible|checked|enabled|disabled|read-only|read-write|placeholder-shown|default|valid|invalid|in-range|out-of-range|required|optional)(?=[^a-z-]|$)/gi,
+    ''
+  )
 }
 
 /**
@@ -829,46 +854,51 @@ function removeStatePseudoClasses(selector) {
  * 每个选项都包含精确性验证
  */
 function generateSelectorLines(elements) {
-  if (!elements || elements.length === 0) return [];
+  if (!elements || elements.length === 0) return []
 
-  const lines = [];
-  const seenSelectors = new Set();
+  const lines = []
+  const seenSelectors = new Set()
 
   // 默认第一行：合并选择器（匹配所有已选元素的最精准选择器）
   if (batchPickerState.computing) {
     // 正在计算，显示 loading
-    lines.push({ selector: '⏳ 正在计算最优选择器...', type: '计算中', loading: true });
+    lines.push({ selector: '⏳ 正在计算最优选择器...', type: '计算中', loading: true })
   } else if (batchPickerState.mergedSelector) {
-    const merged = removeStatePseudoClasses(batchPickerState.mergedSelector);
-    const selectedCount = batchPickerState.selectedElements.length;
-    const isExact = batchPickerState.mergedMatchCount === selectedCount;
-    const typeLabel = elements.length === 1 ? '精确' : (isExact ? `精准(${batchPickerState.mergedMatchCount})` : `合并(${batchPickerState.mergedMatchCount})`);
-    lines.push({ selector: merged, type: typeLabel });
-    seenSelectors.add(merged);
+    const merged = removeStatePseudoClasses(batchPickerState.mergedSelector)
+    const selectedCount = batchPickerState.selectedElements.length
+    const isExact = batchPickerState.mergedMatchCount === selectedCount
+    const typeLabel =
+      elements.length === 1
+        ? '精确'
+        : isExact
+          ? `精准(${batchPickerState.mergedMatchCount})`
+          : `合并(${batchPickerState.mergedMatchCount})`
+    lines.push({ selector: merged, type: typeLabel })
+    seenSelectors.add(merged)
   }
 
   // 每个元素的独立选择器（去重，跳过与合并选择器相同的）
-  elements.forEach(el => {
-    const cleanSelector = removeStatePseudoClasses(el.selector);
+  elements.forEach((el) => {
+    const cleanSelector = removeStatePseudoClasses(el.selector)
     if (!seenSelectors.has(cleanSelector)) {
-      seenSelectors.add(cleanSelector);
-      lines.push({ selector: cleanSelector, type: '独立' });
+      seenSelectors.add(cleanSelector)
+      lines.push({ selector: cleanSelector, type: '独立' })
     }
-  });
+  })
 
-  return lines;
+  return lines
 }
 
 // 获取所有当前显示的选择器（逗号分隔合并）
 function getAllCombinedSelector() {
-  const container = document.getElementById('selector-options-container');
-  if (!container) return null;
+  const container = document.getElementById('selector-options-container')
+  if (!container) return null
 
-  const codeEls = container.querySelectorAll('.selector-line-text');
-  if (codeEls.length === 0) return null;
+  const codeEls = container.querySelectorAll('.selector-line-text')
+  if (codeEls.length === 0) return null
 
-  const selectors = [...codeEls].map(el => el.textContent);
-  return selectors.join(', ');
+  const selectors = [...codeEls].map((el) => el.textContent)
+  return selectors.join(', ')
 }
 
 /**
@@ -876,23 +906,23 @@ function getAllCombinedSelector() {
  */
 function parseSelectorParts(selector) {
   // 处理 :is() 中的逗号，避免被错误分割
-  const isPattern = /:is\([^)]+\)/g;
-  const isMatches = [];
+  const isPattern = /:is\([^)]+\)/g
+  const isMatches = []
   let temp = selector.replace(isPattern, (match) => {
-    isMatches.push(match);
-    return `<<IS${isMatches.length - 1}>>`;
-  });
+    isMatches.push(match)
+    return `<<IS${isMatches.length - 1}>>`
+  })
 
   // 按空格分割（后代选择器）
-  const parts = temp.split(/\s+/).filter(p => p);
+  const parts = temp.split(/\s+/).filter((p) => p)
 
   // 恢复 :is()
-  return parts.map(part => {
+  return parts.map((part) => {
     isMatches.forEach((match, i) => {
-      part = part.replace(`<<IS${i}>>`, match);
-    });
-    return part;
-  });
+      part = part.replace(`<<IS${i}>>`, match)
+    })
+    return part
+  })
 }
 
 /**
@@ -900,17 +930,17 @@ function parseSelectorParts(selector) {
  */
 function isEssentialPart(part) {
   // 有 :nth-child(n) 其中 n > 1
-  if (/:nth-child\([2-9]\d*\)/.test(part)) return true;
+  if (/:nth-child\([2-9]\d*\)/.test(part)) return true
   // 有 ID
-  if (/#[a-zA-Z]/.test(part)) return true;
+  if (/#[a-zA-Z]/.test(part)) return true
   // 有类名
-  if (/\.[a-zA-Z]/.test(part)) return true;
+  if (/\.[a-zA-Z]/.test(part)) return true
   // 有属性选择器
-  if (/\[[^\]]+\]/.test(part)) return true;
+  if (/\[[^\]]+\]/.test(part)) return true
   // 有 :is()
-  if (/:is\(/.test(part)) return true;
+  if (/:is\(/.test(part)) return true
 
-  return false;
+  return false
 }
 
 /**
@@ -918,82 +948,82 @@ function isEssentialPart(part) {
  * 找出所有元素的共同祖先，然后使用后代选择器
  */
 function tryCommonAncestorMerge(elements) {
-  if (elements.length < 2) return null;
+  if (elements.length < 2) return null
 
-  const selectors = elements.map(el => el.selector);
-  const pathsArray = selectors.map(s => s.split(/\s*>\s*/));
+  const selectors = elements.map((el) => el.selector)
+  const pathsArray = selectors.map((s) => s.split(/\s*>\s*/))
 
   // 找出共同前缀
-  let commonPrefixLength = 0;
-  const minLength = Math.min(...pathsArray.map(p => p.length));
+  let commonPrefixLength = 0
+  const minLength = Math.min(...pathsArray.map((p) => p.length))
 
   for (let i = 0; i < minLength; i++) {
-    const parts = pathsArray.map(p => p[i]);
-    const uniqueParts = [...new Set(parts)];
+    const parts = pathsArray.map((p) => p[i])
+    const uniqueParts = [...new Set(parts)]
     if (uniqueParts.length === 1) {
-      commonPrefixLength++;
+      commonPrefixLength++
     } else {
-      break;
+      break
     }
   }
 
   // 如果没有共同前缀，返回 null
-  if (commonPrefixLength === 0) return null;
+  if (commonPrefixLength === 0) return null
 
   // 构建共同祖先选择器
-  const ancestorParts = pathsArray[0].slice(0, commonPrefixLength);
+  const ancestorParts = pathsArray[0].slice(0, commonPrefixLength)
 
   // 尝试简化祖先选择器（只保留有特征的部分）
   const simplifiedAncestor = ancestorParts.filter((part, index) => {
     // 保留有特征的部分或最后一部分
-    return isEssentialPart(part) || index === ancestorParts.length - 1;
-  });
+    return isEssentialPart(part) || index === ancestorParts.length - 1
+  })
 
   // 获取各元素在共同祖先后的部分
-  const descendantParts = pathsArray.map(p => p.slice(commonPrefixLength));
+  const descendantParts = pathsArray.map((p) => p.slice(commonPrefixLength))
 
   // 如果后代部分都相同，直接返回完整选择器
-  const uniqueDescendants = [...new Set(descendantParts.map(d => d.join(' > ')))];
+  const uniqueDescendants = [...new Set(descendantParts.map((d) => d.join(' > ')))]
   if (uniqueDescendants.length === 1) {
-    return [...simplifiedAncestor, ...descendantParts[0]].join(' > ');
+    return [...simplifiedAncestor, ...descendantParts[0]].join(' > ')
   }
 
   // 使用 :is() 合并后代部分
-  const mergedDescendants = tryMergeDescendants(descendantParts);
+  const mergedDescendants = tryMergeDescendants(descendantParts)
   if (mergedDescendants) {
-    return [...simplifiedAncestor, mergedDescendants].join(' ');
+    return [...simplifiedAncestor, mergedDescendants].join(' ')
   }
 
-  return null;
+  return null
 }
 
 /**
  * 尝试合并后代选择器
  */
 function tryMergeDescendants(descendantParts) {
-  if (descendantParts.length < 2) return null;
+  if (descendantParts.length < 2) return null
 
   // 检查第一层是否可以合并
-  const firstLevel = descendantParts.map(d => d[0]);
-  const uniqueFirst = [...new Set(firstLevel)];
+  const firstLevel = descendantParts.map((d) => d[0])
+  const uniqueFirst = [...new Set(firstLevel)]
 
   if (uniqueFirst.length > 1 && uniqueFirst.length <= 5) {
     // 尝试用 :is() 合并第一层
-    const mergedFirst = tryMergeLayerByParts(uniqueFirst);
+    const mergedFirst = tryMergeLayerByParts(uniqueFirst)
     if (mergedFirst) {
       // 检查剩余部分是否相同
-      const remainingParts = descendantParts.map(d => d.slice(1));
-      const uniqueRemaining = [...new Set(remainingParts.map(r => r.join(' > ')))];
+      const remainingParts = descendantParts.map((d) => d.slice(1))
+      const uniqueRemaining = [...new Set(remainingParts.map((r) => r.join(' > ')))]
 
       if (uniqueRemaining.length === 1 && uniqueRemaining[0]) {
-        return [mergedFirst, ...remainingParts[0]].join(' > ');
+        return [mergedFirst, ...remainingParts[0]].join(' > ')
       } else if (uniqueRemaining.length === 1) {
-        return mergedFirst;
+        return mergedFirst
       }
     }
   }
 
-  return null;
+  return null
 }
 
 /**
@@ -1001,45 +1031,45 @@ function tryMergeDescendants(descendantParts) {
  */
 function tryMergeLayerByParts(parts) {
   // 解析每个部分
-  const parsed = parts.map(p => parseSelectorPart(p));
+  const parsed = parts.map((p) => parseSelectorPart(p))
 
   // 检查是否有共同的标签
-  const tags = [...new Set(parsed.map(p => p.tag).filter(t => t))];
-  const hasCommonTag = tags.length === 1;
+  const tags = [...new Set(parsed.map((p) => p.tag).filter((t) => t))]
+  const hasCommonTag = tags.length === 1
 
   // 收集所有类名
-  const allClasses = new Set();
-  parsed.forEach(p => p.classes?.forEach(c => allClasses.add(c)));
+  const allClasses = new Set()
+  parsed.forEach((p) => p.classes?.forEach((c) => allClasses.add(c)))
 
   // 收集所有属性
-  const allAttributes = [];
-  parsed.forEach(p => p.attributes?.forEach(a => allAttributes.push(a)));
+  const allAttributes = []
+  parsed.forEach((p) => p.attributes?.forEach((a) => allAttributes.push(a)))
 
   // 如果有共同标签，尝试构建 :is() 选择器
   if (hasCommonTag) {
-    const tag = tags[0];
-    const differences = [];
+    const tag = tags[0]
+    const differences = []
 
     // 找出不同的部分
     for (const part of parsed) {
-      const diff = [];
-      if (part.id) diff.push(`#${part.id}`);
-      if (part.classes?.length > 0) diff.push(part.classes.map(c => `.${c}`).join(''));
-      if (part.nthChild && part.nthChild !== 1) diff.push(`:nth-child(${part.nthChild})`);
-      if (diff.length > 0) differences.push(diff.join(''));
+      const diff = []
+      if (part.id) diff.push(`#${part.id}`)
+      if (part.classes?.length > 0) diff.push(part.classes.map((c) => `.${c}`).join(''))
+      if (part.nthChild && part.nthChild !== 1) diff.push(`:nth-child(${part.nthChild})`)
+      if (diff.length > 0) differences.push(diff.join(''))
     }
 
     if (differences.length > 0 && differences.length <= 5) {
-      return `${tag}:is(${differences.join(', ')})`;
+      return `${tag}:is(${differences.join(', ')})`
     }
   }
 
   // 如果没有共同标签，但类名相似
   if (allClasses.size > 0 && allClasses.size <= 3) {
-    return `:is(${parts.join(', ')})`;
+    return `:is(${parts.join(', ')})`
   }
 
-  return null;
+  return null
 }
 
 /**
@@ -1047,116 +1077,134 @@ function tryMergeLayerByParts(parts) {
  * 增强版：支持路径分析、确定性属性过滤
  */
 function tryIsMerge(elements) {
-  if (elements.length < 2) return null;
+  if (elements.length < 2) return null
 
   // 确定性属性白名单（用于合并）
   const STABLE_ATTRS = new Set([
-    'type', 'role', 'data-type', 'data-role', 'data-kind',
-    'data-variant', 'data-size', 'data-testid', 'data-test', 'data-id',
-    'lang', 'dir', 'target', 'rel', 'colspan', 'rowspan', 'scope'
-  ]);
+    'type',
+    'role',
+    'data-type',
+    'data-role',
+    'data-kind',
+    'data-variant',
+    'data-size',
+    'data-testid',
+    'data-test',
+    'data-id',
+    'lang',
+    'dir',
+    'target',
+    'rel',
+    'colspan',
+    'rowspan',
+    'scope',
+  ])
 
   // 检查属性是否是确定性属性
   const isStableAttr = (attrStr) => {
-    const match = attrStr.match(/^\[([^\]=]+)/);
-    return match && STABLE_ATTRS.has(match[1]);
-  };
+    const match = attrStr.match(/^\[([^\]=]+)/)
+    return match && STABLE_ATTRS.has(match[1])
+  }
 
   // 提取每个元素的特征选择器
-  const featureSelectors = elements.map(el => {
+  const featureSelectors = elements.map((el) => {
     // 优先使用 ID
-    if (el.id) return '#' + CSS.escape(el.id);
+    if (el.id) return '#' + CSS.escape(el.id)
 
     // 使用类名
     if (el.className) {
-      const classes = el.className.split(' ').filter(c =>
-        c && /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(c) && !/^(css-|styled-|sc-|js-|_)/.test(c)
-      );
+      const classes = el.className
+        .split(' ')
+        .filter(
+          (c) => c && /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(c) && !/^(css-|styled-|sc-|js-|_)/.test(c)
+        )
       if (classes.length > 0) {
-        return '.' + CSS.escape(classes[0]);
+        return '.' + CSS.escape(classes[0])
       }
     }
 
     // 使用选择器中的确定性属性（仅使用白名单中的属性）
-    const attrMatches = el.selector.match(/\[[^\]]+\]/g) || [];
-    const stableAttr = attrMatches.find(attr => isStableAttr(attr));
+    const attrMatches = el.selector.match(/\[[^\]]+\]/g) || []
+    const stableAttr = attrMatches.find((attr) => isStableAttr(attr))
     if (stableAttr) {
-      return stableAttr;
+      return stableAttr
     }
 
-    return null;
-  });
+    return null
+  })
 
   // 如果所有元素都有特征选择器
-  if (featureSelectors.every(s => s !== null)) {
-    const uniqueFeatures = [...new Set(featureSelectors)];
+  if (featureSelectors.every((s) => s !== null)) {
+    const uniqueFeatures = [...new Set(featureSelectors)]
     if (uniqueFeatures.length > 1 && uniqueFeatures.length <= 10) {
-      return `:is(${uniqueFeatures.join(', ')})`;
+      return `:is(${uniqueFeatures.join(', ')})`
     }
   }
 
   // 尝试路径合并
-  const pathsArray = elements.map(el => el.selector.split(/\s*>\s*/));
-  if (pathsArray.length >= 2 && pathsArray.every(p => p.length === pathsArray[0].length)) {
-    const pathLength = pathsArray[0].length;
-    const mergedPath = [];
+  const pathsArray = elements.map((el) => el.selector.split(/\s*>\s*/))
+  if (pathsArray.length >= 2 && pathsArray.every((p) => p.length === pathsArray[0].length)) {
+    const pathLength = pathsArray[0].length
+    const mergedPath = []
 
     for (let i = 0; i < pathLength; i++) {
-      const parts = pathsArray.map(p => p[i]);
-      const uniqueParts = [...new Set(parts)];
+      const parts = pathsArray.map((p) => p[i])
+      const uniqueParts = [...new Set(parts)]
 
       if (uniqueParts.length === 1) {
-        mergedPath.push(uniqueParts[0]);
+        mergedPath.push(uniqueParts[0])
       } else if (uniqueParts.length <= 5) {
         // 移除伪类后检查是否相同
-        const baseParts = uniqueParts.map(p => p.replace(/:[a-z-]+\([^)]*\)|:[a-z-]+/gi, ''));
-        const uniqueBase = [...new Set(baseParts)];
+        const baseParts = uniqueParts.map((p) => p.replace(/:[a-z-]+\([^)]*\)|:[a-z-]+/gi, ''))
+        const uniqueBase = [...new Set(baseParts)]
 
         if (uniqueBase.length === 1) {
           // 基础选择器相同，只是伪类不同
-          mergedPath.push(`${uniqueBase[0]}:is(${uniqueParts.join(', ')})`);
+          mergedPath.push(`${uniqueBase[0]}:is(${uniqueParts.join(', ')})`)
         } else {
           // 基础选择器也不同，用 :is() 直接合并
-          mergedPath.push(`:is(${uniqueParts.join(', ')})`);
+          mergedPath.push(`:is(${uniqueParts.join(', ')})`)
         }
       } else {
         // 差异太大，不适合合并
-        return null;
+        return null
       }
     }
 
-    return mergedPath.join(' > ');
+    return mergedPath.join(' > ')
   }
 
-  return null;
+  return null
 }
 
 /**
  * 尝试使用共同类名合并
  */
 function tryCommonClassMerge(elements) {
-  if (elements.length < 2) return null;
+  if (elements.length < 2) return null
 
   // 获取所有元素的类名
-  const allClasses = elements.map(el => {
-    if (!el.className) return [];
-    return el.className.split(' ').filter(c =>
-      c && /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(c) && !/^(css-|styled-|sc-|js-|_)/.test(c)
-    );
-  });
+  const allClasses = elements.map((el) => {
+    if (!el.className) return []
+    return el.className
+      .split(' ')
+      .filter(
+        (c) => c && /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(c) && !/^(css-|styled-|sc-|js-|_)/.test(c)
+      )
+  })
 
   // 找出共同类名
-  if (allClasses.length === 0 || allClasses[0].length === 0) return null;
+  if (allClasses.length === 0 || allClasses[0].length === 0) return null
 
-  const commonClasses = allClasses[0].filter(cls =>
-    allClasses.every(classes => classes.includes(cls))
-  );
+  const commonClasses = allClasses[0].filter((cls) =>
+    allClasses.every((classes) => classes.includes(cls))
+  )
 
   if (commonClasses.length > 0) {
-    return '.' + commonClasses.map(c => CSS.escape(c)).join('.');
+    return '.' + commonClasses.map((c) => CSS.escape(c)).join('.')
   }
 
-  return null;
+  return null
 }
 
 /**
@@ -1170,81 +1218,81 @@ function parseSelectorPart(part) {
     classes: [],
     nthChild: null,
     attributes: [],
-    original: part
-  };
+    original: part,
+  }
 
   // 提取 nth-child
-  const nthMatch = part.match(/:nth-child\((\d+)\)/);
+  const nthMatch = part.match(/:nth-child\((\d+)\)/)
   if (nthMatch) {
-    result.nthChild = parseInt(nthMatch[1]);
-    part = part.replace(/:nth-child\(\d+\)/, '');
+    result.nthChild = parseInt(nthMatch[1])
+    part = part.replace(/:nth-child\(\d+\)/, '')
   }
 
   // 提取 ID
-  const idMatch = part.match(/#([a-zA-Z_-][a-zA-Z0-9_-]*)/);
+  const idMatch = part.match(/#([a-zA-Z_-][a-zA-Z0-9_-]*)/)
   if (idMatch) {
-    result.id = idMatch[1];
-    part = part.replace(/#[a-zA-Z_-][a-zA-Z0-9_-]*/, '');
+    result.id = idMatch[1]
+    part = part.replace(/#[a-zA-Z_-][a-zA-Z0-9_-]*/, '')
   }
 
   // 提取类名
-  const classMatches = part.match(/\.[a-zA-Z_-][a-zA-Z0-9_-]*/g);
+  const classMatches = part.match(/\.[a-zA-Z_-][a-zA-Z0-9_-]*/g)
   if (classMatches) {
-    result.classes = classMatches.map(c => c.slice(1));
-    part = part.replace(/\.[a-zA-Z_-][a-zA-Z0-9_-]*/g, '');
+    result.classes = classMatches.map((c) => c.slice(1))
+    part = part.replace(/\.[a-zA-Z_-][a-zA-Z0-9_-]*/g, '')
   }
 
   // 提取属性
-  const attrMatches = part.match(/\[[^\]]+\]/g);
+  const attrMatches = part.match(/\[[^\]]+\]/g)
   if (attrMatches) {
-    result.attributes = attrMatches;
-    part = part.replace(/\[[^\]]+\]/g, '');
+    result.attributes = attrMatches
+    part = part.replace(/\[[^\]]+\]/g, '')
   }
 
   // 剩余的是标签名
-  result.tag = part.trim() || '*';
+  result.tag = part.trim() || '*'
 
-  return result;
+  return result
 }
 
 function removeSelectedElement(index) {
-  const removed = batchPickerState.selectedElements.splice(index, 1);
-  updateSelectedElementsUI();
+  const removed = batchPickerState.selectedElements.splice(index, 1)
+  updateSelectedElementsUI()
 
   // 通知注入脚本移除特定元素的高亮样式（使用唯一 ID 精确定位）
   if (removed.length > 0) {
     sendPickerCommand('REMOVE_ELEMENT_HIGHLIGHT', {
       pickerUid: removed[0].pickerUid,
-      selector: removed[0].selector  // 向后兼容
-    });
+      selector: removed[0].selector, // 向后兼容
+    })
   }
 }
 
 // 获取当前显示的所有选择器（用于隐藏/显示等操作）
 async function getCheckedSelectors() {
-  const combined = getAllCombinedSelector();
+  const combined = getAllCombinedSelector()
   if (combined) {
-    return [combined];
+    return [combined]
   }
 
   // 回退：直接用勾选元素的选择器
-  const checkedElements = [];
-  batchSelectedList.querySelectorAll('.batch-item-checkbox:checked').forEach(checkbox => {
-    const index = parseInt(checkbox.dataset.index);
+  const checkedElements = []
+  batchSelectedList.querySelectorAll('.batch-item-checkbox:checked').forEach((checkbox) => {
+    const index = parseInt(checkbox.dataset.index)
     if (batchPickerState.selectedElements[index]) {
-      checkedElements.push(batchPickerState.selectedElements[index]);
+      checkedElements.push(batchPickerState.selectedElements[index])
     }
-  });
+  })
 
-  if (checkedElements.length === 0) return [];
-  return checkedElements.map(el => el.selector);
+  if (checkedElements.length === 0) return []
+  return checkedElements.map((el) => el.selector)
 }
 
 // 批量隐藏元素
 async function batchHideElements(selectors) {
   if (!selectors || selectors.length === 0) {
-    showNotification('请先选择要隐藏的元素');
-    return;
+    showNotification('请先选择要隐藏的元素')
+    return
   }
 
   const code = `
@@ -1268,59 +1316,60 @@ async function batchHideElements(selectors) {
 
       return { success: true, addedCount };
     })(${JSON.stringify(selectors)})
-  `;
+  `
 
   const result = await new Promise((resolve) => {
     chrome.devtools.inspectedWindow.eval(code, (result, error) => {
       if (error) {
-        console.error('[BatchPicker] 批量隐藏失败:', error);
-        resolve(null);
+        console.error('[BatchPicker] 批量隐藏失败:', error)
+        resolve(null)
       } else {
-        resolve(result);
+        resolve(result)
       }
-    });
-  });
+    })
+  })
 
   if (result && result.success) {
     // 同步到存储
-    const domain = await getCurrentDomain();
+    const domain = await getCurrentDomain()
     if (domain) {
-      const storageResult = await chrome.storage.local.get(['hideElementsSettings']);
-      const allSettings = storageResult.hideElementsSettings || {};
-      const domainSettings = allSettings[domain] || { enabled: false, selectors: [] };
+      const storageResult = await chrome.storage.local.get(['hideElementsSettings'])
+      const allSettings = storageResult.hideElementsSettings || {}
+      const domainSettings = allSettings[domain] || { enabled: false, selectors: [] }
 
       // 合并新选择器
-      selectors.forEach(selector => {
+      selectors.forEach((selector) => {
         if (!domainSettings.selectors.includes(selector)) {
-          domainSettings.selectors.push(selector);
+          domainSettings.selectors.push(selector)
         }
-      });
-      domainSettings.enabled = true;
+      })
+      domainSettings.enabled = true
 
-      allSettings[domain] = domainSettings;
-      await chrome.storage.local.set({ hideElementsSettings: allSettings });
+      allSettings[domain] = domainSettings
+      await chrome.storage.local.set({ hideElementsSettings: allSettings })
 
       // 通知 content script
-      const tabId = chrome.devtools.inspectedWindow.tabId;
+      const tabId = chrome.devtools.inspectedWindow.tabId
       if (tabId) {
-        chrome.tabs.sendMessage(tabId, {
-          type: 'UPDATE_HIDE_ELEMENTS',
-          enabled: true,
-          selectors: domainSettings.selectors
-        }).catch(() => {
-        });
+        chrome.tabs
+          .sendMessage(tabId, {
+            type: 'UPDATE_HIDE_ELEMENTS',
+            enabled: true,
+            selectors: domainSettings.selectors,
+          })
+          .catch(() => {})
       }
     }
 
-    showNotification(`已隐藏 ${result.addedCount} 个元素`);
+    showNotification(`已隐藏 ${result.addedCount} 个元素`)
   }
 }
 
 // 批量显示元素
 async function batchShowElements(selectors) {
   if (!selectors || selectors.length === 0) {
-    showNotification('请先选择要显示的元素');
-    return;
+    showNotification('请先选择要显示的元素')
+    return
   }
 
   const code = `
@@ -1342,46 +1391,47 @@ async function batchShowElements(selectors) {
       styleEl.textContent = currentStyles;
       return { success: true, removedCount };
     })(${JSON.stringify(selectors)})
-  `;
+  `
 
   const result = await new Promise((resolve) => {
     chrome.devtools.inspectedWindow.eval(code, (result, error) => {
       if (error) {
-        console.error('[BatchPicker] 批量显示失败:', error);
-        resolve(null);
+        console.error('[BatchPicker] 批量显示失败:', error)
+        resolve(null)
       } else {
-        resolve(result);
+        resolve(result)
       }
-    });
-  });
+    })
+  })
 
   if (result && result.success) {
     // 同步到存储
-    const domain = await getCurrentDomain();
+    const domain = await getCurrentDomain()
     if (domain) {
-      const storageResult = await chrome.storage.local.get(['hideElementsSettings']);
-      const allSettings = storageResult.hideElementsSettings || {};
-      const domainSettings = allSettings[domain] || { enabled: false, selectors: [] };
+      const storageResult = await chrome.storage.local.get(['hideElementsSettings'])
+      const allSettings = storageResult.hideElementsSettings || {}
+      const domainSettings = allSettings[domain] || { enabled: false, selectors: [] }
 
       // 移除选择器
-      domainSettings.selectors = domainSettings.selectors.filter(s => !selectors.includes(s));
+      domainSettings.selectors = domainSettings.selectors.filter((s) => !selectors.includes(s))
 
-      allSettings[domain] = domainSettings;
-      await chrome.storage.local.set({ hideElementsSettings: allSettings });
+      allSettings[domain] = domainSettings
+      await chrome.storage.local.set({ hideElementsSettings: allSettings })
 
       // 通知 content script
-      const tabId = chrome.devtools.inspectedWindow.tabId;
+      const tabId = chrome.devtools.inspectedWindow.tabId
       if (tabId) {
-        chrome.tabs.sendMessage(tabId, {
-          type: 'UPDATE_HIDE_ELEMENTS',
-          enabled: domainSettings.enabled,
-          selectors: domainSettings.selectors
-        }).catch(() => {
-        });
+        chrome.tabs
+          .sendMessage(tabId, {
+            type: 'UPDATE_HIDE_ELEMENTS',
+            enabled: domainSettings.enabled,
+            selectors: domainSettings.selectors,
+          })
+          .catch(() => {})
       }
     }
 
-    showNotification(`已显示 ${result.removedCount} 个元素`);
+    showNotification(`已显示 ${result.removedCount} 个元素`)
   }
 }
 
@@ -1389,244 +1439,243 @@ async function batchShowElements(selectors) {
 async function initBatchPicker() {
   // 确保 Port 连接已建立
   if (!backgroundPort) {
-    connectToBackground();
+    connectToBackground()
     // 等待连接建立
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100))
   }
 
   // 设置消息监听器，将页面中的 element-picker-message 事件转发到 background
-  setupPickerMessageListener();
+  setupPickerMessageListener()
 
   // 尝试同步当前状态（处理 DevTools 刷新的情况）
-  await syncPickerState();
+  await syncPickerState()
 
   // 开始/停止选择按钮
   if (startPickerBtn) {
     startPickerBtn.addEventListener('click', async () => {
       if (batchPickerState.isActive) {
         // 立即更新本地状态
-        batchPickerState.isActive = false;
-        updatePickerStatus();
-        await sendPickerCommand('STOP');
+        batchPickerState.isActive = false
+        updatePickerStatus()
+        await sendPickerCommand('STOP')
       } else {
-        const injected = await injectElementPicker();
+        const injected = await injectElementPicker()
         if (injected) {
           // 等待脚本加载
-          await new Promise(resolve => setTimeout(resolve, 200));
+          await new Promise((resolve) => setTimeout(resolve, 200))
           // 立即更新本地状态
-          batchPickerState.isActive = true;
-          updatePickerStatus();
+          batchPickerState.isActive = true
+          updatePickerStatus()
           // 立即显示选中元素区域
           if (batchSelectedInfo) {
-            batchSelectedInfo.style.display = 'block';
+            batchSelectedInfo.style.display = 'block'
           }
           if (batchMergedSelectorSection) {
-            batchMergedSelectorSection.style.display = 'block';
+            batchMergedSelectorSection.style.display = 'block'
           }
-          updateSelectedElementsUI();
-          await sendPickerCommand('START');
+          updateSelectedElementsUI()
+          await sendPickerCommand('START')
         }
       }
-    });
+    })
   }
 
   // 清除选择按钮
   if (clearSelectionBtn) {
     clearSelectionBtn.addEventListener('click', async () => {
-      batchPickerState.selectedElements = [];
-      updateSelectedElementsUI();
-      await sendPickerCommand('CLEAR');
-    });
+      batchPickerState.selectedElements = []
+      updateSelectedElementsUI()
+      await sendPickerCommand('CLEAR')
+    })
   }
 
   // 隐藏选中按钮
   if (hideSelectedBtn) {
     hideSelectedBtn.addEventListener('click', async () => {
-      const selectors = await getCheckedSelectors();
-      await batchHideElements(selectors);
-    });
+      const selectors = await getCheckedSelectors()
+      await batchHideElements(selectors)
+    })
   }
 
   // 显示选中按钮
   if (showSelectedBtn) {
     showSelectedBtn.addEventListener('click', async () => {
-      const selectors = await getCheckedSelectors();
-      await batchShowElements(selectors);
-    });
+      const selectors = await getCheckedSelectors()
+      await batchShowElements(selectors)
+    })
   }
 
   // 复制合并选择器按钮
   if (copyMergedSelectorBtn) {
     copyMergedSelectorBtn.addEventListener('click', async () => {
-      const selector = getAllCombinedSelector();
+      const selector = getAllCombinedSelector()
       if (selector) {
-        await copyToClipboard(selector);
-        showNotification('选择器已复制');
+        await copyToClipboard(selector)
+        showNotification('选择器已复制')
       }
-    });
+    })
   }
 
   // 快捷操作按钮
-  const selectAllBtn = document.getElementById('select-all-btn');
-  const deselectAllBtn = document.getElementById('deselect-all-btn');
-  const invertSelectionBtn = document.getElementById('invert-selection-btn');
+  const selectAllBtn = document.getElementById('select-all-btn')
+  const deselectAllBtn = document.getElementById('deselect-all-btn')
+  const invertSelectionBtn = document.getElementById('invert-selection-btn')
 
   if (selectAllBtn) {
     selectAllBtn.addEventListener('click', () => {
-      batchSelectedList.querySelectorAll('.batch-item-checkbox').forEach(cb => {
-        cb.checked = true;
-      });
-      updateSelectorOptionsDisplay();
-      showNotification('已全选');
-    });
+      batchSelectedList.querySelectorAll('.batch-item-checkbox').forEach((cb) => {
+        cb.checked = true
+      })
+      updateSelectorOptionsDisplay()
+      showNotification('已全选')
+    })
   }
 
   if (deselectAllBtn) {
     deselectAllBtn.addEventListener('click', () => {
-      batchSelectedList.querySelectorAll('.batch-item-checkbox').forEach(cb => {
-        cb.checked = false;
-      });
-      updateSelectorOptionsDisplay();
-      showNotification('已取消全选');
-    });
+      batchSelectedList.querySelectorAll('.batch-item-checkbox').forEach((cb) => {
+        cb.checked = false
+      })
+      updateSelectorOptionsDisplay()
+      showNotification('已取消全选')
+    })
   }
 
   if (invertSelectionBtn) {
     invertSelectionBtn.addEventListener('click', () => {
-      batchSelectedList.querySelectorAll('.batch-item-checkbox').forEach(cb => {
-        cb.checked = !cb.checked;
-      });
-      updateSelectorOptionsDisplay();
-      showNotification('已反选');
-    });
+      batchSelectedList.querySelectorAll('.batch-item-checkbox').forEach((cb) => {
+        cb.checked = !cb.checked
+      })
+      updateSelectorOptionsDisplay()
+      showNotification('已反选')
+    })
   }
 
   // 键盘快捷键
   document.addEventListener('keydown', (e) => {
     // 只在批量选择区域可见时响应
-    const batchInfo = document.getElementById('batch-selected-info');
-    if (!batchInfo || batchInfo.style.display === 'none') return;
+    const batchInfo = document.getElementById('batch-selected-info')
+    if (!batchInfo || batchInfo.style.display === 'none') return
 
     // Ctrl+A: 全选
     if (e.ctrlKey && e.key === 'a') {
-      e.preventDefault();
-      batchSelectedList.querySelectorAll('.batch-item-checkbox').forEach(cb => {
-        cb.checked = true;
-      });
-      updateSelectorOptionsDisplay();
-      showNotification('已全选 (Ctrl+A)');
+      e.preventDefault()
+      batchSelectedList.querySelectorAll('.batch-item-checkbox').forEach((cb) => {
+        cb.checked = true
+      })
+      updateSelectorOptionsDisplay()
+      showNotification('已全选 (Ctrl+A)')
     }
 
     // Delete: 删除选中的元素
     if (e.key === 'Delete') {
-      const checkedBoxes = batchSelectedList.querySelectorAll('.batch-item-checkbox:checked');
+      const checkedBoxes = batchSelectedList.querySelectorAll('.batch-item-checkbox:checked')
       if (checkedBoxes.length > 0) {
         const indicesToRemove = [...checkedBoxes]
-          .map(cb => parseInt(cb.dataset.index))
-          .sort((a, b) => b - a); // 从后往前删除，避免索引变化
+          .map((cb) => parseInt(cb.dataset.index))
+          .sort((a, b) => b - a) // 从后往前删除，避免索引变化
 
         for (const index of indicesToRemove) {
-          batchPickerState.selectedElements.splice(index, 1);
+          batchPickerState.selectedElements.splice(index, 1)
         }
-        updateSelectedElementsUI();
-        showNotification(`已删除 ${indicesToRemove.length} 个元素`);
+        updateSelectedElementsUI()
+        showNotification(`已删除 ${indicesToRemove.length} 个元素`)
 
         // 通知注入脚本移除高亮
         for (const index of indicesToRemove) {
-          sendPickerCommand('REMOVE_ELEMENT_HIGHLIGHT', { index });
+          sendPickerCommand('REMOVE_ELEMENT_HIGHLIGHT', { index })
         }
       }
     }
-  });
+  })
 
   // 应用隐藏按钮
   if (applyHideBtn) {
     applyHideBtn.addEventListener('click', async () => {
-      const selectors = await getCheckedSelectors();
-      await batchHideElements(selectors);
-    });
+      const selectors = await getCheckedSelectors()
+      await batchHideElements(selectors)
+    })
   }
-
 }
 
 // 启动批量选择功能
-initBatchPicker();
+initBatchPicker()
 
 // HTML转义
 function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
+  const div = document.createElement('div')
+  div.textContent = text
+  return div.innerHTML
 }
 
 // 获取值类型样式类名
 function getValueTypeClass(value) {
-  if (typeof value === 'number') return 'number';
-  if (typeof value === 'boolean') return 'boolean';
-  if (typeof value === 'object' && value !== null) return 'object';
-  return '';
+  if (typeof value === 'number') return 'number'
+  if (typeof value === 'boolean') return 'boolean'
+  if (typeof value === 'object' && value !== null) return 'object'
+  return ''
 }
 
 // 计算字符串行数
 function countLines(str) {
-  return str.split('\n').length;
+  return str.split('\n').length
 }
 
 // 生成唯一ID
 function generateId() {
-  return `item-${++itemIdCounter}`;
+  return `item-${++itemIdCounter}`
 }
 
 // ========== 代码编辑器风格 JSON 渲染器 ==========
-let editorCounter = 0;
+let editorCounter = 0
 
 // 简单的JSON语法高亮
 function highlightJson(jsonStr) {
   return jsonStr
     .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?)/g, (match) => {
-      let cls = 'json-string';
+      let cls = 'json-string'
       if (/:$/.test(match)) {
-        cls = 'json-key';
-        match = '<span class="' + cls + '">' + match.slice(0, -1) + '</span>:';
+        cls = 'json-key'
+        match = '<span class="' + cls + '">' + match.slice(0, -1) + '</span>:'
       } else {
-        match = '<span class="' + cls + '">' + match + '</span>';
+        match = '<span class="' + cls + '">' + match + '</span>'
       }
-      return match;
+      return match
     })
     .replace(/\b(true|false)\b/g, '<span class="json-boolean">$1</span>')
     .replace(/\b(null)\b/g, '<span class="json-null">$1</span>')
-    .replace(/\b(-?\d+\.?\d*([eE][+-]?\d+)?)\b/g, '<span class="json-number">$1</span>');
+    .replace(/\b(-?\d+\.?\d*([eE][+-]?\d+)?)\b/g, '<span class="json-number">$1</span>')
 }
 
 // 渲染带行号和折叠功能的代码编辑器风格JSON
 function renderCodeEditor(jsonStr, maxLines = 10, editable = false) {
-  if (!jsonStr) return '<div class="code-editor-empty">(无数据)</div>';
+  if (!jsonStr) return '<div class="code-editor-empty">(无数据)</div>'
 
-  let parsed;
-  let formatted;
+  let parsed
+  let formatted
   try {
-    parsed = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr;
-    formatted = JSON.stringify(parsed, null, 2);
+    parsed = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr
+    formatted = JSON.stringify(parsed, null, 2)
   } catch (e) {
-    formatted = typeof jsonStr === 'string' ? jsonStr : String(jsonStr);
+    formatted = typeof jsonStr === 'string' ? jsonStr : String(jsonStr)
   }
 
-  const lines = formatted.split('\n');
-  const lineCount = lines.length;
-  const editorId = `code-editor-${++editorCounter}`;
+  const lines = formatted.split('\n')
+  const lineCount = lines.length
+  const editorId = `code-editor-${++editorCounter}`
 
   // Build line numbers and content
   function buildLines(startLine, endLine) {
-    let html = '';
+    let html = ''
     for (let i = startLine; i < endLine && i < lineCount; i++) {
-      const lineNum = i + 1;
-      const lineContent = escapeHtml(lines[i]);
+      const lineNum = i + 1
+      const lineContent = escapeHtml(lines[i])
       html += `<div class="code-line">
         <span class="line-number">${lineNum}</span>
         <span class="line-content">${lineContent}</span>
-      </div>`;
+      </div>`
     }
-    return html;
+    return html
   }
 
   // If small enough, no collapse needed
@@ -1642,13 +1691,13 @@ function renderCodeEditor(jsonStr, maxLines = 10, editable = false) {
           ${buildLines(0, lineCount)}
         </div>
       </div>
-    `;
+    `
   }
 
   // Need collapse - show preview with expand
-  const previewLines = buildLines(0, maxLines);
-  const fullLines = buildLines(0, lineCount);
-  const remainingLines = lineCount - maxLines;
+  const previewLines = buildLines(0, maxLines)
+  const fullLines = buildLines(0, lineCount)
+  const remainingLines = lineCount - maxLines
 
   return `
     <div class="code-editor collapsible" id="${editorId}">
@@ -1675,182 +1724,192 @@ function renderCodeEditor(jsonStr, maxLines = 10, editable = false) {
         ${fullLines}
       </div>
     </div>
-  `;
+  `
 }
 
 // 切换代码编辑器折叠状态
 window.toggleCodeEditor = function (id, collapse) {
-  const container = document.getElementById(id);
-  if (!container) return;
+  const container = document.getElementById(id)
+  if (!container) return
 
-  const preview = container.querySelector('.code-body-preview');
-  const full = container.querySelector('.code-body-full');
+  const preview = container.querySelector('.code-body-preview')
+  const full = container.querySelector('.code-body-full')
 
   if (collapse) {
-    preview.style.display = 'block';
-    full.style.display = 'none';
+    preview.style.display = 'block'
+    full.style.display = 'none'
   } else {
-    preview.style.display = 'none';
-    full.style.display = 'block';
+    preview.style.display = 'none'
+    full.style.display = 'block'
   }
-};
+}
 
 // 复制代码编辑器内容
 window.copyCodeEditor = function (id) {
-  const container = document.getElementById(id);
-  if (!container) return;
+  const container = document.getElementById(id)
+  if (!container) return
 
   // 获取所有行内容
-  const lines = container.querySelectorAll('.line-content');
-  const text = Array.from(lines).map(l => l.textContent).join('\n');
+  const lines = container.querySelectorAll('.line-content')
+  const text = Array.from(lines)
+    .map((l) => l.textContent)
+    .join('\n')
 
-  copyToClipboard(text).then(() => {
-    // 显示反馈
-    const btn = container.querySelector('.code-copy-btn');
-    if (btn) {
-      const originalText = btn.textContent;
-      btn.textContent = '已复制!';
-      setTimeout(() => btn.textContent = originalText, 1500);
-    }
-  }).catch(() => {
-    showNotification('复制失败');
-  });
-};
+  copyToClipboard(text)
+    .then(() => {
+      // 显示反馈
+      const btn = container.querySelector('.code-copy-btn')
+      if (btn) {
+        const originalText = btn.textContent
+        btn.textContent = '已复制!'
+        setTimeout(() => (btn.textContent = originalText), 1500)
+      }
+    })
+    .catch(() => {
+      showNotification('复制失败')
+    })
+}
 
 // ========== Chrome DevTools 风格 JSON 预览渲染器 ==========
-let previewCounter = 0;
+let previewCounter = 0
 
 // 获取折叠值的预览文本
 function getPreviewText(value, maxLength = 50) {
-  if (value === null) return 'null';
-  if (value === undefined) return 'undefined';
-  if (typeof value === 'boolean') return String(value);
-  if (typeof value === 'number') return String(value);
+  if (value === null) return 'null'
+  if (value === undefined) return 'undefined'
+  if (typeof value === 'boolean') return String(value)
+  if (typeof value === 'number') return String(value)
   if (typeof value === 'string') {
-    if (value.length <= maxLength) return `"${value}"`;
-    return `"${value.substring(0, maxLength)}…"`;
+    if (value.length <= maxLength) return `"${value}"`
+    return `"${value.substring(0, maxLength)}…"`
   }
   if (Array.isArray(value)) {
-    return `Array(${value.length})`;
+    return `Array(${value.length})`
   }
   if (typeof value === 'object') {
-    const keys = Object.keys(value);
-    if (keys.length === 0) return '{}';
-    return `{${keys.length}}`;
+    const keys = Object.keys(value)
+    if (keys.length === 0) return '{}'
+    return `{${keys.length}}`
   }
-  return String(value);
+  return String(value)
 }
 
 // 将JSON值渲染为Chrome DevTools预览树
 function renderJsonPreviewValue(value, depth = 0, key = null) {
-  const indent = depth * 12;
-  const previewId = `json-preview-${++previewCounter}`;
+  const indent = depth * 12
+  const previewId = `json-preview-${++previewCounter}`
 
   // 自动展开阈值（最大子元素数量）
-  const AUTO_EXPAND_THRESHOLD = 5;
+  const AUTO_EXPAND_THRESHOLD = 5
   // 自动展开最大深度
-  const AUTO_EXPAND_MAX_DEPTH = 2;
+  const AUTO_EXPAND_MAX_DEPTH = 2
 
   // 判断节点是否应该默认展开
   const shouldAutoExpand = (childCount, currentDepth) => {
-    return currentDepth < AUTO_EXPAND_MAX_DEPTH && childCount <= AUTO_EXPAND_THRESHOLD;
-  };
+    return currentDepth < AUTO_EXPAND_MAX_DEPTH && childCount <= AUTO_EXPAND_THRESHOLD
+  }
 
   // null值
   if (value === null) {
-    return `<span class="json-null">null</span>`;
+    return `<span class="json-null">null</span>`
   }
 
   // undefined值
   if (value === undefined) {
-    return `<span class="json-null">undefined</span>`;
+    return `<span class="json-null">undefined</span>`
   }
 
   // 布尔值
   if (typeof value === 'boolean') {
-    return `<span class="json-boolean">${value}</span>`;
+    return `<span class="json-boolean">${value}</span>`
   }
 
   // 数字值
   if (typeof value === 'number') {
-    return `<span class="json-number">${value}</span>`;
+    return `<span class="json-number">${value}</span>`
   }
 
   // 字符串值
   if (typeof value === 'string') {
-    const escaped = escapeHtml(value);
+    const escaped = escapeHtml(value)
     if (escaped.length <= 100) {
-      return `<span class="json-string">"${escaped}"</span>`;
+      return `<span class="json-string">"${escaped}"</span>`
     }
-    return `<span class="json-string">"${escaped.substring(0, 100)}…"</span>`;
+    return `<span class="json-string">"${escaped.substring(0, 100)}…"</span>`
   }
 
   // 数组
   if (Array.isArray(value)) {
     if (value.length === 0) {
-      return `<span class="json-bracket">[]</span>`;
+      return `<span class="json-bracket">[]</span>`
     }
 
-    const previewText = `Array(${value.length})`;
-    const items = value.map((item, index) => {
-      // 检查子项是否可展开
-      const isExpandable = typeof item === 'object' && item !== null;
-      if (isExpandable) {
-        const itemPreviewId = `json-preview-${++previewCounter}`;
-        const childIndent = indent + 12;
+    const previewText = `Array(${value.length})`
+    const items = value
+      .map((item, index) => {
+        // 检查子项是否可展开
+        const isExpandable = typeof item === 'object' && item !== null
+        if (isExpandable) {
+          const itemPreviewId = `json-preview-${++previewCounter}`
+          const childIndent = indent + 12
 
-        // 递归渲染子元素
-        const childItems = Array.isArray(item)
-          ? item.map((childItem, childIndex) => {
-            const childHtml = renderJsonPreviewValue(childItem, depth + 2, childIndex);
-            const childExpandable = typeof childItem === 'object' && childItem !== null;
-            if (childExpandable) {
-              return `<div class="json-tree-item" style="padding-left: ${childIndent + 12}px;">
+          // 递归渲染子元素
+          const childItems = Array.isArray(item)
+            ? item
+                .map((childItem, childIndex) => {
+                  const childHtml = renderJsonPreviewValue(childItem, depth + 2, childIndex)
+                  const childExpandable = typeof childItem === 'object' && childItem !== null
+                  if (childExpandable) {
+                    return `<div class="json-tree-item" style="padding-left: ${childIndent + 12}px;">
                   <span class="json-item-label">
                     <span class="json-key">${childIndex}</span><span class="json-colon">:</span>
                   </span>
                   ${childHtml}
-                </div>`;
-            }
-            return `<div class="json-tree-item" style="padding-left: ${childIndent + 12}px;">
+                </div>`
+                  }
+                  return `<div class="json-tree-item" style="padding-left: ${childIndent + 12}px;">
                 <span class="json-item-label">
                   <span class="json-key">${childIndex}</span><span class="json-colon">:</span>
                 </span>
                 ${childHtml}
-              </div>`;
-          }).join('')
-          : Object.keys(item || {}).map(childKey => {
-            const childHtml = renderJsonPreviewValue(item[childKey], depth + 2, childKey);
-            const childExpandable = typeof item[childKey] === 'object' && item[childKey] !== null;
-            if (childExpandable) {
-              return `<div class="json-tree-item" style="padding-left: ${childIndent + 12}px;">
+              </div>`
+                })
+                .join('')
+            : Object.keys(item || {})
+                .map((childKey) => {
+                  const childHtml = renderJsonPreviewValue(item[childKey], depth + 2, childKey)
+                  const childExpandable =
+                    typeof item[childKey] === 'object' && item[childKey] !== null
+                  if (childExpandable) {
+                    return `<div class="json-tree-item" style="padding-left: ${childIndent + 12}px;">
                   <span class="json-item-label">
                     <span class="json-key">"${escapeHtml(childKey)}"</span><span class="json-colon">:</span>
                   </span>
                   ${childHtml}
-                </div>`;
-            }
-            return `<div class="json-tree-item" style="padding-left: ${childIndent + 12}px;">
+                </div>`
+                  }
+                  return `<div class="json-tree-item" style="padding-left: ${childIndent + 12}px;">
                 <span class="json-item-label">
                   <span class="json-key">"${escapeHtml(childKey)}"</span><span class="json-colon">:</span>
                 </span>
                 ${childHtml}
-              </div>`;
-          }).join('');
+              </div>`
+                })
+                .join('')
 
-        const openBracket = Array.isArray(item) ? '[' : '{';
-        const closeBracket = Array.isArray(item) ? ']' : '}';
-        const childCount = Array.isArray(item) ? item.length : Object.keys(item || {}).length;
-        const previewLabel = Array.isArray(item) ? `Array(${childCount})` : `{${childCount}}`;
+          const openBracket = Array.isArray(item) ? '[' : '{'
+          const closeBracket = Array.isArray(item) ? ']' : '}'
+          const childCount = Array.isArray(item) ? item.length : Object.keys(item || {}).length
+          const previewLabel = Array.isArray(item) ? `Array(${childCount})` : `{${childCount}}`
 
-        // 嵌套项自动展开
-        const childIsExpanded = shouldAutoExpand(childCount, depth + 1);
-        const childExpandedClass = childIsExpanded ? 'expanded' : 'collapsed';
-        const childExpandedStyle = childIsExpanded ? 'inline' : 'none';
-        const childCollapsedStyle = childIsExpanded ? 'none' : 'inline';
-        const childToggleClass = childIsExpanded ? 'expanded' : '';
+          // 嵌套项自动展开
+          const childIsExpanded = shouldAutoExpand(childCount, depth + 1)
+          const childExpandedClass = childIsExpanded ? 'expanded' : 'collapsed'
+          const childExpandedStyle = childIsExpanded ? 'inline' : 'none'
+          const childCollapsedStyle = childIsExpanded ? 'none' : 'inline'
+          const childToggleClass = childIsExpanded ? 'expanded' : ''
 
-        return `<div class="json-tree-item" style="padding-left: ${indent + 12}px;">
+          return `<div class="json-tree-item" style="padding-left: ${indent + 12}px;">
           <span class="json-tree-node ${childExpandedClass}" data-preview-id="${itemPreviewId}">
             <span class="json-node-content">
               <span class="json-toggle ${childToggleClass}" title="展开/折叠"></span>
@@ -1869,23 +1928,24 @@ function renderJsonPreviewValue(value, depth = 0, key = null) {
               <div class="json-tree-item" style="padding-left: ${childIndent + 12}px;"><span class="json-bracket">${closeBracket}</span></div>
             </span>
           </span>
-        </div>`;
-      }
-      const itemHtml = renderJsonPreviewValue(item, depth + 1, index);
-      return `<div class="json-tree-item" style="padding-left: ${indent + 12}px;">
+        </div>`
+        }
+        const itemHtml = renderJsonPreviewValue(item, depth + 1, index)
+        return `<div class="json-tree-item" style="padding-left: ${indent + 12}px;">
         <span class="json-item-label">
           <span class="json-key">${index}</span><span class="json-colon">:</span>
         </span>
         ${itemHtml}
-      </div>`;
-    }).join('');
+      </div>`
+      })
+      .join('')
 
     // Determine if root array should be auto-expanded
-    const isExpanded = shouldAutoExpand(value.length, depth);
-    const expandedClass = isExpanded ? 'expanded' : 'collapsed';
-    const expandedStyle = isExpanded ? 'inline' : 'none';
-    const collapsedStyle = isExpanded ? 'none' : 'inline';
-    const toggleExpandedClass = isExpanded ? 'expanded' : '';
+    const isExpanded = shouldAutoExpand(value.length, depth)
+    const expandedClass = isExpanded ? 'expanded' : 'collapsed'
+    const expandedStyle = isExpanded ? 'inline' : 'none'
+    const collapsedStyle = isExpanded ? 'none' : 'inline'
+    const toggleExpandedClass = isExpanded ? 'expanded' : ''
 
     return `<span class="json-tree-node ${expandedClass}" data-preview-id="${previewId}">
       <span class="json-node-content">
@@ -1900,75 +1960,83 @@ function renderJsonPreviewValue(value, depth = 0, key = null) {
         </span>
         <div class="json-tree-item" style="padding-left: ${indent + 12}px;"><span class="json-bracket">]</span></div>
       </span>
-    </span>`;
+    </span>`
   }
 
   // Object
   if (typeof value === 'object') {
-    const keys = Object.keys(value);
+    const keys = Object.keys(value)
     if (keys.length === 0) {
-      return `<span class="json-bracket">{}</span>`;
+      return `<span class="json-bracket">{}</span>`
     }
 
-    const items = keys.map(k => {
-      // Check if value is expandable
-      const isExpandable = typeof value[k] === 'object' && value[k] !== null;
-      if (isExpandable) {
-        const itemPreviewId = `json-preview-${++previewCounter}`;
-        const childIndent = indent + 12;
+    const items = keys
+      .map((k) => {
+        // Check if value is expandable
+        const isExpandable = typeof value[k] === 'object' && value[k] !== null
+        if (isExpandable) {
+          const itemPreviewId = `json-preview-${++previewCounter}`
+          const childIndent = indent + 12
 
-        // Recursively render children
-        const childItems = Array.isArray(value[k])
-          ? value[k].map((childItem, childIndex) => {
-            const childHtml = renderJsonPreviewValue(childItem, depth + 2, childIndex);
-            const childExpandable = typeof childItem === 'object' && childItem !== null;
-            if (childExpandable) {
-              return `<div class="json-tree-item" style="padding-left: ${childIndent + 12}px;">
+          // Recursively render children
+          const childItems = Array.isArray(value[k])
+            ? value[k]
+                .map((childItem, childIndex) => {
+                  const childHtml = renderJsonPreviewValue(childItem, depth + 2, childIndex)
+                  const childExpandable = typeof childItem === 'object' && childItem !== null
+                  if (childExpandable) {
+                    return `<div class="json-tree-item" style="padding-left: ${childIndent + 12}px;">
                   <span class="json-item-label">
                     <span class="json-key">${childIndex}</span><span class="json-colon">:</span>
                   </span>
                   ${childHtml}
-                </div>`;
-            }
-            return `<div class="json-tree-item" style="padding-left: ${childIndent + 12}px;">
+                </div>`
+                  }
+                  return `<div class="json-tree-item" style="padding-left: ${childIndent + 12}px;">
                 <span class="json-item-label">
                   <span class="json-key">${childIndex}</span><span class="json-colon">:</span>
                 </span>
                 ${childHtml}
-              </div>`;
-          }).join('')
-          : Object.keys(value[k] || {}).map(childKey => {
-            const childHtml = renderJsonPreviewValue(value[k][childKey], depth + 2, childKey);
-            const childExpandable = typeof value[k][childKey] === 'object' && value[k][childKey] !== null;
-            if (childExpandable) {
-              return `<div class="json-tree-item" style="padding-left: ${childIndent + 12}px;">
+              </div>`
+                })
+                .join('')
+            : Object.keys(value[k] || {})
+                .map((childKey) => {
+                  const childHtml = renderJsonPreviewValue(value[k][childKey], depth + 2, childKey)
+                  const childExpandable =
+                    typeof value[k][childKey] === 'object' && value[k][childKey] !== null
+                  if (childExpandable) {
+                    return `<div class="json-tree-item" style="padding-left: ${childIndent + 12}px;">
                   <span class="json-item-label">
                     <span class="json-key">"${escapeHtml(childKey)}"</span><span class="json-colon">:</span>
                   </span>
                   ${childHtml}
-                </div>`;
-            }
-            return `<div class="json-tree-item" style="padding-left: ${childIndent + 12}px;">
+                </div>`
+                  }
+                  return `<div class="json-tree-item" style="padding-left: ${childIndent + 12}px;">
                 <span class="json-item-label">
                   <span class="json-key">"${escapeHtml(childKey)}"</span><span class="json-colon">:</span>
                 </span>
                 ${childHtml}
-              </div>`;
-          }).join('');
+              </div>`
+                })
+                .join('')
 
-        const openBracket = Array.isArray(value[k]) ? '[' : '{';
-        const closeBracket = Array.isArray(value[k]) ? ']' : '}';
-        const childCount = Array.isArray(value[k]) ? value[k].length : Object.keys(value[k] || {}).length;
-        const previewLabel = Array.isArray(value[k]) ? `Array(${childCount})` : `{${childCount}}`;
+          const openBracket = Array.isArray(value[k]) ? '[' : '{'
+          const closeBracket = Array.isArray(value[k]) ? ']' : '}'
+          const childCount = Array.isArray(value[k])
+            ? value[k].length
+            : Object.keys(value[k] || {}).length
+          const previewLabel = Array.isArray(value[k]) ? `Array(${childCount})` : `{${childCount}}`
 
-        // 嵌套项自动展开
-        const childIsExpanded = shouldAutoExpand(childCount, depth + 1);
-        const childExpandedClass = childIsExpanded ? 'expanded' : 'collapsed';
-        const childExpandedStyle = childIsExpanded ? 'inline' : 'none';
-        const childCollapsedStyle = childIsExpanded ? 'none' : 'inline';
-        const childToggleClass = childIsExpanded ? 'expanded' : '';
+          // 嵌套项自动展开
+          const childIsExpanded = shouldAutoExpand(childCount, depth + 1)
+          const childExpandedClass = childIsExpanded ? 'expanded' : 'collapsed'
+          const childExpandedStyle = childIsExpanded ? 'inline' : 'none'
+          const childCollapsedStyle = childIsExpanded ? 'none' : 'inline'
+          const childToggleClass = childIsExpanded ? 'expanded' : ''
 
-        return `<div class="json-tree-item" style="padding-left: ${indent + 12}px;">
+          return `<div class="json-tree-item" style="padding-left: ${indent + 12}px;">
           <span class="json-tree-node ${childExpandedClass}" data-preview-id="${itemPreviewId}">
             <span class="json-node-content">
               <span class="json-toggle ${childToggleClass}" title="展开/折叠"></span>
@@ -1987,23 +2055,24 @@ function renderJsonPreviewValue(value, depth = 0, key = null) {
               <div class="json-tree-item" style="padding-left: ${childIndent + 12}px;"><span class="json-bracket">${closeBracket}</span></div>
             </span>
           </span>
-        </div>`;
-      }
-      const itemHtml = renderJsonPreviewValue(value[k], depth + 1, k);
-      return `<div class="json-tree-item" style="padding-left: ${indent + 12}px;">
+        </div>`
+        }
+        const itemHtml = renderJsonPreviewValue(value[k], depth + 1, k)
+        return `<div class="json-tree-item" style="padding-left: ${indent + 12}px;">
         <span class="json-item-label">
           <span class="json-key">"${escapeHtml(k)}"</span><span class="json-colon">:</span>
         </span>
         ${itemHtml}
-      </div>`;
-    }).join('');
+      </div>`
+      })
+      .join('')
 
     // Determine if root object should be auto-expanded
-    const isExpanded = shouldAutoExpand(keys.length, depth);
-    const expandedClass = isExpanded ? 'expanded' : 'collapsed';
-    const expandedStyle = isExpanded ? 'inline' : 'none';
-    const collapsedStyle = isExpanded ? 'none' : 'inline';
-    const toggleExpandedClass = isExpanded ? 'expanded' : '';
+    const isExpanded = shouldAutoExpand(keys.length, depth)
+    const expandedClass = isExpanded ? 'expanded' : 'collapsed'
+    const expandedStyle = isExpanded ? 'inline' : 'none'
+    const collapsedStyle = isExpanded ? 'none' : 'inline'
+    const toggleExpandedClass = isExpanded ? 'expanded' : ''
 
     return `<span class="json-tree-node ${expandedClass}" data-preview-id="${previewId}">
       <span class="json-node-content">
@@ -2018,67 +2087,69 @@ function renderJsonPreviewValue(value, depth = 0, key = null) {
         </span>
         <div class="json-tree-item" style="padding-left: ${indent + 12}px;"><span class="json-bracket">}</span></div>
       </span>
-    </span>`;
+    </span>`
   }
 
-  return escapeHtml(String(value));
+  return escapeHtml(String(value))
 }
 
 // 切换JSON预览节点展开/折叠
 function toggleJsonPreviewNode(node) {
-  if (!node) return;
+  if (!node) return
 
-  const isCollapsed = node.classList.contains('collapsed');
-  const toggle = node.querySelector(':scope > .json-node-content > .json-toggle');
-  const collapsedView = node.querySelector(':scope > .json-node-content > .json-collapsed-view');
-  const expandedView = node.querySelector(':scope > .json-expanded-view');
+  const isCollapsed = node.classList.contains('collapsed')
+  const toggle = node.querySelector(':scope > .json-node-content > .json-toggle')
+  const collapsedView = node.querySelector(':scope > .json-node-content > .json-collapsed-view')
+  const expandedView = node.querySelector(':scope > .json-expanded-view')
 
   if (isCollapsed) {
-    node.classList.remove('collapsed');
-    node.classList.add('expanded');
-    if (toggle) toggle.classList.add('expanded');
-    if (collapsedView) collapsedView.style.display = 'none';
-    if (expandedView) expandedView.style.display = 'inline';
+    node.classList.remove('collapsed')
+    node.classList.add('expanded')
+    if (toggle) toggle.classList.add('expanded')
+    if (collapsedView) collapsedView.style.display = 'none'
+    if (expandedView) expandedView.style.display = 'inline'
   } else {
-    node.classList.add('collapsed');
-    node.classList.remove('expanded');
-    if (toggle) toggle.classList.remove('expanded');
-    if (collapsedView) collapsedView.style.display = 'inline';
-    if (expandedView) expandedView.style.display = 'none';
+    node.classList.add('collapsed')
+    node.classList.remove('expanded')
+    if (toggle) toggle.classList.remove('expanded')
+    if (collapsedView) collapsedView.style.display = 'inline'
+    if (expandedView) expandedView.style.display = 'none'
   }
 }
 
 // Setup event delegation for JSON preview clicks
 function setupJsonPreviewEvents(container) {
   container.addEventListener('click', (e) => {
-    const target = e.target;
+    const target = e.target
 
     // Toggle node - click on toggle, key, or collapsed-view
-    if (target.classList.contains('json-toggle') ||
+    if (
+      target.classList.contains('json-toggle') ||
       target.classList.contains('json-key') ||
       target.classList.contains('json-collapsed-view') ||
-      target.classList.contains('json-node-content')) {
-      const node = target.closest('.json-tree-node');
+      target.classList.contains('json-node-content')
+    ) {
+      const node = target.closest('.json-tree-node')
       if (node) {
-        toggleJsonPreviewNode(node);
+        toggleJsonPreviewNode(node)
       }
-      return;
+      return
     }
 
     // Toolbar buttons
     if (target.classList.contains('json-preview-btn')) {
-      const action = target.dataset.action;
+      const action = target.dataset.action
       if (action === 'expand-all') {
-        container.querySelectorAll('.json-tree-node.collapsed').forEach(node => {
-          toggleJsonPreviewNode(node);
-        });
+        container.querySelectorAll('.json-tree-node.collapsed').forEach((node) => {
+          toggleJsonPreviewNode(node)
+        })
       } else if (action === 'collapse-all') {
-        container.querySelectorAll('.json-tree-node.expanded').forEach(node => {
-          toggleJsonPreviewNode(node);
-        });
+        container.querySelectorAll('.json-tree-node.expanded').forEach((node) => {
+          toggleJsonPreviewNode(node)
+        })
       } else if (action === 'copy') {
         // 使用存储的原始JSON数据而不是显示文本
-        const rawJson = container.dataset.rawJson;
+        const rawJson = container.dataset.rawJson
         if (rawJson) {
           // 解码HTML实体
           const decodedJson = rawJson
@@ -2086,46 +2157,50 @@ function setupJsonPreviewEvents(container) {
             .replace(/&amp;/g, '&')
             .replace(/&lt;/g, '<')
             .replace(/&gt;/g, '>')
-            .replace(/&#39;/g, "'");
-          copyToClipboard(decodedJson).then(() => {
-            showNotification('已复制到剪贴板');
-          }).catch(() => {
-            showNotification('复制失败');
-          });
+            .replace(/&#39;/g, "'")
+          copyToClipboard(decodedJson)
+            .then(() => {
+              showNotification('已复制到剪贴板')
+            })
+            .catch(() => {
+              showNotification('复制失败')
+            })
         } else {
           // 如果没有存储的原始数据，尝试获取内容
-          const content = container.querySelector('.json-preview-content');
+          const content = container.querySelector('.json-preview-content')
           if (content) {
-            copyToClipboard(content.textContent).then(() => {
-              showNotification('已复制到剪贴板');
-            }).catch(() => {
-              showNotification('复制失败');
-            });
+            copyToClipboard(content.textContent)
+              .then(() => {
+                showNotification('已复制到剪贴板')
+              })
+              .catch(() => {
+                showNotification('复制失败')
+              })
           }
         }
       }
     }
-  });
+  })
 }
 
 // 渲染完整的JSON预览容器（Chrome DevTools风格）
 function renderJsonPreview(jsonStr) {
-  if (!jsonStr) return '<div class="json-preview-empty">(无数据)</div>';
+  if (!jsonStr) return '<div class="json-preview-empty">(无数据)</div>'
 
-  let parsed;
-  let formattedStr = '';
+  let parsed
+  let formattedStr = ''
   try {
-    parsed = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr;
-    formattedStr = JSON.stringify(parsed, null, 2);
+    parsed = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr
+    formattedStr = JSON.stringify(parsed, null, 2)
   } catch (e) {
-    return `<div class="json-preview-error">解析错误: ${escapeHtml(e.message)}</div>`;
+    return `<div class="json-preview-error">解析错误: ${escapeHtml(e.message)}</div>`
   }
 
-  const containerId = `json-preview-container-${++previewCounter}`;
-  const content = renderJsonPreviewValue(parsed, 0);
+  const containerId = `json-preview-container-${++previewCounter}`
+  const content = renderJsonPreviewValue(parsed, 0)
 
   // 存储原始JSON字符串用于复制
-  const escapedJson = escapeHtml(formattedStr).replace(/"/g, '&quot;');
+  const escapedJson = escapeHtml(formattedStr).replace(/"/g, '&quot;')
 
   return `
     <div class="json-preview-container" id="${containerId}" data-raw-json="${escapedJson}">
@@ -2138,32 +2213,32 @@ function renderJsonPreview(jsonStr) {
         ${content}
       </div>
     </div>
-  `;
+  `
 }
 
 // Initialize JSON preview events after content is rendered
 function initJsonPreviewEvents() {
-  document.querySelectorAll('.json-preview-container').forEach(container => {
+  document.querySelectorAll('.json-preview-container').forEach((container) => {
     if (!container.dataset.eventsInitialized) {
-      container.dataset.eventsInitialized = 'true';
-      setupJsonPreviewEvents(container);
+      container.dataset.eventsInitialized = 'true'
+      setupJsonPreviewEvents(container)
     }
-  });
+  })
 }
 
 // Render editable JSON with same style as preview
 function renderEditableJsonPreview(jsonStr, textareaId) {
-  let formatted = '';
+  let formatted = ''
   if (jsonStr) {
     try {
-      const parsed = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr;
-      formatted = JSON.stringify(parsed, null, 2);
+      const parsed = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr
+      formatted = JSON.stringify(parsed, null, 2)
     } catch (e) {
-      formatted = typeof jsonStr === 'string' ? jsonStr : String(jsonStr);
+      formatted = typeof jsonStr === 'string' ? jsonStr : String(jsonStr)
     }
   }
 
-  const containerId = `json-edit-container-${++previewCounter}`;
+  const containerId = `json-edit-container-${++previewCounter}`
 
   return `
     <div class="json-preview-container json-edit-container" id="${containerId}">
@@ -2176,61 +2251,63 @@ function renderEditableJsonPreview(jsonStr, textareaId) {
         <textarea id="${textareaId}" class="json-edit-textarea" spellcheck="false">${escapeHtml(formatted)}</textarea>
       </div>
     </div>
-  `;
+  `
 }
 
 // Setup events for editable JSON preview
 function setupEditableJsonEvents(container, textareaId) {
-  const textarea = document.getElementById(textareaId);
-  if (!textarea) return;
+  const textarea = document.getElementById(textareaId)
+  if (!textarea) return
 
   container.addEventListener('click', (e) => {
-    const target = e.target;
-    if (!target.classList.contains('json-preview-btn')) return;
+    const target = e.target
+    if (!target.classList.contains('json-preview-btn')) return
 
-    const action = target.dataset.action;
+    const action = target.dataset.action
     if (action === 'format') {
       try {
-        const parsed = JSON.parse(textarea.value);
-        textarea.value = JSON.stringify(parsed, null, 2);
-        showNotification('JSON 已格式化');
+        const parsed = JSON.parse(textarea.value)
+        textarea.value = JSON.stringify(parsed, null, 2)
+        showNotification('JSON 已格式化')
       } catch (e) {
-        showNotification('JSON 格式错误: ' + e.message);
+        showNotification('JSON 格式错误: ' + e.message)
       }
     } else if (action === 'copy') {
-      copyToClipboard(textarea.value).then(() => {
-        showNotification('已复制到剪贴板');
-      }).catch(() => {
-        showNotification('复制失败');
-      });
+      copyToClipboard(textarea.value)
+        .then(() => {
+          showNotification('已复制到剪贴板')
+        })
+        .catch(() => {
+          showNotification('复制失败')
+        })
     }
-  });
+  })
 }
 
 // Render collapsible textarea for mock editing
 function renderEditableCodeEditor(value, textareaId, maxLines = 10) {
   if (!value) {
-    return `<textarea id="${textareaId}" class="code-textarea" placeholder="输入 Mock 响应数据 (JSON)"></textarea>`;
+    return `<textarea id="${textareaId}" class="code-textarea" placeholder="输入 Mock 响应数据 (JSON)"></textarea>`
   }
 
-  let formatted = value;
+  let formatted = value
   try {
-    const parsed = typeof value === 'string' ? JSON.parse(value) : value;
-    formatted = JSON.stringify(parsed, null, 2);
-  } catch (e) { }
+    const parsed = typeof value === 'string' ? JSON.parse(value) : value
+    formatted = JSON.stringify(parsed, null, 2)
+  } catch (e) {}
 
-  const lines = formatted.split('\n');
-  const lineCount = lines.length;
+  const lines = formatted.split('\n')
+  const lineCount = lines.length
 
   if (lineCount <= maxLines) {
-    return `<textarea id="${textareaId}" class="code-textarea">${escapeHtml(formatted)}</textarea>`;
+    return `<textarea id="${textareaId}" class="code-textarea">${escapeHtml(formatted)}</textarea>`
   }
 
   // Large content - show collapsible preview + textarea
-  const editorId = `editable-${textareaId}-${++editorCounter}`;
-  const previewLines = lines.slice(0, maxLines);
-  const previewStr = previewLines.join('\n');
-  const remainingLines = lineCount - maxLines;
+  const editorId = `editable-${textareaId}-${++editorCounter}`
+  const previewLines = lines.slice(0, maxLines)
+  const previewStr = previewLines.join('\n')
+  const remainingLines = lineCount - maxLines
 
   return `
     <div class="editable-wrapper" id="${editorId}">
@@ -2255,40 +2332,40 @@ function renderEditableCodeEditor(value, textareaId, maxLines = 10) {
         <textarea id="${textareaId}" class="code-textarea">${escapeHtml(formatted)}</textarea>
       </div>
     </div>
-  `;
+  `
 }
 
 // Toggle editable code view
 window.toggleEditableCode = function (wrapperId, textareaId, showPreview) {
-  const wrapper = document.getElementById(wrapperId);
-  if (!wrapper) return;
+  const wrapper = document.getElementById(wrapperId)
+  if (!wrapper) return
 
-  const preview = wrapper.querySelector('.editable-preview');
-  const full = wrapper.querySelector('.editable-full');
+  const preview = wrapper.querySelector('.editable-preview')
+  const full = wrapper.querySelector('.editable-full')
 
   if (showPreview) {
-    preview.style.display = 'block';
-    full.style.display = 'none';
+    preview.style.display = 'block'
+    full.style.display = 'none'
   } else {
-    preview.style.display = 'none';
-    full.style.display = 'block';
+    preview.style.display = 'none'
+    full.style.display = 'block'
     // Focus textarea
-    const textarea = document.getElementById(textareaId);
-    if (textarea) textarea.focus();
+    const textarea = document.getElementById(textareaId)
+    if (textarea) textarea.focus()
   }
-};
+}
 
 // Format storage value for display with collapse support
 function renderStorageItem(key, value, sectionId) {
-  const typeClass = getValueTypeClass(value);
-  const itemId = generateId();
-  const jsonStr = typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value);
+  const typeClass = getValueTypeClass(value)
+  const itemId = generateId()
+  const jsonStr = typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value)
 
   if (typeof value === 'object' && value !== null) {
     // Object/Array value - use JSON tree view
-    const isArray = Array.isArray(value);
-    const itemCount = isArray ? value.length : Object.keys(value).length;
-    const typeLabel = isArray ? '数组' : '对象';
+    const isArray = Array.isArray(value)
+    const itemCount = isArray ? value.length : Object.keys(value).length
+    const typeLabel = isArray ? '数组' : '对象'
 
     return `
       <div class="storage-item">
@@ -2310,17 +2387,17 @@ function renderStorageItem(key, value, sectionId) {
           </div>
         </div>
       </div>
-    `;
+    `
   } else {
     // Primitive value (string, number, boolean)
-    const typeLabel = typeof value === 'string' ? '字符串' :
-      typeof value === 'number' ? '数字' : '布尔值';
-    const charCount = String(value).length;
-    const needsCollapse = charCount > TRUNCATE_LIMIT;
+    const typeLabel =
+      typeof value === 'string' ? '字符串' : typeof value === 'number' ? '数字' : '布尔值'
+    const charCount = String(value).length
+    const needsCollapse = charCount > TRUNCATE_LIMIT
 
     if (needsCollapse) {
-      const previewStr = String(value).substring(0, TRUNCATE_LIMIT);
-      const remainingChars = charCount - TRUNCATE_LIMIT;
+      const previewStr = String(value).substring(0, TRUNCATE_LIMIT)
+      const remainingChars = charCount - TRUNCATE_LIMIT
 
       return `
         <div class="storage-item">
@@ -2358,7 +2435,7 @@ function renderStorageItem(key, value, sectionId) {
             </div>
           </span>
         </div>
-      `;
+      `
     } else {
       return `
         <div class="storage-item">
@@ -2376,7 +2453,7 @@ function renderStorageItem(key, value, sectionId) {
           </div>
           <span class="storage-value ${typeClass}">${escapeHtml(String(value))}</span>
         </div>
-      `;
+      `
     }
   }
 }
@@ -2385,210 +2462,220 @@ function renderStorageItem(key, value, sectionId) {
 outputEl.addEventListener('click', (e) => {
   // Handle JSON tree toggle clicks directly
   if (e.target.classList.contains('json-tree-toggle')) {
-    const treeItem = e.target.closest('.json-tree-item');
+    const treeItem = e.target.closest('.json-tree-item')
     if (treeItem) {
-      treeItem.classList.toggle('collapsed');
-      const isCollapsed = treeItem.classList.contains('collapsed');
-      e.target.textContent = isCollapsed ? '▶' : '▼';
-      const children = treeItem.querySelector('.json-tree-children');
-      if (children) children.style.display = isCollapsed ? 'none' : 'block';
+      treeItem.classList.toggle('collapsed')
+      const isCollapsed = treeItem.classList.contains('collapsed')
+      e.target.textContent = isCollapsed ? '▶' : '▼'
+      const children = treeItem.querySelector('.json-tree-children')
+      if (children) children.style.display = isCollapsed ? 'none' : 'block'
     }
-    return;
+    return
   }
 
   // Handle toggle buttons
-  const btn = e.target.closest('.toggle-btn');
+  const btn = e.target.closest('.toggle-btn')
   if (btn) {
-    const container = btn.closest('.value-container, .object-value-wrapper, .json-tree-item');
-    if (!container) return;
+    const container = btn.closest('.value-container, .object-value-wrapper, .json-tree-item')
+    if (!container) return
 
     if (container.classList.contains('value-container')) {
-      container.classList.toggle('expanded');
+      container.classList.toggle('expanded')
     } else if (container.classList.contains('object-value-wrapper')) {
-      container.classList.toggle('collapsed');
-      container.classList.toggle('expanded');
+      container.classList.toggle('collapsed')
+      container.classList.toggle('expanded')
     } else if (container.classList.contains('json-tree-item')) {
-      container.classList.toggle('collapsed');
-      const icon = container.querySelector('.json-tree-toggle');
-      if (icon) icon.textContent = container.classList.contains('collapsed') ? '▶' : '▼';
-      const children = container.querySelector('.json-tree-children');
-      if (children) children.style.display = container.classList.contains('collapsed') ? 'none' : 'block';
+      container.classList.toggle('collapsed')
+      const icon = container.querySelector('.json-tree-toggle')
+      if (icon) icon.textContent = container.classList.contains('collapsed') ? '▶' : '▼'
+      const children = container.querySelector('.json-tree-children')
+      if (children)
+        children.style.display = container.classList.contains('collapsed') ? 'none' : 'block'
     }
-    return;
+    return
   }
 
   // Handle copy buttons
-  const copyBtn = e.target.closest('.storage-copy-btn');
+  const copyBtn = e.target.closest('.storage-copy-btn')
   if (copyBtn) {
-    const textToCopy = copyBtn.dataset.value;
+    const textToCopy = copyBtn.dataset.value
     if (textToCopy) {
       copyToClipboard(textToCopy).then(() => {
-        const originalText = copyBtn.innerHTML;
-        copyBtn.innerHTML = '<span class="icon">✓</span><span>已复制</span>';
+        const originalText = copyBtn.innerHTML
+        copyBtn.innerHTML = '<span class="icon">✓</span><span>已复制</span>'
         setTimeout(() => {
-          copyBtn.innerHTML = originalText;
-        }, 1500);
-      });
+          copyBtn.innerHTML = originalText
+        }, 1500)
+      })
     }
-    return;
+    return
   }
 
   // Handle delete buttons
-  const deleteBtn = e.target.closest('.storage-delete-btn');
+  const deleteBtn = e.target.closest('.storage-delete-btn')
   if (deleteBtn) {
-    const sectionId = deleteBtn.dataset.section;
-    const key = deleteBtn.dataset.key;
+    const sectionId = deleteBtn.dataset.section
+    const key = deleteBtn.dataset.key
     if (sectionId && key) {
-      const areaName = sectionId.replace('storage-', '');
+      const areaName = sectionId.replace('storage-', '')
       if (confirm(`确定要删除 "${key}" 吗？`)) {
-        chrome.storage[areaName].remove(key).then(() => {
-          return loadStorageArea(areaName);
-        }).then(() => {
-          renderAll();
-          showNotification(`已删除: ${key}`);
-        });
+        chrome.storage[areaName]
+          .remove(key)
+          .then(() => {
+            return loadStorageArea(areaName)
+          })
+          .then(() => {
+            renderAll()
+            showNotification(`已删除: ${key}`)
+          })
       }
     }
-    return;
+    return
   }
 
   // Handle section refresh buttons
-  const refreshBtn = e.target.closest('.section-refresh-btn');
+  const refreshBtn = e.target.closest('.section-refresh-btn')
   if (refreshBtn) {
-    const sectionId = refreshBtn.dataset.section;
+    const sectionId = refreshBtn.dataset.section
     if (sectionId) {
-      const areaName = sectionId.replace('storage-', '');
+      const areaName = sectionId.replace('storage-', '')
       loadStorageArea(areaName).then(() => {
-        renderAll();
-        showNotification(`${storageSections[sectionId].title} 已刷新`);
-      });
+        renderAll()
+        showNotification(`${storageSections[sectionId].title} 已刷新`)
+      })
     }
-    return;
+    return
   }
-});
+})
 
 // JSON Syntax Highlighting
 function syntaxHighlight(json) {
   if (typeof json !== 'string') {
-    json = JSON.stringify(json, null, 2);
+    json = JSON.stringify(json, null, 2)
   }
 
-  return json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
-      let cls = 'json-number';
-      if (/^"/.test(match)) {
-        if (/:$/.test(match)) {
-          cls = 'json-key';
-        } else {
-          cls = 'json-string';
+  return json
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(
+      /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+      function (match) {
+        let cls = 'json-number'
+        if (/^"/.test(match)) {
+          if (/:$/.test(match)) {
+            cls = 'json-key'
+          } else {
+            cls = 'json-string'
+          }
+        } else if (/true|false/.test(match)) {
+          cls = 'json-boolean'
+        } else if (/null/.test(match)) {
+          cls = 'json-null'
         }
-      } else if (/true|false/.test(match)) {
-        cls = 'json-boolean';
-      } else if (/null/.test(match)) {
-        cls = 'json-null';
+        return '<span class="' + cls + '">' + match + '</span>'
       }
-      return '<span class="' + cls + '">' + match + '</span>';
-    });
+    )
 }
 
 // Create JSON tree view (collapsible)
 function createJsonTreeView(data, maxDepth = 5, currentDepth = 0) {
   if (currentDepth >= maxDepth) {
-    return `<pre class="json-content">${syntaxHighlight(JSON.stringify(data, null, 2))}</pre>`;
+    return `<pre class="json-content">${syntaxHighlight(JSON.stringify(data, null, 2))}</pre>`
   }
 
   if (data === null) {
-    return '<span class="json-null">null</span>';
+    return '<span class="json-null">null</span>'
   }
 
   if (typeof data === 'boolean') {
-    return `<span class="json-boolean">${data}</span>`;
+    return `<span class="json-boolean">${data}</span>`
   }
 
   if (typeof data === 'number') {
-    return `<span class="json-number">${data}</span>`;
+    return `<span class="json-number">${data}</span>`
   }
 
   if (typeof data === 'string') {
-    return `<span class="json-string">"${escapeHtml(data)}"</span>`;
+    return `<span class="json-string">"${escapeHtml(data)}"</span>`
   }
 
   if (Array.isArray(data)) {
     if (data.length === 0) {
-      return '<span class="json-bracket">[]</span>';
+      return '<span class="json-bracket">[]</span>'
     }
 
-    let html = '<div class="json-tree-item">';
-    html += '<span class="json-tree-toggle">▼</span>';
-    html += '<span class="json-bracket">[</span>';
-    html += '<span class="json-item-count">' + data.length + ' items</span>';
-    html += '<div class="json-tree-children">';
+    let html = '<div class="json-tree-item">'
+    html += '<span class="json-tree-toggle">▼</span>'
+    html += '<span class="json-bracket">[</span>'
+    html += '<span class="json-item-count">' + data.length + ' items</span>'
+    html += '<div class="json-tree-children">'
 
     data.forEach((item, index) => {
-      html += '<div class="json-tree-child">';
-      html += '<span class="json-index">' + index + ':</span> ';
-      html += createJsonTreeView(item, maxDepth, currentDepth + 1);
-      html += '</div>';
-    });
+      html += '<div class="json-tree-child">'
+      html += '<span class="json-index">' + index + ':</span> '
+      html += createJsonTreeView(item, maxDepth, currentDepth + 1)
+      html += '</div>'
+    })
 
-    html += '</div>';
-    html += '<span class="json-bracket">]</span>';
-    html += '</div>';
+    html += '</div>'
+    html += '<span class="json-bracket">]</span>'
+    html += '</div>'
 
-    return html;
+    return html
   }
 
   if (typeof data === 'object') {
-    const keys = Object.keys(data);
+    const keys = Object.keys(data)
     if (keys.length === 0) {
-      return '<span class="json-bracket">{}</span>';
+      return '<span class="json-bracket">{}</span>'
     }
 
-    let html = '<div class="json-tree-item">';
-    html += '<span class="json-tree-toggle">▼</span>';
-    html += '<span class="json-bracket">{</span>';
-    html += '<span class="json-item-count">' + keys.length + ' keys</span>';
-    html += '<div class="json-tree-children">';
+    let html = '<div class="json-tree-item">'
+    html += '<span class="json-tree-toggle">▼</span>'
+    html += '<span class="json-bracket">{</span>'
+    html += '<span class="json-item-count">' + keys.length + ' keys</span>'
+    html += '<div class="json-tree-children">'
 
-    keys.forEach(key => {
-      html += '<div class="json-tree-child">';
-      html += '<span class="json-key">"' + escapeHtml(key) + '"</span>: ';
-      html += createJsonTreeView(data[key], maxDepth, currentDepth + 1);
-      html += '</div>';
-    });
+    keys.forEach((key) => {
+      html += '<div class="json-tree-child">'
+      html += '<span class="json-key">"' + escapeHtml(key) + '"</span>: '
+      html += createJsonTreeView(data[key], maxDepth, currentDepth + 1)
+      html += '</div>'
+    })
 
-    html += '</div>';
-    html += '<span class="json-bracket">}</span>';
-    html += '</div>';
+    html += '</div>'
+    html += '<span class="json-bracket">}</span>'
+    html += '</div>'
 
-    return html;
+    return html
   }
 
-  return '<span class="json-string">"' + escapeHtml(String(data)) + '"</span>';
+  return '<span class="json-string">"' + escapeHtml(String(data)) + '"</span>'
 }
 
 // Render section
 function renderSection(sectionId, section) {
-  const typeClass = sectionId.replace('storage-', '');
-  const data = section.data || [];
-  const count = data.length;
+  const typeClass = sectionId.replace('storage-', '')
+  const data = section.data || []
+  const count = data.length
 
-  let contentHtml = '';
+  let contentHtml = ''
   if (section.error) {
     contentHtml = `
       <div class="console-entry error">
         <span class="message">${escapeHtml(section.error)}</span>
       </div>
-    `;
+    `
   } else if (count === 0) {
     contentHtml = `
       <div class="empty-state">
         <div class="empty-icon">📭</div>
         <div>暂无数据</div>
       </div>
-    `;
+    `
   } else {
-    contentHtml = data.map(item => renderStorageItem(item.key, item.value, sectionId)).join('');
+    contentHtml = data.map((item) => renderStorageItem(item.key, item.value, sectionId)).join('')
   }
 
   return `
@@ -2608,206 +2695,207 @@ function renderSection(sectionId, section) {
         ${contentHtml}
       </div>
     </div>
-  `;
+  `
 }
 
 // Render all sections
 function renderAll() {
   outputEl.innerHTML = Object.entries(storageSections)
     .map(([id, section]) => renderSection(id, section))
-    .join('');
+    .join('')
 }
 
 // Load storage data for a specific area
 async function loadStorageArea(areaName) {
-  const sectionKey = `storage-${areaName}`;
-  const section = storageSections[sectionKey];
+  const sectionKey = `storage-${areaName}`
+  const section = storageSections[sectionKey]
 
   try {
-    const data = await chrome.storage[areaName].get(null);
-    const items = Object.entries(data || {}).map(([key, value]) => ({ key, value }));
-    section.data = items;
-    section.error = null;
+    const data = await chrome.storage[areaName].get(null)
+    const items = Object.entries(data || {}).map(([key, value]) => ({ key, value }))
+    section.data = items
+    section.error = null
   } catch (error) {
-    section.data = [];
-    section.error = areaName === 'session'
-      ? '会话存储不可用或为空'
-      : `读取失败: ${error.message}`;
+    section.data = []
+    section.error = areaName === 'session' ? '会话存储不可用或为空' : `读取失败: ${error.message}`
   }
 }
 
 // Load all storage data
 async function loadAllStorageData() {
-  await Promise.all([
-    loadStorageArea('local'),
-    loadStorageArea('sync'),
-    loadStorageArea('session')
-  ]);
-  renderAll();
+  await Promise.all([loadStorageArea('local'), loadStorageArea('sync'), loadStorageArea('session')])
+  renderAll()
 }
 
 // Show notification
 function showNotification(message) {
-  notificationTextEl.textContent = message;
-  notificationEl.classList.add('show');
+  notificationTextEl.textContent = message
+  notificationEl.classList.add('show')
 
   setTimeout(() => {
-    notificationEl.classList.remove('show');
-  }, 2000);
+    notificationEl.classList.remove('show')
+  }, 2000)
 }
 
 // Initial load
-loadAllStorageData().catch(err => {
+loadAllStorageData().catch((err) => {
   if (!isContextInvalidatedError(err)) {
-    console.error('Failed to load storage data:', err);
+    console.error('Failed to load storage data:', err)
   }
-});
+})
 
 // Listen for storage changes
 chrome.storage.onChanged.addListener((changes, areaName) => {
-  const changedKeys = Object.keys(changes);
-  showNotification(`${areaName} 存储已更新: ${changedKeys.join(', ')}`);
+  const changedKeys = Object.keys(changes)
+  showNotification(`${areaName} 存储已更新: ${changedKeys.join(', ')}`)
 
   // Reload the changed area
   setTimeout(async () => {
-    await loadStorageArea(areaName);
-    renderAll();
-  }, 100);
+    await loadStorageArea(areaName)
+    renderAll()
+  }, 100)
 
   // Check if blocked domains changed and update mock exclude patterns
   if (areaName === 'sync' && changes.cy_settings) {
-    const newSettings = changes.cy_settings.newValue;
+    const newSettings = changes.cy_settings.newValue
     if (newSettings && newSettings.domainBlockedData) {
       // Reload blocked domains to exclude patterns
-      loadBlockedDomainsToExclude();
+      loadBlockedDomainsToExclude()
     }
   }
-});
+})
 
 // ============================================
 // Mock 标签页功能
 // ============================================
 
 // Mock数据存储
-let mockRequests = [];
-let selectedRequestId = null;
-let currentInspectedDomain = ''; // 当前被检查页面的域名
-let currentTypeFilter = 'all'; // 当前类型过滤器
+let mockRequests = []
+let selectedRequestId = null
+let currentInspectedDomain = '' // 当前被检查页面的域名
+let currentTypeFilter = 'all' // 当前类型过滤器
 let mockFilterSettings = {
-  maxDisplayCount: 50,  // 最大显示请求数量
-  excludePatterns: []   // 要排除的URL模式
-};
+  maxDisplayCount: 50, // 最大显示请求数量
+  excludePatterns: [], // 要排除的URL模式
+}
 
 // ========== 资源嗅探相关变量 ==========
-let capturedResources = [];
-let currentResourceFilter = 'all';
+let capturedResources = []
+let currentResourceFilter = 'all'
 
 // Mock DOM元素
-const mockListContent = document.getElementById('mock-list-content');
-const mockEditor = document.getElementById('mock-editor');
-const mockFilterInput = document.getElementById('mock-filter-input');
-const mockClearBtn = document.getElementById('mock-clear-btn');
-const mockRefreshBtn = document.getElementById('mock-refresh-btn');
-const currentDomainText = document.getElementById('current-domain-text');
-const filterCurrentDomainCheckbox = document.getElementById('filter-current-domain');
-const autoScrollCheckbox = document.getElementById('auto-scroll');
-const maxDisplayCountInput = document.getElementById('max-display-count');
-const excludePatternInput = document.getElementById('exclude-pattern-input');
-const addExcludeBtn = document.getElementById('add-exclude-btn');
-const clearExcludeBtn = document.getElementById('clear-exclude-btn');
-const excludePatternsList = document.getElementById('exclude-patterns-list');
-const mockTypeTabs = document.getElementById('mock-type-tabs');
+const mockListContent = document.getElementById('mock-list-content')
+const mockEditor = document.getElementById('mock-editor')
+const mockFilterInput = document.getElementById('mock-filter-input')
+const mockClearBtn = document.getElementById('mock-clear-btn')
+const mockRefreshBtn = document.getElementById('mock-refresh-btn')
+const currentDomainText = document.getElementById('current-domain-text')
+const filterCurrentDomainCheckbox = document.getElementById('filter-current-domain')
+const autoScrollCheckbox = document.getElementById('auto-scroll')
+const maxDisplayCountInput = document.getElementById('max-display-count')
+const excludePatternInput = document.getElementById('exclude-pattern-input')
+const addExcludeBtn = document.getElementById('add-exclude-btn')
+const clearExcludeBtn = document.getElementById('clear-exclude-btn')
+const excludePatternsList = document.getElementById('exclude-patterns-list')
+const mockTypeTabs = document.getElementById('mock-type-tabs')
 
 // 根据资源类型获取图标类名
 function getTypeIconClass(type) {
   const typeMap = {
-    'xhr': 'xhr',
-    'fetch': 'fetch',
-    'document': 'doc',
-    'doc': 'doc',
-    'javascript': 'js',
-    'js': 'js',
-    'stylesheet': 'css',
-    'css': 'css',
-    'image': 'img',
-    'img': 'img',
-    'media': 'media',
-    'font': 'font',
-    'websocket': 'ws',
-    'ws': 'ws'
-  };
-  return typeMap[type?.toLowerCase()] || 'other';
+    xhr: 'xhr',
+    fetch: 'fetch',
+    document: 'doc',
+    doc: 'doc',
+    javascript: 'js',
+    js: 'js',
+    stylesheet: 'css',
+    css: 'css',
+    image: 'img',
+    img: 'img',
+    media: 'media',
+    font: 'font',
+    websocket: 'ws',
+    ws: 'ws',
+  }
+  return typeMap[type?.toLowerCase()] || 'other'
 }
 
 // 获取类型短标签
 function getTypeLabel(type) {
   const typeMap = {
-    'xhr': 'XHR',
-    'fetch': 'FTC',
-    'document': 'DOC',
-    'doc': 'DOC',
-    'javascript': 'JS',
-    'js': 'JS',
-    'stylesheet': 'CSS',
-    'css': 'CSS',
-    'image': 'IMG',
-    'img': 'IMG',
-    'media': 'MED',
-    'font': 'FNT',
-    'websocket': 'WS',
-    'ws': 'WS'
-  };
-  return typeMap[type?.toLowerCase()] || 'OTH';
+    xhr: 'XHR',
+    fetch: 'FTC',
+    document: 'DOC',
+    doc: 'DOC',
+    javascript: 'JS',
+    js: 'JS',
+    stylesheet: 'CSS',
+    css: 'CSS',
+    image: 'IMG',
+    img: 'IMG',
+    media: 'MED',
+    font: 'FNT',
+    websocket: 'WS',
+    ws: 'WS',
+  }
+  return typeMap[type?.toLowerCase()] || 'OTH'
 }
 
 // 检查请求类型是否匹配过滤器
 function matchesTypeFilter(reqType, filter) {
-  if (filter === 'all') return true;
-  const type = reqType?.toLowerCase();
+  if (filter === 'all') return true
+  const type = reqType?.toLowerCase()
 
   if (filter === 'xhr') {
-    return type === 'xhr' || type === 'fetch';
+    return type === 'xhr' || type === 'fetch'
   }
   if (filter === 'doc') {
-    return type === 'document' || type === 'doc' || type === 'html';
+    return type === 'document' || type === 'doc' || type === 'html'
   }
   if (filter === 'js') {
-    return type === 'javascript' || type === 'js' || type === 'script';
+    return type === 'javascript' || type === 'js' || type === 'script'
   }
   if (filter === 'css') {
-    return type === 'stylesheet' || type === 'css';
+    return type === 'stylesheet' || type === 'css'
   }
   if (filter === 'img') {
-    return type === 'image' || type === 'img' || type === 'png' || type === 'jpg' || type === 'gif' || type === 'svg';
+    return (
+      type === 'image' ||
+      type === 'img' ||
+      type === 'png' ||
+      type === 'jpg' ||
+      type === 'gif' ||
+      type === 'svg'
+    )
   }
   if (filter === 'media') {
-    return type === 'media' || type === 'video' || type === 'audio';
+    return type === 'media' || type === 'video' || type === 'audio'
   }
   if (filter === 'font') {
-    return type === 'font' || type === 'woff' || type === 'woff2' || type === 'ttf';
+    return type === 'font' || type === 'woff' || type === 'woff2' || type === 'ttf'
   }
   if (filter === 'ws') {
-    return type === 'websocket' || type === 'ws';
+    return type === 'websocket' || type === 'ws'
   }
-  return type === filter;
+  return type === filter
 }
 
 // 从存储加载mock过滤设置
 async function loadMockFilterSettings() {
   try {
-    const result = await chrome.storage.local.get('mockFilterSettings');
+    const result = await chrome.storage.local.get('mockFilterSettings')
     if (result.mockFilterSettings) {
-      mockFilterSettings = { ...mockFilterSettings, ...result.mockFilterSettings };
+      mockFilterSettings = { ...mockFilterSettings, ...result.mockFilterSettings }
     }
     // Update UI
     if (maxDisplayCountInput) {
-      maxDisplayCountInput.value = mockFilterSettings.maxDisplayCount;
+      maxDisplayCountInput.value = mockFilterSettings.maxDisplayCount
     }
-    renderExcludePatterns();
+    renderExcludePatterns()
   } catch (e) {
     // Ignore context invalidated errors
     if (!isContextInvalidatedError(e)) {
-      console.error('Failed to load mock filter settings:', e);
+      console.error('Failed to load mock filter settings:', e)
     }
   }
 }
@@ -2816,103 +2904,113 @@ async function loadMockFilterSettings() {
 async function saveMockFilterSettings() {
   // Check context validity first
   if (!isExtensionContextValid()) {
-    return;
+    return
   }
   try {
-    await chrome.storage.local.set({ mockFilterSettings });
+    await chrome.storage.local.set({ mockFilterSettings })
   } catch (e) {
     // Ignore context invalidated errors
     if (!isContextInvalidatedError(e)) {
-      console.error('Failed to save mock filter settings:', e);
+      console.error('Failed to save mock filter settings:', e)
     }
   }
 }
 
 // 渲染排除模式列表
 function renderExcludePatterns() {
-  if (!excludePatternsList) return;
+  if (!excludePatternsList) return
 
   if (mockFilterSettings.excludePatterns.length === 0) {
-    excludePatternsList.innerHTML = '<span style="font-size: 10px; color: #555;">无排除关键词</span>';
-    return;
+    excludePatternsList.innerHTML =
+      '<span style="font-size: 10px; color: #555;">无排除关键词</span>'
+    return
   }
 
-  excludePatternsList.innerHTML = mockFilterSettings.excludePatterns.map((pattern, index) => `
+  excludePatternsList.innerHTML = mockFilterSettings.excludePatterns
+    .map(
+      (pattern, index) => `
     <span class="exclude-pattern-item">
       <span>${escapeHtml(pattern)}</span>
       <button class="remove-btn" data-index="${index}" title="移除">×</button>
     </span>
-  `).join('');
+  `
+    )
+    .join('')
 
   // Add click handlers for remove buttons
-  excludePatternsList.querySelectorAll('.remove-btn').forEach(btn => {
+  excludePatternsList.querySelectorAll('.remove-btn').forEach((btn) => {
     btn.addEventListener('click', (e) => {
-      const index = parseInt(e.target.dataset.index, 10);
-      removeExcludePattern(index);
-    });
-  });
+      const index = parseInt(e.target.dataset.index, 10)
+      removeExcludePattern(index)
+    })
+  })
 }
 
 // 添加排除模式
 function addExcludePattern(pattern) {
-  if (!pattern || pattern.trim() === '') return;
+  if (!pattern || pattern.trim() === '') return
 
   // Split by space and add each pattern
-  const patterns = pattern.trim().split(/\s+/).filter(p => p.length > 0);
+  const patterns = pattern
+    .trim()
+    .split(/\s+/)
+    .filter((p) => p.length > 0)
 
   for (const p of patterns) {
     if (!mockFilterSettings.excludePatterns.includes(p)) {
-      mockFilterSettings.excludePatterns.push(p);
+      mockFilterSettings.excludePatterns.push(p)
     }
   }
 
-  saveMockFilterSettings();
-  renderExcludePatterns();
-  renderMockList(mockFilterInput.value);
+  saveMockFilterSettings()
+  renderExcludePatterns()
+  renderMockList(mockFilterInput.value)
 }
 
 // 移除排除模式
 function removeExcludePattern(index) {
-  mockFilterSettings.excludePatterns.splice(index, 1);
-  saveMockFilterSettings();
-  renderExcludePatterns();
-  renderMockList(mockFilterInput.value);
+  mockFilterSettings.excludePatterns.splice(index, 1)
+  saveMockFilterSettings()
+  renderExcludePatterns()
+  renderMockList(mockFilterInput.value)
 }
 
 // 清空所有排除模式
 function clearExcludePatterns() {
-  mockFilterSettings.excludePatterns = [];
-  saveMockFilterSettings();
-  renderExcludePatterns();
-  renderMockList(mockFilterInput.value);
+  mockFilterSettings.excludePatterns = []
+  saveMockFilterSettings()
+  renderExcludePatterns()
+  renderMockList(mockFilterInput.value)
 }
 
 // 检查扩展上下文是否仍然有效
 function isExtensionContextValid() {
   try {
-    return !!(chrome.runtime && chrome.runtime.id);
+    return !!(chrome.runtime && chrome.runtime.id)
   } catch (e) {
-    return false;
+    return false
   }
 }
 
 // 检查错误是否由于上下文失效导致
 function isContextInvalidatedError(error) {
-  if (!error) return false;
-  const message = error.message || error.toString();
-  return message.includes('Extension context invalidated') ||
-         message.includes('Extension not loaded') ||
-         message.includes('message port closed') ||
-         message.includes('Extension context invalid');
+  if (!error) return false
+  const message = error.message || error.toString()
+  return (
+    message.includes('Extension context invalidated') ||
+    message.includes('Extension not loaded') ||
+    message.includes('message port closed') ||
+    message.includes('Extension context invalid')
+  )
 }
 
 // 显示上下文失效警告
 function showContextInvalidatedWarning() {
   // 检查是否已存在警告
-  if (document.getElementById('context-invalidated-warning')) return;
+  if (document.getElementById('context-invalidated-warning')) return
 
-  const warning = document.createElement('div');
-  warning.id = 'context-invalidated-warning';
+  const warning = document.createElement('div')
+  warning.id = 'context-invalidated-warning'
   warning.style.cssText = `
     position: fixed;
     top: 0;
@@ -2925,59 +3023,59 @@ function showContextInvalidatedWarning() {
     z-index: 99999;
     font-size: 14px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-  `;
+  `
   warning.innerHTML = `
     ⚠️ 扩展已重新加载，请关闭并重新打开 DevTools 面板以恢复功能
     <button onclick="this.parentElement.remove()" style="margin-left: 10px; padding: 4px 12px; cursor: pointer; border: none; background: white; color: #ff4444; border-radius: 4px;">关闭</button>
-  `;
-  document.body.appendChild(warning);
+  `
+  document.body.appendChild(warning)
 }
 
 // 从后台加载被阻止的域名并添加到排除模式
 async function loadBlockedDomainsToExclude() {
   // Check if extension context is still valid
   if (!isExtensionContextValid()) {
-    return;
+    return
   }
 
   try {
-    const response = await sendMessage('GET_BLOCKED_DOMAINS');
+    const response = await sendMessage('GET_BLOCKED_DOMAINS')
     if (response && response.allDomainBlockedData) {
       // Get current domain's blocked domains
-      const currentDomain = currentInspectedDomain;
-      let blockedList = [];
+      const currentDomain = currentInspectedDomain
+      let blockedList = []
 
       // Get blocked domains for current domain
-      const blockedDomainsMap = response.allDomainBlockedData.blockedDomains || {};
+      const blockedDomainsMap = response.allDomainBlockedData.blockedDomains || {}
       if (currentDomain && blockedDomainsMap[currentDomain]) {
-        blockedList.push(...blockedDomainsMap[currentDomain]);
+        blockedList.push(...blockedDomainsMap[currentDomain])
       }
 
       // Get blocked response domains for current domain
-      const blockedResponseDomainsMap = response.allDomainBlockedData.blockedResponseDomains || {};
+      const blockedResponseDomainsMap = response.allDomainBlockedData.blockedResponseDomains || {}
       if (currentDomain && blockedResponseDomainsMap[currentDomain]) {
-        blockedList.push(...blockedResponseDomainsMap[currentDomain]);
+        blockedList.push(...blockedResponseDomainsMap[currentDomain])
       }
 
       // Add to exclude patterns if not already present
-      let added = false;
+      let added = false
       for (const domain of [...new Set(blockedList)]) {
         if (domain && !mockFilterSettings.excludePatterns.includes(domain)) {
-          mockFilterSettings.excludePatterns.push(domain);
-          added = true;
+          mockFilterSettings.excludePatterns.push(domain)
+          added = true
         }
       }
 
       if (added) {
-        saveMockFilterSettings();
-        renderExcludePatterns();
-        renderMockList(mockFilterInput.value);
+        saveMockFilterSettings()
+        renderExcludePatterns()
+        renderMockList(mockFilterInput.value)
       }
     }
   } catch (e) {
     // Silently ignore context invalidated errors
     if (!isContextInvalidatedError(e) && isExtensionContextValid()) {
-      console.error('Failed to load blocked domains:', e);
+      console.error('Failed to load blocked domains:', e)
     }
   }
 }
@@ -2985,105 +3083,111 @@ async function loadBlockedDomainsToExclude() {
 // 获取URL路径（不包含查询字符串，用于匹配）
 function getUrlPath(url) {
   try {
-    const urlObj = new URL(url);
-    return urlObj.origin + urlObj.pathname;
+    const urlObj = new URL(url)
+    return urlObj.origin + urlObj.pathname
   } catch (e) {
-    return url;
+    return url
   }
 }
 
 // 获取用于显示的短URL
 function getShortUrl(url) {
   try {
-    const urlObj = new URL(url);
-    let path = urlObj.pathname;
+    const urlObj = new URL(url)
+    let path = urlObj.pathname
     if (path.length > 40) {
-      path = path.substring(0, 37) + '...';
+      path = path.substring(0, 37) + '...'
     }
-    return path + urlObj.search.substring(0, 20);
+    return path + urlObj.search.substring(0, 20)
   } catch (e) {
-    return url.substring(0, 50);
+    return url.substring(0, 50)
   }
 }
 
 // Format bytes
 function formatBytes(bytes) {
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
 }
 
 // 检查URL是否匹配排除模式
 function isUrlBlocked(url) {
   try {
-    const urlLower = url.toLowerCase();
+    const urlLower = url.toLowerCase()
 
     // Check against exclude patterns (simple string matching)
     for (const pattern of mockFilterSettings.excludePatterns) {
       if (urlLower.includes(pattern.toLowerCase())) {
-        return true;
+        return true
       }
     }
 
-    return false;
+    return false
   } catch (e) {
-    return false;
+    return false
   }
 }
 
 // 检查请求是否匹配当前过滤条件
 function matchesCurrentFilter(req) {
-  const filterByDomain = filterCurrentDomainCheckbox && filterCurrentDomainCheckbox.checked;
-  const filter = mockFilterInput ? mockFilterInput.value : '';
-  const showPatterns = filter.trim().split(/\s+/).filter(p => p.length > 0);
+  const filterByDomain = filterCurrentDomainCheckbox && filterCurrentDomainCheckbox.checked
+  const filter = mockFilterInput ? mockFilterInput.value : ''
+  const showPatterns = filter
+    .trim()
+    .split(/\s+/)
+    .filter((p) => p.length > 0)
 
   // Filter by type
   if (!matchesTypeFilter(req.type, currentTypeFilter)) {
-    return false;
+    return false
   }
 
   // Filter out blocked domains
   if (isUrlBlocked(req.url)) {
-    return false;
+    return false
   }
 
   // Show-only filter
   if (showPatterns.length > 0) {
-    const urlLower = req.url.toLowerCase();
-    let matchesAny = false;
+    const urlLower = req.url.toLowerCase()
+    let matchesAny = false
     for (const pattern of showPatterns) {
       if (urlLower.includes(pattern.toLowerCase())) {
-        matchesAny = true;
-        break;
+        matchesAny = true
+        break
       }
     }
     if (!matchesAny) {
-      return false;
+      return false
     }
   }
 
   // Domain filter
   if (filterByDomain && currentInspectedDomain) {
     try {
-      const reqHostname = new URL(req.url).hostname;
-      if (!reqHostname.includes(currentInspectedDomain) && !currentInspectedDomain.includes(reqHostname)) {
-        return false;
+      const reqHostname = new URL(req.url).hostname
+      if (
+        !reqHostname.includes(currentInspectedDomain) &&
+        !currentInspectedDomain.includes(reqHostname)
+      ) {
+        return false
       }
     } catch (e) {
-      return false;
+      return false
     }
   }
 
-  return true;
+  return true
 }
 
 // 跟踪所有已知请求ID（用于检测新请求）
-let knownRequestIds = new Set();
+let knownRequestIds = new Set()
 
 // Render mock request list
 function renderMockList(filter = '', forceAnimate = false) {
-  const filterByDomain = filterCurrentDomainCheckbox && filterCurrentDomainCheckbox.checked;
-  const maxCount = mockFilterSettings.maxDisplayCount || 50;
+  const filterByDomain = filterCurrentDomainCheckbox && filterCurrentDomainCheckbox.checked
+  const maxCount = mockFilterSettings.maxDisplayCount || 50
 
   // 先获取页面上下文中的 mock 规则，用于正确判断 mock 状态
   const code = `
@@ -3095,120 +3199,128 @@ function renderMockList(filter = '', forceAnimate = false) {
       }
       return rules;
     })()
-  `;
+  `
 
   chrome.devtools.inspectedWindow.eval(code, (mockRules) => {
-    renderMockListWithRules(filter, forceAnimate, filterByDomain, maxCount, mockRules || {});
-  });
+    renderMockListWithRules(filter, forceAnimate, filterByDomain, maxCount, mockRules || {})
+  })
 }
 
 // 使用获取到的 mock 规则渲染列表
 function renderMockListWithRules(filter, forceAnimate, filterByDomain, maxCount, mockRules) {
   // Parse filter into show-only patterns (space-separated) - only show matching requests
-  const showPatterns = filter.trim().split(/\s+/).filter(p => p.length > 0);
+  const showPatterns = filter
+    .trim()
+    .split(/\s+/)
+    .filter((p) => p.length > 0)
 
-  const filtered = mockRequests.filter(req => {
+  const filtered = mockRequests.filter((req) => {
     // Filter by type
     if (!matchesTypeFilter(req.type, currentTypeFilter)) {
-      return false;
+      return false
     }
 
     // Filter out blocked domains (exclude patterns)
     if (isUrlBlocked(req.url)) {
-      return false;
+      return false
     }
 
     // Show-only filter (space-separated keywords) - only show if URL matches any pattern
     if (showPatterns.length > 0) {
-      const urlLower = req.url.toLowerCase();
-      let matchesAny = false;
+      const urlLower = req.url.toLowerCase()
+      let matchesAny = false
       for (const pattern of showPatterns) {
         if (urlLower.includes(pattern.toLowerCase())) {
-          matchesAny = true;
-          break;
+          matchesAny = true
+          break
         }
       }
       if (!matchesAny) {
-        return false; // Don't show this request if it doesn't match any pattern
+        return false // Don't show this request if it doesn't match any pattern
       }
     }
 
     // Domain filter
     if (filterByDomain && currentInspectedDomain) {
       try {
-        const reqHostname = new URL(req.url).hostname;
-        if (!reqHostname.includes(currentInspectedDomain) && !currentInspectedDomain.includes(reqHostname)) {
-          return false;
+        const reqHostname = new URL(req.url).hostname
+        if (
+          !reqHostname.includes(currentInspectedDomain) &&
+          !currentInspectedDomain.includes(reqHostname)
+        ) {
+          return false
         }
       } catch (e) {
-        return false;
+        return false
       }
     }
-    return true;
-  });
+    return true
+  })
 
   // ========== URL 去重逻辑 ==========
   // 同 URL 的请求只显示一个，优先显示已 mock 的数据
-  const urlGroupMap = new Map(); // key: method:url, value: array of requests
+  const urlGroupMap = new Map() // key: method:url, value: array of requests
 
-  filtered.forEach(req => {
-    const key = `${req.method}:${req.url}`;
+  filtered.forEach((req) => {
+    const key = `${req.method}:${req.url}`
     if (!urlGroupMap.has(key)) {
-      urlGroupMap.set(key, []);
+      urlGroupMap.set(key, [])
     }
-    urlGroupMap.get(key).push(req);
-  });
+    urlGroupMap.get(key).push(req)
+  })
 
   // 对每个 URL 组，选择要显示的 item
-  const displayRequests = [];
+  const displayRequests = []
   for (const [key, requests] of urlGroupMap) {
     // 优先选择已 mock 的请求（检查页面上下文中的 mock 规则）
-    const hasMockRule = mockRules[key] === true;
-    const mockedRequest = requests.find(r => r.status === 'mocked' || hasMockRule);
+    const hasMockRule = mockRules[key] === true
+    const mockedRequest = requests.find((r) => r.status === 'mocked' || hasMockRule)
 
     if (mockedRequest) {
       // 如果找到已 mock 的请求，标记为 mocked 状态
       if (hasMockRule && mockedRequest.status !== 'mocked') {
-        mockedRequest.status = 'mocked';
+        mockedRequest.status = 'mocked'
       }
-      displayRequests.push(mockedRequest);
+      displayRequests.push(mockedRequest)
     } else {
       // 没有 mock 的请求，选择最新的（数组第一个是最新的）
-      displayRequests.push(requests[0]);
+      displayRequests.push(requests[0])
     }
   }
 
   // 按 timestamp 倒序排列（最新的在前）
-  displayRequests.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+  displayRequests.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
 
   // Apply max display count limit
-  const finalDisplayRequests = displayRequests.slice(0, maxCount);
+  const finalDisplayRequests = displayRequests.slice(0, maxCount)
 
   // Find truly new requests (new in mockRequests, not just new to the view)
-  const currentAllIds = new Set(mockRequests.map(r => r.id));
-  const newRequestIds = [...currentAllIds].filter(id => !knownRequestIds.has(id));
+  const currentAllIds = new Set(mockRequests.map((r) => r.id))
+  const newRequestIds = [...currentAllIds].filter((id) => !knownRequestIds.has(id))
 
   // Update known IDs
-  knownRequestIds = currentAllIds;
+  knownRequestIds = currentAllIds
 
   if (finalDisplayRequests.length === 0) {
-    const domainHint = currentInspectedDomain ? `当前域名: ${currentInspectedDomain}` : '';
-    const typeHint = currentTypeFilter !== 'all' ? `类型: ${currentTypeFilter.toUpperCase()}` : '';
+    const domainHint = currentInspectedDomain ? `当前域名: ${currentInspectedDomain}` : ''
+    const typeHint = currentTypeFilter !== 'all' ? `类型: ${currentTypeFilter.toUpperCase()}` : ''
     mockListContent.innerHTML = `
       <div class="mock-empty-state">
         <div class="icon">📡</div>
-        <div class="text">${showPatterns.length > 0 ? '无匹配请求' : (filterByDomain ? '当前域名无请求' : (currentTypeFilter !== 'all' ? '该类型无请求' : '暂无请求'))}</div>
+        <div class="text">${showPatterns.length > 0 ? '无匹配请求' : filterByDomain ? '当前域名无请求' : currentTypeFilter !== 'all' ? '该类型无请求' : '暂无请求'}</div>
         <div class="hint">${showPatterns.length > 0 || filterByDomain || currentTypeFilter !== 'all' ? '' : '刷新页面或等待网络请求'}</div>
         ${currentInspectedDomain ? `<div class="hint">${domainHint}</div>` : ''}
         ${typeHint ? `<div class="hint">${typeHint}</div>` : ''}
       </div>
-    `;
-    return;
+    `
+    return
   }
 
   // Show count info
-  const countInfo = filtered.length > maxCount ?
-    `<div class="mock-count-info">显示 ${maxCount} / ${filtered.length} 条请求</div>` : '';
+  const countInfo =
+    filtered.length > maxCount
+      ? `<div class="mock-count-info">显示 ${maxCount} / ${filtered.length} 条请求</div>`
+      : ''
 
   // Table header
   const tableHeader = `
@@ -3222,32 +3334,38 @@ function renderMockListWithRules(filter, forceAnimate, filterByDomain, maxCount,
       <div class="col col-size">Size</div>
       <div class="col col-time">Time</div>
     </div>
-  `;
+  `
 
   // Items wrapper for proper alternating colors
-  const itemsHtml = finalDisplayRequests.map((req, index) => {
-    // 检查页面上下文中的 mock 规则来判断是否已 mock
-    const mockKey = `${req.method}:${req.url}`;
-    const hasMockRule = mockRules[mockKey] === true;
-    const isMocked = req.status === 'mocked' || hasMockRule;
-    const isMockPending = req.status === 'mock-pending';
-    const statusClass = isMocked ? 'mocked' :
-      isMockPending ? 'pending' :
-        (req.status >= 200 && req.status < 300) ? 'success' :
-          req.status >= 400 ? 'error' : 'pending';
-    const methodClass = req.method.toLowerCase();
-    const timeStr = req.time ? `${req.time.toFixed(0)}ms` : '';
-    const sizeStr = req.responseSize ? formatBytes(req.responseSize) : '';
-    const typeIconClass = getTypeIconClass(req.type);
-    const typeLabel = getTypeLabel(req.type);
-    const shortUrl = getShortUrl(req.url);
-    // Only animate if this is a truly new request
-    const isNew = newRequestIds.includes(req.id);
+  const itemsHtml = finalDisplayRequests
+    .map((req, index) => {
+      // 检查页面上下文中的 mock 规则来判断是否已 mock
+      const mockKey = `${req.method}:${req.url}`
+      const hasMockRule = mockRules[mockKey] === true
+      const isMocked = req.status === 'mocked' || hasMockRule
+      const isMockPending = req.status === 'mock-pending'
+      const statusClass = isMocked
+        ? 'mocked'
+        : isMockPending
+          ? 'pending'
+          : req.status >= 200 && req.status < 300
+            ? 'success'
+            : req.status >= 400
+              ? 'error'
+              : 'pending'
+      const methodClass = req.method.toLowerCase()
+      const timeStr = req.time ? `${req.time.toFixed(0)}ms` : ''
+      const sizeStr = req.responseSize ? formatBytes(req.responseSize) : ''
+      const typeIconClass = getTypeIconClass(req.type)
+      const typeLabel = getTypeLabel(req.type)
+      const shortUrl = getShortUrl(req.url)
+      // Only animate if this is a truly new request
+      const isNew = newRequestIds.includes(req.id)
 
-    // 生成唯一的开关 ID
-    const switchId = `switch_${req.id}`;
+      // 生成唯一的开关 ID
+      const switchId = `switch_${req.id}`
 
-    return `
+      return `
       <div class="mock-item ${selectedRequestId === req.id ? 'active' : ''} ${isMocked ? 'mocked' : ''} ${isNew ? 'new-item' : ''}"
            data-id="${req.id}">
         <div class="col-icon">
@@ -3263,7 +3381,7 @@ function renderMockListWithRules(filter, forceAnimate, filterByDomain, maxCount,
           <span class="url" title="${escapeHtml(req.url)}">${escapeHtml(shortUrl)}${isMocked ? '<span class="mock-badge">MOCK</span>' : ''}</span>
         </div>
         <div class="col-status">
-          <span class="status ${statusClass}">${isMocked ? 'MOCK' : (isMockPending ? 'PEND' : (req.status || '...'))}</span>
+          <span class="status ${statusClass}">${isMocked ? 'MOCK' : isMockPending ? 'PEND' : req.status || '...'}</span>
         </div>
         <div class="col-type">
           <span class="type-label">${typeLabel}</span>
@@ -3272,45 +3390,46 @@ function renderMockListWithRules(filter, forceAnimate, filterByDomain, maxCount,
         <div class="col-time">${timeStr || '-'}</div>
         <button class="mock-item-delete" data-id="${req.id}" title="删除">×</button>
       </div>
-    `;
-  }).join('');
+    `
+    })
+    .join('')
 
-  mockListContent.innerHTML = tableHeader + countInfo + itemsHtml;
+  mockListContent.innerHTML = tableHeader + countInfo + itemsHtml
 
   // Add click handlers for items
-  mockListContent.querySelectorAll('.mock-item').forEach(item => {
+  mockListContent.querySelectorAll('.mock-item').forEach((item) => {
     item.addEventListener('click', (e) => {
       // Don't select if clicking delete button
       if (e.target.classList.contains('mock-item-delete')) {
-        return;
+        return
       }
-      const id = item.dataset.id;
-      selectMockRequest(id);
-    });
-  });
+      const id = item.dataset.id
+      selectMockRequest(id)
+    })
+  })
 
   // Add click handlers for delete buttons
-  mockListContent.querySelectorAll('.mock-item-delete').forEach(btn => {
+  mockListContent.querySelectorAll('.mock-item-delete').forEach((btn) => {
     btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const id = btn.dataset.id;
-      deleteMockRequest(id);
-    });
-  });
+      e.stopPropagation()
+      const id = btn.dataset.id
+      deleteMockRequest(id)
+    })
+  })
 
   // Add click handlers for mock switches
-  mockListContent.querySelectorAll('.url-mock-switch').forEach(sw => {
-    const url = sw.dataset.url;
-    const method = sw.dataset.method;
+  mockListContent.querySelectorAll('.url-mock-switch').forEach((sw) => {
+    const url = sw.dataset.url
+    const method = sw.dataset.method
 
     // 加载保存的开关状态
     loadMockSwitchState(method, url, (enabled) => {
-      sw.checked = enabled === true;
+      sw.checked = enabled === true
 
       // 添加点击事件
       sw.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const newEnabled = sw.checked;
+        e.stopPropagation()
+        const newEnabled = sw.checked
 
         // 在页面上下文切换 mock 开关
         const code = `
@@ -3326,108 +3445,108 @@ function renderMockListWithRules(filter, forceAnimate, filterByDomain, maxCount,
               return false;
             }
           })()
-        `;
+        `
 
         chrome.devtools.inspectedWindow.eval(code, (result) => {
           if (result) {
             // 保存开关状态到 storage
-            saveMockSwitchState(method, url, newEnabled);
+            saveMockSwitchState(method, url, newEnabled)
 
             // 联动逻辑：单个开关打开时，总开关也打开
             if (newEnabled) {
-              ensureGlobalMockEnabled();
+              ensureGlobalMockEnabled()
             } else {
               // 联动逻辑：所有单个开关都关闭时，总开关也关闭
-              checkAndUpdateGlobalSwitch();
+              checkAndUpdateGlobalSwitch()
             }
 
-            showNotification(newEnabled ? 'Mock 已启用' : 'Mock 已禁用');
+            showNotification(newEnabled ? 'Mock 已启用' : 'Mock 已禁用')
           } else {
             // 没有规则，取消开关
-            sw.checked = false;
-            showNotification('请先设置 Mock 数据');
+            sw.checked = false
+            showNotification('请先设置 Mock 数据')
           }
-        });
-      });
-    });
-  });
+        })
+      })
+    })
+  })
 }
 
 // 保存 mock 开关状态
 function saveMockSwitchState(method, url, enabled) {
-  const key = `${method}:${url}`;
+  const key = `${method}:${url}`
   chrome.storage.session.get(['mockSwitchStates'], (result) => {
-    const states = result.mockSwitchStates || {};
-    states[key] = enabled;
-    chrome.storage.session.set({ mockSwitchStates: states });
-  });
+    const states = result.mockSwitchStates || {}
+    states[key] = enabled
+    chrome.storage.session.set({ mockSwitchStates: states })
+  })
 }
 
 // 加载 mock 开关状态
 function loadMockSwitchState(method, url, callback) {
-  const key = `${method}:${url}`;
+  const key = `${method}:${url}`
   chrome.storage.session.get(['mockSwitchStates'], (result) => {
-    const states = result.mockSwitchStates || {};
-    callback(states[key] === true);
-  });
+    const states = result.mockSwitchStates || {}
+    callback(states[key] === true)
+  })
 }
 
 // ========== Mock 开关联动逻辑 ==========
 
 // 更新总开关 UI 状态
 function updateMockGlobalStatus(enabled) {
-  const mockGlobalStatus = document.getElementById('mock-global-status');
+  const mockGlobalStatus = document.getElementById('mock-global-status')
   if (mockGlobalStatus) {
-    mockGlobalStatus.textContent = enabled ? 'Mock 开启' : 'Mock 关闭';
-    mockGlobalStatus.style.color = enabled ? '#4ec9b0' : '#666';
+    mockGlobalStatus.textContent = enabled ? 'Mock 开启' : 'Mock 关闭'
+    mockGlobalStatus.style.color = enabled ? '#4ec9b0' : '#666'
   }
 }
 
 // 同步总开关到页面上下文
 function syncMockGlobalSwitch(enabled) {
-  const code = `window.__mockEnabled = ${enabled};`;
-  chrome.devtools.inspectedWindow.eval(code);
+  const code = `window.__mockEnabled = ${enabled};`
+  chrome.devtools.inspectedWindow.eval(code)
 }
 
 // 确保总开关打开
 function ensureGlobalMockEnabled() {
-  const mockGlobalSwitch = document.getElementById('mock-global-switch');
+  const mockGlobalSwitch = document.getElementById('mock-global-switch')
   if (mockGlobalSwitch && !mockGlobalSwitch.checked) {
-    mockGlobalSwitch.checked = true;
-    updateMockGlobalStatus(true);
-    syncMockGlobalSwitch(true);
-    chrome.storage.session.set({ mockGlobalEnabled: true });
+    mockGlobalSwitch.checked = true
+    updateMockGlobalStatus(true)
+    syncMockGlobalSwitch(true)
+    chrome.storage.session.set({ mockGlobalEnabled: true })
   }
 }
 
 // 检查并更新总开关（当所有单个开关都关闭时，关闭总开关）
 function checkAndUpdateGlobalSwitch() {
   chrome.storage.session.get(['mockSwitchStates'], (result) => {
-    const states = result.mockSwitchStates || {};
-    const hasAnyEnabled = Object.values(states).some(enabled => enabled === true);
+    const states = result.mockSwitchStates || {}
+    const hasAnyEnabled = Object.values(states).some((enabled) => enabled === true)
 
     if (!hasAnyEnabled) {
       // 所有开关都关闭，关闭总开关
-      const mockGlobalSwitch = document.getElementById('mock-global-switch');
+      const mockGlobalSwitch = document.getElementById('mock-global-switch')
       if (mockGlobalSwitch && mockGlobalSwitch.checked) {
-        mockGlobalSwitch.checked = false;
-        updateMockGlobalStatus(false);
-        syncMockGlobalSwitch(false);
-        chrome.storage.session.set({ mockGlobalEnabled: false });
+        mockGlobalSwitch.checked = false
+        updateMockGlobalStatus(false)
+        syncMockGlobalSwitch(false)
+        chrome.storage.session.set({ mockGlobalEnabled: false })
       }
     }
-  });
+  })
 }
 
 // 关闭所有单个开关
 function turnOffAllIndividualSwitches() {
   // 关闭 UI 中的所有开关
-  const allSwitches = document.querySelectorAll('.url-mock-switch');
-  allSwitches.forEach(sw => {
+  const allSwitches = document.querySelectorAll('.url-mock-switch')
+  allSwitches.forEach((sw) => {
     if (sw.checked) {
-      sw.checked = false;
-      const url = sw.dataset.url;
-      const method = sw.dataset.method;
+      sw.checked = false
+      const url = sw.dataset.url
+      const method = sw.dataset.method
 
       // 更新页面上下文
       const code = `
@@ -3440,29 +3559,29 @@ function turnOffAllIndividualSwitches() {
           }
           return false;
         })()
-      `;
-      chrome.devtools.inspectedWindow.eval(code);
+      `
+      chrome.devtools.inspectedWindow.eval(code)
     }
-  });
+  })
 
   // 清空 storage 中的所有开关状态
   chrome.storage.session.get(['mockSwitchStates'], (result) => {
-    const states = result.mockSwitchStates || {};
+    const states = result.mockSwitchStates || {}
     for (const key in states) {
-      states[key] = false;
+      states[key] = false
     }
-    chrome.storage.session.set({ mockSwitchStates: states });
-  });
+    chrome.storage.session.set({ mockSwitchStates: states })
+  })
 }
 
 // Delete a single mock request
 function deleteMockRequest(id) {
-  const index = mockRequests.findIndex(r => r.id === id);
+  const index = mockRequests.findIndex((r) => r.id === id)
   if (index >= 0) {
-    const req = mockRequests[index];
+    const req = mockRequests[index]
 
     // 删除页面上下文中的 mock 数据
-    const mockKey = `${req.method}:${req.url}`;
+    const mockKey = `${req.method}:${req.url}`
     const code = `
       (function() {
         if (window.__mockData && window.__mockData['${mockKey.replace(/'/g, "\\'")}']) {
@@ -3472,49 +3591,49 @@ function deleteMockRequest(id) {
         }
         return false;
       })()
-    `;
-    chrome.devtools.inspectedWindow.eval(code);
+    `
+    chrome.devtools.inspectedWindow.eval(code)
 
     // 删除 storage 中的开关状态
-    const storageKey = mockKey;
+    const storageKey = mockKey
     chrome.storage.session.get(['mockSwitchStates'], (result) => {
-      const states = result.mockSwitchStates || {};
-      delete states[storageKey];
-      chrome.storage.session.set({ mockSwitchStates: states });
-    });
+      const states = result.mockSwitchStates || {}
+      delete states[storageKey]
+      chrome.storage.session.set({ mockSwitchStates: states })
+    })
 
-    mockRequests.splice(index, 1);
+    mockRequests.splice(index, 1)
     if (selectedRequestId === id) {
-      selectedRequestId = null;
-      renderEmptyEditor();
+      selectedRequestId = null
+      renderEmptyEditor()
     }
-    renderMockList(mockFilterInput.value);
-    showNotification('已删除请求和 Mock 规则');
+    renderMockList(mockFilterInput.value)
+    showNotification('已删除请求和 Mock 规则')
   }
 }
 
 // Select a mock request
 function selectMockRequest(id) {
-  selectedRequestId = id;
-  const req = mockRequests.find(r => r.id === id);
+  selectedRequestId = id
+  const req = mockRequests.find((r) => r.id === id)
 
   // Update list selection immediately (without full re-render)
   if (mockListContent) {
-    mockListContent.querySelectorAll('.mock-item').forEach(item => {
+    mockListContent.querySelectorAll('.mock-item').forEach((item) => {
       if (item.dataset.id === id) {
-        item.classList.add('active');
+        item.classList.add('active')
       } else {
-        item.classList.remove('active');
+        item.classList.remove('active')
       }
-    });
+    })
   }
 
   if (!req) {
-    renderEmptyEditor();
-    return;
+    renderEmptyEditor()
+    return
   }
 
-  renderMockEditor(req);
+  renderMockEditor(req)
 }
 
 // Render empty editor state
@@ -3524,28 +3643,31 @@ function renderEmptyEditor() {
       <div class="icon">📝</div>
       <div class="text">选择一个请求查看详情</div>
     </div>
-  `;
+  `
 }
 
 // Render mock editor for a request
 function renderMockEditor(req) {
-  const isMocked = req.status === 'mocked';
-  const responseBody = req.responseBody || '';
+  const isMocked = req.status === 'mocked'
+  const responseBody = req.responseBody || ''
 
   // Format for display and editing
-  let formattedBody = responseBody;
+  let formattedBody = responseBody
   try {
-    const parsed = JSON.parse(responseBody);
-    formattedBody = JSON.stringify(parsed, null, 2);
-  } catch (e) { }
+    const parsed = JSON.parse(responseBody)
+    formattedBody = JSON.stringify(parsed, null, 2)
+  } catch (e) {}
 
   // Mock textarea default value
-  const mockTextareaValue = formattedBody;
+  const mockTextareaValue = formattedBody
 
   // Status display
-  const statusDisplay = isMocked ? 'MOCKED' : (req.status || 'Pending');
-  const statusStyle = isMocked ? 'background: #4ec9b0; color: #1e1e1e; font-weight: 600;' :
-    (req.status >= 400 ? 'background: #c53030; color: white;' : '');
+  const statusDisplay = isMocked ? 'MOCKED' : req.status || 'Pending'
+  const statusStyle = isMocked
+    ? 'background: #4ec9b0; color: #1e1e1e; font-weight: 600;'
+    : req.status >= 400
+      ? 'background: #c53030; color: white;'
+      : ''
 
   mockEditor.innerHTML = `
     <div class="mock-editor-header">
@@ -3590,35 +3712,55 @@ function renderMockEditor(req) {
               ${req.timestamp ? `<tr><th>Timestamp</th><td>${new Date(req.timestamp).toLocaleString()}</td></tr>` : ''}
             </tbody>
           </table>
-          ${Object.keys(req.requestHeaders || {}).length > 0 ? `
+          ${
+            Object.keys(req.requestHeaders || {}).length > 0
+              ? `
             <div style="background: #f0f0f0; padding: 8px; font-weight: 600; margin-top: 16px; margin-bottom: 8px;">请求头</div>
             <table class="headers-table">
               <tbody>
-                ${Object.entries(req.requestHeaders || {}).map(([key, value]) => `
+                ${Object.entries(req.requestHeaders || {})
+                  .map(
+                    ([key, value]) => `
                   <tr><th>${escapeHtml(key)}</th><td>${escapeHtml(String(value))}</td></tr>
-                `).join('')}
+                `
+                  )
+                  .join('')}
               </tbody>
             </table>
-          ` : ''}
-          ${Object.keys(req.responseHeaders || {}).length > 0 ? `
+          `
+              : ''
+          }
+          ${
+            Object.keys(req.responseHeaders || {}).length > 0
+              ? `
             <div style="background: #f0f0f0; padding: 8px; font-weight: 600; margin-top: 16px; margin-bottom: 8px;">响应头</div>
             <table class="headers-table">
               <tbody>
-                ${Object.entries(req.responseHeaders || {}).map(([key, value]) => `
+                ${Object.entries(req.responseHeaders || {})
+                  .map(
+                    ([key, value]) => `
                   <tr><th>${escapeHtml(key)}</th><td>${escapeHtml(String(value))}</td></tr>
-                `).join('')}
+                `
+                  )
+                  .join('')}
               </tbody>
             </table>
-          ` : ''}
+          `
+              : ''
+          }
         </div>
       </div>
       <!-- Payload Tab -->
       <div class="mock-editor-pane" id="pane-payload">
         <div class="mock-response-viewer">
-          ${req.requestBody ? `
+          ${
+            req.requestBody
+              ? `
             <div style="background: #f0f0f0; padding: 8px; font-weight: 600; margin-bottom: 8px;">请求载荷</div>
             ${renderJsonPreview(req.requestBody)}
-          ` : '<div class="json-preview-empty">无请求体</div>'}
+          `
+              : '<div class="json-preview-empty">无请求体</div>'
+          }
         </div>
       </div>
       <!-- Preview Tab -->
@@ -3645,71 +3787,71 @@ function renderMockEditor(req) {
         </div>
       </div>
     </div>
-  `;
+  `
 
   // Initialize JSON preview events
-  initJsonPreviewEvents();
+  initJsonPreviewEvents()
 
   // Setup editable JSON events
-  const editContainer = document.querySelector('.json-edit-container');
+  const editContainer = document.querySelector('.json-edit-container')
   if (editContainer) {
-    setupEditableJsonEvents(editContainer, 'mock-response-textarea');
+    setupEditableJsonEvents(editContainer, 'mock-response-textarea')
   }
 
   // Add tab switching
-  mockEditor.querySelectorAll('.mock-editor-tab').forEach(tab => {
+  mockEditor.querySelectorAll('.mock-editor-tab').forEach((tab) => {
     tab.addEventListener('click', () => {
-      mockEditor.querySelectorAll('.mock-editor-tab').forEach(t => t.classList.remove('active'));
-      mockEditor.querySelectorAll('.mock-editor-pane').forEach(p => p.classList.remove('active'));
-      tab.classList.add('active');
-      const paneId = 'pane-' + tab.dataset.tab;
-      document.getElementById(paneId).classList.add('active');
-    });
-  });
+      mockEditor.querySelectorAll('.mock-editor-tab').forEach((t) => t.classList.remove('active'))
+      mockEditor.querySelectorAll('.mock-editor-pane').forEach((p) => p.classList.remove('active'))
+      tab.classList.add('active')
+      const paneId = 'pane-' + tab.dataset.tab
+      document.getElementById(paneId).classList.add('active')
+    })
+  })
 
   // 编辑器失去焦点时自动保存 mock
-  const mockTextarea = document.getElementById('mock-response-textarea');
+  const mockTextarea = document.getElementById('mock-response-textarea')
   if (mockTextarea) {
     // 记录初始值，用于检测是否有变化
-    let initialValue = mockTextarea.value;
-    let hasChanged = false;
+    let initialValue = mockTextarea.value
+    let hasChanged = false
 
     mockTextarea.addEventListener('input', () => {
       if (mockTextarea.value !== initialValue) {
-        hasChanged = true;
+        hasChanged = true
       }
-    });
+    })
 
     mockTextarea.addEventListener('blur', () => {
       if (hasChanged) {
-        autoMockOnBlur(req);
-        initialValue = mockTextarea.value;
-        hasChanged = false;
+        autoMockOnBlur(req)
+        initialValue = mockTextarea.value
+        hasChanged = false
       }
-    });
+    })
   }
 }
 
 // 编辑器失去焦点时自动保存 mock
 function autoMockOnBlur(req) {
-  const textarea = document.getElementById('mock-response-textarea');
-  const value = textarea.value.trim();
+  const textarea = document.getElementById('mock-response-textarea')
+  const value = textarea.value.trim()
 
   if (!value) {
-    return;
+    return
   }
 
   // 解析 mock 数据
-  let mockData;
+  let mockData
   try {
-    mockData = JSON.parse(value);
+    mockData = JSON.parse(value)
   } catch (e) {
-    mockData = value;
+    mockData = value
   }
 
-  const mockKey = `${req.method || 'GET'}:${req.url}`;
-  console.log('[DevTools] ===================== MOCK 自动保存 =====================');
-  console.log('[DevTools] Mock 规则:', mockKey);
+  const mockKey = `${req.method || 'GET'}:${req.url}`
+  console.log('[DevTools] ===================== MOCK 自动保存 =====================')
+  console.log('[DevTools] Mock 规则:', mockKey)
 
   // 在页面上下文设置 mock 数据，并确保总开关打开
   const code = `
@@ -3724,33 +3866,33 @@ function autoMockOnBlur(req) {
       console.log('[Page] Mock 规则已设置并启用，总开关已打开，后续匹配的请求将返回 mock 数据');
       return true;
     })()
-  `;
+  `
 
   chrome.devtools.inspectedWindow.eval(code, (result, isException) => {
     if (isException) {
-      console.error('[DevTools] 执行异常:', isException);
+      console.error('[DevTools] 执行异常:', isException)
     } else if (result) {
-      console.log('[DevTools] Mock 规则已自动保存');
+      console.log('[DevTools] Mock 规则已自动保存')
 
       // 保存开关状态
-      saveMockSwitchState(req.method || 'GET', req.url, true);
+      saveMockSwitchState(req.method || 'GET', req.url, true)
 
       // 更新总开关 UI（确保总开关打开）
-      ensureGlobalMockEnabled();
+      ensureGlobalMockEnabled()
 
       // 更新列表中该请求的开关状态
-      const switchEl = document.querySelector(`.url-mock-switch[data-id="${req.id}"]`);
+      const switchEl = document.querySelector(`.url-mock-switch[data-id="${req.id}"]`)
       if (switchEl) {
-        switchEl.checked = true;
+        switchEl.checked = true
       }
 
       // 更新请求状态显示为 mocked
-      req.status = 'mocked';
-      renderMockList(mockFilterInput.value);
+      req.status = 'mocked'
+      renderMockList(mockFilterInput.value)
 
-      showNotification('Mock 已自动保存');
+      showNotification('Mock 已自动保存')
     }
-  });
+  })
 }
 
 // 获取所有 mock 规则
@@ -3771,20 +3913,20 @@ function getMockRules() {
         };
       });
     })()
-  `;
+  `
 
   chrome.devtools.inspectedWindow.eval(code, (result, isException) => {
     if (isException) {
-      console.error('[DevTools] 获取规则异常:', isException);
-      return [];
+      console.error('[DevTools] 获取规则异常:', isException)
+      return []
     }
-    return result || [];
-  });
+    return result || []
+  })
 }
 
 // 切换 mock 开关
 function toggleMockRule(method, url, enabled) {
-  const mockKey = `${method}:${url}`;
+  const mockKey = `${method}:${url}`
   const code = `
     (function() {
       if (!window.__mockData) return;
@@ -3796,21 +3938,21 @@ function toggleMockRule(method, url, enabled) {
       }
       return false;
     })()
-  `;
+  `
 
   chrome.devtools.inspectedWindow.eval(code, (result, isException) => {
     if (isException) {
-      console.error('[DevTools] 切换开关异常:', isException);
+      console.error('[DevTools] 切换开关异常:', isException)
     } else {
-      console.log('[DevTools] Mock 开关已切换:', mockKey, 'enabled:', enabled);
+      console.log('[DevTools] Mock 开关已切换:', mockKey, 'enabled:', enabled)
     }
-  });
+  })
 }
 
 // 刷新 mock 规则列表（如果需要显示）
 function refreshMockRulesList() {
   // 这里可以添加更新 UI 的代码
-  console.log('[DevTools] 刷新 mock 规则列表');
+  console.log('[DevTools] 刷新 mock 规则列表')
 }
 
 // Network request handler (from devtools API)
@@ -3820,29 +3962,29 @@ function handleRequest(harEntry) {
 
   // Get request info from HAR entry structure
   // harEntry.request contains: url, method, headers, etc.
-  const req = harEntry.request;
-  if (!req) return;
+  const req = harEntry.request
+  if (!req) return
 
-  const url = req.url;
-  const method = req.method || 'GET';
+  const url = req.url
+  const method = req.method || 'GET'
   // Resource type is stored in _resourceType (undocumented but standard)
-  const requestType = (harEntry._resourceType || '').toString().toLowerCase();
+  const requestType = (harEntry._resourceType || '').toString().toLowerCase()
 
   // console.log('[DevTools Network] Request captured:', method, url, 'type:', requestType);
 
   // Only capture XHR/Fetch requests
   if (requestType !== 'xhr' && requestType !== 'fetch') {
     // console.log('[DevTools Network] Skipping non-XHR/Fetch request:', requestType);
-    return;
+    return
   }
 
   // Get request hostname for display
-  let requestHostname = '';
+  let requestHostname = ''
   try {
-    requestHostname = new URL(url).hostname;
+    requestHostname = new URL(url).hostname
   } catch (e) {
     // console.log('[DevTools Network] Invalid URL:', url);
-    return;
+    return
   }
 
   // console.log('[DevTools Network] Processing XHR/Fetch request:', method, url, 'hostname:', requestHostname);
@@ -3850,40 +3992,42 @@ function handleRequest(harEntry) {
   // Get response content via getContent() method
   harEntry.getContent((content, encoding) => {
     // Get response info from harEntry.response
-    const response = harEntry.response || {};
+    const response = harEntry.response || {}
 
     // Convert headers array [{name, value}] to object {name: value}
-    const headersObj = {};
+    const headersObj = {}
     if (Array.isArray(response.headers)) {
-      response.headers.forEach(h => {
+      response.headers.forEach((h) => {
         if (h.name && h.value !== undefined) {
-          headersObj[h.name] = h.value;
+          headersObj[h.name] = h.value
         }
-      });
+      })
     }
 
     // Convert request headers array [{name, value}] to object {name: value}
-    const requestHeadersObj = {};
+    const requestHeadersObj = {}
     if (Array.isArray(req.headers)) {
-      req.headers.forEach(h => {
+      req.headers.forEach((h) => {
         if (h.name && h.value !== undefined) {
-          requestHeadersObj[h.name] = h.value;
+          requestHeadersObj[h.name] = h.value
         }
-      });
+      })
     }
 
     // Get request body from HAR entry
-    const requestBody = req.postData ? req.postData.text : '';
+    const requestBody = req.postData ? req.postData.text : ''
 
     // Check if this request was mocked by checking response header
-    const isMocked = headersObj['x-mock-intercepted'] === 'true';
+    const isMocked = headersObj['x-mock-intercepted'] === 'true'
 
     // 创建请求记录（不去重，每次都新增）
     const reqData = {
-      id: harEntry._requestId || (Date.now().toString() + '_' + Math.random().toString(36).substr(2, 9)),
+      id:
+        harEntry._requestId ||
+        Date.now().toString() + '_' + Math.random().toString(36).substr(2, 9),
       url: url,
       method: method,
-      status: isMocked ? 'mocked' : (response.status || 200),
+      status: isMocked ? 'mocked' : response.status || 200,
       type: requestType,
       time: harEntry.time ? harEntry.time : 0,
       responseSize: response.contentSize || (content ? content.length : 0),
@@ -3892,59 +4036,60 @@ function handleRequest(harEntry) {
       requestHeaders: requestHeadersObj,
       requestBody: requestBody,
       timestamp: Date.now(),
-      requestDomain: requestHostname
-    };
+      requestDomain: requestHostname,
+    }
 
     // 所有请求都新增到列表顶部（不去重）
     // console.log('[DevTools Network] Adding request to list:', method, url, 'isMocked:', isMocked);
-    mockRequests.unshift(reqData);
+    mockRequests.unshift(reqData)
 
     // console.log('[DevTools Network] Total requests in list:', mockRequests.length);
 
     // Keep only last 100 requests
     if (mockRequests.length > 100) {
-      mockRequests = mockRequests.slice(0, 100);
+      mockRequests = mockRequests.slice(0, 100)
     }
 
     // 只有匹配当前过滤条件的请求才触发渲染
-    const matchesFilter = matchesCurrentFilter(reqData);
+    const matchesFilter = matchesCurrentFilter(reqData)
     if (matchesFilter) {
-      scheduleMockListRender();
+      scheduleMockListRender()
     }
 
     // Auto scroll to top if enabled (newest requests are at the top)
     if (mockListContent && autoScrollCheckbox && autoScrollCheckbox.checked) {
-      mockListContent.scrollTop = 0;
+      mockListContent.scrollTop = 0
     }
-  });
+  })
 }
 
 // Debounced render for mock list
-let mockListRenderTimer = null;
+let mockListRenderTimer = null
 function scheduleMockListRender() {
   if (mockListRenderTimer) {
-    clearTimeout(mockListRenderTimer);
+    clearTimeout(mockListRenderTimer)
   }
   mockListRenderTimer = setTimeout(() => {
-    renderMockList(mockFilterInput.value);
-    mockListRenderTimer = null;
-  }, 100); // Batch renders within 100ms
+    renderMockList(mockFilterInput.value)
+    mockListRenderTimer = null
+  }, 100) // Batch renders within 100ms
 }
 
 // ========== 资源嗅探功能 ==========
 
 // 扫描页面资源
 function scanPageResources() {
-  console.log('[DevTools] 开始扫描资源...');
-  capturedResources = [];
-  const resourcesContainer = document.getElementById('resources-container');
+  console.log('[DevTools] 开始扫描资源...')
+  capturedResources = []
+  const resourcesContainer = document.getElementById('resources-container')
 
   if (!resourcesContainer) {
-    console.error('[DevTools] resources-container 元素不存在');
-    return;
+    console.error('[DevTools] resources-container 元素不存在')
+    return
   }
 
-  resourcesContainer.innerHTML = '<div class="resources-empty-state"><div class="icon">🔍</div><div class="text">正在扫描资源...</div></div>';
+  resourcesContainer.innerHTML =
+    '<div class="resources-empty-state"><div class="icon">🔍</div><div class="text">正在扫描资源...</div></div>'
 
   // 在页面上下文执行扫描
   const scanCode = `
@@ -4101,86 +4246,91 @@ function scanPageResources() {
       console.log('[Page Scan] 找到资源:', unique.length);
       return unique;
     })()
-  `;
+  `
 
   chrome.devtools.inspectedWindow.eval(scanCode, (result) => {
-    console.log('[DevTools] 扫描结果:', result);
+    console.log('[DevTools] 扫描结果:', result)
     if (result && Array.isArray(result)) {
       capturedResources = result.map((r, i) => ({
         id: 'res_' + Date.now() + '_' + i,
-        ...r
-      }));
-      console.log('[DevTools] 捕获资源数量:', capturedResources.length);
-      renderResources();
+        ...r,
+      }))
+      console.log('[DevTools] 捕获资源数量:', capturedResources.length)
+      renderResources()
     } else {
-      resourcesContainer.innerHTML = '<div class="resources-empty-state"><div class="icon">⚠️</div><div class="text">扫描失败</div></div>';
+      resourcesContainer.innerHTML =
+        '<div class="resources-empty-state"><div class="icon">⚠️</div><div class="text">扫描失败</div></div>'
     }
-  });
+  })
 }
 
 // 渲染资源列表
 function renderResources() {
-  const resourcesContainer = document.getElementById('resources-container');
+  const resourcesContainer = document.getElementById('resources-container')
 
   if (!capturedResources || capturedResources.length === 0) {
-    resourcesContainer.innerHTML = '<div class="resources-empty-state"><div class="icon">📦</div><div class="text">未发现资源</div><div class="hint">当前页面没有可嗅探的资源</div></div>';
-    return;
+    resourcesContainer.innerHTML =
+      '<div class="resources-empty-state"><div class="icon">📦</div><div class="text">未发现资源</div><div class="hint">当前页面没有可嗅探的资源</div></div>'
+    return
   }
 
   // 根据类型过滤
-  let filtered = capturedResources;
+  let filtered = capturedResources
   if (currentResourceFilter !== 'all') {
-    filtered = capturedResources.filter(r => r.type === currentResourceFilter);
+    filtered = capturedResources.filter((r) => r.type === currentResourceFilter)
   }
 
   if (filtered.length === 0) {
-    resourcesContainer.innerHTML = '<div class="resources-empty-state"><div class="icon">📦</div><div class="text">该类型暂无资源</div></div>';
-    return;
+    resourcesContainer.innerHTML =
+      '<div class="resources-empty-state"><div class="icon">📦</div><div class="text">该类型暂无资源</div></div>'
+    return
   }
 
   // 渲染网格
-  const grid = document.createElement('div');
-  grid.className = 'resources-grid';
+  const grid = document.createElement('div')
+  grid.className = 'resources-grid'
 
-  filtered.forEach(resource => {
-    const item = createResourceItem(resource);
-    grid.appendChild(item);
-  });
+  filtered.forEach((resource) => {
+    const item = createResourceItem(resource)
+    grid.appendChild(item)
+  })
 
-  resourcesContainer.innerHTML = '';
-  resourcesContainer.appendChild(grid);
+  resourcesContainer.innerHTML = ''
+  resourcesContainer.appendChild(grid)
 }
 
 // 创建资源项
 function createResourceItem(resource) {
-  const item = document.createElement('div');
-  item.className = 'resource-item';
-  item.dataset.id = resource.id;
+  const item = document.createElement('div')
+  item.className = 'resource-item'
+  item.dataset.id = resource.id
 
-  const typeIcon = {
-    image: '🖼️',
-    video: '🎬',
-    audio: '🎵',
-    document: '📄',
-    other: '📎'
-  }[resource.type] || '📎';
+  const typeIcon =
+    {
+      image: '🖼️',
+      video: '🎬',
+      audio: '🎵',
+      document: '📄',
+      other: '📎',
+    }[resource.type] || '📎'
 
   // 检查是否可以预览（排除本地资源）
-  const canPreview = !resource.url.startsWith('chrome://') &&
-                      !resource.url.startsWith('chrome-extension://') &&
-                      !resource.url.startsWith('edge://') &&
-                      !resource.url.startsWith('about:');
+  const canPreview =
+    !resource.url.startsWith('chrome://') &&
+    !resource.url.startsWith('chrome-extension://') &&
+    !resource.url.startsWith('edge://') &&
+    !resource.url.startsWith('about:')
 
   // 预览区域
-  let previewContent = '';
+  let previewContent = ''
   if (resource.type === 'image' && canPreview) {
-    previewContent = `<img src="${resource.url}" loading="lazy" onerror="this.parentElement.innerHTML='<span class=\\'preview-placeholder\\'>❌</span>'">`;
+    previewContent = `<img src="${resource.url}" loading="lazy" onerror="this.parentElement.innerHTML='<span class=\\'preview-placeholder\\'>❌</span>'">`
   } else if (resource.type === 'video' && canPreview) {
-    previewContent = `<span class="preview-placeholder">${typeIcon}</span>`;
+    previewContent = `<span class="preview-placeholder">${typeIcon}</span>`
   } else if (resource.type === 'audio' && canPreview) {
-    previewContent = `<span class="preview-placeholder">${typeIcon}</span>`;
+    previewContent = `<span class="preview-placeholder">${typeIcon}</span>`
   } else {
-    previewContent = `<span class="preview-placeholder">${typeIcon}</span>`;
+    previewContent = `<span class="preview-placeholder">${typeIcon}</span>`
   }
 
   item.innerHTML = `
@@ -4195,35 +4345,38 @@ function createResourceItem(resource) {
       <button class="resource-action-btn copy" data-id="${resource.id}" data-url="${encodeURIComponent(resource.url)}">复制链接</button>
       <button class="resource-action-btn download" data-id="${resource.id}" data-url="${encodeURIComponent(resource.url)}" data-type="${resource.type}">下载</button>
     </div>
-  `;
+  `
 
   // 点击选中
   item.addEventListener('click', (e) => {
     if (!e.target.classList.contains('resource-action-btn')) {
-      document.querySelectorAll('.resource-item').forEach(i => i.classList.remove('selected'));
-      item.classList.add('selected');
+      document.querySelectorAll('.resource-item').forEach((i) => i.classList.remove('selected'))
+      item.classList.add('selected')
     }
-  });
+  })
 
-  return item;
+  return item
 }
 
 // 复制到剪贴板
 function copyToClipboard(text) {
-  navigator.clipboard.writeText(text).then(() => {
-    showNotification('已复制到剪贴板');
-  }).catch(() => {
-    // 降级方案
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    textarea.style.position = 'fixed';
-    textarea.style.opacity = '0';
-    document.body.appendChild(textarea);
-    textarea.select();
-    document.execCommand('copy');
-    document.body.removeChild(textarea);
-    showNotification('已复制到剪贴板');
-  });
+  navigator.clipboard
+    .writeText(text)
+    .then(() => {
+      showNotification('已复制到剪贴板')
+    })
+    .catch(() => {
+      // 降级方案
+      const textarea = document.createElement('textarea')
+      textarea.value = text
+      textarea.style.position = 'fixed'
+      textarea.style.opacity = '0'
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+      showNotification('已复制到剪贴板')
+    })
 }
 
 // 下载资源
@@ -4231,166 +4384,166 @@ async function downloadResource(url, type) {
   try {
     // 对于图片和简单文件，直接下载
     if (type === 'image' || type === 'other') {
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = url.split('/').pop().split('?')[0] || 'download';
-      a.target = '_blank';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      showNotification('已触发下载');
+      const a = document.createElement('a')
+      a.href = url
+      a.download = url.split('/').pop().split('?')[0] || 'download'
+      a.target = '_blank'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      showNotification('已触发下载')
     } else if (type === 'video') {
       // 视频：尝试通过 fetch 获取并下载
-      showNotification('正在下载视频...');
+      showNotification('正在下载视频...')
       try {
-        const response = await fetch(url);
-        const blob = await response.blob();
-        const blobUrl = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = blobUrl;
-        a.download = 'video_' + Date.now() + '.mp4';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(blobUrl);
-        showNotification('视频下载完成');
+        const response = await fetch(url)
+        const blob = await response.blob()
+        const blobUrl = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = blobUrl
+        a.download = 'video_' + Date.now() + '.mp4'
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(blobUrl)
+        showNotification('视频下载完成')
       } catch (e) {
         // 视频下载失败，在新标签页打开
-        chrome.tabs.create({ url: url });
-        showNotification('已在新标签页打开');
+        chrome.tabs.create({ url: url })
+        showNotification('已在新标签页打开')
       }
     } else {
       // 其他类型：在新标签页打开
-      chrome.tabs.create({ url: url });
-      showNotification('已在新标签页打开');
+      chrome.tabs.create({ url: url })
+      showNotification('已在新标签页打开')
     }
   } catch (error) {
-    console.error('下载失败:', error);
+    console.error('下载失败:', error)
     // 失败时在新标签页打开
-    chrome.tabs.create({ url: url });
-    showNotification('已在新标签页打开');
+    chrome.tabs.create({ url: url })
+    showNotification('已在新标签页打开')
   }
 }
 
 // 初始化资源标签页事件
 function initResourcesTab() {
-  const scanBtn = document.getElementById('resources-scan-btn');
-  const clearBtn = document.getElementById('resources-clear-btn');
-  const typeFilter = document.getElementById('resource-type-filter');
+  const scanBtn = document.getElementById('resources-scan-btn')
+  const clearBtn = document.getElementById('resources-clear-btn')
+  const typeFilter = document.getElementById('resource-type-filter')
 
   if (scanBtn) {
-    scanBtn.addEventListener('click', scanPageResources);
+    scanBtn.addEventListener('click', scanPageResources)
   }
 
   if (clearBtn) {
     clearBtn.addEventListener('click', () => {
-      capturedResources = [];
-      const resourcesContainer = document.getElementById('resources-container');
-      resourcesContainer.innerHTML = '<div class="resources-empty-state"><div class="icon">📦</div><div class="text">点击"扫描"按钮嗅探页面资源</div><div class="hint">支持图片、视频、音频、文档等资源</div></div>';
-    });
+      capturedResources = []
+      const resourcesContainer = document.getElementById('resources-container')
+      resourcesContainer.innerHTML =
+        '<div class="resources-empty-state"><div class="icon">📦</div><div class="text">点击"扫描"按钮嗅探页面资源</div><div class="hint">支持图片、视频、音频、文档等资源</div></div>'
+    })
   }
 
   if (typeFilter) {
     typeFilter.addEventListener('change', (e) => {
-      currentResourceFilter = e.target.value;
-      renderResources();
-    });
+      currentResourceFilter = e.target.value
+      renderResources()
+    })
   }
 
   // 事件委托处理复制和下载按钮
-  const resourcesContainer = document.getElementById('resources-container');
+  const resourcesContainer = document.getElementById('resources-container')
   resourcesContainer.addEventListener('click', (e) => {
     if (e.target.classList.contains('copy')) {
-      const url = decodeURIComponent(e.target.dataset.url);
-      copyToClipboard(url);
+      const url = decodeURIComponent(e.target.dataset.url)
+      copyToClipboard(url)
     } else if (e.target.classList.contains('download')) {
-      const url = decodeURIComponent(e.target.dataset.url);
-      const type = e.target.dataset.type;
-      downloadResource(url, type);
+      const url = decodeURIComponent(e.target.dataset.url)
+      const type = e.target.dataset.type
+      downloadResource(url, type)
     }
-  });
+  })
 }
-
 
 // Initialize network monitoring
 function initNetworkMonitoring() {
   // console.log('[DevTools] Initializing network monitoring...');
 
   // Get current inspected tab info
-  updateCurrentDomain();
+  updateCurrentDomain()
 
   // Listen for network requests via devtools API
-  chrome.devtools.network.onRequestFinished.addListener(handleRequest);
+  chrome.devtools.network.onRequestFinished.addListener(handleRequest)
   // console.log('[DevTools] Network request listener registered');
 
   // ========== Mock 总开关初始化 ==========
-  const mockGlobalSwitch = document.getElementById('mock-global-switch');
-  const mockGlobalStatus = document.getElementById('mock-global-status');
+  const mockGlobalSwitch = document.getElementById('mock-global-switch')
+  const mockGlobalStatus = document.getElementById('mock-global-status')
 
   if (mockGlobalSwitch) {
     // 从 storage 加载开关状态
     chrome.storage.session.get(['mockGlobalEnabled'], (result) => {
-      const enabled = result.mockGlobalEnabled === true;
-      mockGlobalSwitch.checked = enabled;
-      updateMockGlobalStatus(enabled);
-      syncMockGlobalSwitch(enabled);
-    });
+      const enabled = result.mockGlobalEnabled === true
+      mockGlobalSwitch.checked = enabled
+      updateMockGlobalStatus(enabled)
+      syncMockGlobalSwitch(enabled)
+    })
 
     // 总开关事件监听
     mockGlobalSwitch.addEventListener('change', (e) => {
-      const enabled = e.target.checked;
-      updateMockGlobalStatus(enabled);
-      syncMockGlobalSwitch(enabled);
-      chrome.storage.session.set({ mockGlobalEnabled: enabled });
+      const enabled = e.target.checked
+      updateMockGlobalStatus(enabled)
+      syncMockGlobalSwitch(enabled)
+      chrome.storage.session.set({ mockGlobalEnabled: enabled })
 
       // 联动逻辑：总开关关闭时，关闭所有单个开关
       if (!enabled) {
-        turnOffAllIndividualSwitches();
+        turnOffAllIndividualSwitches()
       }
 
-      showNotification(enabled ? 'Mock 已启用' : 'Mock 已禁用');
-    });
+      showNotification(enabled ? 'Mock 已启用' : 'Mock 已禁用')
+    })
   }
 
   // ========== 筛选参数持久化 ==========
   // 加载保存的筛选参数
   chrome.storage.session.get(['mockFilterValue', 'mockFilterDomain'], (result) => {
     if (result.mockFilterValue !== undefined) {
-      mockFilterInput.value = result.mockFilterValue;
+      mockFilterInput.value = result.mockFilterValue
     }
     if (result.mockFilterDomain !== undefined && filterCurrentDomainCheckbox) {
-      filterCurrentDomainCheckbox.checked = result.mockFilterDomain;
+      filterCurrentDomainCheckbox.checked = result.mockFilterDomain
     }
-    renderMockList(mockFilterInput.value);
-  });
+    renderMockList(mockFilterInput.value)
+  })
 
   // Listen for navigation to clear requests and update domain
   chrome.devtools.network.onNavigated.addListener((url) => {
     // Update current domain
     try {
-      const urlObj = new URL(url);
-      currentInspectedDomain = urlObj.hostname;
-      updateDomainDisplay();
+      const urlObj = new URL(url)
+      currentInspectedDomain = urlObj.hostname
+      updateDomainDisplay()
       // Load blocked domains for new domain
-      loadBlockedDomainsToExclude();
+      loadBlockedDomainsToExclude()
     } catch (e) {
-      currentInspectedDomain = '';
-      updateDomainDisplay();
+      currentInspectedDomain = ''
+      updateDomainDisplay()
     }
 
     // Clear mock requests list on navigation
-    mockRequests = [];
-    selectedRequestId = null;
-    knownRequestIds = new Set(); // Reset known IDs
-    renderMockList();
-    renderEmptyEditor();
-  });
+    mockRequests = []
+    selectedRequestId = null
+    knownRequestIds = new Set() // Reset known IDs
+    renderMockList()
+    renderEmptyEditor()
+  })
 
   // Add domain filter checkbox listener
   if (filterCurrentDomainCheckbox) {
     filterCurrentDomainCheckbox.addEventListener('change', () => {
-      renderMockList(mockFilterInput.value);
-    });
+      renderMockList(mockFilterInput.value)
+    })
   }
 }
 
@@ -4398,28 +4551,28 @@ function initNetworkMonitoring() {
 function updateCurrentDomain() {
   chrome.devtools.inspectedWindow.eval('location.hostname', (result, isException) => {
     if (!isException) {
-      currentInspectedDomain = result;
-      updateDomainDisplay();
+      currentInspectedDomain = result
+      updateDomainDisplay()
       // Load blocked domains for current domain
-      loadBlockedDomainsToExclude();
+      loadBlockedDomainsToExclude()
     }
-  });
+  })
 }
 
 // Update domain display in UI
 function updateDomainDisplay() {
   if (currentDomainText) {
-    currentDomainText.textContent = currentInspectedDomain ? `域名: ${currentInspectedDomain}` : '-';
-    currentDomainText.title = currentInspectedDomain || '';
+    currentDomainText.textContent = currentInspectedDomain ? `域名: ${currentInspectedDomain}` : '-'
+    currentDomainText.title = currentInspectedDomain || ''
   }
 }
 
 // Filter input handler
 mockFilterInput.addEventListener('input', (e) => {
-  const value = e.target.value;
-  chrome.storage.session.set({ mockFilterValue: value });
-  renderMockList(value);
-});
+  const value = e.target.value
+  chrome.storage.session.set({ mockFilterValue: value })
+  renderMockList(value)
+})
 
 // Clear button handler
 mockClearBtn.addEventListener('click', () => {
@@ -4432,241 +4585,245 @@ mockClearBtn.addEventListener('click', () => {
       }
       return true;
     })()
-  `;
-  chrome.devtools.inspectedWindow.eval(code);
+  `
+  chrome.devtools.inspectedWindow.eval(code)
 
   // 清空 storage 中的所有开关状态
-  chrome.storage.session.set({ mockSwitchStates: {} });
-  chrome.storage.session.set({ mockGlobalEnabled: false });
+  chrome.storage.session.set({ mockSwitchStates: {} })
+  chrome.storage.session.set({ mockGlobalEnabled: false })
 
   // 更新总开关 UI
-  const mockGlobalSwitch = document.getElementById('mock-global-switch');
+  const mockGlobalSwitch = document.getElementById('mock-global-switch')
   if (mockGlobalSwitch) {
-    mockGlobalSwitch.checked = false;
-    updateMockGlobalStatus(false);
+    mockGlobalSwitch.checked = false
+    updateMockGlobalStatus(false)
   }
 
-  mockRequests = [];
-  selectedRequestId = null;
-  knownRequestIds = new Set(); // Reset known IDs
-  renderMockList();
-  renderEmptyEditor();
-  showNotification('已清空请求列表和所有 Mock 规则');
-});
+  mockRequests = []
+  selectedRequestId = null
+  knownRequestIds = new Set() // Reset known IDs
+  renderMockList()
+  renderEmptyEditor()
+  showNotification('已清空请求列表和所有 Mock 规则')
+})
 
 // Refresh button handler - reload the inspected page
 mockRefreshBtn.addEventListener('click', () => {
-  chrome.devtools.inspectedWindow.reload();
-});
+  chrome.devtools.inspectedWindow.reload()
+})
 
 // Max display count input handler
 if (maxDisplayCountInput) {
   maxDisplayCountInput.addEventListener('change', (e) => {
-    const value = parseInt(e.target.value, 10);
+    const value = parseInt(e.target.value, 10)
     if (value >= 10 && value <= 500) {
-      mockFilterSettings.maxDisplayCount = value;
+      mockFilterSettings.maxDisplayCount = value
       if (isExtensionContextValid()) {
-        saveMockFilterSettings().catch(err => {
+        saveMockFilterSettings().catch((err) => {
           // Ignore context invalidated errors
           if (!isContextInvalidatedError(err)) {
-            console.error('Failed to save mock filter settings:', err);
+            console.error('Failed to save mock filter settings:', err)
           }
-        });
+        })
       }
-      renderMockList(mockFilterInput.value);
+      renderMockList(mockFilterInput.value)
     }
-  });
+  })
 }
 
 // Add exclude pattern button handler
 if (addExcludeBtn) {
   addExcludeBtn.addEventListener('click', () => {
     if (excludePatternInput) {
-      addExcludePattern(excludePatternInput.value);
-      excludePatternInput.value = '';
+      addExcludePattern(excludePatternInput.value)
+      excludePatternInput.value = ''
     }
-  });
+  })
 }
 
 // Exclude pattern input enter key handler
 if (excludePatternInput) {
   excludePatternInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
-      addExcludePattern(excludePatternInput.value);
-      excludePatternInput.value = '';
+      addExcludePattern(excludePatternInput.value)
+      excludePatternInput.value = ''
     }
-  });
+  })
 }
 
 // Clear exclude patterns button handler
 if (clearExcludeBtn) {
   clearExcludeBtn.addEventListener('click', () => {
-    clearExcludePatterns();
-    showNotification('已清空排除关键词');
-  });
+    clearExcludePatterns()
+    showNotification('已清空排除关键词')
+  })
 }
 
 // Type filter tabs handler
 if (mockTypeTabs) {
-  mockTypeTabs.querySelectorAll('.type-tab').forEach(tab => {
+  mockTypeTabs.querySelectorAll('.type-tab').forEach((tab) => {
     tab.addEventListener('click', () => {
       // Update active state
-      mockTypeTabs.querySelectorAll('.type-tab').forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
+      mockTypeTabs.querySelectorAll('.type-tab').forEach((t) => t.classList.remove('active'))
+      tab.classList.add('active')
 
       // Update filter and re-render
-      currentTypeFilter = tab.dataset.type;
-      renderMockList(mockFilterInput.value);
-    });
-  });
+      currentTypeFilter = tab.dataset.type
+      renderMockList(mockFilterInput.value)
+    })
+  })
 }
 
 // Initialize mock functionality
-loadMockFilterSettings().catch(err => {
+loadMockFilterSettings().catch((err) => {
   // Ignore context invalidated errors during initialization
   if (!isContextInvalidatedError(err)) {
-    console.error('Failed to load mock filter settings:', err);
+    console.error('Failed to load mock filter settings:', err)
   }
-});
-initNetworkMonitoring();
+})
+initNetworkMonitoring()
 
 // ============================================
 // Bookmarks Tab Functionality
 // ============================================
-const bookmarksList = document.getElementById('bookmarks-list');
-const bookmarksSearchInput = document.getElementById('bookmarks-search-input');
-const bookmarksCount = document.getElementById('bookmarks-count');
-const bookmarksRefreshBtn = document.getElementById('bookmarks-refresh-btn');
+const bookmarksList = document.getElementById('bookmarks-list')
+const bookmarksSearchInput = document.getElementById('bookmarks-search-input')
+const bookmarksCount = document.getElementById('bookmarks-count')
+const bookmarksRefreshBtn = document.getElementById('bookmarks-refresh-btn')
 
-let allBookmarks = [];
-let bookmarkTreeRoot = null;
-let bookmarksViewMode = 'grid'; // 'tree' or 'grid'
+let allBookmarks = []
+let bookmarkTreeRoot = null
+let bookmarksViewMode = 'grid' // 'tree' or 'grid'
 
 // Flatten bookmark tree into array for search
 function flattenBookmarkTree(node, array) {
-  if (!node) return;
+  if (!node) return
 
   if (node.url) {
-    array.push(node);
+    array.push(node)
   }
 
   if (node.children) {
-    node.children.forEach(child => flattenBookmarkTree(child, array));
+    node.children.forEach((child) => flattenBookmarkTree(child, array))
   }
 }
 
 // Count total items in a bookmark tree
 function countBookmarkItems(node) {
-  let count = 0;
+  let count = 0
   if (node.url) {
-    count = 1;
+    count = 1
   }
   if (node.children) {
-    node.children.forEach(child => {
-      count += countBookmarkItems(child);
-    });
+    node.children.forEach((child) => {
+      count += countBookmarkItems(child)
+    })
   }
-  return count;
+  return count
 }
 
 // Find bookmark node by id in tree
 function findBookmarkNode(node, id) {
-  if (node.id === id) return node;
+  if (node.id === id) return node
   if (node.children) {
     for (const child of node.children) {
-      const found = findBookmarkNode(child, id);
-      if (found) return found;
+      const found = findBookmarkNode(child, id)
+      if (found) return found
     }
   }
-  return null;
+  return null
 }
 
 // Get favicon URL for a domain
 function getFaviconUrl(url) {
   try {
-    const domain = new URL(url).hostname;
-    return `chrome://favicon/${domain}`;
+    const domain = new URL(url).hostname
+    return `chrome://favicon/${domain}`
   } catch {
-    return '';
+    return ''
   }
 }
 
 // Format date for display
 function formatDate(dateString) {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now - date;
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffMs = now - date
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
 
-  if (diffMins < 1) return '刚刚';
-  if (diffMins < 60) return `${diffMins} 分钟前`;
-  if (diffHours < 24) return `${diffHours} 小时前`;
-  if (diffDays < 7) return `${diffDays} 天前`;
-  return date.toLocaleDateString('zh-CN');
+  if (diffMins < 1) return '刚刚'
+  if (diffMins < 60) return `${diffMins} 分钟前`
+  if (diffHours < 24) return `${diffHours} 小时前`
+  if (diffDays < 7) return `${diffDays} 天前`
+  return date.toLocaleDateString('zh-CN')
 }
 
 // Load bookmarks from chrome.bookmarks API
 async function loadBookmarks() {
-  if (!bookmarksList) return;
+  if (!bookmarksList) return
 
-  bookmarksList.innerHTML = '<div class="bookmarks-loading">加载中...</div>';
-  console.log('[书签] 开始加载...');
+  bookmarksList.innerHTML = '<div class="bookmarks-loading">加载中...</div>'
+  console.log('[书签] 开始加载...')
 
   try {
     // Check if bookmarks API is available
     if (!chrome.bookmarks) {
-      throw new Error('chrome.bookmarks API 不可用，请重新加载扩展');
+      throw new Error('chrome.bookmarks API 不可用，请重新加载扩展')
     }
 
-    const tree = await chrome.bookmarks.getTree();
-    console.log('[书签] 获取到书签树:', tree);
+    const tree = await chrome.bookmarks.getTree()
+    console.log('[书签] 获取到书签树:', tree)
 
     // Store tree root
-    bookmarkTreeRoot = tree[0];
+    bookmarkTreeRoot = tree[0]
 
     // Store original tree for search functionality
-    allBookmarks = [];
-    flattenBookmarkTree(bookmarkTreeRoot, allBookmarks);
-    console.log('[书签] 展平后书签数量:', allBookmarks.length);
+    allBookmarks = []
+    flattenBookmarkTree(bookmarkTreeRoot, allBookmarks)
+    console.log('[书签] 展平后书签数量:', allBookmarks.length)
 
     // Render in tree structure
-    renderBookmarksTreeRoot(bookmarkTreeRoot);
+    renderBookmarksTreeRoot(bookmarkTreeRoot)
   } catch (error) {
-    console.error('[书签] 加载失败:', error);
-    bookmarksList.innerHTML = '<div class="bookmarks-empty"><div class="icon">⚠️</div><div>加载失败: ' + error.message + '</div></div>';
+    console.error('[书签] 加载失败:', error)
+    bookmarksList.innerHTML =
+      '<div class="bookmarks-empty"><div class="icon">⚠️</div><div>加载失败: ' +
+      error.message +
+      '</div></div>'
   }
 }
 
 // Render bookmarks tree root
 function renderBookmarksTreeRoot(rootNode) {
-  if (!bookmarksList) return;
+  if (!bookmarksList) return
 
   if (!rootNode || !rootNode.children || rootNode.children.length === 0) {
-    bookmarksList.innerHTML = '<div class="bookmarks-empty"><div class="icon">📭</div><div>暂无书签</div></div>';
-    if (bookmarksCount) bookmarksCount.textContent = '0 个书签';
-    return;
+    bookmarksList.innerHTML =
+      '<div class="bookmarks-empty"><div class="icon">📭</div><div>暂无书签</div></div>'
+    if (bookmarksCount) bookmarksCount.textContent = '0 个书签'
+    return
   }
 
-  const totalCount = countBookmarkItems(rootNode);
-  if (bookmarksCount) bookmarksCount.textContent = `${totalCount} 个书签`;
+  const totalCount = countBookmarkItems(rootNode)
+  if (bookmarksCount) bookmarksCount.textContent = `${totalCount} 个书签`
 
-  bookmarksList.innerHTML = renderBookmarksTree(rootNode.children, bookmarksList, 0);
+  bookmarksList.innerHTML = renderBookmarksTree(rootNode.children, bookmarksList, 0)
 }
 
 // Render bookmarks in tree structure
 function renderBookmarksTree(nodes, container, level = 0) {
-  if (!nodes || !Array.isArray(nodes)) return '';
+  if (!nodes || !Array.isArray(nodes)) return ''
 
-  let html = '';
-  const isGridMode = bookmarksViewMode === 'grid';
+  let html = ''
+  const isGridMode = bookmarksViewMode === 'grid'
 
   for (const node of nodes) {
     if (node.children) {
       // This is a folder
-      const childCount = countBookmarkItems(node);
-      const hasOnlyBookmarks = node.children.every(c => c.url);
+      const childCount = countBookmarkItems(node)
+      const hasOnlyBookmarks = node.children.every((c) => c.url)
 
       html += `
         <div class="bookmark-folder" data-id="${node.id}" data-level="${level}">
@@ -4684,11 +4841,11 @@ function renderBookmarksTree(nodes, container, level = 0) {
             ${renderBookmarksTree(node.children, container, level + 1)}
           </div>
         </div>
-      `;
+      `
     } else if (node.url) {
       // This is a bookmark
-      const faviconUrl = getFaviconUrl(node.url);
-      const dateAdded = formatDate(node.dateAdded);
+      const faviconUrl = getFaviconUrl(node.url)
+      const dateAdded = formatDate(node.dateAdded)
 
       html += `
         <div class="bookmark-item" data-url="${escapeHtml(node.url)}" data-id="${node.id}" data-level="${level}">
@@ -4706,45 +4863,47 @@ function renderBookmarksTree(nodes, container, level = 0) {
             <button class="bookmark-action-btn delete" data-action="delete" title="删除">🗑️</button>
           </div>
         </div>
-      `;
+      `
     }
   }
 
-  return html;
+  return html
 }
 
 // Count total items in a bookmark tree
 function countBookmarkItems(node) {
-  let count = 0;
+  let count = 0
   if (node.url) {
-    count = 1;
+    count = 1
   }
   if (node.children) {
-    node.children.forEach(child => {
-      count += countBookmarkItems(child);
-    });
+    node.children.forEach((child) => {
+      count += countBookmarkItems(child)
+    })
   }
-  return count;
+  return count
 }
 
 // Render bookmarks list
 function renderBookmarks(bookmarks) {
-  if (!bookmarksList) return;
+  if (!bookmarksList) return
 
   if (bookmarks.length === 0) {
-    bookmarksList.innerHTML = '<div class="bookmarks-empty"><div class="icon">📭</div><div>暂无书签</div></div>';
-    if (bookmarksCount) bookmarksCount.textContent = '0 个书签';
-    return;
+    bookmarksList.innerHTML =
+      '<div class="bookmarks-empty"><div class="icon">📭</div><div>暂无书签</div></div>'
+    if (bookmarksCount) bookmarksCount.textContent = '0 个书签'
+    return
   }
 
-  if (bookmarksCount) bookmarksCount.textContent = `${bookmarks.length} 个书签`;
+  if (bookmarksCount) bookmarksCount.textContent = `${bookmarks.length} 个书签`
 
   // For search results, show flat list
-  bookmarksList.innerHTML = bookmarks.map(bookmark => {
-    const faviconUrl = getFaviconUrl(bookmark.url);
-    const dateAdded = formatDate(bookmark.dateAdded);
+  bookmarksList.innerHTML = bookmarks
+    .map((bookmark) => {
+      const faviconUrl = getFaviconUrl(bookmark.url)
+      const dateAdded = formatDate(bookmark.dateAdded)
 
-    return `
+      return `
       <div class="bookmark-item" data-url="${escapeHtml(bookmark.url)}" data-id="${bookmark.id}">
         <div class="bookmark-favicon">
           ${faviconUrl ? `<img src="${faviconUrl}" onerror="this.parentElement.innerHTML='<div class=\\'fallback\\'>🔗</div>'">` : '<div class="fallback">🔗</div>'}
@@ -4755,8 +4914,9 @@ function renderBookmarks(bookmarks) {
         </div>
         <div class="bookmark-date">${dateAdded}</div>
       </div>
-    `;
-  }).join('');
+    `
+    })
+    .join('')
 }
 
 // Search bookmarks in tree
@@ -4764,460 +4924,470 @@ function searchBookmarksInTree(query) {
   if (!query) {
     // Reload tree view
     if (bookmarkTreeRoot) {
-      renderBookmarksTreeRoot(bookmarkTreeRoot);
+      renderBookmarksTreeRoot(bookmarkTreeRoot)
     } else {
-      chrome.bookmarks.getTree().then(tree => {
-        bookmarkTreeRoot = tree[0];
-        renderBookmarksTreeRoot(bookmarkTreeRoot);
-      });
+      chrome.bookmarks.getTree().then((tree) => {
+        bookmarkTreeRoot = tree[0]
+        renderBookmarksTreeRoot(bookmarkTreeRoot)
+      })
     }
-    return;
+    return
   }
 
   // Filter and show flat results
-  const lowerQuery = query.toLowerCase();
-  const filtered = allBookmarks.filter(bookmark =>
-    bookmark.title.toLowerCase().includes(lowerQuery) ||
-    bookmark.url.toLowerCase().includes(lowerQuery)
-  );
+  const lowerQuery = query.toLowerCase()
+  const filtered = allBookmarks.filter(
+    (bookmark) =>
+      bookmark.title.toLowerCase().includes(lowerQuery) ||
+      bookmark.url.toLowerCase().includes(lowerQuery)
+  )
 
   if (filtered.length === 0) {
-    bookmarksList.innerHTML = '<div class="bookmarks-empty"><div class="icon">🔍</div><div>未找到匹配的书签</div></div>';
-    if (bookmarksCount) bookmarksCount.textContent = `找到 0 个书签`;
+    bookmarksList.innerHTML =
+      '<div class="bookmarks-empty"><div class="icon">🔍</div><div>未找到匹配的书签</div></div>'
+    if (bookmarksCount) bookmarksCount.textContent = `找到 0 个书签`
   } else {
-    renderBookmarks(filtered);
-    if (bookmarksCount) bookmarksCount.textContent = `找到 ${filtered.length} 个书签`;
+    renderBookmarks(filtered)
+    if (bookmarksCount) bookmarksCount.textContent = `找到 ${filtered.length} 个书签`
   }
 }
 
 // Search bookmarks
 function searchBookmarks(query) {
-  searchBookmarksInTree(query);
+  searchBookmarksInTree(query)
 }
 
 // Bookmarks event listeners
 if (bookmarksRefreshBtn) {
-  bookmarksRefreshBtn.addEventListener('click', loadBookmarks);
+  bookmarksRefreshBtn.addEventListener('click', loadBookmarks)
 }
 
-const bookmarksViewModeSelect = document.getElementById('bookmarks-view-mode');
+const bookmarksViewModeSelect = document.getElementById('bookmarks-view-mode')
 if (bookmarksViewModeSelect) {
   bookmarksViewModeSelect.addEventListener('change', (e) => {
-    bookmarksViewMode = e.target.value;
+    bookmarksViewMode = e.target.value
     if (bookmarkTreeRoot) {
-      renderBookmarksTreeRoot(bookmarkTreeRoot);
+      renderBookmarksTreeRoot(bookmarkTreeRoot)
     }
-  });
+  })
 }
 
 if (bookmarksSearchInput) {
-  let searchTimeout;
+  let searchTimeout
   bookmarksSearchInput.addEventListener('input', (e) => {
-    clearTimeout(searchTimeout);
+    clearTimeout(searchTimeout)
     searchTimeout = setTimeout(() => {
-      searchBookmarks(e.target.value);
-    }, 200);
-  });
+      searchBookmarks(e.target.value)
+    }, 200)
+  })
 }
 
 // Bookmark click handler - open in new tab or toggle folder
 bookmarksList?.addEventListener('click', (e) => {
   // Handle action buttons
-  const actionBtn = e.target.closest('.bookmark-action-btn');
+  const actionBtn = e.target.closest('.bookmark-action-btn')
   if (actionBtn) {
-    e.stopPropagation();
-    const action = actionBtn.dataset.action;
-    const item = actionBtn.closest('.bookmark-item') || actionBtn.closest('.bookmark-folder');
-    const bookmarkId = item?.dataset.id;
+    e.stopPropagation()
+    const action = actionBtn.dataset.action
+    const item = actionBtn.closest('.bookmark-item') || actionBtn.closest('.bookmark-folder')
+    const bookmarkId = item?.dataset.id
 
     switch (action) {
       case 'edit':
-        openBookmarkEditDialog(bookmarkId);
-        break;
+        openBookmarkEditDialog(bookmarkId)
+        break
       case 'delete':
-        deleteBookmark(bookmarkId);
-        break;
+        deleteBookmark(bookmarkId)
+        break
       case 'add-bookmark':
-        createNewBookmark(bookmarkId);
-        break;
+        createNewBookmark(bookmarkId)
+        break
       case 'add-folder':
-        createNewFolder(bookmarkId);
-        break;
+        createNewFolder(bookmarkId)
+        break
     }
-    return;
+    return
   }
 
   // Handle folder collapse/expand (exclude drag handle)
-  const folderHeader = e.target.closest('.bookmark-folder-header');
-  if (folderHeader && !e.target.closest('.bookmark-item-actions') && !e.target.closest('.bookmark-drag-handle')) {
-    const folder = folderHeader.closest('.bookmark-folder');
+  const folderHeader = e.target.closest('.bookmark-folder-header')
+  if (
+    folderHeader &&
+    !e.target.closest('.bookmark-item-actions') &&
+    !e.target.closest('.bookmark-drag-handle')
+  ) {
+    const folder = folderHeader.closest('.bookmark-folder')
     if (folder) {
-      folder.classList.toggle('collapsed');
-      const children = folder.querySelector('.bookmark-children');
+      folder.classList.toggle('collapsed')
+      const children = folder.querySelector('.bookmark-children')
       if (children) {
-        children.classList.toggle('hidden');
+        children.classList.toggle('hidden')
       }
     }
-    return;
+    return
   }
 
   // Handle bookmark item click (exclude drag handle)
-  const item = e.target.closest('.bookmark-item');
-  if (item && !e.target.closest('.bookmark-item-actions') && !e.target.closest('.bookmark-drag-handle')) {
-    const url = item.dataset.url;
+  const item = e.target.closest('.bookmark-item')
+  if (
+    item &&
+    !e.target.closest('.bookmark-item-actions') &&
+    !e.target.closest('.bookmark-drag-handle')
+  ) {
+    const url = item.dataset.url
     if (url) {
-      chrome.tabs.create({ url });
+      chrome.tabs.create({ url })
     }
   }
-});
+})
 
 // ========== Bookmark CRUD Operations ==========
-const bookmarkEditOverlay = document.getElementById('bookmark-edit-overlay');
-const bookmarkEditDialogTitle = document.getElementById('bookmark-edit-dialog-title');
-const bookmarkEditTitleInput = document.getElementById('bookmark-edit-title-input');
-const bookmarkEditUrlInput = document.getElementById('bookmark-edit-url-input');
-const bookmarkEditUrlField = document.getElementById('bookmark-edit-url-field');
-const bookmarkEditSaveBtn = document.getElementById('bookmark-edit-save-btn');
-const bookmarkEditCancelBtn = document.getElementById('bookmark-edit-cancel-btn');
-const bookmarkEditDeleteBtn = document.getElementById('bookmark-edit-delete-btn');
-const bookmarkContextMenu = document.getElementById('bookmark-context-menu');
+const bookmarkEditOverlay = document.getElementById('bookmark-edit-overlay')
+const bookmarkEditDialogTitle = document.getElementById('bookmark-edit-dialog-title')
+const bookmarkEditTitleInput = document.getElementById('bookmark-edit-title-input')
+const bookmarkEditUrlInput = document.getElementById('bookmark-edit-url-input')
+const bookmarkEditUrlField = document.getElementById('bookmark-edit-url-field')
+const bookmarkEditSaveBtn = document.getElementById('bookmark-edit-save-btn')
+const bookmarkEditCancelBtn = document.getElementById('bookmark-edit-cancel-btn')
+const bookmarkEditDeleteBtn = document.getElementById('bookmark-edit-delete-btn')
+const bookmarkContextMenu = document.getElementById('bookmark-context-menu')
 
-let currentEditingBookmark = null;
-let currentEditingParentId = null;
+let currentEditingBookmark = null
+let currentEditingParentId = null
 
 // Get reference to new-folder menu item
-const contextNewFolder = document.getElementById('context-new-folder');
+const contextNewFolder = document.getElementById('context-new-folder')
 
 // Right-click context menu for bookmarks
 bookmarksList?.addEventListener('contextmenu', (e) => {
-  e.preventDefault();
+  e.preventDefault()
 
-  const folder = e.target.closest('.bookmark-folder');
-  const item = e.target.closest('.bookmark-item');
-  const target = folder || item;
+  const folder = e.target.closest('.bookmark-folder')
+  const item = e.target.closest('.bookmark-item')
+  const target = folder || item
 
   if (target) {
-    const isFolder = !!folder;
+    const isFolder = !!folder
     currentEditingBookmark = {
       id: target.dataset.id,
-      isFolder: isFolder
-    };
-    currentEditingParentId = null;
+      isFolder: isFolder,
+    }
+    currentEditingParentId = null
 
     // Show/hide "new-folder" option based on target type
     if (contextNewFolder) {
-      contextNewFolder.style.display = isFolder ? 'block' : 'none';
+      contextNewFolder.style.display = isFolder ? 'block' : 'none'
     }
 
     // Show context menu
-    bookmarkContextMenu.style.left = e.pageX + 'px';
-    bookmarkContextMenu.style.top = e.pageY + 'px';
-    bookmarkContextMenu.classList.add('active');
+    bookmarkContextMenu.style.left = e.pageX + 'px'
+    bookmarkContextMenu.style.top = e.pageY + 'px'
+    bookmarkContextMenu.classList.add('active')
   }
-});
+})
 
 // Close context menu when clicking elsewhere
 document.addEventListener('click', () => {
-  bookmarkContextMenu?.classList.remove('active');
-});
+  bookmarkContextMenu?.classList.remove('active')
+})
 
 // Context menu actions
 bookmarkContextMenu?.addEventListener('click', (e) => {
-  const action = e.target.closest('.context-menu-item');
-  if (!action) return;
+  const action = e.target.closest('.context-menu-item')
+  if (!action) return
 
-  const actionType = action.dataset.action;
-  const bookmarkId = currentEditingBookmark?.id;
+  const actionType = action.dataset.action
+  const bookmarkId = currentEditingBookmark?.id
 
   switch (actionType) {
     case 'edit':
-      openBookmarkEditDialog(bookmarkId);
-      break;
+      openBookmarkEditDialog(bookmarkId)
+      break
     case 'new-folder':
-      createNewFolder(bookmarkId);
-      break;
+      createNewFolder(bookmarkId)
+      break
     case 'new-bookmark':
-      createNewBookmark(bookmarkId);
-      break;
+      createNewBookmark(bookmarkId)
+      break
     case 'delete':
-      deleteBookmark(bookmarkId);
-      break;
+      deleteBookmark(bookmarkId)
+      break
   }
 
-  bookmarkContextMenu.classList.remove('active');
-});
+  bookmarkContextMenu.classList.remove('active')
+})
 
 // Open bookmark edit dialog
 async function openBookmarkEditDialog(bookmarkId) {
-  const bookmark = await chrome.bookmarks.get(bookmarkId);
-  if (!bookmark || bookmark.length === 0) return;
+  const bookmark = await chrome.bookmarks.get(bookmarkId)
+  if (!bookmark || bookmark.length === 0) return
 
-  const b = bookmark[0];
-  currentEditingBookmark = b;
-  currentEditingParentId = b.parentId;
+  const b = bookmark[0]
+  currentEditingBookmark = b
+  currentEditingParentId = b.parentId
 
   if (b.url) {
     // It's a bookmark
-    bookmarkEditDialogTitle.textContent = '编辑书签';
-    bookmarkEditUrlField.style.display = 'block';
-    bookmarkEditTitleInput.value = b.title || '';
-    bookmarkEditUrlInput.value = b.url || '';
-    bookmarkEditDeleteBtn.style.display = 'inline-block';
+    bookmarkEditDialogTitle.textContent = '编辑书签'
+    bookmarkEditUrlField.style.display = 'block'
+    bookmarkEditTitleInput.value = b.title || ''
+    bookmarkEditUrlInput.value = b.url || ''
+    bookmarkEditDeleteBtn.style.display = 'inline-block'
   } else {
     // It's a folder
-    bookmarkEditDialogTitle.textContent = '编辑文件夹';
-    bookmarkEditUrlField.style.display = 'none';
-    bookmarkEditTitleInput.value = b.title || '';
-    bookmarkEditDeleteBtn.style.display = 'inline-block';
+    bookmarkEditDialogTitle.textContent = '编辑文件夹'
+    bookmarkEditUrlField.style.display = 'none'
+    bookmarkEditTitleInput.value = b.title || ''
+    bookmarkEditDeleteBtn.style.display = 'inline-block'
   }
 
-  bookmarkEditOverlay.classList.add('active');
+  bookmarkEditOverlay.classList.add('active')
 }
 
 // Create new folder
 async function createNewFolder(parentId = null) {
-  const defaultParent = bookmarkTreeRoot?.children?.find(c => !c.url) || bookmarkTreeRoot;
-  const targetParentId = parentId || currentEditingBookmark?.id || defaultParent?.id || '1';
+  const defaultParent = bookmarkTreeRoot?.children?.find((c) => !c.url) || bookmarkTreeRoot
+  const targetParentId = parentId || currentEditingBookmark?.id || defaultParent?.id || '1'
 
   // Open folder dialog instead of directly creating
-  openFolderDialog(targetParentId);
+  openFolderDialog(targetParentId)
 }
 
 // Create new bookmark
 async function createNewBookmark(parentId = null) {
-  const defaultParent = bookmarkTreeRoot?.children?.find(c => !c.url) || bookmarkTreeRoot;
-  let targetParentId = parentId || currentEditingBookmark?.id || defaultParent?.id || '1';
+  const defaultParent = bookmarkTreeRoot?.children?.find((c) => !c.url) || bookmarkTreeRoot
+  let targetParentId = parentId || currentEditingBookmark?.id || defaultParent?.id || '1'
 
   // If parentId is a bookmark (not a folder), get its parent folder instead
   if (parentId && !currentEditingBookmark?.isFolder) {
     try {
-      const bookmark = await chrome.bookmarks.get(parentId);
+      const bookmark = await chrome.bookmarks.get(parentId)
       if (bookmark && bookmark.length > 0) {
-        targetParentId = bookmark[0].parentId || targetParentId;
+        targetParentId = bookmark[0].parentId || targetParentId
       }
     } catch (e) {
-      console.error('Failed to get bookmark parent:', e);
+      console.error('Failed to get bookmark parent:', e)
     }
   }
 
   // Show edit dialog for new bookmark
-  currentEditingBookmark = null;
-  currentEditingParentId = targetParentId;
+  currentEditingBookmark = null
+  currentEditingParentId = targetParentId
 
-  bookmarkEditDialogTitle.textContent = '新建书签';
-  bookmarkEditUrlField.style.display = 'block';
-  bookmarkEditTitleInput.value = '';
-  bookmarkEditUrlInput.value = '';
-  bookmarkEditDeleteBtn.style.display = 'none';
+  bookmarkEditDialogTitle.textContent = '新建书签'
+  bookmarkEditUrlField.style.display = 'block'
+  bookmarkEditTitleInput.value = ''
+  bookmarkEditUrlInput.value = ''
+  bookmarkEditDeleteBtn.style.display = 'none'
 
-  bookmarkEditOverlay.classList.add('active');
+  bookmarkEditOverlay.classList.add('active')
 }
 
 // Delete bookmark/folder
 async function deleteBookmark(bookmarkId) {
   // Check if it's a folder
-  const bookmark = await chrome.bookmarks.get(bookmarkId);
-  if (!bookmark || bookmark.length === 0) return;
+  const bookmark = await chrome.bookmarks.get(bookmarkId)
+  if (!bookmark || bookmark.length === 0) return
 
-  const isFolder = !bookmark[0].url;
+  const isFolder = !bookmark[0].url
   const confirmMsg = isFolder
     ? '确定要删除此文件夹及其所有内容吗？此操作无法撤销。'
-    : '确定要删除此书签吗？';
+    : '确定要删除此书签吗？'
 
   if (!confirm(confirmMsg)) {
-    return;
+    return
   }
 
   try {
     if (isFolder) {
       // Use removeTree for folders (recursive delete)
-      await chrome.bookmarks.removeTree(bookmarkId);
-      showNotification('文件夹已删除');
+      await chrome.bookmarks.removeTree(bookmarkId)
+      showNotification('文件夹已删除')
     } else {
-      await chrome.bookmarks.remove(bookmarkId);
-      showNotification('书签已删除');
+      await chrome.bookmarks.remove(bookmarkId)
+      showNotification('书签已删除')
     }
-    await loadBookmarks();
+    await loadBookmarks()
   } catch (error) {
-    console.error('[书签] 删除失败:', error);
-    showNotification('删除失败: ' + error.message);
+    console.error('[书签] 删除失败:', error)
+    showNotification('删除失败: ' + error.message)
   }
 }
 
 // Save bookmark changes
 bookmarkEditSaveBtn?.addEventListener('click', async () => {
-  const title = bookmarkEditTitleInput.value.trim();
-  const url = bookmarkEditUrlInput.value.trim();
+  const title = bookmarkEditTitleInput.value.trim()
+  const url = bookmarkEditUrlInput.value.trim()
 
   if (!title) {
-    showNotification('请输入标题');
-    return;
+    showNotification('请输入标题')
+    return
   }
 
   try {
     if (currentEditingBookmark && currentEditingBookmark.id) {
       // Update existing bookmark/folder
-      const updates = { title };
+      const updates = { title }
       if (currentEditingBookmark.url) {
-        updates.url = url;
+        updates.url = url
         if (!url) {
-          showNotification('请输入网址');
-          return;
+          showNotification('请输入网址')
+          return
         }
       }
 
-      await chrome.bookmarks.update(currentEditingBookmark.id, updates);
-      showNotification('已保存');
+      await chrome.bookmarks.update(currentEditingBookmark.id, updates)
+      showNotification('已保存')
     } else {
       // Create new bookmark
       if (!url) {
-        showNotification('请输入网址');
-        return;
+        showNotification('请输入网址')
+        return
       }
       await chrome.bookmarks.create({
         parentId: currentEditingParentId || '1',
         title,
-        url
-      });
-      showNotification('已创建');
+        url,
+      })
+      showNotification('已创建')
     }
 
-    bookmarkEditOverlay.classList.remove('active');
-    await loadBookmarks();
+    bookmarkEditOverlay.classList.remove('active')
+    await loadBookmarks()
   } catch (error) {
-    console.error('[书签] 保存失败:', error);
-    showNotification('保存失败: ' + error.message);
+    console.error('[书签] 保存失败:', error)
+    showNotification('保存失败: ' + error.message)
   }
-});
+})
 
 // Cancel edit
 bookmarkEditCancelBtn?.addEventListener('click', () => {
-  bookmarkEditOverlay.classList.remove('active');
-  currentEditingBookmark = null;
-  currentEditingParentId = null;
-});
+  bookmarkEditOverlay.classList.remove('active')
+  currentEditingBookmark = null
+  currentEditingParentId = null
+})
 
 // Delete button in edit dialog
 bookmarkEditDeleteBtn?.addEventListener('click', async () => {
   if (currentEditingBookmark && currentEditingBookmark.id) {
-    await deleteBookmark(currentEditingBookmark.id);
-    bookmarkEditOverlay.classList.remove('active');
+    await deleteBookmark(currentEditingBookmark.id)
+    bookmarkEditOverlay.classList.remove('active')
   }
-});
+})
 
 // Close overlay when clicking outside
 bookmarkEditOverlay?.addEventListener('click', (e) => {
   if (e.target === bookmarkEditOverlay) {
-    bookmarkEditOverlay.classList.remove('active');
-    currentEditingBookmark = null;
-    currentEditingParentId = null;
+    bookmarkEditOverlay.classList.remove('active')
+    currentEditingBookmark = null
+    currentEditingParentId = null
   }
-});
+})
 
 // ========== Folder Dialog Functionality ==========
-const folderDialogOverlay = document.getElementById('folder-dialog-overlay');
-const folderNameInput = document.getElementById('folder-name-input');
-const folderDialogCancelBtn = document.getElementById('folder-dialog-cancel-btn');
-const folderDialogCreateBtn = document.getElementById('folder-dialog-create-btn');
+const folderDialogOverlay = document.getElementById('folder-dialog-overlay')
+const folderNameInput = document.getElementById('folder-name-input')
+const folderDialogCancelBtn = document.getElementById('folder-dialog-cancel-btn')
+const folderDialogCreateBtn = document.getElementById('folder-dialog-create-btn')
 
-let currentFolderParentId = null;
+let currentFolderParentId = null
 
 // Open folder dialog
 function openFolderDialog(parentId = null) {
-  currentFolderParentId = parentId;
-  folderNameInput.value = '';
-  folderDialogOverlay.classList.add('active');
-  folderNameInput.focus();
+  currentFolderParentId = parentId
+  folderNameInput.value = ''
+  folderDialogOverlay.classList.add('active')
+  folderNameInput.focus()
 }
 
 // Create folder from dialog
 folderDialogCreateBtn?.addEventListener('click', async () => {
-  const folderName = folderNameInput.value.trim();
+  const folderName = folderNameInput.value.trim()
 
   if (!folderName) {
-    showNotification('请输入文件夹名称');
-    folderNameInput.focus();
-    return;
+    showNotification('请输入文件夹名称')
+    folderNameInput.focus()
+    return
   }
 
   try {
-    const defaultParent = bookmarkTreeRoot?.children?.find(c => !c.url) || bookmarkTreeRoot;
-    const targetParentId = currentFolderParentId || defaultParent?.id || '1';
+    const defaultParent = bookmarkTreeRoot?.children?.find((c) => !c.url) || bookmarkTreeRoot
+    const targetParentId = currentFolderParentId || defaultParent?.id || '1'
 
     await chrome.bookmarks.create({
       parentId: targetParentId,
-      title: folderName
-    });
+      title: folderName,
+    })
 
-    showNotification('文件夹已创建');
-    folderDialogOverlay.classList.remove('active');
-    await loadBookmarks();
+    showNotification('文件夹已创建')
+    folderDialogOverlay.classList.remove('active')
+    await loadBookmarks()
   } catch (error) {
-    console.error('[书签] 创建文件夹失败:', error);
-    showNotification('创建失败: ' + error.message);
+    console.error('[书签] 创建文件夹失败:', error)
+    showNotification('创建失败: ' + error.message)
   }
-});
+})
 
 // Cancel folder dialog
 folderDialogCancelBtn?.addEventListener('click', () => {
-  folderDialogOverlay.classList.remove('active');
-  currentFolderParentId = null;
-});
+  folderDialogOverlay.classList.remove('active')
+  currentFolderParentId = null
+})
 
 // Close folder dialog when clicking outside
 folderDialogOverlay?.addEventListener('click', (e) => {
   if (e.target === folderDialogOverlay) {
-    folderDialogOverlay.classList.remove('active');
-    currentFolderParentId = null;
+    folderDialogOverlay.classList.remove('active')
+    currentFolderParentId = null
   }
-});
+})
 
 // Handle Enter key in folder name input
 folderNameInput?.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
-    folderDialogCreateBtn.click();
+    folderDialogCreateBtn.click()
   } else if (e.key === 'Escape') {
-    folderDialogCancelBtn.click();
+    folderDialogCancelBtn.click()
   }
-});
+})
 
 // ========== Drag and Drop Functionality ==========
-let draggedItem = null;
-let draggedItemType = null; // 'bookmark' or 'folder'
-let folderExpandTimer = null;
-let hoveredFolder = null;
+let draggedItem = null
+let draggedItemType = null // 'bookmark' or 'folder'
+let folderExpandTimer = null
+let hoveredFolder = null
 
 // Initialize drag and drop after bookmarks are loaded
 function initDragAndDrop() {
-  bookmarksList.addEventListener('dragstart', handleDragStart);
-  bookmarksList.addEventListener('dragend', handleDragEnd);
-  bookmarksList.addEventListener('dragover', handleDragOver);
-  bookmarksList.addEventListener('dragleave', handleDragLeave);
-  bookmarksList.addEventListener('drop', handleDrop);
+  bookmarksList.addEventListener('dragstart', handleDragStart)
+  bookmarksList.addEventListener('dragend', handleDragEnd)
+  bookmarksList.addEventListener('dragover', handleDragOver)
+  bookmarksList.addEventListener('dragleave', handleDragLeave)
+  bookmarksList.addEventListener('drop', handleDrop)
 
   // Add hover detection for auto-expanding folders
-  bookmarksList.addEventListener('dragenter', handleDragEnter);
+  bookmarksList.addEventListener('dragenter', handleDragEnter)
 }
 
 function handleDragStart(e) {
-  const dragHandle = e.target.closest('.bookmark-drag-handle');
-  if (!dragHandle) return;
+  const dragHandle = e.target.closest('.bookmark-drag-handle')
+  if (!dragHandle) return
 
-  const target = dragHandle.closest('.bookmark-item, .bookmark-folder');
-  if (!target) return;
+  const target = dragHandle.closest('.bookmark-item, .bookmark-folder')
+  if (!target) return
 
-  draggedItem = target;
-  draggedItemType = target.classList.contains('bookmark-folder') ? 'folder' : 'bookmark';
+  draggedItem = target
+  draggedItemType = target.classList.contains('bookmark-folder') ? 'folder' : 'bookmark'
 
-  target.classList.add('dragging');
-  e.dataTransfer.effectAllowed = 'move';
-  e.dataTransfer.setData('text/plain', target.dataset.id);
+  target.classList.add('dragging')
+  e.dataTransfer.effectAllowed = 'move'
+  e.dataTransfer.setData('text/plain', target.dataset.id)
 
   // Store additional info
-  e.dataTransfer.setData('drag-type', draggedItemType);
+  e.dataTransfer.setData('drag-type', draggedItemType)
 
   // Create custom drag image with better styling
-  const dragImage = document.createElement('div');
+  const dragImage = document.createElement('div')
   dragImage.style.cssText = `
     position: fixed;
     top: -9999px;
@@ -5235,78 +5405,83 @@ function handleDragStart(e) {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  `;
+  `
 
-  const icon = draggedItemType === 'folder' ? '📁' : '🔖';
-  const title = target.querySelector('.bookmark-title, .bookmark-folder-name')?.textContent || '未命名';
+  const icon = draggedItemType === 'folder' ? '📁' : '🔖'
+  const title =
+    target.querySelector('.bookmark-title, .bookmark-folder-name')?.textContent || '未命名'
 
-  dragImage.innerHTML = `<span style="margin-right: 8px;">${icon}</span><span>${escapeHtml(title)}</span>`;
-  document.body.appendChild(dragImage);
+  dragImage.innerHTML = `<span style="margin-right: 8px;">${icon}</span><span>${escapeHtml(title)}</span>`
+  document.body.appendChild(dragImage)
 
-  e.dataTransfer.setDragImage(dragImage, 20, 20);
-  setTimeout(() => document.body.removeChild(dragImage), 0);
+  e.dataTransfer.setDragImage(dragImage, 20, 20)
+  setTimeout(() => document.body.removeChild(dragImage), 0)
 }
 
 function handleDragEnd(e) {
   if (draggedItem) {
-    draggedItem.classList.remove('dragging');
-    draggedItem = null;
-    draggedItemType = null;
+    draggedItem.classList.remove('dragging')
+    draggedItem = null
+    draggedItemType = null
   }
 
   // Clear folder expand timer
   if (folderExpandTimer) {
-    clearTimeout(folderExpandTimer);
-    folderExpandTimer = null;
+    clearTimeout(folderExpandTimer)
+    folderExpandTimer = null
   }
-  hoveredFolder = null;
+  hoveredFolder = null
 
   // Remove all drag-related classes
-  bookmarksList.querySelectorAll('.dragging, .drag-over, .drag-over-folder, .drag-over-reorder').forEach(el => {
-    el.classList.remove('dragging', 'drag-over', 'drag-over-folder', 'drag-over-reorder');
-  });
+  bookmarksList
+    .querySelectorAll('.dragging, .drag-over, .drag-over-folder, .drag-over-reorder')
+    .forEach((el) => {
+      el.classList.remove('dragging', 'drag-over', 'drag-over-folder', 'drag-over-reorder')
+    })
 
   // Remove all drop indicators
-  bookmarksList.querySelectorAll('.drop-indicator').forEach(el => {
-    el.remove();
-  });
+  bookmarksList.querySelectorAll('.drop-indicator').forEach((el) => {
+    el.remove()
+  })
 }
 
 function handleDragOver(e) {
-  e.preventDefault();
-  e.dataTransfer.dropEffect = 'move';
+  e.preventDefault()
+  e.dataTransfer.dropEffect = 'move'
 
-  const target = e.target.closest('.bookmark-item, .bookmark-folder');
-  if (!target || target === draggedItem) return;
+  const target = e.target.closest('.bookmark-item, .bookmark-folder')
+  if (!target || target === draggedItem) return
 
   // Check if target is a descendant of dragged item
   if (draggedItem && draggedItem.contains(target)) {
-    return;
+    return
   }
 
   // Remove all previous drag states
-  bookmarksList.querySelectorAll('.drag-over, .drag-over-folder, .drag-over-reorder').forEach(el => {
-    el.classList.remove('drag-over', 'drag-over-folder', 'drag-over-reorder');
-  });
+  bookmarksList
+    .querySelectorAll('.drag-over, .drag-over-folder, .drag-over-reorder')
+    .forEach((el) => {
+      el.classList.remove('drag-over', 'drag-over-folder', 'drag-over-reorder')
+    })
 
   // Remove previous drop indicators
-  bookmarksList.querySelectorAll('.drop-indicator').forEach(el => {
-    el.remove();
-  });
+  bookmarksList.querySelectorAll('.drop-indicator').forEach((el) => {
+    el.remove()
+  })
 
   // Determine drop position with improved detection
-  const rect = target.getBoundingClientRect();
-  const relativeY = (e.clientY - rect.top) / rect.height;
-  const relativeX = (e.clientX - rect.left) / rect.width;
+  const rect = target.getBoundingClientRect()
+  const relativeY = (e.clientY - rect.top) / rect.height
+  const relativeX = (e.clientX - rect.left) / rect.width
 
   // Clear zone detection with more precise thresholds
-  const isTop = relativeY < 0.2;
-  const isBottom = relativeY > 0.8;
-  const isMiddle = !isTop && !isBottom;
-  const isCenterX = relativeX >= 0.25 && relativeX <= 0.75;
+  const isTop = relativeY < 0.2
+  const isBottom = relativeY > 0.8
+  const isMiddle = !isTop && !isBottom
+  const isCenterX = relativeX >= 0.25 && relativeX <= 0.75
 
   // Check for keyboard modifiers
-  const ctrlKey = e.ctrlKey || e.metaKey;
+  const ctrlKey = e.ctrlKey || e.metaKey
 
   if (target.classList.contains('bookmark-folder')) {
     // Target is a folder
@@ -5314,26 +5489,26 @@ function handleDragOver(e) {
       // Collapsed folder
       if (isMiddle && isCenterX && !ctrlKey) {
         // Center area - drop into folder (with auto-expand)
-        target.classList.add('drag-over-folder');
+        target.classList.add('drag-over-folder')
       } else {
         // Edges or ctrl key - reorder
-        target.classList.add('drag-over-reorder');
-        showDropIndicator(target, isTop ? 'before' : 'after');
+        target.classList.add('drag-over-reorder')
+        showDropIndicator(target, isTop ? 'before' : 'after')
       }
     } else {
       // Expanded folder
       if (isMiddle && isCenterX && !ctrlKey) {
         // Center area - drop into folder
-        target.classList.add('drag-over-folder');
+        target.classList.add('drag-over-folder')
       } else {
         // Edges or ctrl key - reorder
-        target.classList.add('drag-over-reorder');
-        showDropIndicator(target, isTop ? 'before' : 'after');
+        target.classList.add('drag-over-reorder')
+        showDropIndicator(target, isTop ? 'before' : 'after')
       }
     }
   } else {
     // Target is a bookmark - always show reorder state
-    target.classList.add('drag-over');
+    target.classList.add('drag-over')
     // No indicator needed for bookmarks, the border is enough
   }
 }
@@ -5341,264 +5516,279 @@ function handleDragOver(e) {
 // Helper function to show drop indicator
 function showDropIndicator(target, position) {
   // Remove existing indicators
-  bookmarksList.querySelectorAll('.drop-indicator').forEach(el => el.remove());
+  bookmarksList.querySelectorAll('.drop-indicator').forEach((el) => el.remove())
 
-  const indicator = document.createElement('div');
-  indicator.className = `drop-indicator drop-indicator-${position}`;
+  const indicator = document.createElement('div')
+  indicator.className = `drop-indicator drop-indicator-${position}`
 
   if (position === 'before') {
-    target.parentNode.insertBefore(indicator, target);
+    target.parentNode.insertBefore(indicator, target)
   } else {
-    target.parentNode.insertBefore(indicator, target.nextSibling);
+    target.parentNode.insertBefore(indicator, target.nextSibling)
   }
 }
 
 function handleDragLeave(e) {
-  const target = e.target.closest('.bookmark-item, .bookmark-folder');
+  const target = e.target.closest('.bookmark-item, .bookmark-folder')
   if (target && !bookmarksList.contains(e.relatedTarget)) {
-    target.classList.remove('drag-over', 'drag-over-folder', 'drag-over-reorder');
+    target.classList.remove('drag-over', 'drag-over-folder', 'drag-over-reorder')
   }
 
   // Clear folder expand timer if leaving
   if (hoveredFolder && folderExpandTimer) {
-    clearTimeout(folderExpandTimer);
-    folderExpandTimer = null;
+    clearTimeout(folderExpandTimer)
+    folderExpandTimer = null
   }
 }
 
 // Handle drag enter for auto-expand folders
 function handleDragEnter(e) {
-  const folder = e.target.closest('.bookmark-folder');
+  const folder = e.target.closest('.bookmark-folder')
 
   // Clear previous timer
   if (folderExpandTimer) {
-    clearTimeout(folderExpandTimer);
-    folderExpandTimer = null;
+    clearTimeout(folderExpandTimer)
+    folderExpandTimer = null
   }
 
   // If hovering over a collapsed folder, set timer to auto-expand
-  if (folder && folder.classList.contains('collapsed') && draggedItem && !folder.contains(draggedItem)) {
-    hoveredFolder = folder;
+  if (
+    folder &&
+    folder.classList.contains('collapsed') &&
+    draggedItem &&
+    !folder.contains(draggedItem)
+  ) {
+    hoveredFolder = folder
     folderExpandTimer = setTimeout(() => {
       // Auto-expand the folder
-      folder.classList.remove('collapsed');
-      const children = folder.querySelector('.bookmark-children');
+      folder.classList.remove('collapsed')
+      const children = folder.querySelector('.bookmark-children')
       if (children) {
-        children.classList.remove('hidden');
+        children.classList.remove('hidden')
       }
 
       // Update the icon
-      const icon = folder.querySelector('.bookmark-folder-icon');
-      if (icon) icon.textContent = '▼';
+      const icon = folder.querySelector('.bookmark-folder-icon')
+      if (icon) icon.textContent = '▼'
 
       // Clear hover state
-      hoveredFolder = null;
-      folderExpandTimer = null;
-    }, 800); // Auto-expand after 800ms of hovering
+      hoveredFolder = null
+      folderExpandTimer = null
+    }, 800) // Auto-expand after 800ms of hovering
   }
 }
 
 async function handleDrop(e) {
-  e.preventDefault();
+  e.preventDefault()
 
-  const target = e.target.closest('.bookmark-item, .bookmark-folder');
-  if (!target || !draggedItem || target === draggedItem) return;
+  const target = e.target.closest('.bookmark-item, .bookmark-folder')
+  if (!target || !draggedItem || target === draggedItem) return
 
   // Check if target is a descendant of dragged item
   if (draggedItem.contains(target)) {
-    showNotification('不能将文件夹移动到其子文件夹中');
-    return;
+    showNotification('不能将文件夹移动到其子文件夹中')
+    return
   }
 
-  const draggedId = draggedItem.dataset.id;
-  const targetId = target.dataset.id;
+  const draggedId = draggedItem.dataset.id
+  const targetId = target.dataset.id
 
   try {
     // Get target's info from tree
-    const targetNode = await findBookmarkNodeInTree(targetId);
+    const targetNode = await findBookmarkNodeInTree(targetId)
     if (!targetNode) {
-      showNotification('找不到目标书签');
-      return;
+      showNotification('找不到目标书签')
+      return
     }
 
     // Improved position detection - must match handleDragOver thresholds
-    const rect = target.getBoundingClientRect();
-    const relativeY = (e.clientY - rect.top) / rect.height;
-    const relativeX = (e.clientX - rect.left) / rect.width;
+    const rect = target.getBoundingClientRect()
+    const relativeY = (e.clientY - rect.top) / rect.height
+    const relativeX = (e.clientX - rect.left) / rect.width
 
     // Clearer zone detection - same as handleDragOver
-    const isTop = relativeY < 0.2;
-    const isBottom = relativeY > 0.8;
-    const isMiddle = !isTop && !isBottom;
-    const isCenterX = relativeX >= 0.25 && relativeX <= 0.75;
+    const isTop = relativeY < 0.2
+    const isBottom = relativeY > 0.8
+    const isMiddle = !isTop && !isBottom
+    const isCenterX = relativeX >= 0.25 && relativeX <= 0.75
 
-    const ctrlKey = e.ctrlKey || e.metaKey;
+    const ctrlKey = e.ctrlKey || e.metaKey
 
     if (target.classList.contains('bookmark-folder')) {
       // Target is a folder
       if (isMiddle && isCenterX && !ctrlKey && !target.classList.contains('collapsed')) {
         // Drop INTO the expanded folder (center, no modifiers)
-        await chrome.bookmarks.move(draggedId, { parentId: targetId });
-        showNotification('已移动到文件夹');
+        await chrome.bookmarks.move(draggedId, { parentId: targetId })
+        showNotification('已移动到文件夹')
       } else if (isMiddle && ctrlKey) {
         // Ctrl + middle = insert at beginning of folder
-        await chrome.bookmarks.move(draggedId, { parentId: targetId, index: 0 });
-        showNotification('已移动到文件夹顶部');
+        await chrome.bookmarks.move(draggedId, { parentId: targetId, index: 0 })
+        showNotification('已移动到文件夹顶部')
       } else {
         // Edges or ctrl key - reorder at parent level
-        const parentContainer = target.closest('.bookmark-children') || bookmarksList;
-        const parentFolder = target.closest('.bookmark-folder');
+        const parentContainer = target.closest('.bookmark-children') || bookmarksList
+        const parentFolder = target.closest('.bookmark-folder')
 
         // Get all siblings at this level
-        const siblings = Array.from(parentContainer.children)
-          .filter(el => el.classList.contains('bookmark-item') || el.classList.contains('bookmark-folder'));
+        const siblings = Array.from(parentContainer.children).filter(
+          (el) => el.classList.contains('bookmark-item') || el.classList.contains('bookmark-folder')
+        )
 
-        let targetIndex = siblings.indexOf(target);
+        let targetIndex = siblings.indexOf(target)
 
         await chrome.bookmarks.move(draggedId, {
           parentId: parentFolder?.dataset.id || targetNode.parentId,
-          index: isTop ? targetIndex : targetIndex + 1
-        });
-        showNotification('已重新排序');
+          index: isTop ? targetIndex : targetIndex + 1,
+        })
+        showNotification('已重新排序')
       }
     } else {
       // Target is a bookmark
-      const parentContainer = target.closest('.bookmark-children') || bookmarksList;
-      const parentFolder = target.closest('.bookmark-folder');
+      const parentContainer = target.closest('.bookmark-children') || bookmarksList
+      const parentFolder = target.closest('.bookmark-folder')
 
-      const siblings = Array.from(parentContainer.children)
-        .filter(el => el.classList.contains('bookmark-item') || el.classList.contains('bookmark-folder'));
+      const siblings = Array.from(parentContainer.children).filter(
+        (el) => el.classList.contains('bookmark-item') || el.classList.contains('bookmark-folder')
+      )
 
-      let targetIndex = siblings.indexOf(target);
+      let targetIndex = siblings.indexOf(target)
 
       await chrome.bookmarks.move(draggedId, {
         parentId: parentFolder?.dataset.id || targetNode.parentId,
-        index: isTop ? targetIndex : targetIndex + 1
-      });
-      showNotification('已重新排序');
+        index: isTop ? targetIndex : targetIndex + 1,
+      })
+      showNotification('已重新排序')
     }
 
-    await loadBookmarks();
+    await loadBookmarks()
   } catch (error) {
-    console.error('[书签] 移动失败:', error);
-    showNotification('移动失败: ' + error.message);
+    console.error('[书签] 移动失败:', error)
+    showNotification('移动失败: ' + error.message)
   }
 
   // Cleanup
-  handleDragEnd(e);
+  handleDragEnd(e)
 }
 
 // Helper function to find bookmark node in tree
 async function findBookmarkNodeInTree(id) {
-  const tree = await chrome.bookmarks.getTree();
+  const tree = await chrome.bookmarks.getTree()
 
   function findNode(node, targetId) {
-    if (node.id === targetId) return node;
+    if (node.id === targetId) return node
     if (node.children) {
       for (const child of node.children) {
-        const found = findNode(child, targetId);
-        if (found) return found;
+        const found = findNode(child, targetId)
+        if (found) return found
       }
     }
-    return null;
+    return null
   }
 
-  return findNode(tree[0], id);
+  return findNode(tree[0], id)
 }
 
 // Initialize drag and drop when bookmarks are loaded
-const originalLoadBookmarks = loadBookmarks;
+const originalLoadBookmarks = loadBookmarks
 loadBookmarks = async function () {
-  await originalLoadBookmarks.call(this);
-  initDragAndDrop();
-};
+  await originalLoadBookmarks.call(this)
+  initDragAndDrop()
+}
 
 // ============================================
 // History Tab Functionality
 // ============================================
-const historyList = document.getElementById('history-list');
-const historySearchInput = document.getElementById('history-search-input');
-const historyTimeRange = document.getElementById('history-time-range');
-const historyCount = document.getElementById('history-count');
-const historyRefreshBtn = document.getElementById('history-refresh-btn');
-const historyClearBtn = document.getElementById('history-clear-btn');
+const historyList = document.getElementById('history-list')
+const historySearchInput = document.getElementById('history-search-input')
+const historyTimeRange = document.getElementById('history-time-range')
+const historyCount = document.getElementById('history-count')
+const historyRefreshBtn = document.getElementById('history-refresh-btn')
+const historyClearBtn = document.getElementById('history-clear-btn')
 
-let allHistory = [];
-let filteredHistory = [];
+let allHistory = []
+let filteredHistory = []
 
 // Get time range in milliseconds since epoch
 function getHistoryTimeRange(rangeType) {
-  const now = Date.now();
+  const now = Date.now()
   const ranges = {
     hour: 60 * 60 * 1000,
     day: 24 * 60 * 60 * 1000,
     week: 7 * 24 * 60 * 60 * 1000,
     month: 30 * 24 * 60 * 60 * 1000,
-    all: 0
-  };
+    all: 0,
+  }
 
-  const duration = ranges[rangeType] || 0;
-  return duration === 0 ? 0 : now - duration;
+  const duration = ranges[rangeType] || 0
+  return duration === 0 ? 0 : now - duration
 }
 
 // Load history from chrome.history API
 async function loadHistory() {
-  if (!historyList) return;
+  if (!historyList) return
 
-  historyList.innerHTML = '<div class="history-loading">加载中...</div>';
-  console.log('[历史] 开始加载...');
+  historyList.innerHTML = '<div class="history-loading">加载中...</div>'
+  console.log('[历史] 开始加载...')
 
   try {
     // Check if history API is available
     if (!chrome.history) {
-      throw new Error('chrome.history API 不可用，请重新加载扩展');
+      throw new Error('chrome.history API 不可用，请重新加载扩展')
     }
 
-    const timeRange = historyTimeRange ? historyTimeRange.value : 'day';
-    const since = getHistoryTimeRange(timeRange);
-    console.log('[历史] 时间范围:', timeRange, 'since:', since);
+    const timeRange = historyTimeRange ? historyTimeRange.value : 'day'
+    const since = getHistoryTimeRange(timeRange)
+    console.log('[历史] 时间范围:', timeRange, 'since:', since)
 
     const results = await chrome.history.search({
       text: '',
       maxResults: 10000,
-      startTime: since
-    });
+      startTime: since,
+    })
 
-    console.log('[历史] 获取到历史记录数量:', results.length);
+    console.log('[历史] 获取到历史记录数量:', results.length)
 
-    allHistory = results;
-    filteredHistory = results;
-    renderHistory(results);
+    allHistory = results
+    filteredHistory = results
+    renderHistory(results)
   } catch (error) {
-    console.error('[历史] 加载失败:', error);
-    historyList.innerHTML = '<div class="history-empty"><div class="icon">⚠️</div><div>加载失败: ' + error.message + '</div></div>';
+    console.error('[历史] 加载失败:', error)
+    historyList.innerHTML =
+      '<div class="history-empty"><div class="icon">⚠️</div><div>加载失败: ' +
+      error.message +
+      '</div></div>'
   }
 }
 
 // Render history list grouped by date
 function renderHistory(historyItems) {
-  if (!historyList) return;
+  if (!historyList) return
 
   if (historyItems.length === 0) {
-    historyList.innerHTML = '<div class="history-empty"><div class="icon">📭</div><div>暂无历史记录</div></div>';
-    if (historyCount) historyCount.textContent = '0 条记录';
-    return;
+    historyList.innerHTML =
+      '<div class="history-empty"><div class="icon">📭</div><div>暂无历史记录</div></div>'
+    if (historyCount) historyCount.textContent = '0 条记录'
+    return
   }
 
-  if (historyCount) historyCount.textContent = `${historyItems.length} 条记录`;
+  if (historyCount) historyCount.textContent = `${historyItems.length} 条记录`
 
   // Group by date
-  const grouped = groupHistoryByDate(historyItems);
+  const grouped = groupHistoryByDate(historyItems)
 
-  let html = '';
+  let html = ''
   for (const [date, items] of Object.entries(grouped)) {
-    html += `<div class="history-date-group">${date}</div>`;
-    html += items.map(item => {
-      const faviconUrl = getFaviconUrl(item.url);
-      const time = new Date(item.lastVisitTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-      const visitCount = item.visitCount > 1 ? ` · ${item.visitCount} 次` : '';
+    html += `<div class="history-date-group">${date}</div>`
+    html += items
+      .map((item) => {
+        const faviconUrl = getFaviconUrl(item.url)
+        const time = new Date(item.lastVisitTime).toLocaleTimeString('zh-CN', {
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+        const visitCount = item.visitCount > 1 ? ` · ${item.visitCount} 次` : ''
 
-      return `
+        return `
         <div class="history-item" data-url="${escapeHtml(item.url)}" data-id="${item.id}">
           <div class="history-favicon">
             ${faviconUrl ? `<img src="${faviconUrl}" onerror="this.parentElement.innerHTML='<div class=\\'fallback\\'>🔗</div>'">` : '<div class="fallback">🔗</div>'}
@@ -5609,199 +5799,207 @@ function renderHistory(historyItems) {
           </div>
           <div class="history-time">${time}${visitCount}</div>
         </div>
-      `;
-    }).join('');
+      `
+      })
+      .join('')
   }
 
-  historyList.innerHTML = html;
+  historyList.innerHTML = html
 }
 
 // Group history items by date
 function groupHistoryByDate(items) {
-  const grouped = {};
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const yesterday = today - 86400000;
-  const thisWeek = today - 6 * 86400000;
+  const grouped = {}
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const yesterday = today - 86400000
+  const thisWeek = today - 6 * 86400000
 
   for (const item of items) {
-    const itemTime = item.lastVisitTime;
-    let dateLabel;
+    const itemTime = item.lastVisitTime
+    let dateLabel
 
     if (itemTime >= today) {
-      dateLabel = '今天';
+      dateLabel = '今天'
     } else if (itemTime >= yesterday) {
-      dateLabel = '昨天';
+      dateLabel = '昨天'
     } else if (itemTime >= thisWeek) {
-      dateLabel = '本周';
+      dateLabel = '本周'
     } else {
-      const itemDate = new Date(itemTime);
-      dateLabel = itemDate.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' });
+      const itemDate = new Date(itemTime)
+      dateLabel = itemDate.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })
     }
 
     if (!grouped[dateLabel]) {
-      grouped[dateLabel] = [];
+      grouped[dateLabel] = []
     }
-    grouped[dateLabel].push(item);
+    grouped[dateLabel].push(item)
   }
 
-  return grouped;
+  return grouped
 }
 
 // Search history
 function searchHistory(query) {
   if (!query) {
-    filteredHistory = allHistory;
-    renderHistory(allHistory);
-    return;
+    filteredHistory = allHistory
+    renderHistory(allHistory)
+    return
   }
 
-  const lowerQuery = query.toLowerCase();
-  filteredHistory = allHistory.filter(item =>
-    item.title.toLowerCase().includes(lowerQuery) ||
-    item.url.toLowerCase().includes(lowerQuery)
-  );
+  const lowerQuery = query.toLowerCase()
+  filteredHistory = allHistory.filter(
+    (item) =>
+      item.title.toLowerCase().includes(lowerQuery) || item.url.toLowerCase().includes(lowerQuery)
+  )
 
-  renderHistory(filteredHistory);
+  renderHistory(filteredHistory)
 }
 
 // Clear all history
 async function clearAllHistory() {
   if (!confirm('确定要清空所有浏览历史吗？\n此操作无法撤销。')) {
-    return;
+    return
   }
 
   try {
-    await chrome.history.deleteAll();
-    allHistory = [];
-    filteredHistory = [];
-    renderHistory([]);
-    showNotification('历史记录已清空');
+    await chrome.history.deleteAll()
+    allHistory = []
+    filteredHistory = []
+    renderHistory([])
+    showNotification('历史记录已清空')
   } catch (error) {
-    console.error('[历史] 清空失败:', error);
-    showNotification('清空失败: ' + error.message);
+    console.error('[历史] 清空失败:', error)
+    showNotification('清空失败: ' + error.message)
   }
 }
 
 // History event listeners
 if (historyRefreshBtn) {
-  historyRefreshBtn.addEventListener('click', loadHistory);
+  historyRefreshBtn.addEventListener('click', loadHistory)
 }
 
 if (historyClearBtn) {
-  historyClearBtn.addEventListener('click', clearAllHistory);
+  historyClearBtn.addEventListener('click', clearAllHistory)
 }
 
 if (historyTimeRange) {
-  historyTimeRange.addEventListener('change', loadHistory);
+  historyTimeRange.addEventListener('change', loadHistory)
 }
 
 if (historySearchInput) {
-  let searchTimeout;
+  let searchTimeout
   historySearchInput.addEventListener('input', (e) => {
-    clearTimeout(searchTimeout);
+    clearTimeout(searchTimeout)
     searchTimeout = setTimeout(() => {
-      searchHistory(e.target.value);
-    }, 200);
-  });
+      searchHistory(e.target.value)
+    }, 200)
+  })
 }
 
 // History click handler - open in new tab
 historyList?.addEventListener('click', (e) => {
-  const item = e.target.closest('.history-item');
+  const item = e.target.closest('.history-item')
   if (item) {
-    const url = item.dataset.url;
+    const url = item.dataset.url
     if (url) {
-      chrome.tabs.create({ url });
+      chrome.tabs.create({ url })
     }
   }
-});
+})
 
 // ========== EventBus 消息监控 ==========
-let eventbusMessages = [];
-let eventbusMonitorEnabled = true;
-let eventbusMonitorPaused = false;
-let eventbusStats = { sent: 0, received: 0, failed: 0, latencies: [] };
+let eventbusMessages = []
+let eventbusMonitorEnabled = true
+let eventbusMonitorPaused = false
+let eventbusStats = { sent: 0, received: 0, failed: 0, latencies: [] }
 
-const eventbusMessageList = document.getElementById('eventbus-message-list');
-const eventbusFilter = document.getElementById('eventbus-filter');
-const eventbusDirectionFilter = document.getElementById('eventbus-direction-filter');
-const eventbusClearBtn = document.getElementById('eventbus-clear-btn');
-const eventbusPauseBtn = document.getElementById('eventbus-pause-btn');
-const eventbusMonitorCheckbox = document.getElementById('eventbus-monitor-enabled');
+const eventbusMessageList = document.getElementById('eventbus-message-list')
+const eventbusFilter = document.getElementById('eventbus-filter')
+const eventbusDirectionFilter = document.getElementById('eventbus-direction-filter')
+const eventbusClearBtn = document.getElementById('eventbus-clear-btn')
+const eventbusPauseBtn = document.getElementById('eventbus-pause-btn')
+const eventbusMonitorCheckbox = document.getElementById('eventbus-monitor-enabled')
 
 // 初始化EventBus监控
 function initEventBusMonitor() {
   if (typeof EventBus === 'undefined') {
-    console.warn('[EventBus Monitor] EventBus未加载');
-    return;
+    console.warn('[EventBus Monitor] EventBus未加载')
+    return
   }
 
   // 启用DevTools监控
-  EventBus.enableDevToolsMonitor();
+  EventBus.enableDevToolsMonitor()
 
   // 订阅EventBus内部消息
   chrome.runtime.onMessage.addListener((message) => {
-    if (message.type === 'EVENTBUS_DEVTOOLS_LOG' && eventbusMonitorEnabled && !eventbusMonitorPaused) {
-      handleEventBusMessages(message.events || []);
+    if (
+      message.type === 'EVENTBUS_DEVTOOLS_LOG' &&
+      eventbusMonitorEnabled &&
+      !eventbusMonitorPaused
+    ) {
+      handleEventBusMessages(message.events || [])
     }
-  });
+  })
 
-  console.log('[EventBus Monitor] 已初始化');
+  console.log('[EventBus Monitor] 已初始化')
 }
 
 // 处理EventBus消息
 function handleEventBusMessages(events) {
   for (const event of events) {
-    eventbusMessages.unshift(event);
+    eventbusMessages.unshift(event)
 
     // 更新统计
     if (event.direction === 'send') {
-      eventbusStats.sent++;
+      eventbusStats.sent++
     } else if (event.direction === 'receive') {
-      eventbusStats.received++;
+      eventbusStats.received++
     }
 
     // 限制消息数量
     if (eventbusMessages.length > 200) {
-      eventbusMessages.pop();
+      eventbusMessages.pop()
     }
   }
 
-  renderEventBusMessages();
-  updateEventBusStats();
+  renderEventBusMessages()
+  updateEventBusStats()
 }
 
 // 渲染EventBus消息列表
 function renderEventBusMessages() {
-  if (!eventbusMessageList) return;
+  if (!eventbusMessageList) return
 
-  const filterText = eventbusFilter?.value?.toLowerCase() || '';
-  const directionFilter = eventbusDirectionFilter?.value || 'all';
+  const filterText = eventbusFilter?.value?.toLowerCase() || ''
+  const directionFilter = eventbusDirectionFilter?.value || 'all'
 
-  let filtered = eventbusMessages;
+  let filtered = eventbusMessages
 
   // 类型过滤
   if (filterText) {
-    filtered = filtered.filter(m => m.type?.toLowerCase().includes(filterText));
+    filtered = filtered.filter((m) => m.type?.toLowerCase().includes(filterText))
   }
 
   // 方向过滤
   if (directionFilter !== 'all') {
-    filtered = filtered.filter(m => m.direction === directionFilter);
+    filtered = filtered.filter((m) => m.direction === directionFilter)
   }
 
   if (filtered.length === 0) {
-    eventbusMessageList.innerHTML = '<div style="color: #999; text-align: center; padding: 40px;">暂无消息</div>';
-    return;
+    eventbusMessageList.innerHTML =
+      '<div style="color: #999; text-align: center; padding: 40px;">暂无消息</div>'
+    return
   }
 
-  eventbusMessageList.innerHTML = filtered.slice(0, 100).map((msg, i) => {
-    const bgColor = msg.direction === 'send' ? '#e3f2fd' : '#e8f5e9';
-    const borderColor = msg.direction === 'send' ? '#2196f3' : '#4caf50';
-    const time = new Date(msg.timestamp).toLocaleTimeString('zh-CN');
+  eventbusMessageList.innerHTML = filtered
+    .slice(0, 100)
+    .map((msg, i) => {
+      const bgColor = msg.direction === 'send' ? '#e3f2fd' : '#e8f5e9'
+      const borderColor = msg.direction === 'send' ? '#2196f3' : '#4caf50'
+      const time = new Date(msg.timestamp).toLocaleTimeString('zh-CN')
 
-    return `
+      return `
       <div class="eventbus-msg" style="padding: 8px; margin-bottom: 4px; background: ${bgColor}; border-left: 3px solid ${borderColor}; border-radius: 4px; cursor: pointer;"
            data-index="${i}">
         <div style="display: flex; justify-content: space-between; font-size: 11px;">
@@ -5812,85 +6010,88 @@ function renderEventBusMessages() {
           方向: ${msg.direction === 'send' ? '发送' : '接收'} | 来自: ${msg.fromEnv || 'unknown'}
         </div>
       </div>
-    `;
-  }).join('');
+    `
+    })
+    .join('')
 
   // 点击查看详情
-  eventbusMessageList.querySelectorAll('.eventbus-msg').forEach(el => {
+  eventbusMessageList.querySelectorAll('.eventbus-msg').forEach((el) => {
     el.addEventListener('click', () => {
-      const index = parseInt(el.dataset.index);
-      const msg = filtered[index];
+      const index = parseInt(el.dataset.index)
+      const msg = filtered[index]
       if (msg) {
-        console.log('[EventBus Message]', msg);
+        console.log('[EventBus Message]', msg)
         // 显示详情弹窗
-        alert(`消息详情:\n${JSON.stringify(msg, null, 2)}`);
+        alert(`消息详情:\n${JSON.stringify(msg, null, 2)}`)
       }
-    });
-  });
+    })
+  })
 }
 
 // 更新EventBus统计
 function updateEventBusStats() {
-  const sentEl = document.getElementById('eventbus-sent');
-  const receivedEl = document.getElementById('eventbus-received');
-  const failedEl = document.getElementById('eventbus-failed');
-  const latencyEl = document.getElementById('eventbus-latency');
+  const sentEl = document.getElementById('eventbus-sent')
+  const receivedEl = document.getElementById('eventbus-received')
+  const failedEl = document.getElementById('eventbus-failed')
+  const latencyEl = document.getElementById('eventbus-latency')
 
-  if (sentEl) sentEl.textContent = eventbusStats.sent;
-  if (receivedEl) receivedEl.textContent = eventbusStats.received;
-  if (failedEl) failedEl.textContent = eventbusStats.failed;
+  if (sentEl) sentEl.textContent = eventbusStats.sent
+  if (receivedEl) receivedEl.textContent = eventbusStats.received
+  if (failedEl) failedEl.textContent = eventbusStats.failed
 
   // 计算平均延迟
   if (eventbusStats.latencies.length > 0) {
-    const avg = Math.round(eventbusStats.latencies.reduce((a, b) => a + b, 0) / eventbusStats.latencies.length);
-    if (latencyEl) latencyEl.textContent = avg + 'ms';
+    const avg = Math.round(
+      eventbusStats.latencies.reduce((a, b) => a + b, 0) / eventbusStats.latencies.length
+    )
+    if (latencyEl) latencyEl.textContent = avg + 'ms'
   }
 }
 
 // 清空消息
 if (eventbusClearBtn) {
   eventbusClearBtn.addEventListener('click', () => {
-    eventbusMessages = [];
-    eventbusStats = { sent: 0, received: 0, failed: 0, latencies: [] };
-    renderEventBusMessages();
-    updateEventBusStats();
-  });
+    eventbusMessages = []
+    eventbusStats = { sent: 0, received: 0, failed: 0, latencies: [] }
+    renderEventBusMessages()
+    updateEventBusStats()
+  })
 }
 
 // 暂停/恢复
 if (eventbusPauseBtn) {
   eventbusPauseBtn.addEventListener('click', () => {
-    eventbusMonitorPaused = !eventbusMonitorPaused;
-    eventbusPauseBtn.textContent = eventbusMonitorPaused ? '▶️ 恢复' : '⏸️ 暂停';
-  });
+    eventbusMonitorPaused = !eventbusMonitorPaused
+    eventbusPauseBtn.textContent = eventbusMonitorPaused ? '▶️ 恢复' : '⏸️ 暂停'
+  })
 }
 
 // 启用/禁用监控
 if (eventbusMonitorCheckbox) {
   eventbusMonitorCheckbox.addEventListener('change', (e) => {
-    eventbusMonitorEnabled = e.target.checked;
+    eventbusMonitorEnabled = e.target.checked
     if (eventbusMonitorEnabled) {
-      EventBus?.enableDevToolsMonitor();
+      EventBus?.enableDevToolsMonitor()
     } else {
-      EventBus?.disableDevToolsMonitor();
+      EventBus?.disableDevToolsMonitor()
     }
-  });
+  })
 }
 
 // 过滤器事件
 if (eventbusFilter) {
-  eventbusFilter.addEventListener('input', renderEventBusMessages);
+  eventbusFilter.addEventListener('input', renderEventBusMessages)
 }
 if (eventbusDirectionFilter) {
-  eventbusDirectionFilter.addEventListener('change', renderEventBusMessages);
+  eventbusDirectionFilter.addEventListener('change', renderEventBusMessages)
 }
 
 // 初始化
-setTimeout(initEventBusMonitor, 500);
+setTimeout(initEventBusMonitor, 500)
 
 // 辅助函数
 function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
+  const div = document.createElement('div')
+  div.textContent = text
+  return div.innerHTML
 }

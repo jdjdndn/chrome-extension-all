@@ -17,24 +17,24 @@
 
 ```javascript
 // 在 detectDeviceTier 附近添加缓存变量
-let _cachedDeviceTier = null;
+let _cachedDeviceTier = null
 
 function detectDeviceTier() {
-  if (_cachedDeviceTier) return _cachedDeviceTier;
-  
-  let tier = 'medium';
+  if (_cachedDeviceTier) return _cachedDeviceTier
+
+  let tier = 'medium'
   if (navigator.deviceMemory) {
-    if (navigator.deviceMemory >= 8) tier = 'high';
-    else if (navigator.deviceMemory >= 4) tier = 'medium';
-    else tier = 'low';
+    if (navigator.deviceMemory >= 8) tier = 'high'
+    else if (navigator.deviceMemory >= 4) tier = 'medium'
+    else tier = 'low'
   } else if (navigator.hardwareConcurrency) {
-    if (navigator.hardwareConcurrency >= 8) tier = 'high';
-    else if (navigator.hardwareConcurrency >= 4) tier = 'medium';
-    else tier = 'low';
+    if (navigator.hardwareConcurrency >= 8) tier = 'high'
+    else if (navigator.hardwareConcurrency >= 4) tier = 'medium'
+    else tier = 'low'
   }
-  
-  _cachedDeviceTier = tier;
-  return tier;
+
+  _cachedDeviceTier = tier
+  return tier
 }
 ```
 
@@ -48,14 +48,14 @@ function detectDeviceTier() {
 
 ```javascript
 // 替换 _getAvailableWorker
-let _workerLoadIndex = 0;
+let _workerLoadIndex = 0
 
 function _getAvailableWorker() {
-  if (_compressorWorkers.length === 0) return null;
+  if (_compressorWorkers.length === 0) return null
   // 轮询分配
-  const worker = _compressorWorkers[_workerLoadIndex % _compressorWorkers.length];
-  _workerLoadIndex++;
-  return worker;
+  const worker = _compressorWorkers[_workerLoadIndex % _compressorWorkers.length]
+  _workerLoadIndex++
+  return worker
 }
 ```
 
@@ -68,13 +68,14 @@ function _getAvailableWorker() {
 ### 实现
 
 1. 在state.stats中添加：
+
 ```javascript
 workerCompressSuccess: 0,
 workerCompressFallback: 0,
 workerCompressTotalMs: 0,
 ```
 
-2. 在_compressViaWorker中记录耗时
+2. 在\_compressViaWorker中记录耗时
 3. 在compressImage中更新统计
 
 ---
@@ -97,10 +98,10 @@ workerCompressTotalMs: 0,
 
 ```javascript
 function _getOptimalWorkerCount() {
-  const tier = detectDeviceTier();
-  if (tier === 'high') return 4;
-  if (tier === 'medium') return 2;
-  return 1;
+  const tier = detectDeviceTier()
+  if (tier === 'high') return 4
+  if (tier === 'medium') return 2
+  return 1
 }
 ```
 

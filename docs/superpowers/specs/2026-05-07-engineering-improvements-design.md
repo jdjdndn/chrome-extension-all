@@ -138,6 +138,7 @@ git commit --no-verify
 文件：`scripts/hot-reload-server.js`
 
 职责：
+
 - 启动HTTP服务器（端口8765，支持动态分配）
 - 提供`POST /reload`端点接收构建完成通知
 - 提供`GET /check-build`端点供Service Worker轮询
@@ -161,6 +162,7 @@ GET /check-build?last=<timestamp>
 文件：`hot-reload-background.js`（根目录，通过Vite复制到dist）
 
 职责：
+
 - 开发模式下加载
 - 使用`chrome.alarms.create`每2秒唤醒
 - HTTP请求`/check-build`检查是否有新构建
@@ -171,7 +173,7 @@ GET /check-build?last=<timestamp>
 ```javascript
 // 仅在开发模式下启用
 if (typeof chrome !== 'undefined' && chrome.alarms) {
-  chrome.alarms.create('hot-reload-check', { periodInMinutes: 2/60 }) // 每2秒
+  chrome.alarms.create('hot-reload-check', { periodInMinutes: 2 / 60 }) // 每2秒
 
   chrome.alarms.onAlarm.addListener(async (alarm) => {
     if (alarm.name === 'hot-reload-check') {
@@ -188,12 +190,14 @@ if (typeof chrome !== 'undefined' && chrome.alarms) {
 文件：`content/hot-reload-client.js`
 
 职责：
+
 - 开发模式下注入content script
 - WebSocket连接热重载服务器
 - 收到重载消息 → `location.reload()`
 - 断线自动重连（指数退避）
 
 注入方式：
+
 - 开发模式下通过manifest.content_scripts注入
 - 生产构建时通过Vite插件移除该条目
 
@@ -213,20 +217,21 @@ export default defineConfig(({ mode }) => ({
           // 通知热重载服务器构建完成
           fetch('http://localhost:8765/reload', { method: 'POST' }).catch(() => {})
         }
-      }
+      },
     },
     {
       name: 'dev-manifest-transform',
       // 开发模式：在manifest中添加hot-reload相关脚本
       // 生产模式：移除hot-reload相关脚本
-    }
-  ]
+    },
+  ],
 }))
 ```
 
 ### 3.5 Manifest处理
 
 开发模式需要：
+
 1. Service Worker中引入`hot-reload-background.js`
 2. content_scripts中添加`hot-reload-client.js`
 
@@ -255,13 +260,13 @@ export default defineConfig(({ mode }) => ({
 
 ### 4.1 命令设计
 
-| 命令 | 功能 |
-|------|------|
-| `npm run dev` | 启动开发模式：热重载服务器 + Vite watch |
-| `npm run build` | 生产构建（无热重载） |
-| `npm run format` | 格式化全部代码 |
-| `npm run typecheck` | TypeScript类型检查 |
-| `npm run lint` | ESLint检查 |
+| 命令                | 功能                                    |
+| ------------------- | --------------------------------------- |
+| `npm run dev`       | 启动开发模式：热重载服务器 + Vite watch |
+| `npm run build`     | 生产构建（无热重载）                    |
+| `npm run format`    | 格式化全部代码                          |
+| `npm run typecheck` | TypeScript类型检查                      |
+| `npm run lint`      | ESLint检查                              |
 
 ### 4.2 dev命令实现
 
@@ -283,41 +288,41 @@ export default defineConfig(({ mode }) => ({
 
 ### 5.1 新增文件
 
-| 文件 | 说明 |
-|------|------|
-| `.prettierrc` | Prettier配置 |
-| `.prettierignore` | Prettier忽略文件 |
-| `scripts/hot-reload-server.js` | 热重载HTTP/WebSocket服务器 |
-| `scripts/dev.js` | 开发模式启动脚本 |
-| `hot-reload-background.js` | Service Worker热重载脚本（根目录） |
-| `content/hot-reload-client.js` | 页面热重载客户端 |
+| 文件                           | 说明                               |
+| ------------------------------ | ---------------------------------- |
+| `.prettierrc`                  | Prettier配置                       |
+| `.prettierignore`              | Prettier忽略文件                   |
+| `scripts/hot-reload-server.js` | 热重载HTTP/WebSocket服务器         |
+| `scripts/dev.js`               | 开发模式启动脚本                   |
+| `hot-reload-background.js`     | Service Worker热重载脚本（根目录） |
+| `content/hot-reload-client.js` | 页面热重载客户端                   |
 
 ### 5.2 修改文件
 
-| 文件 | 修改内容 |
-|------|----------|
-| `package.json` | 新增依赖、scripts、lint-staged配置 |
-| `vite.config.js` | 添加热重载通知插件、manifest转换 |
-| `manifest.json` | 通过Vite插件动态处理 |
+| 文件             | 修改内容                           |
+| ---------------- | ---------------------------------- |
+| `package.json`   | 新增依赖、scripts、lint-staged配置 |
+| `vite.config.js` | 添加热重载通知插件、manifest转换   |
+| `manifest.json`  | 通过Vite插件动态处理               |
 
 ## 六、依赖清单
 
-| 依赖 | 用途 | 类型 |
-|------|------|------|
-| `eslint` | 代码检查 | devDependencies |
-| `prettier` | 代码格式化 | devDependencies |
+| 依赖               | 用途          | 类型            |
+| ------------------ | ------------- | --------------- |
+| `eslint`           | 代码检查      | devDependencies |
+| `prettier`         | 代码格式化    | devDependencies |
 | `simple-git-hooks` | Git hooks管理 | devDependencies |
-| `lint-staged` | 暂存文件检查 | devDependencies |
-| `ws` | WebSocket服务 | devDependencies |
+| `lint-staged`      | 暂存文件检查  | devDependencies |
+| `ws`               | WebSocket服务 | devDependencies |
 
 ## 七、风险与缓解
 
-| 风险 | 缓解措施 |
-|------|----------|
-| 端口8765被占用 | 支持环境变量配置端口，或自动选择可用端口 |
-| Service Worker轮询延迟 | 最小2秒间隔，Chrome保证alarms可靠性 |
-| Content Script WebSocket断线 | 实现指数退避重连机制 |
-| 热重载脚本误入生产构建 | Vite插件强制移除，构建后校验manifest |
+| 风险                         | 缓解措施                                 |
+| ---------------------------- | ---------------------------------------- |
+| 端口8765被占用               | 支持环境变量配置端口，或自动选择可用端口 |
+| Service Worker轮询延迟       | 最小2秒间隔，Chrome保证alarms可靠性      |
+| Content Script WebSocket断线 | 实现指数退避重连机制                     |
+| 热重载脚本误入生产构建       | Vite插件强制移除，构建后校验manifest     |
 
 ## 八、实现顺序
 

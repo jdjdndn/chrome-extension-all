@@ -6,21 +6,21 @@
 
 ## 当前状态 (v5)
 
-| 模块 | 状态 | 说明 |
-|------|------|------|
-| JS库替换 | ✅ | 30+ 库，API 拦截 + CDN 降级链 + jsDelivr 动态查询 |
-| CSS框架替换 | ✅ | 14+ CSS 库，独立开关 |
-| 字体替换 | ✅ | Google Fonts / FontAwesome 镜像 |
-| 图片懒加载 | ✅ | 原生 `loading="lazy"` + `fetchPriority="low"` |
-| 图片压缩 | ✅ | Canvas 重绘 WebP/JPEG，2048px 缩放，队列控制 |
-| CDN健康探测 | ✅ | HEAD 探测，5 分钟缓存，RTT 记录，降级链集成 |
-| CDN Preconnect | ✅ | 优先 preconnect，其余 dns-prefetch |
-| API 拦截 | ✅ | 拦截 createElement / appendChild / insertBefore |
-| MutationObserver 兜底 | ✅ | 50ms 批量，每次 100 节点 |
-| 统计持久化 | ✅ | 防抖 + 增量写入 chrome.storage.local |
-| 替换详情记录 | ✅ | 最近 50 条，含类型/库名/CDN/时间 |
-| 资源去重 | ✅ | 页面内 Set 去重 |
-| 压缩结果缓存 | ✅ | 页面内 Map 缓存压缩决策 |
+| 模块                  | 状态 | 说明                                              |
+| --------------------- | ---- | ------------------------------------------------- |
+| JS库替换              | ✅   | 30+ 库，API 拦截 + CDN 降级链 + jsDelivr 动态查询 |
+| CSS框架替换           | ✅   | 14+ CSS 库，独立开关                              |
+| 字体替换              | ✅   | Google Fonts / FontAwesome 镜像                   |
+| 图片懒加载            | ✅   | 原生 `loading="lazy"` + `fetchPriority="low"`     |
+| 图片压缩              | ✅   | Canvas 重绘 WebP/JPEG，2048px 缩放，队列控制      |
+| CDN健康探测           | ✅   | HEAD 探测，5 分钟缓存，RTT 记录，降级链集成       |
+| CDN Preconnect        | ✅   | 优先 preconnect，其余 dns-prefetch                |
+| API 拦截              | ✅   | 拦截 createElement / appendChild / insertBefore   |
+| MutationObserver 兜底 | ✅   | 50ms 批量，每次 100 节点                          |
+| 统计持久化            | ✅   | 防抖 + 增量写入 chrome.storage.local              |
+| 替换详情记录          | ✅   | 最近 50 条，含类型/库名/CDN/时间                  |
+| 资源去重              | ✅   | 页面内 Set 去重                                   |
+| 压缩结果缓存          | ✅   | 页面内 Map 缓存压缩决策                           |
 
 ### v5 遗留问题
 
@@ -38,6 +38,7 @@
 **目标**：扩展第三方资源优化能力 + 提升用户可控性 + 增加性能可观测性
 
 **原则**：
+
 - 高 ROI 优先：第三方脚本延迟 > 站点配置 > 性能度量
 - 不改变现有核心拦截架构，增量扩展
 - 每个迭代独立可交付、可验证
@@ -52,6 +53,7 @@
 ### 问题分析
 
 当前加速器只能替换 CDN 可用的库。但页面中常见的拖慢项是：
+
 - Google Analytics / 百度统计
 - 广告脚本（AdSense、联盟广告）
 - 社交分享按钮（微信 SDK、微博 SDK）
@@ -64,12 +66,12 @@
 
 **策略分级**：
 
-| 策略 | 行为 | 适用场景 |
-|------|------|---------|
-| `idle` | 页面空闲时注入（requestIdleCallback） | 非关键 analytics |
-| `defer` | 页面 load 后 3 秒注入 | 社交 SDK、客服 |
-| `block` | 完全不注入 | 用户主动屏蔽 |
-| `pass` | 不处理（原始行为） | 默认 |
+| 策略    | 行为                                  | 适用场景         |
+| ------- | ------------------------------------- | ---------------- |
+| `idle`  | 页面空闲时注入（requestIdleCallback） | 非关键 analytics |
+| `defer` | 页面 load 后 3 秒注入                 | 社交 SDK、客服   |
+| `block` | 完全不注入                            | 用户主动屏蔽     |
+| `pass`  | 不处理（原始行为）                    | 默认             |
 
 **匹配规则**（用户可配置）：
 
@@ -102,56 +104,56 @@ async function processScript(script) {
 
   // CDN 无法替换 → 尝试第三方延迟
   if (!match && state.config.thirdPartyDeferral?.enabled) {
-    const deferralRule = matchDeferralRule(url);
+    const deferralRule = matchDeferralRule(url)
     if (deferralRule) {
-      deferScript(script, deferralRule.strategy);
-      return;
+      deferScript(script, deferralRule.strategy)
+      return
     }
   }
 }
 
 function deferScript(script, strategy) {
-  const src = script.src;
-  script.removeAttribute('src');
-  script.dataset._deferredSrc = src;
-  script.dataset._deferralStrategy = strategy;
-  script.dataset._raDeferralTime = Date.now();
+  const src = script.src
+  script.removeAttribute('src')
+  script.dataset._deferredSrc = src
+  script.dataset._deferralStrategy = strategy
+  script.dataset._raDeferralTime = Date.now()
 
   const loadFn = () => {
-    script.src = script.dataset._deferredSrc;
-    script.dataset._raLoaded = 'true';
-  };
+    script.src = script.dataset._deferredSrc
+    script.dataset._raLoaded = 'true'
+  }
 
   switch (strategy) {
     case 'idle':
       if ('requestIdleCallback' in window) {
-        requestIdleCallback(loadFn, { timeout: state.config.thirdPartyDeferral.maxDeferralMs });
+        requestIdleCallback(loadFn, { timeout: state.config.thirdPartyDeferral.maxDeferralMs })
       } else {
-        setTimeout(loadFn, 100);
+        setTimeout(loadFn, 100)
       }
-      break;
+      break
     case 'defer':
       if (document.readyState === 'complete') {
-        setTimeout(loadFn, 3000);
+        setTimeout(loadFn, 3000)
       } else {
-        window.addEventListener('load', () => setTimeout(loadFn, 3000), { once: true });
+        window.addEventListener('load', () => setTimeout(loadFn, 3000), { once: true })
       }
-      break;
+      break
     case 'block':
       // 不加载，记录到统计
-      state.stats.thirdPartyBlocked = (state.stats.thirdPartyBlocked || 0) + 1;
-      break;
+      state.stats.thirdPartyBlocked = (state.stats.thirdPartyBlocked || 0) + 1
+      break
   }
 }
 ```
 
 ### 文件变更
 
-| 文件 | 变更 |
-|------|------|
+| 文件                                      | 变更                                                                |
+| ----------------------------------------- | ------------------------------------------------------------------- |
 | `content/modules/resource-accelerator.js` | 新增 `deferScript()`、`matchDeferralRule()`，扩展 `processScript()` |
-| `popup.html` | 新增第三方脚本延迟配置区域 |
-| `popup.js` | 新增延迟策略 UI 交互 |
+| `popup.html`                              | 新增第三方脚本延迟配置区域                                          |
+| `popup.js`                                | 新增延迟策略 UI 交互                                                |
 
 ### 配置项
 
@@ -178,11 +180,11 @@ function deferScript(script, strategy) {
 
 ### 风险
 
-| 风险 | 影响 | 缓解 |
-|------|------|------|
+| 风险                     | 影响                   | 缓解                              |
+| ------------------------ | ---------------------- | --------------------------------- |
 | 延迟加载导致页面功能异常 | 部分脚本有执行顺序依赖 | 提供策略选择 + maxDeferralMs 兜底 |
-| CSP 限制第三方脚本 | 延迟注入失败 | CSP 检测到时自动跳过 |
-| 用户误开启 | 体验下降 | 默认关闭，需用户手动开启 |
+| CSP 限制第三方脚本       | 延迟注入失败           | CSP 检测到时自动跳过              |
+| 用户误开启               | 体验下降               | 默认关闭，需用户手动开启          |
 
 ---
 
@@ -193,6 +195,7 @@ function deferScript(script, strategy) {
 ### 问题分析
 
 当前加速器是全局生效的，但某些站点可能：
+
 - 自身已有 CDN 加速，不需要替换
 - 有特殊 CSP 限制，替换会导致功能异常
 - 图片压缩不适用（如图片编辑网站）
@@ -225,35 +228,35 @@ function deferScript(script, strategy) {
 
 ```javascript
 function getSiteConfig(hostname) {
-  const rules = state.config.siteConfig?.rules || [];
+  const rules = state.config.siteConfig?.rules || []
   // 精确匹配优先
-  const exact = rules.find(r => r.domain === hostname);
-  if (exact) return exact;
+  const exact = rules.find((r) => r.domain === hostname)
+  if (exact) return exact
   // 通配符匹配
-  const wildcard = rules.find(r => {
-    if (!r.domain.startsWith('*')) return false;
-    const suffix = r.domain.slice(1);
-    return hostname.endsWith(suffix);
-  });
-  return wildcard || null;
+  const wildcard = rules.find((r) => {
+    if (!r.domain.startsWith('*')) return false
+    const suffix = r.domain.slice(1)
+    return hostname.endsWith(suffix)
+  })
+  return wildcard || null
 }
 
 // 在 init() 和 processScript/processLink/processImage 中调用
 function isSiteEnabled(feature) {
-  const site = getSiteConfig(location.hostname);
-  if (site && !site.enabled) return false;
-  if (site && feature in site) return site[feature];
-  return state.config[feature];  // 回退到全局配置
+  const site = getSiteConfig(location.hostname)
+  if (site && !site.enabled) return false
+  if (site && feature in site) return site[feature]
+  return state.config[feature] // 回退到全局配置
 }
 ```
 
 ### 文件变更
 
-| 文件 | 变更 |
-|------|------|
+| 文件                                      | 变更                                                        |
+| ----------------------------------------- | ----------------------------------------------------------- |
 | `content/modules/resource-accelerator.js` | 新增 `getSiteConfig()`、`isSiteEnabled()`，各处理函数中调用 |
-| `popup.html` | 新增站点配置管理 UI |
-| `popup.js` | 新增站点配置 CRUD 逻辑 |
+| `popup.html`                              | 新增站点配置管理 UI                                         |
+| `popup.js`                                | 新增站点配置 CRUD 逻辑                                      |
 
 ### 验收标准
 
@@ -305,33 +308,33 @@ function isSiteEnabled(feature) {
 ```javascript
 // init() 中采集初始数据
 function collectNavigationTiming() {
-  if (!window.PerformanceNavigationTiming) return null;
-  const entries = performance.getEntriesByType('navigation');
-  if (!entries.length) return null;
-  const nav = entries[0];
+  if (!window.PerformanceNavigationTiming) return null
+  const entries = performance.getEntriesByType('navigation')
+  if (!entries.length) return null
+  const nav = entries[0]
   return {
     ttfb: nav.responseStart - nav.requestStart,
     domContentLoaded: nav.domContentLoadedEventEnd - nav.startTime,
     loadEvent: nav.loadEventEnd - nav.startTime,
     transferSize: nav.transferSize,
-  };
+  }
 }
 
 // 页面 load 后汇总
 function collectResourceTiming() {
-  const entries = performance.getEntriesByType('resource');
-  return entries.map(e => ({
+  const entries = performance.getEntriesByType('resource')
+  return entries.map((e) => ({
     name: e.name,
     type: e.initiatorType,
     duration: e.duration,
     transferSize: e.transferSize,
-  }));
+  }))
 }
 
 // 估算节省时间（基于 RTT 差异）
 function estimateTimeSaved(replacements) {
   // 假设：国内 CDN RTT ~50ms，原始 CDN RTT ~200ms
-  return replacements.length * 150; // 每个替换节省 ~150ms
+  return replacements.length * 150 // 每个替换节省 ~150ms
 }
 ```
 
@@ -352,11 +355,11 @@ function estimateTimeSaved(replacements) {
 
 ### 文件变更
 
-| 文件 | 变更 |
-|------|------|
+| 文件                                      | 变更                                                                               |
+| ----------------------------------------- | ---------------------------------------------------------------------------------- |
 | `content/modules/resource-accelerator.js` | 新增 `collectNavigationTiming()`、`collectResourceTiming()`、`estimateTimeSaved()` |
-| `popup.html` | 新增性能对比展示区域 |
-| `popup.js` | 新增性能数据展示逻辑 |
+| `popup.html`                              | 新增性能对比展示区域                                                               |
+| `popup.js`                                | 新增性能数据展示逻辑                                                               |
 
 ### 验收标准
 
@@ -384,8 +387,8 @@ function estimateTimeSaved(replacements) {
 const IMAGE_FORMAT_PRIORITY = [
   { mime: 'image/avif', ext: '.avif', test: 'toDataURL("image/avif")' },
   { mime: 'image/webp', ext: '.webp', test: 'toDataURL("image/webp")' },
-  { mime: 'image/jpeg', ext: '.jpg',  test: null },  // 通用
-];
+  { mime: 'image/jpeg', ext: '.jpg', test: null }, // 通用
+]
 ```
 
 **修改 `compressImage()`**：
@@ -393,39 +396,43 @@ const IMAGE_FORMAT_PRIORITY = [
 ```javascript
 // 支持格式检测
 function getSupportedImageFormat() {
-  if (state._imageFormat) return state._imageFormat;
-  const canvas = document.createElement('canvas');
-  canvas.width = 1;
-  canvas.height = 1;
+  if (state._imageFormat) return state._imageFormat
+  const canvas = document.createElement('canvas')
+  canvas.width = 1
+  canvas.height = 1
   for (const fmt of IMAGE_FORMAT_PRIORITY) {
     try {
       if (fmt.test && canvas.toDataURL(fmt.mime).startsWith(`data:${fmt.mime}`)) {
-        state._imageFormat = fmt;
-        return fmt;
+        state._imageFormat = fmt
+        return fmt
       }
     } catch {}
   }
-  state._imageFormat = IMAGE_FORMAT_PRIORITY[2]; // fallback JPEG
-  return state._imageFormat;
+  state._imageFormat = IMAGE_FORMAT_PRIORITY[2] // fallback JPEG
+  return state._imageFormat
 }
 
 // 压缩时使用最优格式
 function compressImage(url) {
   // ... 现有逻辑 ...
-  const format = getSupportedImageFormat();
-  canvas.toBlob(blob => {
-    // 同时尝试次优格式，取体积更小的
-    // ... 比较逻辑 ...
-  }, format.mime, state.config.imageQuality);
+  const format = getSupportedImageFormat()
+  canvas.toBlob(
+    (blob) => {
+      // 同时尝试次优格式，取体积更小的
+      // ... 比较逻辑 ...
+    },
+    format.mime,
+    state.config.imageQuality
+  )
 }
 ```
 
 ### 文件变更
 
-| 文件 | 变更 |
-|------|------|
+| 文件                                      | 变更                                                     |
+| ----------------------------------------- | -------------------------------------------------------- |
 | `content/modules/resource-accelerator.js` | 新增 `getSupportedImageFormat()`，修改 `compressImage()` |
-| `popup.js` | 统计展示中显示实际使用的图片格式 |
+| `popup.js`                                | 统计展示中显示实际使用的图片格式                         |
 
 ### 验收标准
 
@@ -460,23 +467,23 @@ function analyzeFontUsage(fontCSS) {
   // 解析 @font-face 声明
   // 按字重统计：400 > 700 > 其他
   // 返回按优先级排序的字体 URL 列表
-  const declarations = parseFontFaces(fontCSS);
+  const declarations = parseFontFaces(fontCSS)
   return declarations
     .sort((a, b) => getWeightPriority(a.weight) - getWeightPriority(b.weight))
-    .slice(0, 3);  // 最多 3 个
+    .slice(0, 3) // 最多 3 个
 }
 
 function getWeightPriority(weight) {
-  if (weight === '400' || weight === 'normal') return 0;
-  if (weight === '700' || weight === 'bold') return 1;
-  return 2;
+  if (weight === '400' || weight === 'normal') return 0
+  if (weight === '700' || weight === 'bold') return 1
+  return 2
 }
 ```
 
 ### 文件变更
 
-| 文件 | 变更 |
-|------|------|
+| 文件                                      | 变更                                   |
+| ----------------------------------------- | -------------------------------------- |
 | `content/modules/resource-accelerator.js` | 修改 `addPreloadHint()` 和字体处理逻辑 |
 
 ### 验收标准
@@ -496,6 +503,7 @@ function getWeightPriority(weight) {
 **优先级**：迭代 1 > 迭代 2 > 迭代 3 > 迭代 4 > 迭代 5
 
 **理由**：
+
 - 迭代 1（第三方延迟）ROI 最高：analytics/广告脚本是页面最大拖慢项
 - 迭代 2（站点配置）解决用户可控性问题，是长期使用的基础设施
 - 迭代 3（性能度量）让用户看到加速效果，提升使用粘性
@@ -506,23 +514,23 @@ function getWeightPriority(weight) {
 
 ## 风险评估
 
-| 风险 | 影响 | 缓解措施 |
-|------|------|---------|
+| 风险                           | 影响                   | 缓解措施                                         |
+| ------------------------------ | ---------------------- | ------------------------------------------------ |
 | 第三方脚本延迟导致页面功能异常 | 部分脚本有执行顺序依赖 | 默认关闭 + maxDeferralMs 兜底 + 用户可按站点调整 |
-| 站点配置规则过多导致性能问题 | 规则匹配耗时 | 规则数量限制 + 精确匹配优先 |
-| AVIF 编码耗时 | 压缩延迟增加 | 异步 + 并发限制 + 缓存 |
-| 字体 preload 误判 | 首屏字体加载变慢 | 降级为无条件 preload |
-| CSP 限制第三方脚本注入 | 延迟加载失败 | CSP 检测到时自动跳过 |
+| 站点配置规则过多导致性能问题   | 规则匹配耗时           | 规则数量限制 + 精确匹配优先                      |
+| AVIF 编码耗时                  | 压缩延迟增加           | 异步 + 并发限制 + 缓存                           |
+| 字体 preload 误判              | 首屏字体加载变慢       | 降级为无条件 preload                             |
+| CSP 限制第三方脚本注入         | 延迟加载失败           | CSP 检测到时自动跳过                             |
 
 ---
 
 ## 文件变更汇总
 
-| 文件 | 迭代1 | 迭代2 | 迭代3 | 迭代4 | 迭代5 |
-|------|-------|-------|-------|-------|-------|
-| `content/modules/resource-accelerator.js` | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `popup.html` | ✅ | ✅ | ✅ | - | - |
-| `popup.js` | ✅ | ✅ | ✅ | ✅ | - |
+| 文件                                      | 迭代1 | 迭代2 | 迭代3 | 迭代4 | 迭代5 |
+| ----------------------------------------- | ----- | ----- | ----- | ----- | ----- |
+| `content/modules/resource-accelerator.js` | ✅    | ✅    | ✅    | ✅    | ✅    |
+| `popup.html`                              | ✅    | ✅    | ✅    | -     | -     |
+| `popup.js`                                | ✅    | ✅    | ✅    | ✅    | -     |
 
 ---
 
@@ -530,10 +538,10 @@ function getWeightPriority(weight) {
 
 v5 完成了基础缺陷修复和功能补全（去重、持久化、缓存、缩放）。v6 在此基础上：
 
-| v5 基础设施 | v6 扩展 |
-|-------------|---------|
-| API 拦截 `createElement` | 扩展为支持第三方脚本延迟注入 |
-| 全局配置 `DEFAULT_CONFIG` | 扩展为支持站点级配置覆盖 |
-| `state.stats` 统计收集 | 扩展为性能度量对比 |
-| `compressImage()` WebP/JPEG | 扩展为 AVIF 优先 |
-| `addPreloadHint()` 无条件 preload | 扩展为基于字重的智能预加载 |
+| v5 基础设施                       | v6 扩展                      |
+| --------------------------------- | ---------------------------- |
+| API 拦截 `createElement`          | 扩展为支持第三方脚本延迟注入 |
+| 全局配置 `DEFAULT_CONFIG`         | 扩展为支持站点级配置覆盖     |
+| `state.stats` 统计收集            | 扩展为性能度量对比           |
+| `compressImage()` WebP/JPEG       | 扩展为 AVIF 优先             |
+| `addPreloadHint()` 无条件 preload | 扩展为基于字重的智能预加载   |

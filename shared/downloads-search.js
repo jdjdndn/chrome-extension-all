@@ -14,24 +14,24 @@ const DownloadsSearch = {
     const {
       limit = 20,
       startTime = Date.now() - 30 * 24 * 60 * 60 * 1000, // 默认最近30天
-      state = 'all' // 'all', 'in_progress', 'interrupted', 'complete'
-    } = options;
+      state = 'all', // 'all', 'in_progress', 'interrupted', 'complete'
+    } = options
 
     try {
       const searchParams = {
         query: query ? [query] : [],
         limit,
-        startTime
-      };
+        startTime,
+      }
 
       // 按状态过滤
       if (state !== 'all') {
-        searchParams.state = state;
+        searchParams.state = state
       }
 
-      const downloads = await chrome.downloads.search(searchParams);
+      const downloads = await chrome.downloads.search(searchParams)
 
-      return downloads.map(item => ({
+      return downloads.map((item) => ({
         id: item.id,
         filename: item.filename,
         url: item.url,
@@ -44,11 +44,11 @@ const DownloadsSearch = {
         fileSize: item.fileSize,
         danger: item.danger,
         mime: item.mime,
-        exists: item.exists
-      }));
+        exists: item.exists,
+      }))
     } catch (error) {
-      console.error('[DownloadsSearch] 搜索失败:', error);
-      return [];
+      console.error('[DownloadsSearch] 搜索失败:', error)
+      return []
     }
   },
 
@@ -61,12 +61,12 @@ const DownloadsSearch = {
     try {
       const downloads = await chrome.downloads.search({
         limit,
-        orderBy: ['-startTime']
-      });
-      return downloads;
+        orderBy: ['-startTime'],
+      })
+      return downloads
     } catch (error) {
-      console.error('[DownloadsSearch] 获取最近下载失败:', error);
-      return [];
+      console.error('[DownloadsSearch] 获取最近下载失败:', error)
+      return []
     }
   },
 
@@ -76,9 +76,9 @@ const DownloadsSearch = {
    */
   async open(downloadId) {
     try {
-      await chrome.downloads.open(downloadId);
+      await chrome.downloads.open(downloadId)
     } catch (error) {
-      console.error('[DownloadsSearch] 打开文件失败:', error);
+      console.error('[DownloadsSearch] 打开文件失败:', error)
     }
   },
 
@@ -88,9 +88,9 @@ const DownloadsSearch = {
    */
   async show(downloadId) {
     try {
-      await chrome.downloads.show(downloadId);
+      await chrome.downloads.show(downloadId)
     } catch (error) {
-      console.error('[DownloadsSearch] 显示文件失败:', error);
+      console.error('[DownloadsSearch] 显示文件失败:', error)
     }
   },
 
@@ -100,14 +100,14 @@ const DownloadsSearch = {
    * @returns {string}
    */
   formatSize(bytes) {
-    if (!bytes || bytes === -1) return '未知';
-    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-    let i = 0;
+    if (!bytes || bytes === -1) return '未知'
+    const units = ['B', 'KB', 'MB', 'GB', 'TB']
+    let i = 0
     while (bytes >= 1024 && i < units.length - 1) {
-      bytes /= 1024;
-      i++;
+      bytes /= 1024
+      i++
     }
-    return `${bytes.toFixed(i > 0 ? 1 : 0)} ${units[i]}`;
+    return `${bytes.toFixed(i > 0 ? 1 : 0)} ${units[i]}`
   },
 
   /**
@@ -117,11 +117,11 @@ const DownloadsSearch = {
    */
   formatState(state) {
     const stateMap = {
-      'in_progress': { text: '下载中', icon: '⏳', color: '#1890ff' },
-      'interrupted': { text: '已中断', icon: '⚠️', color: '#ff4d4f' },
-      'complete': { text: '已完成', icon: '✅', color: '#52c41a' }
-    };
-    return stateMap[state] || { text: state, icon: '📄', color: '#999' };
+      in_progress: { text: '下载中', icon: '⏳', color: '#1890ff' },
+      interrupted: { text: '已中断', icon: '⚠️', color: '#ff4d4f' },
+      complete: { text: '已完成', icon: '✅', color: '#52c41a' },
+    }
+    return stateMap[state] || { text: state, icon: '📄', color: '#999' }
   },
 
   /**
@@ -130,32 +130,76 @@ const DownloadsSearch = {
    * @returns {string}
    */
   getFileIcon(filename) {
-    const ext = filename.split('.').pop().toLowerCase();
+    const ext = filename.split('.').pop().toLowerCase()
     const iconMap = {
       // 图片
-      'jpg': '🖼️', 'jpeg': '🖼️', 'png': '🖼️', 'gif': '🖼️', 'webp': '🖼️', 'svg': '🖼️', 'bmp': '🖼️',
+      jpg: '🖼️',
+      jpeg: '🖼️',
+      png: '🖼️',
+      gif: '🖼️',
+      webp: '🖼️',
+      svg: '🖼️',
+      bmp: '🖼️',
       // 视频
-      'mp4': '🎬', 'avi': '🎬', 'mkv': '🎬', 'mov': '🎬', 'wmv': '🎬', 'flv': '🎬', 'webm': '🎬',
+      mp4: '🎬',
+      avi: '🎬',
+      mkv: '🎬',
+      mov: '🎬',
+      wmv: '🎬',
+      flv: '🎬',
+      webm: '🎬',
       // 音频
-      'mp3': '🎵', 'wav': '🎵', 'flac': '🎵', 'aac': '🎵', 'ogg': '🎵', 'wma': '🎵',
+      mp3: '🎵',
+      wav: '🎵',
+      flac: '🎵',
+      aac: '🎵',
+      ogg: '🎵',
+      wma: '🎵',
       // 文档
-      'pdf': '📕', 'doc': '📘', 'docx': '📘', 'xls': '📗', 'xlsx': '📗', 'ppt': '📙', 'pptx': '📙',
-      'txt': '📄', 'md': '📄', 'rtf': '📄',
+      pdf: '📕',
+      doc: '📘',
+      docx: '📘',
+      xls: '📗',
+      xlsx: '📗',
+      ppt: '📙',
+      pptx: '📙',
+      txt: '📄',
+      md: '📄',
+      rtf: '📄',
       // 压缩
-      'zip': '📦', 'rar': '📦', '7z': '📦', 'tar': '📦', 'gz': '📦',
+      zip: '📦',
+      rar: '📦',
+      '7z': '📦',
+      tar: '📦',
+      gz: '📦',
       // 代码
-      'js': '📜', 'ts': '📜', 'py': '📜', 'java': '📜', 'cpp': '📜', 'c': '📜', 'go': '📜',
-      'html': '🌐', 'css': '🎨', 'json': '📋', 'xml': '📋',
+      js: '📜',
+      ts: '📜',
+      py: '📜',
+      java: '📜',
+      cpp: '📜',
+      c: '📜',
+      go: '📜',
+      html: '🌐',
+      css: '🎨',
+      json: '📋',
+      xml: '📋',
       // 可执行
-      'exe': '⚙️', 'msi': '⚙️', 'dmg': '⚙️', 'app': '⚙️', 'deb': '⚙️', 'rpm': '⚙️',
+      exe: '⚙️',
+      msi: '⚙️',
+      dmg: '⚙️',
+      app: '⚙️',
+      deb: '⚙️',
+      rpm: '⚙️',
       // 其他
-      'apk': '📱', 'ipa': '📱'
-    };
-    return iconMap[ext] || '📎';
-  }
-};
+      apk: '📱',
+      ipa: '📱',
+    }
+    return iconMap[ext] || '📎'
+  },
+}
 
 // 导出
 if (typeof window !== 'undefined') {
-  window.DownloadsSearch = DownloadsSearch;
+  window.DownloadsSearch = DownloadsSearch
 }

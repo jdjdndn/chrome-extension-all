@@ -367,7 +367,9 @@
       }
 
       @keyframes spin {
-        to { transform: rotate(360deg); }
+        to {
+          transform: rotate(360deg);
+        }
       }
 
       .ai-suggestion {
@@ -488,7 +490,8 @@
         padding: 8px;
       }
 
-      .tester-header, .batch-header {
+      .tester-header,
+      .batch-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -498,7 +501,8 @@
         font-weight: bold;
       }
 
-      .tester-close, .batch-close {
+      .tester-close,
+      .batch-close {
         background: transparent;
         border: none;
         color: #888;
@@ -506,11 +510,14 @@
         font-size: 14px;
       }
 
-      .tester-close:hover, .batch-close:hover {
+      .tester-close:hover,
+      .batch-close:hover {
         color: #f48771;
       }
 
-      .tester-input, .batch-section input, .batch-section select {
+      .tester-input,
+      .batch-section input,
+      .batch-section select {
         width: 100%;
         background: #1e1e1e;
         border: 1px solid #3c3c3c;
@@ -522,7 +529,9 @@
         margin-bottom: 8px;
       }
 
-      .tester-input:focus, .batch-section input:focus, .batch-section select:focus {
+      .tester-input:focus,
+      .batch-section input:focus,
+      .batch-section select:focus {
         border-color: #007acc;
         outline: none;
       }
@@ -553,12 +562,14 @@
         font-size: 10px;
       }
 
-      .tester-actions, .batch-actions {
+      .tester-actions,
+      .batch-actions {
         display: flex;
         gap: 4px;
       }
 
-      .tester-actions button, .batch-actions button {
+      .tester-actions button,
+      .batch-actions button {
         background: #3c3c3c;
         border: 1px solid #555;
         color: #d4d4d4;
@@ -568,7 +579,8 @@
         border-radius: 2px;
       }
 
-      .tester-actions button:hover, .batch-actions button:hover {
+      .tester-actions button:hover,
+      .batch-actions button:hover {
         background: #505050;
       }
 
@@ -665,7 +677,7 @@
         cursor: pointer;
       }
 
-      .filter-options input[type="checkbox"] {
+      .filter-options input[type='checkbox'] {
         accent-color: #007acc;
       }
 
@@ -842,7 +854,7 @@
         cursor: pointer;
       }
 
-      .settings-section input[type="checkbox"] {
+      .settings-section input[type='checkbox'] {
         accent-color: var(--accent);
       }
 
@@ -1408,7 +1420,7 @@
     <!-- Path Breadcrumbs -->
     <div class="path-section">
       <div class="path-breadcrumbs" id="path-breadcrumbs">
-        <span class="empty-state" style="color: #666; font-size: 10px;">No element selected</span>
+        <span class="empty-state" style="color: #666; font-size: 10px">No element selected</span>
       </div>
     </div>
 
@@ -1416,17 +1428,37 @@
     <div class="toolbar">
       <button id="refresh-btn" title="刷新 (R)">🔄</button>
       <button id="computed-btn" title="计算样式 (C)">📐</button>
-      <button id="ai-btn" style="background: #6b4c9a; border-color: #8b6cb5;" title="AI 优化选择器">✨</button>
-      <button id="ai-explain-btn" style="background: #2d5a87; border-color: #3d7ab7;" title="AI 分析元素">🔍</button>
-      <button id="test-btn" style="background: #059669; border-color: #10b981;" title="测试选择器 (T)">🧪</button>
-      <button id="batch-btn" style="background: #d97706; border-color: #f59e0b;" title="批量操作 (B)">📦</button>
-      <div style="flex:1"></div>
+      <button id="ai-btn" style="background: #6b4c9a; border-color: #8b6cb5" title="AI 优化选择器">
+        ✨
+      </button>
+      <button
+        id="ai-explain-btn"
+        style="background: #2d5a87; border-color: #3d7ab7"
+        title="AI 分析元素"
+      >
+        🔍
+      </button>
+      <button
+        id="test-btn"
+        style="background: #059669; border-color: #10b981"
+        title="测试选择器 (T)"
+      >
+        🧪
+      </button>
+      <button
+        id="batch-btn"
+        style="background: #d97706; border-color: #f59e0b"
+        title="批量操作 (B)"
+      >
+        📦
+      </button>
+      <div style="flex: 1"></div>
       <button id="theme-btn" title="切换主题">🎨</button>
       <button id="settings-btn" title="设置">⚙️</button>
     </div>
 
     <!-- 选择器测试工具 -->
-    <div class="selector-tester" id="selector-tester" style="display: none;">
+    <div class="selector-tester" id="selector-tester" style="display: none">
       <div class="tester-header">
         <span>选择器测试工具</span>
         <button class="tester-close" id="tester-close">×</button>
@@ -1445,7 +1477,7 @@
     </div>
 
     <!-- 批量操作面板 -->
-    <div class="batch-panel" id="batch-panel" style="display: none;">
+    <div class="batch-panel" id="batch-panel" style="display: none">
       <div class="batch-header">
         <span>批量选择元素</span>
         <button class="batch-close" id="batch-close">×</button>
@@ -1454,7 +1486,9 @@
         <!-- 元素拾取控制 -->
         <div class="picker-controls">
           <button id="start-picker-btn" class="picker-btn start">🎯 开始选择</button>
-          <button id="stop-picker-btn" class="picker-btn stop" style="display:none;">⏹️ 停止选择</button>
+          <button id="stop-picker-btn" class="picker-btn stop" style="display: none">
+            ⏹️ 停止选择
+          </button>
           <button id="clear-selection-btn" class="picker-btn clear">🗑️ 清除选择</button>
         </div>
 
@@ -1515,7 +1549,7 @@
     </div>
 
     <!-- AI Suggestions Panel -->
-    <div class="ai-panel" id="ai-panel" style="display: none;">
+    <div class="ai-panel" id="ai-panel" style="display: none">
       <div class="ai-panel-header">
         <span>AI 选择器建议</span>
         <button class="ai-close-btn" id="ai-close-btn">×</button>
@@ -1576,7 +1610,8 @@
       </div>
       <div class="shortcuts-hint">
         <strong>快捷键:</strong>
-        <kbd>R</kbd> 刷新 · <kbd>C</kbd> 计算样式 · <kbd>T</kbd> 测试 · <kbd>B</kbd> 批量 · <kbd>Ctrl+F</kbd> 过滤 · <kbd>Esc</kbd> 关闭
+        <kbd>R</kbd> 刷新 · <kbd>C</kbd> 计算样式 · <kbd>T</kbd> 测试 · <kbd>B</kbd> 批量 ·
+        <kbd>Ctrl+F</kbd> 过滤 · <kbd>Esc</kbd> 关闭
       </div>
     </div>
 

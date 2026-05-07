@@ -39,10 +39,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": [
-        "content/core/load-scheduler.js",
-        "content/core-bundle.js"
-      ],
+      "js": ["content/core/load-scheduler.js", "content/core-bundle.js"],
       "css": ["styles.css"],
       "run_at": "document_start"
     }

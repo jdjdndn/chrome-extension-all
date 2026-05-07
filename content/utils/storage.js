@@ -1,14 +1,14 @@
 // ========== 存储工具模块 ==========
 // 封装 Chrome Storage API 的常用操作（集成 StorageBridge）
 
-'use strict';
+'use strict'
 
 /**
  * 检查是否在扩展环境中
  * @returns {boolean}
  */
 export function isExtensionContext() {
-  return typeof chrome !== 'undefined' && chrome.storage;
+  return typeof chrome !== 'undefined' && chrome.storage
 }
 
 /**
@@ -16,7 +16,7 @@ export function isExtensionContext() {
  * @returns {boolean}
  */
 export function isStorageBridgeReady() {
-  return typeof StorageBridge !== 'undefined';
+  return typeof StorageBridge !== 'undefined'
 }
 
 /**
@@ -27,21 +27,21 @@ export function isStorageBridgeReady() {
  */
 export async function getSync(keys) {
   if (!isExtensionContext()) {
-    return {};
+    return {}
   }
 
   // 优先使用 StorageBridge
   if (isStorageBridgeReady()) {
-    const result = await window.StorageBridge.get(keys, 'sync');
-    return result || {};
+    const result = await window.StorageBridge.get(keys, 'sync')
+    return result || {}
   }
 
   // 降级到原生 API
   try {
-    return await chrome.storage.sync.get(keys);
+    return await chrome.storage.sync.get(keys)
   } catch (error) {
-    console.error('[Storage] sync.get 失败:', error);
-    return {};
+    console.error('[Storage] sync.get 失败:', error)
+    return {}
   }
 }
 
@@ -53,21 +53,21 @@ export async function getSync(keys) {
  */
 export async function setSync(data) {
   if (!isExtensionContext()) {
-    return false;
+    return false
   }
 
   // 优先使用 StorageBridge
   if (isStorageBridgeReady()) {
-    return await window.StorageBridge.set(data, 'sync');
+    return await window.StorageBridge.set(data, 'sync')
   }
 
   // 降级到原生 API
   try {
-    await chrome.storage.sync.set(data);
-    return true;
+    await chrome.storage.sync.set(data)
+    return true
   } catch (error) {
-    console.error('[Storage] sync.set 失败:', error);
-    return false;
+    console.error('[Storage] sync.set 失败:', error)
+    return false
   }
 }
 
@@ -78,20 +78,20 @@ export async function setSync(data) {
  */
 export async function getLocal(keys) {
   if (!isExtensionContext()) {
-    return {};
+    return {}
   }
 
   // 优先使用 StorageBridge
   if (isStorageBridgeReady()) {
-    const result = await window.StorageBridge.get(keys, 'local');
-    return result || {};
+    const result = await window.StorageBridge.get(keys, 'local')
+    return result || {}
   }
 
   try {
-    return await chrome.storage.local.get(keys);
+    return await chrome.storage.local.get(keys)
   } catch (error) {
-    console.error('[Storage] local.get 失败:', error);
-    return {};
+    console.error('[Storage] local.get 失败:', error)
+    return {}
   }
 }
 
@@ -102,20 +102,20 @@ export async function getLocal(keys) {
  */
 export async function setLocal(data) {
   if (!isExtensionContext()) {
-    return false;
+    return false
   }
 
   // 优先使用 StorageBridge
   if (isStorageBridgeReady()) {
-    return await window.StorageBridge.set(data, 'local');
+    return await window.StorageBridge.set(data, 'local')
   }
 
   try {
-    await chrome.storage.local.set(data);
-    return true;
+    await chrome.storage.local.set(data)
+    return true
   } catch (error) {
-    console.error('[Storage] local.set 失败:', error);
-    return false;
+    console.error('[Storage] local.set 失败:', error)
+    return false
   }
 }
 
@@ -127,20 +127,20 @@ export async function setLocal(data) {
  */
 export async function remove(keys, area = 'local') {
   if (!isExtensionContext()) {
-    return false;
+    return false
   }
 
   // 优先使用 StorageBridge
   if (isStorageBridgeReady()) {
-    return await window.StorageBridge.remove(keys, area);
+    return await window.StorageBridge.remove(keys, area)
   }
 
   try {
-    await chrome.storage[area].remove(keys);
-    return true;
+    await chrome.storage[area].remove(keys)
+    return true
   } catch (error) {
-    console.error('[Storage] remove 失败:', error);
-    return false;
+    console.error('[Storage] remove 失败:', error)
+    return false
   }
 }
 
@@ -153,22 +153,22 @@ export async function remove(keys, area = 'local') {
  */
 export function watch(key, callback, area = 'local') {
   if (isStorageBridgeReady()) {
-    return window.StorageBridge.watch(key, callback, area);
+    return window.StorageBridge.watch(key, callback, area)
   }
 
   // 降级：使用原生监听
   if (!isExtensionContext()) {
-    return () => {};
+    return () => {}
   }
 
   const listener = (changes, areaName) => {
     if (areaName === area && changes[key]) {
-      callback(changes[key].newValue, changes[key].oldValue);
+      callback(changes[key].newValue, changes[key].oldValue)
     }
-  };
+  }
 
-  chrome.storage.onChanged.addListener(listener);
-  return () => chrome.storage.onChanged.removeListener(listener);
+  chrome.storage.onChanged.addListener(listener)
+  return () => chrome.storage.onChanged.removeListener(listener)
 }
 
 /**
@@ -178,19 +178,19 @@ export function watch(key, callback, area = 'local') {
  */
 export function subscribe(callback) {
   if (isStorageBridgeReady()) {
-    return window.StorageBridge.subscribe(callback);
+    return window.StorageBridge.subscribe(callback)
   }
 
   if (!isExtensionContext()) {
-    return () => {};
+    return () => {}
   }
 
   const listener = (changes, areaName) => {
-    callback({ area: areaName, changes, timestamp: Date.now() });
-  };
+    callback({ area: areaName, changes, timestamp: Date.now() })
+  }
 
-  chrome.storage.onChanged.addListener(listener);
-  return () => chrome.storage.onChanged.removeListener(listener);
+  chrome.storage.onChanged.addListener(listener)
+  return () => chrome.storage.onChanged.removeListener(listener)
 }
 
 /**
@@ -200,15 +200,15 @@ export function subscribe(callback) {
  */
 export function onChanged(callback) {
   if (!isExtensionContext()) {
-    return () => {};
+    return () => {}
   }
 
   const listener = (changes, areaName) => {
-    callback(changes, areaName);
-  };
+    callback(changes, areaName)
+  }
 
-  chrome.storage.onChanged.addListener(listener);
-  return () => chrome.storage.onChanged.removeListener(listener);
+  chrome.storage.onChanged.addListener(listener)
+  return () => chrome.storage.onChanged.removeListener(listener)
 }
 
 /**
@@ -218,15 +218,15 @@ export function onChanged(callback) {
  * @returns {Promise<object|null>}
  */
 export async function getDomainSettings(settingsKey, domain) {
-  if (!domain) return null;
+  if (!domain) return null
 
   try {
-    const result = await getLocal(settingsKey);
-    const allSettings = result?.[settingsKey] || {};
-    return allSettings[domain] || null;
+    const result = await getLocal(settingsKey)
+    const allSettings = result?.[settingsKey] || {}
+    return allSettings[domain] || null
   } catch (error) {
-    console.error('[Storage] getDomainSettings 失败:', error);
-    return null;
+    console.error('[Storage] getDomainSettings 失败:', error)
+    return null
   }
 }
 
@@ -238,16 +238,16 @@ export async function getDomainSettings(settingsKey, domain) {
  * @returns {Promise<boolean>}
  */
 export async function setDomainSettings(settingsKey, domain, settings) {
-  if (!domain) return false;
+  if (!domain) return false
 
   try {
-    const result = await getLocal(settingsKey);
-    const allSettings = result?.[settingsKey] || {};
-    allSettings[domain] = settings;
-    return await setLocal({ [settingsKey]: allSettings });
+    const result = await getLocal(settingsKey)
+    const allSettings = result?.[settingsKey] || {}
+    allSettings[domain] = settings
+    return await setLocal({ [settingsKey]: allSettings })
   } catch (error) {
-    console.error('[Storage] setDomainSettings 失败:', error);
-    return false;
+    console.error('[Storage] setDomainSettings 失败:', error)
+    return false
   }
 }
 
@@ -260,12 +260,12 @@ export async function setDomainSettings(settingsKey, domain, settings) {
  */
 export async function reactive(key, defaultValue = null, area = 'local') {
   if (isStorageBridgeReady()) {
-    return await window.StorageBridge.reactive(key, defaultValue, area);
+    return await window.StorageBridge.reactive(key, defaultValue, area)
   }
 
   // 降级：简单实现
-  const result = await (area === 'sync' ? getSync(key) : getLocal(key));
-  const value = result?.[key] ?? defaultValue;
+  const result = await (area === 'sync' ? getSync(key) : getLocal(key))
+  const value = result?.[key] ?? defaultValue
 
   const reactiveObj = {
     _value: value,
@@ -273,30 +273,34 @@ export async function reactive(key, defaultValue = null, area = 'local') {
     _area: area,
 
     get value() {
-      return this._value;
+      return this._value
     },
 
     set value(newValue) {
-      this._value = newValue;
+      this._value = newValue
       // 异步保存（不等待）
       if (area === 'sync') {
-        setSync({ [this._key]: newValue }).catch(e => console.error('[Storage] setSync failed:', e));
+        setSync({ [this._key]: newValue }).catch((e) =>
+          console.error('[Storage] setSync failed:', e)
+        )
       } else {
-        setLocal({ [this._key]: newValue }).catch(e => console.error('[Storage] setLocal failed:', e));
+        setLocal({ [this._key]: newValue }).catch((e) =>
+          console.error('[Storage] setLocal failed:', e)
+        )
       }
     },
 
     // 提供异步保存方法
     async save() {
       if (area === 'sync') {
-        return await setSync({ [this._key]: this._value });
+        return await setSync({ [this._key]: this._value })
       } else {
-        return await setLocal({ [this._key]: this._value });
+        return await setLocal({ [this._key]: this._value })
       }
-    }
-  };
+    },
+  }
 
-  return reactiveObj;
+  return reactiveObj
 }
 
 /**
@@ -315,13 +319,13 @@ const StorageUtils = {
   reactive,
   onChanged,
   getDomainSettings,
-  setDomainSettings
-};
-
-export default StorageUtils;
-
-if (typeof window !== 'undefined' && !window.StorageUtils) {
-  window.StorageUtils = StorageUtils;
+  setDomainSettings,
 }
 
-console.log('[Storage] 存储模块已加载 (StorageBridge 增强版)');
+export default StorageUtils
+
+if (typeof window !== 'undefined' && !window.StorageUtils) {
+  window.StorageUtils = StorageUtils
+}
+
+console.log('[Storage] 存储模块已加载 (StorageBridge 增强版)')

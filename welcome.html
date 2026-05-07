@@ -6,8 +6,7 @@
     <title>Welcome - My Chrome Extension</title>
     <style>
       body {
-        font-family:
-          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         max-width: 600px;
         margin: 40px auto;
         padding: 20px;
@@ -64,14 +63,14 @@
     <a href="#" class="get-started-btn" id="close-btn">Get Started</a>
 
     <script>
-      document.getElementById("close-btn").addEventListener("click", (e) => {
-        e.preventDefault();
+      document.getElementById('close-btn').addEventListener('click', (e) => {
+        e.preventDefault()
         chrome.tabs.getCurrent((tab) => {
           if (tab) {
-            chrome.tabs.remove(tab.id);
+            chrome.tabs.remove(tab.id)
           }
-        });
-      });
+        })
+      })
     </script>
   </body>
 </html>

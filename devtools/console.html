@@ -11,7 +11,7 @@
       }
 
       body {
-        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         font-size: 12px;
         background: #f5f5f5;
         color: #333333;
@@ -652,22 +652,22 @@
         letter-spacing: 0.3px;
       }
 
-      .selector-line-type[data-type="精确"] {
+      .selector-line-type[data-type='精确'] {
         background: rgba(0, 122, 204, 0.15);
         color: #007acc;
       }
 
-      .selector-line-type[data-type="共同类名"] {
+      .selector-line-type[data-type='共同类名'] {
         background: rgba(16, 185, 129, 0.15);
         color: #10b981;
       }
 
-      .selector-line-type[data-type=":is()"] {
+      .selector-line-type[data-type=':is()'] {
         background: rgba(139, 92, 246, 0.15);
         color: #8b5cf6;
       }
 
-      .selector-line-type[data-type="共同祖先"] {
+      .selector-line-type[data-type='共同祖先'] {
         background: rgba(245, 158, 11, 0.15);
         color: #f59e0b;
       }
@@ -721,8 +721,13 @@
       }
 
       @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.5; }
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
       }
 
       .batch-merged-content {
@@ -786,7 +791,9 @@
         overflow: hidden;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
         border: 1px solid #d0d0d0;
-        transition: box-shadow 0.3s ease, border-color 0.3s ease;
+        transition:
+          box-shadow 0.3s ease,
+          border-color 0.3s ease;
       }
 
       .console-section:hover {
@@ -821,7 +828,7 @@
       .section-emoji {
         margin-right: 10px;
         font-size: 18px;
-        filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+        filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
       }
 
       .section-title {
@@ -831,9 +838,15 @@
         flex: 1;
       }
 
-      .section-title.local { color: #4ec9b0; }
-      .section-title.sync { color: #73c991; }
-      .section-title.session { color: #e6db74; }
+      .section-title.local {
+        color: #4ec9b0;
+      }
+      .section-title.sync {
+        color: #73c991;
+      }
+      .section-title.session {
+        color: #e6db74;
+      }
 
       .section-count {
         background: #bbb;
@@ -898,7 +911,7 @@
 
       .storage-key {
         color: #007acc;
-        font-family: "Consolas", "Monaco", monospace;
+        font-family: 'Consolas', 'Monaco', monospace;
         font-size: 13px;
         font-weight: 600;
       }
@@ -953,7 +966,7 @@
 
       .storage-value {
         flex: 1;
-        font-family: "Consolas", "Monaco", monospace;
+        font-family: 'Consolas', 'Monaco', monospace;
         font-size: 12px;
         color: #d8773d;
         word-break: break-all;
@@ -974,7 +987,7 @@
 
       /* JSON Tree View */
       .json-tree-view {
-        font-family: "Consolas", "Monaco", monospace;
+        font-family: 'Consolas', 'Monaco', monospace;
         font-size: 11px;
         line-height: 1.6;
         color: #333333;
@@ -1050,7 +1063,7 @@
         background: #e8e8e8;
         border-radius: 6px;
         border-left: 3px solid #007acc;
-        font-family: "Consolas", "Monaco", monospace;
+        font-family: 'Consolas', 'Monaco', monospace;
         font-size: 11px;
         line-height: 1.6;
         overflow-x: auto;
@@ -1117,7 +1130,7 @@
         cursor: pointer;
         margin-left: 8px;
         transition: all 0.2s ease;
-        font-family: "Segoe UI", sans-serif;
+        font-family: 'Segoe UI', sans-serif;
         white-space: nowrap;
       }
 
@@ -1190,7 +1203,7 @@
 
       .sticky-label {
         flex: 1;
-        font-family: "Consolas", "Monaco", monospace;
+        font-family: 'Consolas', 'Monaco', monospace;
         font-size: 11px;
         color: #007acc;
         overflow: hidden;
@@ -1265,16 +1278,26 @@
 
       /* Animation */
       @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(-8px); }
-        to { opacity: 1; transform: translateY(0); }
+        from {
+          opacity: 0;
+          transform: translateY(-8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
       }
 
       .console-section {
         animation: fadeIn 0.3s ease forwards;
       }
 
-      .console-section:nth-child(2) { animation-delay: 0.1s; }
-      .console-section:nth-child(3) { animation-delay: 0.2s; }
+      .console-section:nth-child(2) {
+        animation-delay: 0.1s;
+      }
+      .console-section:nth-child(3) {
+        animation-delay: 0.2s;
+      }
 
       /* Mock Tab Styles */
       .mock-container {
@@ -1315,11 +1338,22 @@
         text-overflow: ellipsis;
       }
 
-      .network-table-header .col-name { padding-left: 8px; }
-      .network-table-header .col-status { text-align: center; }
-      .network-table-header .col-type { text-align: center; }
-      .network-table-header .col-size { text-align: right; }
-      .network-table-header .col-time { text-align: right; padding-right: 8px; }
+      .network-table-header .col-name {
+        padding-left: 8px;
+      }
+      .network-table-header .col-status {
+        text-align: center;
+      }
+      .network-table-header .col-type {
+        text-align: center;
+      }
+      .network-table-header .col-size {
+        text-align: right;
+      }
+      .network-table-header .col-time {
+        text-align: right;
+        padding-right: 8px;
+      }
 
       .mock-list-header {
         padding: 8px 12px;
@@ -1432,7 +1466,7 @@
         text-align: center;
       }
 
-      .mock-item .col-mock-switch input[type="checkbox"] {
+      .mock-item .col-mock-switch input[type='checkbox'] {
         width: 14px;
         height: 14px;
         cursor: pointer;
@@ -1492,11 +1526,26 @@
         font-weight: 600;
       }
 
-      .mock-item .method.get { background: #2d7d46; color: #333333; }
-      .mock-item .method.post { background: #0e639c; color: #333333; }
-      .mock-item .method.put { background: #b8860b; color: #333333; }
-      .mock-item .method.delete { background: #c53030; color: #333333; }
-      .mock-item .method.patch { background: #6b4c9a; color: #333333; }
+      .mock-item .method.get {
+        background: #2d7d46;
+        color: #333333;
+      }
+      .mock-item .method.post {
+        background: #0e639c;
+        color: #333333;
+      }
+      .mock-item .method.put {
+        background: #b8860b;
+        color: #333333;
+      }
+      .mock-item .method.delete {
+        background: #c53030;
+        color: #333333;
+      }
+      .mock-item .method.patch {
+        background: #6b4c9a;
+        color: #333333;
+      }
 
       .mock-item .status {
         font-size: 10px;
@@ -1505,13 +1554,26 @@
         display: inline-block;
       }
 
-      .mock-item .status.success { background: #2d7d46; color: #fff; }
-      .mock-item .status.error { background: #c53030; color: #fff; }
-      .mock-item .status.pending { background: #e0a040; color: #fff; }
-      .mock-item .status.mocked { background: #4ec9b0; color: #fff; font-weight: 600; }
+      .mock-item .status.success {
+        background: #2d7d46;
+        color: #fff;
+      }
+      .mock-item .status.error {
+        background: #c53030;
+        color: #fff;
+      }
+      .mock-item .status.pending {
+        background: #e0a040;
+        color: #fff;
+      }
+      .mock-item .status.mocked {
+        background: #4ec9b0;
+        color: #fff;
+        font-weight: 600;
+      }
 
       .mock-item .url {
-        font-family: "Consolas", "Monaco", monospace;
+        font-family: 'Consolas', 'Monaco', monospace;
         font-size: 11px;
         color: #007acc;
         white-space: nowrap;
@@ -1560,7 +1622,7 @@
       }
 
       .mock-editor-header .request-url {
-        font-family: "Consolas", "Monaco", monospace;
+        font-family: 'Consolas', 'Monaco', monospace;
         font-size: 11px;
         color: #007acc;
       }
@@ -1716,7 +1778,7 @@
         border: 1px solid #bbb;
         border-radius: 4px;
         color: #333333;
-        font-family: "Consolas", "Monaco", monospace;
+        font-family: 'Consolas', 'Monaco', monospace;
         font-size: 11px;
         line-height: 1.5;
         padding: 12px;
@@ -1747,7 +1809,7 @@
         cursor: pointer;
         border: 1px solid #999;
         transition: all 0.2s ease;
-        font-family: "Segoe UI", sans-serif;
+        font-family: 'Segoe UI', sans-serif;
       }
 
       .mock-btn.primary {
@@ -1835,7 +1897,7 @@
       }
 
       .headers-table td {
-        font-family: "Consolas", "Monaco", monospace;
+        font-family: 'Consolas', 'Monaco', monospace;
         color: #007acc;
         word-break: break-all;
       }
@@ -1909,7 +1971,7 @@
 
       #current-domain-text {
         color: #007acc;
-        font-family: "Consolas", "Monaco", monospace;
+        font-family: 'Consolas', 'Monaco', monospace;
         background: #e5e5e5;
         padding: 2px 6px;
         border-radius: 3px;
@@ -1941,7 +2003,8 @@
       }
 
       @keyframes mockedPulse {
-        0%, 100% {
+        0%,
+        100% {
           background: #4ec9b0;
         }
         50% {
@@ -2001,8 +2064,13 @@
       }
 
       @keyframes loadingPulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.5; }
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
       }
 
       /* Filter input icon */
@@ -2042,7 +2110,7 @@
       }
 
       /* Filter row styling */
-      .mock-filter-row input[type="number"]:focus {
+      .mock-filter-row input[type='number']:focus {
         border-color: #007acc;
         outline: none;
       }
@@ -2179,16 +2247,46 @@
         text-transform: uppercase;
       }
 
-      .type-icon.xhr { background: #0e639c; color: #333333; }
-      .type-icon.fetch { background: #0e639c; color: #333333; }
-      .type-icon.doc { background: #6b4c9a; color: #333333; }
-      .type-icon.js { background: #b8860b; color: #333333; }
-      .type-icon.css { background: #2d7d46; color: #333333; }
-      .type-icon.img { background: #c53030; color: #333333; }
-      .type-icon.media { background: #e53e3e; color: #333333; }
-      .type-icon.font { background: #805ad5; color: #333333; }
-      .type-icon.ws { background: #dd6b20; color: #333333; }
-      .type-icon.other { background: #999; color: #333333; }
+      .type-icon.xhr {
+        background: #0e639c;
+        color: #333333;
+      }
+      .type-icon.fetch {
+        background: #0e639c;
+        color: #333333;
+      }
+      .type-icon.doc {
+        background: #6b4c9a;
+        color: #333333;
+      }
+      .type-icon.js {
+        background: #b8860b;
+        color: #333333;
+      }
+      .type-icon.css {
+        background: #2d7d46;
+        color: #333333;
+      }
+      .type-icon.img {
+        background: #c53030;
+        color: #333333;
+      }
+      .type-icon.media {
+        background: #e53e3e;
+        color: #333333;
+      }
+      .type-icon.font {
+        background: #805ad5;
+        color: #333333;
+      }
+      .type-icon.ws {
+        background: #dd6b20;
+        color: #333333;
+      }
+      .type-icon.other {
+        background: #999;
+        color: #333333;
+      }
 
       /* Improved mock list header */
       .mock-list-header-info {
@@ -2263,7 +2361,7 @@
         left: -100%;
         width: 100%;
         height: 100%;
-        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
         transition: left 0.3s ease;
       }
 
@@ -2470,13 +2568,29 @@
       }
 
       /* JSON Syntax Highlighting */
-      .json-key { color: #007acc; }
-      .json-string { color: #d8773d; }
-      .json-number { color: #2d8e4f; }
-      .json-boolean { color: #007acc; }
-      .json-null { color: #007acc; font-style: italic; }
-      .json-bracket { color: #333333; }
-      .json-colon { color: #333333; margin: 0 4px; }
+      .json-key {
+        color: #007acc;
+      }
+      .json-string {
+        color: #d8773d;
+      }
+      .json-number {
+        color: #2d8e4f;
+      }
+      .json-boolean {
+        color: #007acc;
+      }
+      .json-null {
+        color: #007acc;
+        font-style: italic;
+      }
+      .json-bracket {
+        color: #333333;
+      }
+      .json-colon {
+        color: #333333;
+        margin: 0 4px;
+      }
 
       /* ========== Chrome DevTools Style JSON Preview ========== */
       .json-preview-container {
@@ -2602,7 +2716,9 @@
         color: #666666;
         cursor: pointer;
         user-select: none;
-        transition: transform 0.15s ease, color 0.15s ease;
+        transition:
+          transform 0.15s ease,
+          color 0.15s ease;
         flex-shrink: 0;
         position: relative;
         border-radius: 3px;
@@ -2867,11 +2983,26 @@
       }
 
       /* Method badge styles */
-      .mock-item .method.get { background: #2d7d46; color: #fff; }
-      .mock-item .method.post { background: #0e639c; color: #fff; }
-      .mock-item .method.put { background: #b8860b; color: #fff; }
-      .mock-item .method.delete { background: #c53030; color: #fff; }
-      .mock-item .method.patch { background: #6b4c9a; color: #fff; }
+      .mock-item .method.get {
+        background: #2d7d46;
+        color: #fff;
+      }
+      .mock-item .method.post {
+        background: #0e639c;
+        color: #fff;
+      }
+      .mock-item .method.put {
+        background: #b8860b;
+        color: #fff;
+      }
+      .mock-item .method.delete {
+        background: #c53030;
+        color: #fff;
+      }
+      .mock-item .method.patch {
+        background: #6b4c9a;
+        color: #fff;
+      }
 
       /* Mock badge animation */
       .mock-item .mock-badge {
@@ -2879,8 +3010,13 @@
       }
 
       @keyframes mockBadgePulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.7; }
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.7;
+        }
       }
 
       /* Empty state improvements */
@@ -2911,7 +3047,7 @@
 
       /* Textarea improvements */
       .mock-response-editor textarea {
-        font-family: "Fira Code", "Consolas", "Monaco", monospace;
+        font-family: 'Fira Code', 'Consolas', 'Monaco', monospace;
         line-height: 1.6;
         tab-size: 2;
       }
@@ -3765,7 +3901,9 @@
         color: #333333;
         font-size: 13px;
         outline: none;
-        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        transition:
+          border-color 0.2s ease,
+          box-shadow 0.2s ease;
       }
 
       .folder-dialog-field input:focus {
@@ -3791,7 +3929,7 @@
         cursor: pointer;
         border: 1px solid;
         transition: all 0.2s ease;
-        font-family: "Segoe UI", sans-serif;
+        font-family: 'Segoe UI', sans-serif;
       }
 
       .folder-dialog-btn.primary {
@@ -3829,23 +3967,23 @@
         position: relative;
       }
 
-      .bookmark-folder[data-level="0"] {
+      .bookmark-folder[data-level='0'] {
         margin-left: 0;
       }
 
-      .bookmark-folder[data-level="1"] {
+      .bookmark-folder[data-level='1'] {
         margin-left: 16px;
       }
 
-      .bookmark-folder[data-level="2"] {
+      .bookmark-folder[data-level='2'] {
         margin-left: 32px;
       }
 
-      .bookmark-folder[data-level="3"] {
+      .bookmark-folder[data-level='3'] {
         margin-left: 48px;
       }
 
-      .bookmark-folder[data-level="4"] {
+      .bookmark-folder[data-level='4'] {
         margin-left: 64px;
       }
 
@@ -3858,7 +3996,11 @@
         align-items: center;
         gap: 8px;
         padding: 10px 12px;
-        background: linear-gradient(135deg, rgba(0, 122, 204, 0.08) 0%, rgba(0, 122, 204, 0.04) 100%);
+        background: linear-gradient(
+          135deg,
+          rgba(0, 122, 204, 0.08) 0%,
+          rgba(0, 122, 204, 0.04) 100%
+        );
         border: 1px solid rgba(0, 122, 204, 0.2);
         border-radius: 6px;
         transition: all 0.2s ease;
@@ -3866,7 +4008,11 @@
       }
 
       .bookmark-folder-header:hover {
-        background: linear-gradient(135deg, rgba(0, 122, 204, 0.12) 0%, rgba(0, 122, 204, 0.08) 100%);
+        background: linear-gradient(
+          135deg,
+          rgba(0, 122, 204, 0.12) 0%,
+          rgba(0, 122, 204, 0.08) 100%
+        );
         border-color: rgba(0, 122, 204, 0.3);
       }
 
@@ -3945,24 +4091,40 @@
       }
 
       /* Hierarchy background colors */
-      .bookmark-folder[data-level="0"] > .bookmark-folder-header {
-        background: linear-gradient(135deg, rgba(0, 122, 204, 0.08) 0%, rgba(0, 122, 204, 0.04) 100%);
+      .bookmark-folder[data-level='0'] > .bookmark-folder-header {
+        background: linear-gradient(
+          135deg,
+          rgba(0, 122, 204, 0.08) 0%,
+          rgba(0, 122, 204, 0.04) 100%
+        );
       }
 
-      .bookmark-folder[data-level="1"] > .bookmark-folder-header {
-        background: linear-gradient(135deg, rgba(0, 122, 204, 0.12) 0%, rgba(0, 122, 204, 0.06) 100%);
+      .bookmark-folder[data-level='1'] > .bookmark-folder-header {
+        background: linear-gradient(
+          135deg,
+          rgba(0, 122, 204, 0.12) 0%,
+          rgba(0, 122, 204, 0.06) 100%
+        );
       }
 
-      .bookmark-folder[data-level="2"] > .bookmark-folder-header {
-        background: linear-gradient(135deg, rgba(0, 122, 204, 0.16) 0%, rgba(0, 122, 204, 0.08) 100%);
+      .bookmark-folder[data-level='2'] > .bookmark-folder-header {
+        background: linear-gradient(
+          135deg,
+          rgba(0, 122, 204, 0.16) 0%,
+          rgba(0, 122, 204, 0.08) 100%
+        );
       }
 
-      .bookmark-folder[data-level="3"] > .bookmark-folder-header {
-        background: linear-gradient(135deg, rgba(0, 122, 204, 0.20) 0%, rgba(0, 122, 204, 0.10) 100%);
+      .bookmark-folder[data-level='3'] > .bookmark-folder-header {
+        background: linear-gradient(135deg, rgba(0, 122, 204, 0.2) 0%, rgba(0, 122, 204, 0.1) 100%);
       }
 
-      .bookmark-folder[data-level="4"] > .bookmark-folder-header {
-        background: linear-gradient(135deg, rgba(0, 122, 204, 0.24) 0%, rgba(0, 122, 204, 0.12) 100%);
+      .bookmark-folder[data-level='4'] > .bookmark-folder-header {
+        background: linear-gradient(
+          135deg,
+          rgba(0, 122, 204, 0.24) 0%,
+          rgba(0, 122, 204, 0.12) 100%
+        );
       }
 
       /* Drop indicator */
@@ -3976,23 +4138,23 @@
       }
 
       /* Bookmark item hierarchy indentation */
-      .bookmark-item[data-level="0"] {
+      .bookmark-item[data-level='0'] {
         margin-left: 0;
       }
 
-      .bookmark-item[data-level="1"] {
+      .bookmark-item[data-level='1'] {
         margin-left: 16px;
       }
 
-      .bookmark-item[data-level="2"] {
+      .bookmark-item[data-level='2'] {
         margin-left: 32px;
       }
 
-      .bookmark-item[data-level="3"] {
+      .bookmark-item[data-level='3'] {
         margin-left: 48px;
       }
 
-      .bookmark-item[data-level="4"] {
+      .bookmark-item[data-level='4'] {
         margin-left: 64px;
       }
 
@@ -4058,7 +4220,9 @@
         font-size: 14px;
         cursor: grab;
         opacity: 0;
-        transition: opacity 0.2s ease, color 0.2s ease;
+        transition:
+          opacity 0.2s ease,
+          color 0.2s ease;
         user-select: none;
         flex-shrink: 0;
         padding: 0 6px;
@@ -4086,40 +4250,52 @@
       }
 
       /* Additional levels for deep nesting */
-      .bookmark-item[data-level="5"],
-      .bookmark-folder[data-level="5"] {
+      .bookmark-item[data-level='5'],
+      .bookmark-folder[data-level='5'] {
         margin-left: 80px;
       }
 
-      .bookmark-item[data-level="6"],
-      .bookmark-folder[data-level="6"] {
+      .bookmark-item[data-level='6'],
+      .bookmark-folder[data-level='6'] {
         margin-left: 96px;
       }
 
-      .bookmark-item[data-level="7"],
-      .bookmark-folder[data-level="7"] {
+      .bookmark-item[data-level='7'],
+      .bookmark-folder[data-level='7'] {
         margin-left: 112px;
       }
 
-      .bookmark-item[data-level="8"],
-      .bookmark-folder[data-level="8"] {
+      .bookmark-item[data-level='8'],
+      .bookmark-folder[data-level='8'] {
         margin-left: 128px;
       }
 
-      .bookmark-folder[data-level="5"] > .bookmark-folder-header {
-        background: linear-gradient(135deg, rgba(0, 122, 204, 0.28) 0%, rgba(0, 122, 204, 0.14) 100%);
+      .bookmark-folder[data-level='5'] > .bookmark-folder-header {
+        background: linear-gradient(
+          135deg,
+          rgba(0, 122, 204, 0.28) 0%,
+          rgba(0, 122, 204, 0.14) 100%
+        );
       }
 
-      .bookmark-folder[data-level="6"] > .bookmark-folder-header {
-        background: linear-gradient(135deg, rgba(0, 122, 204, 0.32) 0%, rgba(0, 122, 204, 0.16) 100%);
+      .bookmark-folder[data-level='6'] > .bookmark-folder-header {
+        background: linear-gradient(
+          135deg,
+          rgba(0, 122, 204, 0.32) 0%,
+          rgba(0, 122, 204, 0.16) 100%
+        );
       }
 
-      .bookmark-folder[data-level="7"] > .bookmark-folder-header {
-        background: linear-gradient(135deg, rgba(0, 122, 204, 0.36) 0%, rgba(0, 122, 204, 0.18) 100%);
+      .bookmark-folder[data-level='7'] > .bookmark-folder-header {
+        background: linear-gradient(
+          135deg,
+          rgba(0, 122, 204, 0.36) 0%,
+          rgba(0, 122, 204, 0.18) 100%
+        );
       }
 
-      .bookmark-folder[data-level="8"] > .bookmark-folder-header {
-        background: linear-gradient(135deg, rgba(0, 122, 204, 0.40) 0%, rgba(0, 122, 204, 0.20) 100%);
+      .bookmark-folder[data-level='8'] > .bookmark-folder-header {
+        background: linear-gradient(135deg, rgba(0, 122, 204, 0.4) 0%, rgba(0, 122, 204, 0.2) 100%);
       }
 
       /* Improved drag feedback */
@@ -4140,7 +4316,8 @@
       }
 
       @keyframes pulse-border {
-        0%, 100% {
+        0%,
+        100% {
           border-color: #4fc3f7;
           box-shadow: 0 0 20px rgba(79, 195, 247, 0.4);
         }
@@ -4201,7 +4378,8 @@
       }
 
       @keyframes drop-pulse {
-        0%, 100% {
+        0%,
+        100% {
           opacity: 1;
           transform: scaleX(1);
         }
@@ -4243,15 +4421,15 @@
         background: #007acc;
       }
 
-      .bookmark-item[data-level="1"]::before {
+      .bookmark-item[data-level='1']::before {
         background: rgba(0, 122, 204, 0.3);
       }
 
-      .bookmark-item[data-level="2"]::before {
+      .bookmark-item[data-level='2']::before {
         background: rgba(0, 122, 204, 0.5);
       }
 
-      .bookmark-item[data-level="3"]::before {
+      .bookmark-item[data-level='3']::before {
         background: rgba(0, 122, 204, 0.7);
       }
 
@@ -4407,32 +4585,77 @@
                 <span class="batch-picker-status" id="batch-picker-status">未启动</span>
               </div>
               <div class="batch-picker-actions">
-                <button class="batch-action-btn primary" id="start-picker-btn" title="进入选择模式，在页面上点击选择元素">🎯 开始选择</button>
-                <button class="batch-action-btn" id="clear-selection-btn" title="清除所有已选择的元素">🗑️ 清除选择</button>
-                <button class="batch-action-btn danger" id="hide-selected-btn" title="隐藏所有已选择的元素">👁️ 隐藏选中</button>
-                <button class="batch-action-btn success" id="show-selected-btn" title="显示所有已选择的元素">👁️‍🗨️ 显示选中</button>
+                <button
+                  class="batch-action-btn primary"
+                  id="start-picker-btn"
+                  title="进入选择模式，在页面上点击选择元素"
+                >
+                  🎯 开始选择
+                </button>
+                <button
+                  class="batch-action-btn"
+                  id="clear-selection-btn"
+                  title="清除所有已选择的元素"
+                >
+                  🗑️ 清除选择
+                </button>
+                <button
+                  class="batch-action-btn danger"
+                  id="hide-selected-btn"
+                  title="隐藏所有已选择的元素"
+                >
+                  👁️ 隐藏选中
+                </button>
+                <button
+                  class="batch-action-btn success"
+                  id="show-selected-btn"
+                  title="显示所有已选择的元素"
+                >
+                  👁️‍🗨️ 显示选中
+                </button>
               </div>
-              <div class="batch-selected-info" id="batch-selected-info" style="display: none;">
+              <div class="batch-selected-info" id="batch-selected-info" style="display: none">
                 <div class="batch-selected-header">
                   <span>已选择 <span id="batch-selected-count">0</span> 个元素:</span>
                   <div class="batch-quick-actions">
-                    <button class="batch-quick-btn" id="select-all-btn" title="全选 (Ctrl+A)">☑️</button>
-                    <button class="batch-quick-btn" id="deselect-all-btn" title="取消全选">⬜</button>
-                    <button class="batch-quick-btn" id="invert-selection-btn" title="反选">🔄</button>
-                    <button class="batch-copy-btn" id="copy-merged-selector-btn" title="复制合并后的选择器">📋</button>
+                    <button class="batch-quick-btn" id="select-all-btn" title="全选 (Ctrl+A)">
+                      ☑️
+                    </button>
+                    <button class="batch-quick-btn" id="deselect-all-btn" title="取消全选">
+                      ⬜
+                    </button>
+                    <button class="batch-quick-btn" id="invert-selection-btn" title="反选">
+                      🔄
+                    </button>
+                    <button
+                      class="batch-copy-btn"
+                      id="copy-merged-selector-btn"
+                      title="复制合并后的选择器"
+                    >
+                      📋
+                    </button>
                   </div>
                 </div>
                 <div class="batch-selected-list" id="batch-selected-list"></div>
               </div>
-              <div class="batch-merged-selector" id="batch-merged-selector-section" style="display: none;">
+              <div
+                class="batch-merged-selector"
+                id="batch-merged-selector-section"
+                style="display: none"
+              >
                 <div class="batch-merged-label">
                   <span>选择器选项:</span>
-                  <span id="batch-merge-info" class="batch-merge-info" style="display: none;"></span>
+                  <span id="batch-merge-info" class="batch-merge-info" style="display: none"></span>
                 </div>
-                <div id="selector-options-container" style="display: flex; flex-direction: column; gap: 6px;">
+                <div
+                  id="selector-options-container"
+                  style="display: flex; flex-direction: column; gap: 6px"
+                >
                   <!-- 选择器选项将动态生成 -->
                 </div>
-                <button class="batch-apply-btn" id="apply-hide-btn" title="应用隐藏样式到页面">✅ 应用隐藏</button>
+                <button class="batch-apply-btn" id="apply-hide-btn" title="应用隐藏样式到页面">
+                  ✅ 应用隐藏
+                </button>
               </div>
             </div>
           </div>
@@ -4445,18 +4668,64 @@
           <span class="header-icon">🔧</span>
           <span>接口 Mock</span>
           <!-- Mock 总开关 -->
-          <div style="margin-left: auto; display: flex; align-items: center; gap: 8px;">
-            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11px; color: #333; background: #e8e8e8; padding: 4px 10px; border-radius: 4px; border: 1px solid #d0d0d0;">
-              <input type="checkbox" id="mock-global-switch" style="margin: 0; accent-color: #4ec9b0;">
+          <div style="margin-left: auto; display: flex; align-items: center; gap: 8px">
+            <label
+              style="
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                cursor: pointer;
+                font-size: 11px;
+                color: #333;
+                background: #e8e8e8;
+                padding: 4px 10px;
+                border-radius: 4px;
+                border: 1px solid #d0d0d0;
+              "
+            >
+              <input
+                type="checkbox"
+                id="mock-global-switch"
+                style="margin: 0; accent-color: #4ec9b0"
+              />
               <span id="mock-global-status">Mock 关闭</span>
             </label>
-            <button class="mock-btn secondary" id="mock-clear-btn" style="padding: 4px 8px; font-size: 10px;">清空</button>
-            <button class="mock-btn secondary" id="mock-refresh-btn" style="padding: 4px 8px; font-size: 10px;">刷新</button>
+            <button
+              class="mock-btn secondary"
+              id="mock-clear-btn"
+              style="padding: 4px 8px; font-size: 10px"
+            >
+              清空
+            </button>
+            <button
+              class="mock-btn secondary"
+              id="mock-refresh-btn"
+              style="padding: 4px 8px; font-size: 10px"
+            >
+              刷新
+            </button>
           </div>
         </div>
-        <div class="mock-tip" style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 8px 12px; margin: 0 8px 8px 8px; font-size: 11px; color: #856404; display: flex; align-items: center; gap: 6px;">
+        <div
+          class="mock-tip"
+          style="
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 4px;
+            padding: 8px 12px;
+            margin: 0 8px 8px 8px;
+            font-size: 11px;
+            color: #856404;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+          "
+        >
           <span>💡</span>
-          <span>此面板只能捕获打开<strong>之后</strong>发生的 XHR/Fetch 请求。请先打开此面板，然后在页面中操作触发接口请求。</span>
+          <span
+            >此面板只能捕获打开<strong>之后</strong>发生的 XHR/Fetch
+            请求。请先打开此面板，然后在页面中操作触发接口请求。</span
+          >
         </div>
         <div class="mock-container">
           <!-- Request List -->
@@ -4474,37 +4743,136 @@
               <button class="type-tab" data-type="ws">WS</button>
             </div>
             <div class="mock-filter">
-              <input type="text" id="mock-filter-input" placeholder="过滤显示 (空格分隔)...">
-              <div id="mock-domain-info" style="font-size: 10px; color: #666666; margin-top: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <input type="text" id="mock-filter-input" placeholder="过滤显示 (空格分隔)..." />
+              <div
+                id="mock-domain-info"
+                style="
+                  font-size: 10px;
+                  color: #666666;
+                  margin-top: 8px;
+                  display: flex;
+                  align-items: center;
+                  gap: 8px;
+                  flex-wrap: wrap;
+                "
+              >
                 <span id="current-domain-text" title="当前域名">-</span>
-                <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
-                  <input type="checkbox" id="filter-current-domain" style="margin: 0; accent-color: #007acc;">
+                <label style="display: flex; align-items: center; gap: 4px; cursor: pointer">
+                  <input
+                    type="checkbox"
+                    id="filter-current-domain"
+                    style="margin: 0; accent-color: #007acc"
+                  />
                   <span>仅当前域名</span>
                 </label>
-                <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
-                  <input type="checkbox" id="auto-scroll" style="margin: 0; accent-color: #007acc;" checked>
+                <label style="display: flex; align-items: center; gap: 4px; cursor: pointer">
+                  <input
+                    type="checkbox"
+                    id="auto-scroll"
+                    style="margin: 0; accent-color: #007acc"
+                    checked
+                  />
                   <span>自动滚动</span>
                 </label>
               </div>
-              <div class="mock-filter-row" style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
-                <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; font-size: 10px; color: #666666;">
+              <div
+                class="mock-filter-row"
+                style="display: flex; align-items: center; gap: 8px; margin-top: 8px"
+              >
+                <label
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                    cursor: pointer;
+                    font-size: 10px;
+                    color: #666666;
+                  "
+                >
                   <span>最大显示:</span>
-                  <input type="number" id="max-display-count" value="50" min="10" max="500" step="10"
-                         style="width: 60px; padding: 2px 4px; background: #e8e8e8; border: 1px solid #bbb; border-radius: 3px; color: #333333; font-size: 10px;">
+                  <input
+                    type="number"
+                    id="max-display-count"
+                    value="50"
+                    min="10"
+                    max="500"
+                    step="10"
+                    style="
+                      width: 60px;
+                      padding: 2px 4px;
+                      background: #e8e8e8;
+                      border: 1px solid #bbb;
+                      border-radius: 3px;
+                      color: #333333;
+                      font-size: 10px;
+                    "
+                  />
                 </label>
               </div>
               <!-- Exclude patterns section -->
-              <div class="mock-exclude-section" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #d0d0d0;">
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
-                  <span style="font-size: 10px; color: #666666;">排除关键词 (空格分隔)</span>
-                  <button id="clear-exclude-btn" style="font-size: 9px; padding: 1px 6px; background: #bbb; border: 1px solid #999; border-radius: 3px; color: #666666; cursor: pointer;">清空</button>
+              <div
+                class="mock-exclude-section"
+                style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #d0d0d0"
+              >
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    margin-bottom: 4px;
+                  "
+                >
+                  <span style="font-size: 10px; color: #666666">排除关键词 (空格分隔)</span>
+                  <button
+                    id="clear-exclude-btn"
+                    style="
+                      font-size: 9px;
+                      padding: 1px 6px;
+                      background: #bbb;
+                      border: 1px solid #999;
+                      border-radius: 3px;
+                      color: #666666;
+                      cursor: pointer;
+                    "
+                  >
+                    清空
+                  </button>
                 </div>
-                <div style="display: flex; gap: 4px;">
-                  <input type="text" id="exclude-pattern-input" placeholder="例如: tracking analytics"
-                         style="flex: 1; padding: 4px 8px; background: #e8e8e8; border: 1px solid #bbb; border-radius: 3px; color: #333333; font-size: 10px;">
-                  <button id="add-exclude-btn" style="font-size: 10px; padding: 4px 8px; background: #0e639c; border: 1px solid #0e639c; border-radius: 3px; color: #333333; cursor: pointer;">添加</button>
+                <div style="display: flex; gap: 4px">
+                  <input
+                    type="text"
+                    id="exclude-pattern-input"
+                    placeholder="例如: tracking analytics"
+                    style="
+                      flex: 1;
+                      padding: 4px 8px;
+                      background: #e8e8e8;
+                      border: 1px solid #bbb;
+                      border-radius: 3px;
+                      color: #333333;
+                      font-size: 10px;
+                    "
+                  />
+                  <button
+                    id="add-exclude-btn"
+                    style="
+                      font-size: 10px;
+                      padding: 4px 8px;
+                      background: #0e639c;
+                      border: 1px solid #0e639c;
+                      border-radius: 3px;
+                      color: #333333;
+                      cursor: pointer;
+                    "
+                  >
+                    添加
+                  </button>
                 </div>
-                <div id="exclude-patterns-list" class="exclude-patterns-list" style="margin-top: 4px; max-height: 80px; overflow-y: auto;">
+                <div
+                  id="exclude-patterns-list"
+                  class="exclude-patterns-list"
+                  style="margin-top: 4px; max-height: 80px; overflow-y: auto"
+                >
                   <!-- Exclude patterns will be rendered here -->
                 </div>
               </div>
@@ -4532,8 +4900,18 @@
         <div class="tab-header">
           <span class="header-icon">📦</span>
           <span>页面资源嗅探</span>
-          <div style="margin-left: auto; display: flex; gap: 8px; align-items: center;">
-            <select id="resource-type-filter" class="view-mode-select" style="padding: 4px 8px; font-size: 11px; border: 1px solid #d0d0d0; border-radius: 4px; background: #fff;">
+          <div style="margin-left: auto; display: flex; gap: 8px; align-items: center">
+            <select
+              id="resource-type-filter"
+              class="view-mode-select"
+              style="
+                padding: 4px 8px;
+                font-size: 11px;
+                border: 1px solid #d0d0d0;
+                border-radius: 4px;
+                background: #fff;
+              "
+            >
               <option value="all">全部</option>
               <option value="image">图片</option>
               <option value="video">视频</option>
@@ -4541,8 +4919,20 @@
               <option value="document">文档</option>
               <option value="other">其他</option>
             </select>
-            <button class="mock-btn secondary" id="resources-scan-btn" style="padding: 4px 8px; font-size: 10px;">🔍 扫描</button>
-            <button class="mock-btn secondary" id="resources-clear-btn" style="padding: 4px 8px; font-size: 10px;">清空</button>
+            <button
+              class="mock-btn secondary"
+              id="resources-scan-btn"
+              style="padding: 4px 8px; font-size: 10px"
+            >
+              🔍 扫描
+            </button>
+            <button
+              class="mock-btn secondary"
+              id="resources-clear-btn"
+              style="padding: 4px 8px; font-size: 10px"
+            >
+              清空
+            </button>
           </div>
         </div>
         <div class="resources-container" id="resources-container">
@@ -4559,22 +4949,28 @@
         <div class="tab-header">
           <span class="header-icon">🔖</span>
           <span>浏览器书签</span>
-          <div style="margin-left: auto; display: flex; gap: 8px; align-items: center;">
+          <div style="margin-left: auto; display: flex; gap: 8px; align-items: center">
             <select id="bookmarks-view-mode" class="view-mode-select">
               <option value="tree">树形</option>
               <option value="grid" selected>多列</option>
             </select>
-            <button class="mock-btn secondary" id="bookmarks-refresh-btn" style="padding: 4px 8px; font-size: 10px;">🔄 刷新</button>
+            <button
+              class="mock-btn secondary"
+              id="bookmarks-refresh-btn"
+              style="padding: 4px 8px; font-size: 10px"
+            >
+              🔄 刷新
+            </button>
           </div>
         </div>
         <div class="bookmarks-container">
           <!-- Bookmarks Filter -->
           <div class="bookmarks-filter">
-            <input type="text" id="bookmarks-search-input" placeholder="搜索书签...">
+            <input type="text" id="bookmarks-search-input" placeholder="搜索书签..." />
             <div class="bookmarks-stats">
               <span id="bookmarks-count">0 个书签</span>
-              <span style="color: #999999; margin: 0 8px;">|</span>
-              <span style="font-size: 10px; color: #999999;">
+              <span style="color: #999999; margin: 0 8px">|</span>
+              <span style="font-size: 10px; color: #999999">
                 💡 拖拽: 中间放入文件夹, 边缘排序, Ctrl+中部=顶部
               </span>
             </div>
@@ -4591,13 +4987,25 @@
         <div class="tab-header">
           <span class="header-icon">🕐</span>
           <span>浏览历史</span>
-          <button class="mock-btn secondary" id="history-clear-btn" style="margin-left: auto; padding: 4px 8px; font-size: 10px;">🗑️ 清空</button>
-          <button class="mock-btn secondary" id="history-refresh-btn" style="padding: 4px 8px; font-size: 10px;">🔄 刷新</button>
+          <button
+            class="mock-btn secondary"
+            id="history-clear-btn"
+            style="margin-left: auto; padding: 4px 8px; font-size: 10px"
+          >
+            🗑️ 清空
+          </button>
+          <button
+            class="mock-btn secondary"
+            id="history-refresh-btn"
+            style="padding: 4px 8px; font-size: 10px"
+          >
+            🔄 刷新
+          </button>
         </div>
         <div class="history-container">
           <!-- History Filter -->
           <div class="history-filter">
-            <input type="text" id="history-search-input" placeholder="搜索历史...">
+            <input type="text" id="history-search-input" placeholder="搜索历史..." />
             <div class="history-time-range">
               <select id="history-time-range">
                 <option value="hour">过去1小时</option>
@@ -4623,41 +5031,93 @@
         <div class="tab-header">
           <span class="tab-icon">📡</span>
           <span>EventBus 消息监控</span>
-          <div style="margin-left: auto; display: flex; gap: 8px; align-items: center;">
-            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11px;">
-              <input type="checkbox" id="eventbus-monitor-enabled" checked>
+          <div style="margin-left: auto; display: flex; gap: 8px; align-items: center">
+            <label
+              style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11px"
+            >
+              <input type="checkbox" id="eventbus-monitor-enabled" checked />
               <span>启用监控</span>
             </label>
-            <button class="mock-btn secondary" id="eventbus-clear-btn" style="padding: 4px 8px; font-size: 10px;">🗑️ 清空</button>
-            <button class="mock-btn secondary" id="eventbus-pause-btn" style="padding: 4px 8px; font-size: 10px;">⏸️ 暂停</button>
+            <button
+              class="mock-btn secondary"
+              id="eventbus-clear-btn"
+              style="padding: 4px 8px; font-size: 10px"
+            >
+              🗑️ 清空
+            </button>
+            <button
+              class="mock-btn secondary"
+              id="eventbus-pause-btn"
+              style="padding: 4px 8px; font-size: 10px"
+            >
+              ⏸️ 暂停
+            </button>
           </div>
         </div>
 
         <!-- EventBus Stats -->
-        <div class="eventbus-stats" style="display: flex; gap: 12px; padding: 12px; background: #f5f5f5; border-bottom: 1px solid #e0e0e0;">
-          <div style="flex: 1; text-align: center;">
-            <div id="eventbus-sent" style="font-size: 20px; font-weight: 600; color: #1976d2;">0</div>
-            <div style="font-size: 11px; color: #666;">发送</div>
+        <div
+          class="eventbus-stats"
+          style="
+            display: flex;
+            gap: 12px;
+            padding: 12px;
+            background: #f5f5f5;
+            border-bottom: 1px solid #e0e0e0;
+          "
+        >
+          <div style="flex: 1; text-align: center">
+            <div id="eventbus-sent" style="font-size: 20px; font-weight: 600; color: #1976d2">
+              0
+            </div>
+            <div style="font-size: 11px; color: #666">发送</div>
           </div>
-          <div style="flex: 1; text-align: center;">
-            <div id="eventbus-received" style="font-size: 20px; font-weight: 600; color: #388e3c;">0</div>
-            <div style="font-size: 11px; color: #666;">接收</div>
+          <div style="flex: 1; text-align: center">
+            <div id="eventbus-received" style="font-size: 20px; font-weight: 600; color: #388e3c">
+              0
+            </div>
+            <div style="font-size: 11px; color: #666">接收</div>
           </div>
-          <div style="flex: 1; text-align: center;">
-            <div id="eventbus-failed" style="font-size: 20px; font-weight: 600; color: #dc3545;">0</div>
-            <div style="font-size: 11px; color: #666;">失败</div>
+          <div style="flex: 1; text-align: center">
+            <div id="eventbus-failed" style="font-size: 20px; font-weight: 600; color: #dc3545">
+              0
+            </div>
+            <div style="font-size: 11px; color: #666">失败</div>
           </div>
-          <div style="flex: 1; text-align: center;">
-            <div id="eventbus-latency" style="font-size: 20px; font-weight: 600; color: #f57c00;">0ms</div>
-            <div style="font-size: 11px; color: #666;">平均延迟</div>
+          <div style="flex: 1; text-align: center">
+            <div id="eventbus-latency" style="font-size: 20px; font-weight: 600; color: #f57c00">
+              0ms
+            </div>
+            <div style="font-size: 11px; color: #666">平均延迟</div>
           </div>
         </div>
 
         <!-- EventBus Filter -->
-        <div style="padding: 8px 12px; border-bottom: 1px solid #e0e0e0; display: flex; gap: 8px; align-items: center;">
-          <input type="text" id="eventbus-filter" placeholder="过滤消息类型..."
-            style="flex: 1; padding: 6px 8px; font-size: 11px; border: 1px solid #d0d0d0; border-radius: 4px;">
-          <select id="eventbus-direction-filter" style="padding: 6px 8px; font-size: 11px; border: 1px solid #d0d0d0; border-radius: 4px;">
+        <div
+          style="
+            padding: 8px 12px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+          "
+        >
+          <input
+            type="text"
+            id="eventbus-filter"
+            placeholder="过滤消息类型..."
+            style="
+              flex: 1;
+              padding: 6px 8px;
+              font-size: 11px;
+              border: 1px solid #d0d0d0;
+              border-radius: 4px;
+            "
+          />
+          <select
+            id="eventbus-direction-filter"
+            style="padding: 6px 8px; font-size: 11px; border: 1px solid #d0d0d0; border-radius: 4px"
+          >
             <option value="all">全部方向</option>
             <option value="send">发送</option>
             <option value="receive">接收</option>
@@ -4665,8 +5125,8 @@
         </div>
 
         <!-- EventBus Message List -->
-        <div id="eventbus-message-list" style="flex: 1; overflow-y: auto; padding: 8px;">
-          <div style="color: #999; text-align: center; padding: 40px;">等待消息...</div>
+        <div id="eventbus-message-list" style="flex: 1; overflow-y: auto; padding: 8px">
+          <div style="color: #999; text-align: center; padding: 40px">等待消息...</div>
         </div>
       </div>
     </div>
@@ -4683,11 +5143,11 @@
         <div class="bookmark-edit-title" id="bookmark-edit-dialog-title">编辑书签</div>
         <div class="bookmark-edit-field">
           <label for="bookmark-edit-title-input">标题</label>
-          <input type="text" id="bookmark-edit-title-input" placeholder="输入标题">
+          <input type="text" id="bookmark-edit-title-input" placeholder="输入标题" />
         </div>
         <div class="bookmark-edit-field" id="bookmark-edit-url-field">
           <label for="bookmark-edit-url-input">网址</label>
-          <input type="text" id="bookmark-edit-url-input" placeholder="https://example.com">
+          <input type="text" id="bookmark-edit-url-input" placeholder="https://example.com" />
         </div>
         <div class="bookmark-edit-actions">
           <button class="bookmark-edit-btn danger" id="bookmark-edit-delete-btn">删除</button>
@@ -4703,7 +5163,7 @@
         <div class="folder-dialog-title">新建文件夹</div>
         <div class="folder-dialog-field">
           <label for="folder-name-input">文件夹名称</label>
-          <input type="text" id="folder-name-input" placeholder="输入文件夹名称">
+          <input type="text" id="folder-name-input" placeholder="输入文件夹名称" />
         </div>
         <div class="folder-dialog-actions">
           <button class="folder-dialog-btn secondary" id="folder-dialog-cancel-btn">取消</button>
@@ -4715,7 +5175,14 @@
     <!-- Bookmark Context Menu -->
     <div class="bookmark-context-menu" id="bookmark-context-menu">
       <div class="context-menu-item" data-action="edit">✏️ 编辑</div>
-      <div class="context-menu-item" data-action="new-folder" id="context-new-folder" style="display: none;">📁 新建文件夹</div>
+      <div
+        class="context-menu-item"
+        data-action="new-folder"
+        id="context-new-folder"
+        style="display: none"
+      >
+        📁 新建文件夹
+      </div>
       <div class="context-menu-item" data-action="new-bookmark">🔖 新建书签</div>
       <div class="context-menu-divider"></div>
       <div class="context-menu-item danger" data-action="delete">🗑️ 删除</div>

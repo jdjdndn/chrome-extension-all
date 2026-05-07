@@ -2,20 +2,20 @@
 // @match *://*/*
 // 功能：自动检测页面分页按钮，支持键盘快捷键切换上下页
 
-'use strict';
+'use strict'
 
 if (window.KeyboardPaginationLoaded) {
-  console.log('[键盘翻页] 已加载，跳过');
+  console.log('[键盘翻页] 已加载，跳过')
 } else if (!window.getScriptSwitch || !window.getScriptSwitch('keyboard-pagination')) {
-  console.log('[键盘翻页] 已禁用');
+  console.log('[键盘翻页] 已禁用')
 } else {
-  window.KeyboardPaginationLoaded = true;
+  window.KeyboardPaginationLoaded = true
 
   class KeyboardPagination {
     constructor() {
-      this.prevButton = null;
-      this.nextButton = null;
-      this.hintVisible = false;
+      this.prevButton = null
+      this.nextButton = null
+      this.hintVisible = false
       this.config = {
         // 键盘映射
         prevKeys: ['ArrowLeft', 'a', 'A'],
@@ -27,8 +27,8 @@ if (window.KeyboardPaginationLoaded) {
         // 显示提示
         showHint: true,
         // 提示持续时间
-        hintDuration: 2000
-      };
+        hintDuration: 2000,
+      }
 
       // 常见分页按钮选择器
       this.selectors = {
@@ -91,7 +91,7 @@ if (window.KeyboardPaginationLoaded) {
 
           // 社交媒体
           '[data-testid="prev-button"]',
-          '[data-testid="pagination-prev"]'
+          '[data-testid="pagination-prev"]',
         ],
         next: [
           // 通用下一页
@@ -148,89 +148,119 @@ if (window.KeyboardPaginationLoaded) {
 
           // 社交媒体
           '[data-testid="next-button"]',
-          '[data-testid="pagination-next"]'
-        ]
-      };
+          '[data-testid="pagination-next"]',
+        ],
+      }
 
       // 文本匹配模式
       this.textPatterns = {
-        prev: ['上一页', '上一章', '上一节', '上一篇', '上一张', '上一幅', '上一集', '上一期',
-               'previous', 'prev', '«', '‹', '←', '<', 'back', 'before'],
-        next: ['下一页', '下一章', '下一节', '下一篇', '下一张', '下一幅', '下一集', '下一期',
-               'next', '»', '›', '→', '>', 'forward']
-      };
+        prev: [
+          '上一页',
+          '上一章',
+          '上一节',
+          '上一篇',
+          '上一张',
+          '上一幅',
+          '上一集',
+          '上一期',
+          'previous',
+          'prev',
+          '«',
+          '‹',
+          '←',
+          '<',
+          'back',
+          'before',
+        ],
+        next: [
+          '下一页',
+          '下一章',
+          '下一节',
+          '下一篇',
+          '下一张',
+          '下一幅',
+          '下一集',
+          '下一期',
+          'next',
+          '»',
+          '›',
+          '→',
+          '>',
+          'forward',
+        ],
+      }
 
-      this.init();
+      this.init()
     }
 
     init() {
-      this.detectPagination();
-      this.bindEvents();
-      this.createHint();
-      this.injectStyles();
+      this.detectPagination()
+      this.bindEvents()
+      this.createHint()
+      this.injectStyles()
 
       if (this.prevButton || this.nextButton) {
         console.log('[键盘翻页] 检测到分页按钮', {
           prev: this.prevButton ? this.getButtonInfo(this.prevButton) : null,
-          next: this.nextButton ? this.getButtonInfo(this.nextButton) : null
-        });
+          next: this.nextButton ? this.getButtonInfo(this.nextButton) : null,
+        })
       }
     }
 
     detectPagination() {
       // 尝试通过选择器检测
-      this.prevButton = this.findElement('prev');
-      this.nextButton = this.findElement('next');
+      this.prevButton = this.findElement('prev')
+      this.nextButton = this.findElement('next')
 
       // 如果选择器没找到，尝试通过文本检测
       if (!this.prevButton || !this.nextButton) {
-        this.detectByText();
+        this.detectByText()
       }
 
       // 如果还是没找到，尝试检测分页容器
       if (!this.prevButton || !this.nextButton) {
-        this.detectInPaginationContainer();
+        this.detectInPaginationContainer()
       }
     }
 
     findElement(type) {
-      const selectors = this.selectors[type];
+      const selectors = this.selectors[type]
       for (const selector of selectors) {
         try {
           // 跳过 :has() 选择器（兼容性）
-          if (selector.includes(':has(')) continue;
+          if (selector.includes(':has(')) continue
 
-          const elements = document.querySelectorAll(selector);
+          const elements = document.querySelectorAll(selector)
           for (const el of elements) {
             if (this.isValidButton(el, type)) {
-              return el;
+              return el
             }
           }
         } catch (e) {
           // 选择器不支持，跳过
         }
       }
-      return null;
+      return null
     }
 
     detectByText() {
-      const links = document.querySelectorAll('a, button');
+      const links = document.querySelectorAll('a, button')
       const patterns = {
         prev: this.textPatterns.prev,
-        next: this.textPatterns.next
-      };
+        next: this.textPatterns.next,
+      }
 
-      links.forEach(link => {
-        const text = (link.textContent || link.innerText || '').trim().toLowerCase();
-        const title = (link.title || link.getAttribute('aria-label') || '').toLowerCase();
-        const combined = `${text} ${title}`.toLowerCase();
+      links.forEach((link) => {
+        const text = (link.textContent || link.innerText || '').trim().toLowerCase()
+        const title = (link.title || link.getAttribute('aria-label') || '').toLowerCase()
+        const combined = `${text} ${title}`.toLowerCase()
 
         if (!this.prevButton) {
           for (const pattern of patterns.prev) {
             if (combined.includes(pattern.toLowerCase())) {
               if (this.isValidButton(link, 'prev')) {
-                this.prevButton = link;
-                break;
+                this.prevButton = link
+                break
               }
             }
           }
@@ -240,49 +270,57 @@ if (window.KeyboardPaginationLoaded) {
           for (const pattern of patterns.next) {
             if (combined.includes(pattern.toLowerCase())) {
               if (this.isValidButton(link, 'next')) {
-                this.nextButton = link;
-                break;
+                this.nextButton = link
+                break
               }
             }
           }
         }
-      });
+      })
     }
 
     detectInPaginationContainer() {
       // 常见分页容器
       const containerSelectors = [
-        '.pagination', '.pager', '.page-nav', '.pagenavi',
-        '.layui-laypage', '.ant-pagination', '.el-pagination',
-        '[class*="pagination"]', '[class*="pager"]',
-        'nav[aria-label*="pagination"]', 'nav[aria-label*="分页"]'
-      ];
+        '.pagination',
+        '.pager',
+        '.page-nav',
+        '.pagenavi',
+        '.layui-laypage',
+        '.ant-pagination',
+        '.el-pagination',
+        '[class*="pagination"]',
+        '[class*="pager"]',
+        'nav[aria-label*="pagination"]',
+        'nav[aria-label*="分页"]',
+      ]
 
       for (const selector of containerSelectors) {
         try {
-          const container = document.querySelector(selector);
-          if (!container) continue;
+          const container = document.querySelector(selector)
+          if (!container) continue
 
-          const links = container.querySelectorAll('a, button');
-          const validLinks = Array.from(links).filter(link =>
-            !link.classList.contains('active') &&
-            !link.classList.contains('current') &&
-            !link.getAttribute('aria-current')
-          );
+          const links = container.querySelectorAll('a, button')
+          const validLinks = Array.from(links).filter(
+            (link) =>
+              !link.classList.contains('active') &&
+              !link.classList.contains('current') &&
+              !link.getAttribute('aria-current')
+          )
 
           if (validLinks.length >= 2) {
             // 第一个有效链接通常是上一页
             if (!this.prevButton && validLinks[0]) {
-              const first = validLinks[0];
+              const first = validLinks[0]
               if (this.looksLikeNavButton(first, 'prev')) {
-                this.prevButton = first;
+                this.prevButton = first
               }
             }
             // 最后一个有效链接通常是下一页
             if (!this.nextButton && validLinks[validLinks.length - 1]) {
-              const last = validLinks[validLinks.length - 1];
+              const last = validLinks[validLinks.length - 1]
               if (this.looksLikeNavButton(last, 'next')) {
-                this.nextButton = last;
+                this.nextButton = last
               }
             }
           }
@@ -293,131 +331,139 @@ if (window.KeyboardPaginationLoaded) {
     }
 
     isValidButton(el, type) {
-      if (!el) return false;
+      if (!el) return false
 
       // 检查是否可见
-      const rect = el.getBoundingClientRect();
-      if (rect.width === 0 || rect.height === 0) return false;
+      const rect = el.getBoundingClientRect()
+      if (rect.width === 0 || rect.height === 0) return false
 
       // 检查是否禁用
-      if (el.disabled || el.getAttribute('aria-disabled') === 'true') return false;
-      if (el.classList.contains('disabled') || el.classList.contains('is-disabled')) return false;
+      if (el.disabled || el.getAttribute('aria-disabled') === 'true') return false
+      if (el.classList.contains('disabled') || el.classList.contains('is-disabled')) return false
 
       // 检查是否有 href 或 onclick
-      const hasHref = el.tagName === 'A' && el.href && !el.href.includes('#');
-      const hasOnClick = el.hasAttribute('onclick');
-      const isButton = el.tagName === 'BUTTON';
-      const hasRole = el.getAttribute('role') === 'button';
+      const hasHref = el.tagName === 'A' && el.href && !el.href.includes('#')
+      const hasOnClick = el.hasAttribute('onclick')
+      const isButton = el.tagName === 'BUTTON'
+      const hasRole = el.getAttribute('role') === 'button'
 
-      return hasHref || hasOnClick || isButton || hasRole;
+      return hasHref || hasOnClick || isButton || hasRole
     }
 
     looksLikeNavButton(el, type) {
-      const text = (el.textContent || '').trim().toLowerCase();
-      const patterns = this.textPatterns[type];
+      const text = (el.textContent || '').trim().toLowerCase()
+      const patterns = this.textPatterns[type]
 
       // 检查文本
       for (const pattern of patterns) {
-        if (text.includes(pattern.toLowerCase())) return true;
+        if (text.includes(pattern.toLowerCase())) return true
       }
 
       // 检查箭头图标
-      const html = el.innerHTML.toLowerCase();
-      if (type === 'prev' && (html.includes('arrow-left') || html.includes('chevron-left') || html.includes('«'))) return true;
-      if (type === 'next' && (html.includes('arrow-right') || html.includes('chevron-right') || html.includes('»'))) return true;
+      const html = el.innerHTML.toLowerCase()
+      if (
+        type === 'prev' &&
+        (html.includes('arrow-left') || html.includes('chevron-left') || html.includes('«'))
+      )
+        return true
+      if (
+        type === 'next' &&
+        (html.includes('arrow-right') || html.includes('chevron-right') || html.includes('»'))
+      )
+        return true
 
-      return false;
+      return false
     }
 
     getButtonInfo(el) {
       return {
         tag: el.tagName,
         text: (el.textContent || '').trim().substring(0, 30),
-        class: el.className.substring(0, 50)
-      };
+        class: el.className.substring(0, 50),
+      }
     }
 
     bindEvents() {
       document.addEventListener('keydown', (e) => {
         // 忽略输入框中的按键
-        if (this.isInputFocused()) return;
+        if (this.isInputFocused()) return
 
         // 检查修饰键
-        if (this.config.requireAlt && !e.altKey) return;
-        if (this.config.requireCtrl && !e.ctrlKey) return;
+        if (this.config.requireAlt && !e.altKey) return
+        if (this.config.requireCtrl && !e.ctrlKey) return
 
-        const key = e.key;
+        const key = e.key
 
         // 如果页面有可见视频，不拦截左右键（让视频播放器处理快进/快退）
         if ((key === 'ArrowLeft' || key === 'ArrowRight') && this.hasVisibleVideo()) {
-          return;
+          return
         }
 
         // 上一页
         if (this.config.prevKeys.includes(key)) {
           if (this.prevButton) {
-            e.preventDefault();
-            this.clickButton(this.prevButton, 'prev');
+            e.preventDefault()
+            this.clickButton(this.prevButton, 'prev')
           }
         }
 
         // 下一页
         if (this.config.nextKeys.includes(key)) {
           if (this.nextButton) {
-            e.preventDefault();
-            this.clickButton(this.nextButton, 'next');
+            e.preventDefault()
+            this.clickButton(this.nextButton, 'next')
           }
         }
 
         // ? 键显示帮助
         if (key === '?' && e.shiftKey) {
-          e.preventDefault();
-          this.showHelp();
+          e.preventDefault()
+          this.showHelp()
         }
-      });
+      })
 
       // 监听 DOM 变化，重新检测分页按钮
       const observer = new MutationObserver(() => {
-        this.detectPagination();
-      });
-      observer.observe(document.body, { childList: true, subtree: true });
+        this.detectPagination()
+      })
+      observer.observe(document.body, { childList: true, subtree: true })
     }
 
     isInputFocused() {
-      const active = document.activeElement;
-      if (!active) return false;
+      const active = document.activeElement
+      if (!active) return false
 
       // 1. 输入框检测
-      const inputTypes = ['INPUT', 'TEXTAREA', 'SELECT'];
-      if (inputTypes.includes(active.tagName)) return true;
+      const inputTypes = ['INPUT', 'TEXTAREA', 'SELECT']
+      if (inputTypes.includes(active.tagName)) return true
 
       // 2. 可编辑元素检测
-      if (active.isContentEditable) return true;
+      if (active.isContentEditable) return true
 
       // 3. 代码编辑器检测
-      const editors = ['.CodeMirror', '.ace_editor', '.monaco-editor', '[contenteditable="true"]'];
+      const editors = ['.CodeMirror', '.ace_editor', '.monaco-editor', '[contenteditable="true"]']
       for (const selector of editors) {
-        if (active.closest(selector)) return true;
+        if (active.closest(selector)) return true
       }
 
       // 4. 视频播放器控件检测（避免干扰视频进度条等控件）
       const videoSelectors = [
-        'video',                          // video 元素
-        'audio',                          // audio 元素
-        '.bpx-player',                    // B站播放器
-        '.bilibili-player',               // B站旧播放器
-        '.bpx-player-control-wrap',       // B站控制栏
-        '.xgplayer',                      // 西瓜/抖音播放器
-        '.dplayer',                       // DPlayer
-        '.vjs-player',                    // Video.js
-        '.jw-player',                     // JW Player
-        '.plyr',                          // Plyr
+        'video', // video 元素
+        'audio', // audio 元素
+        '.bpx-player', // B站播放器
+        '.bilibili-player', // B站旧播放器
+        '.bpx-player-control-wrap', // B站控制栏
+        '.xgplayer', // 西瓜/抖音播放器
+        '.dplayer', // DPlayer
+        '.vjs-player', // Video.js
+        '.jw-player', // JW Player
+        '.plyr', // Plyr
         '[class*="player"][class*="control"]', // 通用播放器控件
-      ];
+      ]
       for (const selector of videoSelectors) {
         try {
           if (active.matches?.(selector) || active.closest?.(selector)) {
-            return true;
+            return true
           }
         } catch (e) {
           // 选择器不支持，跳过
@@ -426,108 +472,112 @@ if (window.KeyboardPaginationLoaded) {
 
       // 5. 进度条/滑块检测（视频进度条、音量条等）
       const sliderSelectors = [
-        '[role="slider"]',                // ARIA 滑块
-        'input[type="range"]',            // range 输入
-        '.bpx-player-progress',           // B站进度条
-        '.bilibili-player-progress',      // B站旧进度条
+        '[role="slider"]', // ARIA 滑块
+        'input[type="range"]', // range 输入
+        '.bpx-player-progress', // B站进度条
+        '.bilibili-player-progress', // B站旧进度条
         '[class*="progress"][class*="bar"]', // 通用进度条
-        '[class*="seekbar"]',             // 通用 seekbar
-        '[class*="timeline"]',            // 通用时间线
-        '.xgplayer-progress',             // 西瓜播放器进度条
-        '.xgplayer-slider',               // 西瓜播放器滑块
-      ];
+        '[class*="seekbar"]', // 通用 seekbar
+        '[class*="timeline"]', // 通用时间线
+        '.xgplayer-progress', // 西瓜播放器进度条
+        '.xgplayer-slider', // 西瓜播放器滑块
+      ]
       for (const selector of sliderSelectors) {
         try {
           if (active.matches?.(selector) || active.closest?.(selector)) {
-            return true;
+            return true
           }
         } catch (e) {
           // 选择器不支持，跳过
         }
       }
 
-      return false;
+      return false
     }
 
     // 检测页面是否有可见的视频播放器
     hasVisibleVideo() {
-      const videos = document.querySelectorAll('video');
+      const videos = document.querySelectorAll('video')
       for (const video of videos) {
-        const rect = video.getBoundingClientRect();
+        const rect = video.getBoundingClientRect()
         // 视频可见且尺寸足够大（排除小视频广告等）
-        if (rect.width > 200 && rect.height > 150 &&
-            rect.top < window.innerHeight && rect.bottom > 0) {
-          return true;
+        if (
+          rect.width > 200 &&
+          rect.height > 150 &&
+          rect.top < window.innerHeight &&
+          rect.bottom > 0
+        ) {
+          return true
         }
       }
-      return false;
+      return false
     }
 
     clickButton(button, type) {
       // 高亮按钮
-      this.highlightButton(button);
+      this.highlightButton(button)
 
       // 显示提示
-      const text = type === 'prev' ? '← 上一页' : '下一页 →';
-      this.showHint(text);
+      const text = type === 'prev' ? '← 上一页' : '下一页 →'
+      this.showHint(text)
 
       // 延迟点击，让用户看到效果
       setTimeout(() => {
-        button.click();
-      }, 100);
+        button.click()
+      }, 100)
     }
 
     highlightButton(button) {
-      const originalOutline = button.style.outline;
-      const originalBackground = button.style.backgroundColor;
+      const originalOutline = button.style.outline
+      const originalBackground = button.style.backgroundColor
 
-      button.style.outline = '3px solid #11998e';
-      button.style.backgroundColor = 'rgba(17, 153, 142, 0.2)';
+      button.style.outline = '3px solid #11998e'
+      button.style.backgroundColor = 'rgba(17, 153, 142, 0.2)'
 
       setTimeout(() => {
-        button.style.outline = originalOutline;
-        button.style.backgroundColor = originalBackground;
-      }, 300);
+        button.style.outline = originalOutline
+        button.style.backgroundColor = originalBackground
+      }, 300)
     }
 
     createHint() {
-      if (document.getElementById('yc-pagination-hint')) return;
+      if (document.getElementById('yc-pagination-hint')) return
 
-      const hint = document.createElement('div');
-      hint.id = 'yc-pagination-hint';
-      hint.className = 'yc-pagination-hint yc-hidden';
+      const hint = document.createElement('div')
+      hint.id = 'yc-pagination-hint'
+      hint.className = 'yc-pagination-hint yc-hidden'
       hint.innerHTML = `
         <span class="yc-hint-text"></span>
-      `;
-      document.body.appendChild(hint);
+      `
+      document.body.appendChild(hint)
     }
 
     showHint(text) {
-      if (!this.config.showHint) return;
+      if (!this.config.showHint) return
 
-      const hint = document.getElementById('yc-pagination-hint');
-      if (!hint) return;
+      const hint = document.getElementById('yc-pagination-hint')
+      if (!hint) return
 
-      const textEl = hint.querySelector('.yc-hint-text');
-      if (textEl) textEl.textContent = text;
+      const textEl = hint.querySelector('.yc-hint-text')
+      if (textEl) textEl.textContent = text
 
-      hint.classList.remove('yc-hidden');
+      hint.classList.remove('yc-hidden')
 
-      clearTimeout(this.hintTimer);
+      clearTimeout(this.hintTimer)
       this.hintTimer = setTimeout(() => {
-        hint.classList.add('yc-hidden');
-      }, this.config.hintDuration);
+        hint.classList.add('yc-hidden')
+      }, this.config.hintDuration)
     }
 
     showHelp() {
-      const existing = document.querySelector('.yc-pagination-help');
+      const existing = document.querySelector('.yc-pagination-help')
       if (existing) {
-        existing.remove();
-        return;
+        existing.remove()
+        return
       }
 
-      const help = document.createElement('div');
-      help.className = 'yc-pagination-help';
+      const help = document.createElement('div')
+      help.className = 'yc-pagination-help'
       help.innerHTML = `
         <div class="yc-help-content">
           <h3>⌨️ 键盘翻页</h3>
@@ -545,19 +595,19 @@ if (window.KeyboardPaginationLoaded) {
           </div>
           <p class="yc-help-note">在输入框中时快捷键不生效</p>
         </div>
-      `;
+      `
 
-      document.body.appendChild(help);
-      help.addEventListener('click', () => help.remove());
+      document.body.appendChild(help)
+      help.addEventListener('click', () => help.remove())
 
-      setTimeout(() => help.remove(), 5000);
+      setTimeout(() => help.remove(), 5000)
     }
 
     injectStyles() {
-      if (document.getElementById('yc-pagination-styles')) return;
+      if (document.getElementById('yc-pagination-styles')) return
 
-      const style = document.createElement('style');
-      style.id = 'yc-pagination-styles';
+      const style = document.createElement('style')
+      style.id = 'yc-pagination-styles'
       style.textContent = `
         .yc-pagination-hint {
           position: fixed;
@@ -672,53 +722,53 @@ if (window.KeyboardPaginationLoaded) {
         .yc-pagination-indicator .yc-indicator-disabled {
           opacity: 0.4;
         }
-      `;
-      document.head.appendChild(style);
+      `
+      document.head.appendChild(style)
 
       // 创建浮动指示器
       if (this.prevButton || this.nextButton) {
-        this.createIndicator();
+        this.createIndicator()
       }
     }
 
     createIndicator() {
-      if (document.querySelector('.yc-pagination-indicator')) return;
+      if (document.querySelector('.yc-pagination-indicator')) return
 
-      const indicator = document.createElement('div');
-      indicator.className = 'yc-pagination-indicator';
+      const indicator = document.createElement('div')
+      indicator.className = 'yc-pagination-indicator'
       indicator.innerHTML = `
         <span class="yc-indicator-arrow ${this.prevButton ? '' : 'yc-indicator-disabled'}">←</span>
         <span>键盘翻页</span>
         <span class="yc-indicator-arrow ${this.nextButton ? '' : 'yc-indicator-disabled'}">→</span>
-      `;
-      indicator.addEventListener('click', () => this.showHelp());
-      document.body.appendChild(indicator);
+      `
+      indicator.addEventListener('click', () => this.showHelp())
+      document.body.appendChild(indicator)
 
       // 3秒后隐藏
       setTimeout(() => {
-        indicator.style.opacity = '0';
-        indicator.style.pointerEvents = 'none';
-      }, 3000);
+        indicator.style.opacity = '0'
+        indicator.style.pointerEvents = 'none'
+      }, 3000)
 
       // 鼠标移到底部时显示
       document.addEventListener('mousemove', (e) => {
         if (e.clientY > window.innerHeight - 50) {
-          indicator.style.opacity = '1';
-          indicator.style.pointerEvents = 'auto';
+          indicator.style.opacity = '1'
+          indicator.style.pointerEvents = 'auto'
         } else {
-          indicator.style.opacity = '0';
-          indicator.style.pointerEvents = 'none';
+          indicator.style.opacity = '0'
+          indicator.style.pointerEvents = 'none'
         }
-      });
+      })
     }
   }
 
   // 初始化
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
-      window.keyboardPagination = new KeyboardPagination();
-    });
+      window.keyboardPagination = new KeyboardPagination()
+    })
   } else {
-    window.keyboardPagination = new KeyboardPagination();
+    window.keyboardPagination = new KeyboardPagination()
   }
 }

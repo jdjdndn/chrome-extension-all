@@ -3,9 +3,9 @@
 // ========== 图表常量 ==========
 const CHART_COLORS = {
   // 对比图颜色
-  beforeColor: '#ff7043',  // 加速前（橙色）
-  afterColor: '#4caf50',   // 加速后（绿色）
-  lineColor: '#007bff',    // 折线颜色
+  beforeColor: '#ff7043', // 加速前（橙色）
+  afterColor: '#4caf50', // 加速后（绿色）
+  lineColor: '#007bff', // 折线颜色
   barColor: 'rgba(76, 175, 80, 0.5)', // 柱状图颜色（半透明绿色）
 
   // 分布图颜色
@@ -14,31 +14,31 @@ const CHART_COLORS = {
     css: '#17a2b8',
     fonts: '#6f42c1',
     images: '#fd7e14',
-    svg: '#20c997'
+    svg: '#20c997',
   },
 
   // 通用颜色
   gridLine: '#e9ecef',
   textPrimary: '#666',
   textSecondary: '#999',
-  background: 'white'
-};
+  background: 'white',
+}
 
 const CHART_LAYOUT = {
   // 对比图布局
   compare: {
     padding: { top: 20, right: 15, bottom: 30, left: 45 },
-    barGroupRatio: 0.3,    // 柱状图宽度比例
-    barGapRatio: 0.1,      // 柱状图间距比例
-    lineWidth: 0.5
+    barGroupRatio: 0.3, // 柱状图宽度比例
+    barGapRatio: 0.1, // 柱状图间距比例
+    lineWidth: 0.5,
   },
 
   // 趋势图布局
   trend: {
     padding: { top: 20, right: 15, bottom: 30, left: 40 },
-    barHeightRatio: 0.3,   // 柱子高度占图表高度比例
+    barHeightRatio: 0.3, // 柱子高度占图表高度比例
     lineWidth: 0.5,
-    pointRadius: 3
+    pointRadius: 3,
   },
 
   // 分布图布局
@@ -47,12 +47,12 @@ const CHART_LAYOUT = {
     radiusRatio: 0.25,
     legendXRatio: 0.7,
     legendYRatio: 0.2,
-    legendSpacing: 18
+    legendSpacing: 18,
   },
 
   // 通用布局
-  gridLines: 4
-};
+  gridLines: 4,
+}
 
 // ========== 消息通信层 ==========
 // Popup 与 content script 运行在隔离的上下文中，必须使用 Chrome Extension API 通信
@@ -65,10 +65,10 @@ const CHART_LAYOUT = {
  */
 async function sendMessage(type, data = {}) {
   try {
-    return await chrome.runtime.sendMessage({ type, ...data });
+    return await chrome.runtime.sendMessage({ type, ...data })
   } catch (error) {
-    console.error('[Popup] 发送消息失败:', error.message);
-    return null;
+    console.error('[Popup] 发送消息失败:', error.message)
+    return null
   }
 }
 
@@ -77,24 +77,24 @@ async function sendMessage(type, data = {}) {
  */
 async function sendMessageToContentScript(message) {
   try {
-    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
     if (tabs[0]?.id) {
-      return await chrome.tabs.sendMessage(tabs[0].id, message);
+      return await chrome.tabs.sendMessage(tabs[0].id, message)
     }
   } catch (error) {
     // 如果 content script 未加载，静默失败（这是正常情况）
     if (!error.message.includes('Receiving end does not exist')) {
-      console.warn('[Popup] 发送到 content script 失败:', error.message);
+      console.warn('[Popup] 发送到 content script 失败:', error.message)
     }
   }
-  return null;
+  return null
 }
 
 /**
  * 广播消息到所有组件（通过 background）
  */
 async function broadcastMessage(message) {
-  await sendMessage('BROADCAST_MESSAGE', message);
+  await sendMessage('BROADCAST_MESSAGE', message)
 }
 
 // Default settings
@@ -104,138 +104,138 @@ const defaultSettings = {
   blockedDomains: [],
   blockedResponseDomains: [],
   whitelistMode: false,
-  whitelist: []
-};
+  whitelist: [],
+}
 
 // DOM Elements
-const statusEl = document.getElementById('status');
-const toggleBtn = document.getElementById('toggle-btn');
-const debugModeCheckbox = document.getElementById('debug-mode');
+const statusEl = document.getElementById('status')
+const toggleBtn = document.getElementById('toggle-btn')
+const debugModeCheckbox = document.getElementById('debug-mode')
 
 // AI Settings Elements
-const aiMultiThinkingCheckbox = document.getElementById('ai-multi-thinking-enabled');
-const aiRoundsSetting = document.getElementById('ai-rounds-setting');
-const aiThinkingRoundsSelect = document.getElementById('ai-thinking-rounds');
+const aiMultiThinkingCheckbox = document.getElementById('ai-multi-thinking-enabled')
+const aiRoundsSetting = document.getElementById('ai-rounds-setting')
+const aiThinkingRoundsSelect = document.getElementById('ai-thinking-rounds')
 
 // Blocked domains UI
-const blockedDomainsList = document.getElementById('blocked-domains-list');
-const blockedResponseDomainsList = document.getElementById('blocked-response-domains-list');
-const domainInput = document.getElementById('domain-input');
-const responseDomainInput = document.getElementById('response-domain-input');
-const addDomainBtn = document.getElementById('add-domain-btn');
-const addResponseDomainBtn = document.getElementById('add-response-domain-btn');
-const clearDomainsBtn = document.getElementById('clear-domains-btn');
-const clearResponseDomainsBtn = document.getElementById('clear-response-domains-btn');
+const blockedDomainsList = document.getElementById('blocked-domains-list')
+const blockedResponseDomainsList = document.getElementById('blocked-response-domains-list')
+const domainInput = document.getElementById('domain-input')
+const responseDomainInput = document.getElementById('response-domain-input')
+const addDomainBtn = document.getElementById('add-domain-btn')
+const addResponseDomainBtn = document.getElementById('add-response-domain-btn')
+const clearDomainsBtn = document.getElementById('clear-domains-btn')
+const clearResponseDomainsBtn = document.getElementById('clear-response-domains-btn')
 
 // Load settings from storage
 async function loadSettings() {
-  const result = await chrome.storage.sync.get('settings');
-  const settings = result.settings || defaultSettings;
+  const result = await chrome.storage.sync.get('settings')
+  const settings = result.settings || defaultSettings
 
   // Update UI
-  updateStatus(settings.enabled);
-  debugModeCheckbox.checked = settings.debugMode || false;
+  updateStatus(settings.enabled)
+  debugModeCheckbox.checked = settings.debugMode || false
 
   // 白名单模式
-  const whitelistCheckbox = document.getElementById('whitelist-mode');
+  const whitelistCheckbox = document.getElementById('whitelist-mode')
   if (whitelistCheckbox) {
-    whitelistCheckbox.checked = settings.whitelistMode || false;
+    whitelistCheckbox.checked = settings.whitelistMode || false
     whitelistCheckbox.addEventListener('change', async () => {
-      const result = await chrome.storage.sync.get('settings');
-      const currentSettings = result.settings || defaultSettings;
-      currentSettings.whitelistMode = whitelistCheckbox.checked;
-      await chrome.storage.sync.set({ settings: currentSettings });
-    });
+      const result = await chrome.storage.sync.get('settings')
+      const currentSettings = result.settings || defaultSettings
+      currentSettings.whitelistMode = whitelistCheckbox.checked
+      await chrome.storage.sync.set({ settings: currentSettings })
+    })
   }
 
   // Load AI settings
-  loadAISettings(settings);
+  loadAISettings(settings)
 
   // Load script switches
-  await loadScriptSwitches();
+  await loadScriptSwitches()
 
   // Load blocked domains
-  await loadBlockedDomains();
+  await loadBlockedDomains()
 }
 
 // Load AI settings
 function loadAISettings(settings) {
-  const aiSettings = settings.ai || {};
-  const multiThinking = aiSettings.multiThinking || { enabled: false, rounds: 3 };
+  const aiSettings = settings.ai || {}
+  const multiThinking = aiSettings.multiThinking || { enabled: false, rounds: 3 }
 
   if (aiMultiThinkingCheckbox) {
-    aiMultiThinkingCheckbox.checked = multiThinking.enabled;
+    aiMultiThinkingCheckbox.checked = multiThinking.enabled
   }
 
   if (aiRoundsSetting) {
-    aiRoundsSetting.style.display = multiThinking.enabled ? 'block' : 'none';
+    aiRoundsSetting.style.display = multiThinking.enabled ? 'block' : 'none'
   }
 
   if (aiThinkingRoundsSelect) {
-    aiThinkingRoundsSelect.value = String(multiThinking.rounds);
+    aiThinkingRoundsSelect.value = String(multiThinking.rounds)
   }
 }
 
 // Save settings to storage
 async function saveSettings(settings) {
-  const result = await chrome.storage.sync.get('settings');
-  const currentSettings = result.settings || defaultSettings;
-  const newSettings = { ...currentSettings, ...settings };
-  await chrome.storage.sync.set({ settings: newSettings });
-  return newSettings;
+  const result = await chrome.storage.sync.get('settings')
+  const currentSettings = result.settings || defaultSettings
+  const newSettings = { ...currentSettings, ...settings }
+  await chrome.storage.sync.set({ settings: newSettings })
+  return newSettings
 }
 
 // Update status display
 function updateStatus(enabled) {
   if (enabled) {
-    statusEl.textContent = 'Active';
-    statusEl.className = 'status active';
-    toggleBtn.textContent = 'Disable Extension';
+    statusEl.textContent = 'Active'
+    statusEl.className = 'status active'
+    toggleBtn.textContent = 'Disable Extension'
   } else {
-    statusEl.textContent = 'Inactive';
-    statusEl.className = 'status inactive';
-    toggleBtn.textContent = 'Enable Extension';
+    statusEl.textContent = 'Inactive'
+    statusEl.className = 'status inactive'
+    toggleBtn.textContent = 'Enable Extension'
   }
 }
 
 // Toggle extension on/off
 async function toggleExtension() {
-  const result = await chrome.storage.sync.get('settings');
-  const settings = result.settings || defaultSettings;
-  const newEnabled = !settings.enabled;
+  const result = await chrome.storage.sync.get('settings')
+  const settings = result.settings || defaultSettings
+  const newEnabled = !settings.enabled
 
-  const newSettings = await saveSettings({ enabled: newEnabled });
-  updateStatus(newSettings.enabled);
+  const newSettings = await saveSettings({ enabled: newEnabled })
+  updateStatus(newSettings.enabled)
 
   // Notify content scripts (使用 EventBus)
   try {
-    await waitForEventBus();
+    await waitForEventBus()
     await EventBus.publish('TOGGLE_EXTENSION', {
-      enabled: newSettings.enabled
-    });
+      enabled: newSettings.enabled,
+    })
   } catch (error) {
-    console.warn('[Popup] 通知失败:', error);
+    console.warn('[Popup] 通知失败:', error)
   }
 }
 
 // Event Listeners
-toggleBtn.addEventListener('click', toggleExtension);
+toggleBtn.addEventListener('click', toggleExtension)
 
 debugModeCheckbox.addEventListener('change', () => {
-  saveSettings({ debugMode: debugModeCheckbox.checked });
-});
+  saveSettings({ debugMode: debugModeCheckbox.checked })
+})
 
 // ========== Script Switches Management ==========
-const SCRIPT_SWITCHES_KEY = 'scriptSwitches';
+const SCRIPT_SWITCHES_KEY = 'scriptSwitches'
 
 // 获取所有脚本开关 checkbox
-const scriptSwitchCheckboxes = document.querySelectorAll('[data-script]');
+const scriptSwitchCheckboxes = document.querySelectorAll('[data-script]')
 
 // 加载脚本开关状态
 async function loadScriptSwitches() {
   try {
-    const result = await chrome.storage.local.get(SCRIPT_SWITCHES_KEY);
-    const switches = result[SCRIPT_SWITCHES_KEY] || {};
+    const result = await chrome.storage.local.get(SCRIPT_SWITCHES_KEY)
+    const switches = result[SCRIPT_SWITCHES_KEY] || {}
 
     // 获取默认开关配置
     const defaultSwitches = {
@@ -248,219 +248,224 @@ async function loadScriptSwitches() {
       'keyboard-pagination': true,
       'panel-position-manager': true,
       'widen-page': false,
-      'tab-focus': true
-    };
+      'tab-focus': true,
+    }
 
     // 合并默认值和存储的值
-    const mergedSwitches = { ...defaultSwitches, ...switches };
+    const mergedSwitches = { ...defaultSwitches, ...switches }
 
     // 更新 UI
-    scriptSwitchCheckboxes.forEach(checkbox => {
-      const scriptName = checkbox.dataset.script;
-      checkbox.checked = mergedSwitches[scriptName] !== false;
-    });
+    scriptSwitchCheckboxes.forEach((checkbox) => {
+      const scriptName = checkbox.dataset.script
+      checkbox.checked = mergedSwitches[scriptName] !== false
+    })
 
-    console.log('[ScriptSwitches] 已加载:', mergedSwitches);
+    console.log('[ScriptSwitches] 已加载:', mergedSwitches)
   } catch (error) {
-    console.error('[ScriptSwitches] 加载失败:', error);
+    console.error('[ScriptSwitches] 加载失败:', error)
   }
 }
 
 // 保存单个脚本开关状态
 async function saveScriptSwitch(scriptName, enabled) {
   try {
-    const result = await chrome.storage.local.get(SCRIPT_SWITCHES_KEY);
-    const switches = result[SCRIPT_SWITCHES_KEY] || {};
-    switches[scriptName] = enabled;
-    await chrome.storage.local.set({ [SCRIPT_SWITCHES_KEY]: switches });
-    console.log(`[ScriptSwitches] 已保存 ${scriptName}: ${enabled}`);
+    const result = await chrome.storage.local.get(SCRIPT_SWITCHES_KEY)
+    const switches = result[SCRIPT_SWITCHES_KEY] || {}
+    switches[scriptName] = enabled
+    await chrome.storage.local.set({ [SCRIPT_SWITCHES_KEY]: switches })
+    console.log(`[ScriptSwitches] 已保存 ${scriptName}: ${enabled}`)
   } catch (error) {
-    console.error('[ScriptSwitches] 保存失败:', error);
+    console.error('[ScriptSwitches] 保存失败:', error)
   }
 }
 
 // 为每个脚本开关添加事件监听
-scriptSwitchCheckboxes.forEach(checkbox => {
+scriptSwitchCheckboxes.forEach((checkbox) => {
   checkbox.addEventListener('change', () => {
-    const scriptName = checkbox.dataset.script;
-    const enabled = checkbox.checked;
-    saveScriptSwitch(scriptName, enabled);
+    const scriptName = checkbox.dataset.script
+    const enabled = checkbox.checked
+    saveScriptSwitch(scriptName, enabled)
 
     // widen-page 开关联动宽度设置显示
     if (scriptName === 'widen-page') {
-      const widthSetting = document.getElementById('widen-page-width-setting');
-      if (widthSetting) widthSetting.style.display = enabled ? 'block' : 'none';
+      const widthSetting = document.getElementById('widen-page-width-setting')
+      if (widthSetting) widthSetting.style.display = enabled ? 'block' : 'none'
     }
-  });
-});
+  })
+})
 
 // 页面宽度百分比控制
-const widenPageWidthSlider = document.getElementById('widen-page-width');
-const widenPageWidthValue = document.getElementById('widen-page-width-value');
-const widenPageCheckbox = document.getElementById('script-widen-page');
+const widenPageWidthSlider = document.getElementById('widen-page-width')
+const widenPageWidthValue = document.getElementById('widen-page-width-value')
+const widenPageCheckbox = document.getElementById('script-widen-page')
 
 if (widenPageWidthSlider) {
   // 加载保存的宽度值
   chrome.storage.local.get('widenPageWidth', (result) => {
-    const width = result.widenPageWidth || 80;
-    widenPageWidthSlider.value = width;
-    if (widenPageWidthValue) widenPageWidthValue.textContent = width;
+    const width = result.widenPageWidth || 80
+    widenPageWidthSlider.value = width
+    if (widenPageWidthValue) widenPageWidthValue.textContent = width
 
     // 根据开关状态显示/隐藏宽度设置
-    const widthSetting = document.getElementById('widen-page-width-setting');
+    const widthSetting = document.getElementById('widen-page-width-setting')
     if (widthSetting && widenPageCheckbox) {
-      widthSetting.style.display = widenPageCheckbox.checked ? 'block' : 'none';
+      widthSetting.style.display = widenPageCheckbox.checked ? 'block' : 'none'
     }
-  });
+  })
 
   // 滑块变更时保存并实时通知页面
   widenPageWidthSlider.addEventListener('input', () => {
-    const width = parseInt(widenPageWidthSlider.value, 10);
-    if (widenPageWidthValue) widenPageWidthValue.textContent = width;
-    chrome.storage.local.set({ widenPageWidth: width });
+    const width = parseInt(widenPageWidthSlider.value, 10)
+    if (widenPageWidthValue) widenPageWidthValue.textContent = width
+    chrome.storage.local.set({ widenPageWidth: width })
 
     // 实时通知当前活动标签页更新宽度
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs[0]?.id) {
-        chrome.tabs.sendMessage(tabs[0].id, {
-          type: 'WIDEN_PAGE_WIDTH_UPDATE',
-          width: width
-        }).catch(() => {});
+        chrome.tabs
+          .sendMessage(tabs[0].id, {
+            type: 'WIDEN_PAGE_WIDTH_UPDATE',
+            width: width,
+          })
+          .catch(() => {})
       }
-    });
-  });
+    })
+  })
 }
-
 
 // Load blocked domains
 async function loadBlockedDomains() {
   try {
-    const result = await sendMessage('GET_BLOCKED_DOMAINS');
-    console.log('[Blocked Domains] Response:', result);
+    const result = await sendMessage('GET_BLOCKED_DOMAINS')
+    console.log('[Blocked Domains] Response:', result)
     if (result) {
-      renderBlockedDomains(result.blockedDomains || []);
-      renderBlockedResponseDomains(result.blockedResponseDomains || []);
+      renderBlockedDomains(result.blockedDomains || [])
+      renderBlockedResponseDomains(result.blockedResponseDomains || [])
 
       // Debug log
-      console.log('[Blocked Domains] Loaded:', result.blockedDomains);
-      console.log('[Blocked Domains] Current domain:', result.currentDomain);
+      console.log('[Blocked Domains] Loaded:', result.blockedDomains)
+      console.log('[Blocked Domains] Current domain:', result.currentDomain)
     } else {
-      console.error('[Blocked Domains] No result from background');
-      renderBlockedDomains([]);
-      renderBlockedResponseDomains([]);
+      console.error('[Blocked Domains] No result from background')
+      renderBlockedDomains([])
+      renderBlockedResponseDomains([])
     }
   } catch (error) {
-    console.error('[Blocked Domains] Error loading:', error);
-    renderBlockedDomains([]);
-    renderBlockedResponseDomains([]);
+    console.error('[Blocked Domains] Error loading:', error)
+    renderBlockedDomains([])
+    renderBlockedResponseDomains([])
   }
 }
 
 // Render blocked domains in UI
 function renderBlockedDomains(domains) {
   if (!blockedDomainsList) {
-    console.error('[Blocked Domains] blockedDomainsList element not found');
-    return;
+    console.error('[Blocked Domains] blockedDomainsList element not found')
+    return
   }
 
   if (!domains || domains.length === 0) {
-    blockedDomainsList.innerHTML = '<div class="empty-state">暂无阻止的域名</div>';
+    blockedDomainsList.innerHTML = '<div class="empty-state">暂无阻止的域名</div>'
     if (clearDomainsBtn) {
-      clearDomainsBtn.disabled = true;
+      clearDomainsBtn.disabled = true
     }
-    return;
+    return
   }
 
-  blockedDomainsList.innerHTML = domains.map(domain => `
+  blockedDomainsList.innerHTML = domains
+    .map(
+      (domain) => `
     <div class="domain-list-item">
       <span class="domain-text" title="${escapeHtml(domain)}">${escapeHtml(domain)}</span>
       <button class="domain-remove-btn remove-domain" data-domain="${escapeHtml(domain)}">删除</button>
     </div>
-  `).join('');
+  `
+    )
+    .join('')
 
   // Add event listeners to remove buttons
-  document.querySelectorAll('.remove-domain').forEach(btn => {
+  document.querySelectorAll('.remove-domain').forEach((btn) => {
     btn.addEventListener('click', () => {
-      removeDomain(btn.dataset.domain);
-    });
-  });
+      removeDomain(btn.dataset.domain)
+    })
+  })
 
   // Enable clear button when there are domains
   if (clearDomainsBtn) {
-    clearDomainsBtn.disabled = false;
+    clearDomainsBtn.disabled = false
   }
 }
 
 // Escape HTML to prevent XSS
 function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
+  const div = document.createElement('div')
+  div.textContent = text
+  return div.innerHTML
 }
 
 // Add blocked domain
 async function addDomain(domain) {
-  if (!domain) return;
+  if (!domain) return
 
-  const result = await sendMessage('ADD_BLOCKED_DOMAIN', { domain });
+  const result = await sendMessage('ADD_BLOCKED_DOMAIN', { domain })
 
   if (result.success) {
-    domainInput.value = '';
-    renderBlockedDomains(result.domains);
+    domainInput.value = ''
+    renderBlockedDomains(result.domains)
   } else {
-    alert('Failed to add domain');
+    alert('Failed to add domain')
   }
 }
 
 // Remove blocked domain
 async function removeDomain(domain) {
-  const result = await sendMessage('REMOVE_BLOCKED_DOMAIN', { domain });
+  const result = await sendMessage('REMOVE_BLOCKED_DOMAIN', { domain })
 
   if (result.success) {
-    const updatedResult = await sendMessage('GET_BLOCKED_DOMAINS');
-    renderBlockedDomains(updatedResult.blockedDomains || []);
+    const updatedResult = await sendMessage('GET_BLOCKED_DOMAINS')
+    renderBlockedDomains(updatedResult.blockedDomains || [])
   } else {
-    alert('Failed to remove domain');
+    alert('Failed to remove domain')
   }
 }
 
 // Add blocked response domain
 async function addResponseDomain(domain) {
-  if (!domain) return;
+  if (!domain) return
 
-  const result = await sendMessage('ADD_BLOCKED_RESPONSE_DOMAIN', { domain });
+  const result = await sendMessage('ADD_BLOCKED_RESPONSE_DOMAIN', { domain })
 
   if (result.success) {
-    responseDomainInput.value = '';
-    renderBlockedResponseDomains(result.domains || []);
+    responseDomainInput.value = ''
+    renderBlockedResponseDomains(result.domains || [])
   } else {
-    alert('Failed to add response domain');
+    alert('Failed to add response domain')
   }
 }
 
 // Add multiple blocked response domains
 async function addResponseDomains(domains) {
-  let addedCount = 0;
-  let failedCount = 0;
+  let addedCount = 0
+  let failedCount = 0
 
   for (const domain of domains) {
-    const result = await sendMessage('ADD_BLOCKED_RESPONSE_DOMAIN', { domain });
+    const result = await sendMessage('ADD_BLOCKED_RESPONSE_DOMAIN', { domain })
 
     if (result.success) {
-      addedCount++;
+      addedCount++
     } else {
-      failedCount++;
+      failedCount++
     }
   }
 
   if (addedCount > 0) {
-    responseDomainInput.value = '';
+    responseDomainInput.value = ''
     // Reload the list to show updated domains
-    await loadBlockedDomains();
+    await loadBlockedDomains()
   }
 
   if (failedCount > 0) {
-    alert(`成功添加 ${addedCount} 个域名，失败 ${failedCount} 个`);
+    alert(`成功添加 ${addedCount} 个域名，失败 ${failedCount} 个`)
   } else if (addedCount > 0) {
     // All added successfully
   }
@@ -468,13 +473,13 @@ async function addResponseDomains(domains) {
 
 // Remove blocked response domain
 async function removeResponseDomain(domain) {
-  const result = await sendMessage('REMOVE_BLOCKED_RESPONSE_DOMAIN', { domain });
+  const result = await sendMessage('REMOVE_BLOCKED_RESPONSE_DOMAIN', { domain })
 
   if (result.success) {
-    const updatedResult = await sendMessage('GET_BLOCKED_DOMAINS');
-    renderBlockedResponseDomains(updatedResult.domains || []);
+    const updatedResult = await sendMessage('GET_BLOCKED_DOMAINS')
+    renderBlockedResponseDomains(updatedResult.domains || [])
   } else {
-    alert('Failed to remove response domain');
+    alert('Failed to remove response domain')
   }
 }
 
@@ -482,33 +487,37 @@ async function removeResponseDomain(domain) {
 function renderBlockedResponseDomains(domains) {
   if (!domains || domains.length === 0) {
     if (blockedResponseDomainsList) {
-      blockedResponseDomainsList.innerHTML = '<div class="empty-state">暂无阻止的域名</div>';
+      blockedResponseDomainsList.innerHTML = '<div class="empty-state">暂无阻止的域名</div>'
     }
     if (clearResponseDomainsBtn) {
-      clearResponseDomainsBtn.disabled = true;
+      clearResponseDomainsBtn.disabled = true
     }
-    return;
+    return
   }
 
   if (blockedResponseDomainsList) {
-    blockedResponseDomainsList.innerHTML = domains.map(domain => `
+    blockedResponseDomainsList.innerHTML = domains
+      .map(
+        (domain) => `
       <div class="domain-list-item">
         <span class="domain-text" title="${escapeHtml(domain)}">${escapeHtml(domain)}</span>
         <button class="domain-remove-btn remove-response-domain" data-domain="${escapeHtml(domain)}" style="background-color: #e0a800;">删除</button>
       </div>
-    `).join('');
+    `
+      )
+      .join('')
 
     // Add event listeners to remove buttons
-    document.querySelectorAll('.remove-response-domain').forEach(btn => {
+    document.querySelectorAll('.remove-response-domain').forEach((btn) => {
       btn.addEventListener('click', () => {
-        removeResponseDomain(btn.dataset.domain);
-      });
-    });
+        removeResponseDomain(btn.dataset.domain)
+      })
+    })
   }
 
   // Enable clear button when there are domains
   if (clearResponseDomainsBtn) {
-    clearResponseDomainsBtn.disabled = false;
+    clearResponseDomainsBtn.disabled = false
   }
 }
 
@@ -516,102 +525,107 @@ function renderBlockedResponseDomains(domains) {
  * 激活 content script（触发懒初始化）
  */
 async function activateContentScript() {
-  console.log('[Popup] 激活 content script');
+  console.log('[Popup] 激活 content script')
   try {
     // 获取当前激活的 tab
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
     if (!tab?.id || !tab.url) {
-      console.log('[Popup] 无有效 tab，跳过激活');
-      return;
+      console.log('[Popup] 无有效 tab，跳过激活')
+      return
     }
 
     // 排除扩展程序页面和特殊页面
-    const url = tab.url;
-    if (url.startsWith('chrome://') ||
-        url.startsWith('chrome-extension://') ||
-        url.startsWith('about:') ||
-        url.startsWith('edge://') ||
-        url.startsWith('brave://')) {
-      console.log('[Popup] 当前 tab 是特殊页面，跳过激活:', url.substring(0, 50));
-      return;
+    const url = tab.url
+    if (
+      url.startsWith('chrome://') ||
+      url.startsWith('chrome-extension://') ||
+      url.startsWith('about:') ||
+      url.startsWith('edge://') ||
+      url.startsWith('brave://')
+    ) {
+      console.log('[Popup] 当前 tab 是特殊页面，跳过激活:', url.substring(0, 50))
+      return
     }
 
     // 发送激活消息
-    await sendMessage('EXTENSION_ACTIVATE', { source: 'popup' });
-    console.log('[Popup] 激活成功');
+    await sendMessage('EXTENSION_ACTIVATE', { source: 'popup' })
+    console.log('[Popup] 激活成功')
   } catch (error) {
     // 忽略常见错误（如 tab 没有 content script）
     if (!error.message?.includes('Receiving end does not exist')) {
-      console.warn('[Popup] 激活失败:', error);
+      console.warn('[Popup] 激活失败:', error)
     }
   }
 }
 
 // Initialize popup
-loadSettings().catch(console.error);
+loadSettings().catch(console.error)
 
 // popup 打开时激活 content script
-activateContentScript();
+activateContentScript()
 
 // Listen for messages from other parts of the extension
 chrome.runtime.onMessage.addListener((message, _sender, _sendResponse) => {
   if (message.type === 'UPDATE_STATUS') {
-    updateStatus(message.enabled);
+    updateStatus(message.enabled)
   }
-});
+})
 
 // Parse domain input - supports both single domain and multiple domains separated by comma
 function parseDomainInput(input) {
-  if (!input) return [];
+  if (!input) return []
 
   // Remove quotes if present (both single and double quotes)
-  let cleaned = input.replace(/['"]/g, '').trim();
+  let cleaned = input.replace(/['"]/g, '').trim()
 
-  if (!cleaned) return [];
+  if (!cleaned) return []
 
   // Split by comma and trim each entry
-  return cleaned.split(',').map(d => d.trim()).filter(d => d);
+  return cleaned
+    .split(',')
+    .map((d) => d.trim())
+    .filter((d) => d)
 }
 
 // Event listeners for domain management
 if (addDomainBtn) {
   addDomainBtn.addEventListener('click', () => {
-    const input = domainInput.value.trim();
-    const domains = parseDomainInput(input);
+    const input = domainInput.value.trim()
+    const domains = parseDomainInput(input)
 
     if (domains.length === 0) {
-      alert('请输入有效的域名（例如: tracking.example.com 或 "api1.com, api2.com"）');
-      return;
+      alert('请输入有效的域名（例如: tracking.example.com 或 "api1.com, api2.com"）')
+      return
     }
 
     // Add all domains
-    addDomains(domains);
-  });
+    addDomains(domains)
+  })
 }
 
 // Add multiple domains
 async function addDomains(domains) {
-  let addedCount = 0;
-  let failedCount = 0;
+  let addedCount = 0
+  let failedCount = 0
 
   for (const domain of domains) {
-    const result = await sendMessage('ADD_BLOCKED_DOMAIN', { domain });
+    const result = await sendMessage('ADD_BLOCKED_DOMAIN', { domain })
 
     if (result.success) {
-      addedCount++;
+      addedCount++
     } else {
-      failedCount++;
+      failedCount++
     }
   }
 
   if (addedCount > 0) {
-    domainInput.value = '';
+    domainInput.value = ''
     // Reload the list to show updated domains
-    await loadBlockedDomains();
+    await loadBlockedDomains()
   }
 
   if (failedCount > 0) {
-    alert(`成功添加 ${addedCount} 个域名，失败 ${failedCount} 个`);
+    alert(`成功添加 ${addedCount} 个域名，失败 ${failedCount} 个`)
   } else if (addedCount > 0) {
     // All added successfully
   }
@@ -621,112 +635,182 @@ async function addDomains(domains) {
 if (domainInput) {
   domainInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
-      addDomainBtn.click();
+      addDomainBtn.click()
     }
-  });
+  })
 }
 
 // Event listeners for response domain management
 if (addResponseDomainBtn) {
   addResponseDomainBtn.addEventListener('click', () => {
-    const input = responseDomainInput.value.trim();
-    const domains = parseDomainInput(input);
+    const input = responseDomainInput.value.trim()
+    const domains = parseDomainInput(input)
 
     if (domains.length === 0) {
-      alert('请输入有效的域名（例如: api.example.com 或 "api1.com, api2.com"）');
-      return;
+      alert('请输入有效的域名（例如: api.example.com 或 "api1.com, api2.com"）')
+      return
     }
 
     // Add all response domains
-    addResponseDomains(domains);
-  });
+    addResponseDomains(domains)
+  })
 }
 
 // Clear all blocked domains
 async function clearAllDomains() {
-  const result = await sendMessage('GET_BLOCKED_DOMAINS');
+  const result = await sendMessage('GET_BLOCKED_DOMAINS')
 
   if (!result || !result.blockedDomains || result.blockedDomains.length === 0) {
-    return;
+    return
   }
 
   // Remove each domain
   for (const domain of result.blockedDomains) {
-    await sendMessage('REMOVE_BLOCKED_DOMAIN', { domain });
+    await sendMessage('REMOVE_BLOCKED_DOMAIN', { domain })
   }
 
   // Reload the list
-  await loadBlockedDomains();
+  await loadBlockedDomains()
 }
 
 // Clear all blocked response domains
 async function clearAllResponseDomains() {
-  const result = await sendMessage('GET_BLOCKED_DOMAINS');
+  const result = await sendMessage('GET_BLOCKED_DOMAINS')
 
   if (!result || !result.blockedResponseDomains || result.blockedResponseDomains.length === 0) {
-    return;
+    return
   }
 
   // Remove each domain
   for (const domain of result.blockedResponseDomains) {
-    await sendMessage('REMOVE_BLOCKED_RESPONSE_DOMAIN', { domain });
+    await sendMessage('REMOVE_BLOCKED_RESPONSE_DOMAIN', { domain })
   }
 
   // Reload the list
-  await loadBlockedDomains();
+  await loadBlockedDomains()
 }
 
 // Handle Enter key in response domain input
 if (responseDomainInput) {
   responseDomainInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
-      addResponseDomainBtn.click();
+      addResponseDomainBtn.click()
     }
-  });
+  })
 }
 
 // Clear all domains button
 if (clearDomainsBtn) {
-  clearDomainsBtn.addEventListener('click', clearAllDomains);
+  clearDomainsBtn.addEventListener('click', clearAllDomains)
 }
 
 // Clear all response domains button
 if (clearResponseDomainsBtn) {
-  clearResponseDomainsBtn.addEventListener('click', clearAllResponseDomains);
+  clearResponseDomainsBtn.addEventListener('click', clearAllResponseDomains)
 }
 
 // ========== Douyin Keywords Management ==========
-const notInterestedKeywordsTextarea = document.getElementById('not-interested-keywords');
-const autoFollowKeywordsTextarea = document.getElementById('auto-follow-keywords');
-const saveKeywordsBtn = document.getElementById('save-keywords-btn');
-const saveFollowKeywordsBtn = document.getElementById('save-follow-keywords-btn');
+const notInterestedKeywordsTextarea = document.getElementById('not-interested-keywords')
+const autoFollowKeywordsTextarea = document.getElementById('auto-follow-keywords')
+const saveKeywordsBtn = document.getElementById('save-keywords-btn')
+const saveFollowKeywordsBtn = document.getElementById('save-follow-keywords-btn')
 
 // Default keywords from douyin.js
 const defaultNotInterestedKeywords = [
-  '抽象', '漫画', '国漫', '修仙', '玄幻', '系统', '动画', '动漫', '小说', '黑神话',
-  '解说', '好剧', '儿童', '孩子', '观影', '案件', '国学', '狗', '猫', '宠物', '娃',
-  '王者荣耀', '射手', '对抗路', '中单', '上单', '打野', '巅峰赛', '游戏日常', '综艺', '游戏',
-  '美食', '测评', '小品', '春晚', '相亲', '恋爱', '情侣日常', '国服', '驾照', '考试', '结婚',
-  '率土之滨', '程序员', '前端', '动物', '电商', '追剧', '军旅', '短剧', '小说', '恐怖',
-  '影视', '电影', '司机', '工地', '情侣', '原生家庭', '影娱', '好片', '亲子', '幼儿园',
-  '育儿', '育婴', '宝宝', '母婴', '妈妈', '父母', '爸妈', '早教', '幼教', '学前',
-  '儿童', '音乐', '热歌'
-];
+  '抽象',
+  '漫画',
+  '国漫',
+  '修仙',
+  '玄幻',
+  '系统',
+  '动画',
+  '动漫',
+  '小说',
+  '黑神话',
+  '解说',
+  '好剧',
+  '儿童',
+  '孩子',
+  '观影',
+  '案件',
+  '国学',
+  '狗',
+  '猫',
+  '宠物',
+  '娃',
+  '王者荣耀',
+  '射手',
+  '对抗路',
+  '中单',
+  '上单',
+  '打野',
+  '巅峰赛',
+  '游戏日常',
+  '综艺',
+  '游戏',
+  '美食',
+  '测评',
+  '小品',
+  '春晚',
+  '相亲',
+  '恋爱',
+  '情侣日常',
+  '国服',
+  '驾照',
+  '考试',
+  '结婚',
+  '率土之滨',
+  '程序员',
+  '前端',
+  '动物',
+  '电商',
+  '追剧',
+  '军旅',
+  '短剧',
+  '小说',
+  '恐怖',
+  '影视',
+  '电影',
+  '司机',
+  '工地',
+  '情侣',
+  '原生家庭',
+  '影娱',
+  '好片',
+  '亲子',
+  '幼儿园',
+  '育儿',
+  '育婴',
+  '宝宝',
+  '母婴',
+  '妈妈',
+  '父母',
+  '爸妈',
+  '早教',
+  '幼教',
+  '学前',
+  '儿童',
+  '音乐',
+  '热歌',
+]
 
-const defaultAutoFollowKeywords = ['ootd'];
+const defaultAutoFollowKeywords = ['ootd']
 
 /**
  * Parse keywords - newline separated, each line is one keyword
  * Auto deduplicates
  */
 function parseKeywords(text) {
-  if (!text) return [];
+  if (!text) return []
 
   // 按换行符分割，每行一个关键词
-  const lines = text.split(/\n/).map(l => l.trim()).filter(l => l);
+  const lines = text
+    .split(/\n/)
+    .map((l) => l.trim())
+    .filter((l) => l)
 
   // 去重
-  return [...new Set(lines)];
+  return [...new Set(lines)]
 }
 
 /**
@@ -734,7 +818,7 @@ function parseKeywords(text) {
  * Each keyword on its own line
  */
 function formatKeywords(keywords) {
-  return keywords.join('\n');
+  return keywords.join('\n')
 }
 
 /**
@@ -742,46 +826,46 @@ function formatKeywords(keywords) {
  */
 async function loadKeywords() {
   // Only load keywords for Douyin domains
-  const domain = await getCurrentDomain();
+  const domain = await getCurrentDomain()
   if (!isDouyinDomain(domain)) {
-    return;
+    return
   }
 
-  const result = await chrome.storage.local.get(['douyinKeywords']);
+  const result = await chrome.storage.local.get(['douyinKeywords'])
   const keywords = result.douyinKeywords || {
     notInterested: defaultNotInterestedKeywords,
-    autoFollow: defaultAutoFollowKeywords
-  };
+    autoFollow: defaultAutoFollowKeywords,
+  }
 
   // Update textareas - format as comma-separated
   if (notInterestedKeywordsTextarea) {
-    notInterestedKeywordsTextarea.value = formatKeywords(keywords.notInterested);
+    notInterestedKeywordsTextarea.value = formatKeywords(keywords.notInterested)
   }
   if (autoFollowKeywordsTextarea) {
-    autoFollowKeywordsTextarea.value = formatKeywords(keywords.autoFollow);
+    autoFollowKeywordsTextarea.value = formatKeywords(keywords.autoFollow)
   }
 
   // Update keywords count
-  updateKeywordsCount();
+  updateKeywordsCount()
 }
 
 /**
  * Update keywords count display
  */
 function updateKeywordsCount() {
-  const douyinCountEl = document.getElementById('douyin-keywords-count');
-  const biliCountEl = document.getElementById('bili-keywords-count');
+  const douyinCountEl = document.getElementById('douyin-keywords-count')
+  const biliCountEl = document.getElementById('bili-keywords-count')
 
   if (douyinCountEl && notInterestedKeywordsTextarea) {
-    const keywords = parseKeywords(notInterestedKeywordsTextarea.value);
-    douyinCountEl.textContent = `(${keywords.length}个)`;
-    console.log('[Popup] 更新抖音关键词数量:', keywords.length);
+    const keywords = parseKeywords(notInterestedKeywordsTextarea.value)
+    douyinCountEl.textContent = `(${keywords.length}个)`
+    console.log('[Popup] 更新抖音关键词数量:', keywords.length)
   }
 
   if (biliCountEl && biliNotInterestedKeywordsTextarea) {
-    const keywords = parseKeywords(biliNotInterestedKeywordsTextarea.value);
-    biliCountEl.textContent = `(${keywords.length}个)`;
-    console.log('[Popup] 更新B站关键词数量:', keywords.length);
+    const keywords = parseKeywords(biliNotInterestedKeywordsTextarea.value)
+    biliCountEl.textContent = `(${keywords.length}个)`
+    console.log('[Popup] 更新B站关键词数量:', keywords.length)
   }
 }
 
@@ -789,54 +873,56 @@ function updateKeywordsCount() {
  * Save keywords to storage and notify content script
  */
 async function saveKeywords() {
-  if (!notInterestedKeywordsTextarea) return;
+  if (!notInterestedKeywordsTextarea) return
 
   // Only save keywords for Douyin domains
-  const domain = await getCurrentDomain();
+  const domain = await getCurrentDomain()
   if (!isDouyinDomain(domain)) {
-    console.log('非抖音域名，跳过保存关键词');
-    return;
+    console.log('非抖音域名，跳过保存关键词')
+    return
   }
 
   // Parse textarea content (supports both formats, auto deduplicate)
-  const keywords = parseKeywords(notInterestedKeywordsTextarea.value);
+  const keywords = parseKeywords(notInterestedKeywordsTextarea.value)
 
   // Get current auto-follow keywords
   const autoFollowKeywords = autoFollowKeywordsTextarea
     ? parseKeywords(autoFollowKeywordsTextarea.value)
-    : defaultAutoFollowKeywords;
+    : defaultAutoFollowKeywords
 
   await chrome.storage.local.set({
     douyinKeywords: {
       notInterested: keywords,
-      autoFollow: autoFollowKeywords
-    }
-  });
+      autoFollow: autoFollowKeywords,
+    },
+  })
 
-  console.log('不感兴趣关键词已保存:', keywords);
+  console.log('不感兴趣关键词已保存:', keywords)
 
   // Update textarea with deduplicated keywords
-  notInterestedKeywordsTextarea.value = formatKeywords(keywords);
+  notInterestedKeywordsTextarea.value = formatKeywords(keywords)
 
   // Update keywords count
-  updateKeywordsCount();
+  updateKeywordsCount()
 
   // Notify content script to update keywords
   try {
-    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
     if (tabs[0]?.id) {
-      chrome.tabs.sendMessage(tabs[0].id, {
-        type: 'UPDATE_KEYWORDS',
-        keywords: {
-          NOT_INTERESTED_KEYWORDS: keywords,
-          AUTO_FOLLOW_KEYWORDS: autoFollowKeywords
-        }
-      }).catch(() => {
-        // Content script may not be loaded
-      });
+      chrome.tabs
+        .sendMessage(tabs[0].id, {
+          type: 'UPDATE_KEYWORDS',
+          keywords: {
+            NOT_INTERESTED_KEYWORDS: keywords,
+            AUTO_FOLLOW_KEYWORDS: autoFollowKeywords,
+          },
+        })
+        .catch(() => {
+          // Content script may not be loaded
+        })
     }
   } catch (error) {
-    console.error('Failed to notify content script:', error);
+    console.error('Failed to notify content script:', error)
   }
 }
 
@@ -844,64 +930,66 @@ async function saveKeywords() {
  * Save auto-follow keywords
  */
 async function saveAutoFollowKeywords() {
-  if (!autoFollowKeywordsTextarea) return;
+  if (!autoFollowKeywordsTextarea) return
 
   // Only save keywords for Douyin domains
-  const domain = await getCurrentDomain();
+  const domain = await getCurrentDomain()
   if (!isDouyinDomain(domain)) {
-    console.log('非抖音域名，跳过保存关键词');
-    return;
+    console.log('非抖音域名，跳过保存关键词')
+    return
   }
 
   // Parse textarea content (supports both formats, auto deduplicate)
-  const keywords = parseKeywords(autoFollowKeywordsTextarea.value);
+  const keywords = parseKeywords(autoFollowKeywordsTextarea.value)
 
   // Get current not-interested keywords from storage
-  const result = await chrome.storage.local.get(['douyinKeywords']);
+  const result = await chrome.storage.local.get(['douyinKeywords'])
   const currentKeywords = result.douyinKeywords || {
     notInterested: defaultNotInterestedKeywords,
-    autoFollow: defaultAutoFollowKeywords
-  };
+    autoFollow: defaultAutoFollowKeywords,
+  }
 
   await chrome.storage.local.set({
     douyinKeywords: {
       ...currentKeywords,
-      autoFollow: keywords
-    }
-  });
+      autoFollow: keywords,
+    },
+  })
 
-  console.log('自动关注关键词已保存:', keywords);
+  console.log('自动关注关键词已保存:', keywords)
 
   // Update textarea with deduplicated keywords
-  autoFollowKeywordsTextarea.value = formatKeywords(keywords);
+  autoFollowKeywordsTextarea.value = formatKeywords(keywords)
 
   // Notify content script
   try {
-    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
     if (tabs[0]?.id) {
-      chrome.tabs.sendMessage(tabs[0].id, {
-        type: 'UPDATE_KEYWORDS',
-        keywords: {
-          AUTO_FOLLOW_KEYWORDS: keywords
-        }
-      }).catch(() => {});
+      chrome.tabs
+        .sendMessage(tabs[0].id, {
+          type: 'UPDATE_KEYWORDS',
+          keywords: {
+            AUTO_FOLLOW_KEYWORDS: keywords,
+          },
+        })
+        .catch(() => {})
     }
   } catch (error) {
-    console.error('Failed to notify content script:', error);
+    console.error('Failed to notify content script:', error)
   }
 }
 
 // ========== Hide Elements Management ==========
-const hideElementsEnabledCheckbox = document.getElementById('hide-elements-enabled');
-const hideElementsEditor = document.getElementById('hide-elements-editor');
-const batchAddPanel = document.getElementById('batch-add-panel');
-const batchSelectorsInput = document.getElementById('batch-selectors-input');
-const batchAddBtn = document.getElementById('batch-add-selectors-btn');
-const closeBatchPanelBtn = document.getElementById('close-batch-panel-btn');
-const confirmBatchAddBtn = document.getElementById('confirm-batch-add-btn');
+const hideElementsEnabledCheckbox = document.getElementById('hide-elements-enabled')
+const hideElementsEditor = document.getElementById('hide-elements-editor')
+const batchAddPanel = document.getElementById('batch-add-panel')
+const batchSelectorsInput = document.getElementById('batch-selectors-input')
+const batchAddBtn = document.getElementById('batch-add-selectors-btn')
+const closeBatchPanelBtn = document.getElementById('close-batch-panel-btn')
+const confirmBatchAddBtn = document.getElementById('confirm-batch-add-btn')
 
 // Default hide elements selectors
-const defaultHideElementsSelectors = [];
+const defaultHideElementsSelectors = []
 
 /**
  * Parse CSS selectors - supports complex selectors with quotes inside
@@ -909,82 +997,87 @@ const defaultHideElementsSelectors = [];
  * Supports: newline-separated, space-separated (with quotes for complex selectors)
  */
 function parseSelectors(text) {
-  if (!text) return [];
+  if (!text) return []
 
   // 首先尝试按换行符分割（优先）
-  const lines = text.split(/\n/).map(l => l.trim()).filter(l => l);
+  const lines = text
+    .split(/\n/)
+    .map((l) => l.trim())
+    .filter((l) => l)
   if (lines.length > 1) {
     // 如果有多行，按行处理
-    const result = [];
+    const result = []
     for (const line of lines) {
       // 检查是否是引号包裹的选择器
-      if ((line.startsWith('"') && line.endsWith('"')) ||
-          (line.startsWith("'") && line.endsWith("'"))) {
-        result.push(line.slice(1, -1));
+      if (
+        (line.startsWith('"') && line.endsWith('"')) ||
+        (line.startsWith("'") && line.endsWith("'"))
+      ) {
+        result.push(line.slice(1, -1))
       } else {
-        result.push(line);
+        result.push(line)
       }
     }
-    return [...new Set(result)];
+    return [...new Set(result)]
   }
 
   // 单行情况，按空格分割（需要处理引号）
-  const result = [];
-  let current = '';
-  let depth = 0; // Track parenthesis/bracket depth
-  let inQuote = null; // Track quote state
+  const result = []
+  let current = ''
+  let depth = 0 // Track parenthesis/bracket depth
+  let inQuote = null // Track quote state
 
   for (let i = 0; i < text.length; i++) {
-    const char = text[i];
+    const char = text[i]
 
     // 处理引号
     if ((char === '"' || char === "'") && depth === 0) {
       if (inQuote === char) {
         // 结束引号
-        inQuote = null;
+        inQuote = null
         // 引号内的内容作为完整选择器
         if (current.trim()) {
-          result.push(current.trim());
+          result.push(current.trim())
         }
-        current = '';
-        continue;
+        current = ''
+        continue
       } else if (!inQuote) {
         // 开始引号
-        inQuote = char;
-        continue;
+        inQuote = char
+        continue
       }
     }
 
     // 在引号内，直接添加字符
     if (inQuote) {
-      current += char;
-      continue;
+      current += char
+      continue
     }
 
     if (char === '(' || char === '[') {
-      depth++;
-      current += char;
+      depth++
+      current += char
     } else if (char === ')' || char === ']') {
-      depth--;
-      current += char;
+      depth--
+      current += char
     } else if (/\s/.test(char) && depth === 0) {
       // Whitespace at depth 0 means selector boundary
       if (current.trim()) {
-        result.push(current.trim());
+        result.push(current.trim())
       }
-      current = '';
+      current = ''
     } else {
-      current += char;
+      current += char
     }
   }
 
   // Don't forget the last selector
   if (current.trim()) {
-    result.push(current.trim());
+    result.push(current.trim())
   }
 
   // Deduplicate using Set
-  return [...new Set(result)];
+  return [...new Set(result)]
 }
 
 /**
@@ -992,7 +1085,7 @@ function parseSelectors(text) {
  * Each selector on its own line
  */
 function formatSelectors(selectors) {
-  return selectors.join('\n');
+  return selectors.join('\n')
 }
 
 /**
@@ -1000,14 +1093,14 @@ function formatSelectors(selectors) {
  */
 async function getCurrentDomain() {
   try {
-    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
     if (tabs[0]?.url) {
-      return new URL(tabs[0].url).hostname;
+      return new URL(tabs[0].url).hostname
     }
   } catch (error) {
-    console.error('Failed to get current domain:', error);
+    console.error('Failed to get current domain:', error)
   }
-  return null;
+  return null
 }
 
 /**
@@ -1025,7 +1118,7 @@ const DEFAULT_SELECTORS_BY_DOMAIN = {
     '.cursorPointer+*',
     'xg-right-grid>xg-icon:not([class*="automatic-continuous"]):not([class*="xgplayer-volume"])',
     '.danmakuContainer',
-    '#douyin-header-menuCt>div>pace-island>div>*:not(:last-child)'
+    '#douyin-header-menuCt>div>pace-island>div>*:not(:last-child)',
   ],
   'www.douyin.com': [
     '.qmhaloYp:nth-child(n):not(:nth-child(2)):not(:nth-child(5))',
@@ -1036,7 +1129,7 @@ const DEFAULT_SELECTORS_BY_DOMAIN = {
     '.cursorPointer+*',
     'xg-right-grid>xg-icon:not([class*="automatic-continuous"]):not([class*="xgplayer-volume"])',
     '.danmakuContainer',
-    '#douyin-header-menuCt>div>pace-island>div>*:not(:last-child)'
+    '#douyin-header-menuCt>div>pace-island>div>*:not(:last-child)',
   ],
   'bilibili.com': [
     '.left-entry>.v-popover-wrap:nth-child(n+2)',
@@ -1044,7 +1137,7 @@ const DEFAULT_SELECTORS_BY_DOMAIN = {
     '.bili-feed-card:has(.bili-live-card)',
     '.floor-single-card:has(.floor-title)',
     '.bili-feed-card:not(:has(a))',
-    '.feed-card:not(:has(a))'
+    '.feed-card:not(:has(a))',
   ],
   'www.bilibili.com': [
     '.left-entry>.v-popover-wrap:nth-child(n+2)',
@@ -1052,7 +1145,7 @@ const DEFAULT_SELECTORS_BY_DOMAIN = {
     '.bili-feed-card:has(.bili-live-card)',
     '.floor-single-card:has(.floor-title)',
     '.bili-feed-card:not(:has(a))',
-    '.feed-card:not(:has(a))'
+    '.feed-card:not(:has(a))',
   ],
   'pornhub.com': [
     '.cnhmmcccai',
@@ -1060,7 +1153,7 @@ const DEFAULT_SELECTORS_BY_DOMAIN = {
     '#dbdcdkcbbd',
     '#countryRedirectMessage',
     '.video-wrapper>.hd.clear.original',
-    '#welcome'
+    '#welcome',
   ],
   'www.pornhub.com': [
     '.cnhmmcccai',
@@ -1068,126 +1161,141 @@ const DEFAULT_SELECTORS_BY_DOMAIN = {
     '#dbdcdkcbbd',
     '#countryRedirectMessage',
     '.video-wrapper>.hd.clear.original',
-    '#welcome'
+    '#welcome',
   ],
   '4hu.tv': ['.kkm-content'],
-  'www.4hu.tv': ['.kkm-content']
-};
+  'www.4hu.tv': ['.kkm-content'],
+}
 
 async function getDefaultHideSelectors() {
   // 先尝试从 content script 获取
   try {
-    console.log('[隐藏元素] 尝试从 content script 获取默认选择器');
+    console.log('[隐藏元素] 尝试从 content script 获取默认选择器')
     const response = await sendMessageToContentScript({
-      type: 'GET_DEFAULT_HIDE_SELECTORS'
-    });
+      type: 'GET_DEFAULT_HIDE_SELECTORS',
+    })
 
-    console.log('[隐藏元素] 收到响应:', response);
+    console.log('[隐藏元素] 收到响应:', response)
 
     if (response && response.success && response.selectors && response.selectors.length > 0) {
-      console.log('[隐藏元素] ✓ 从 content script 获取默认选择器:', response.selectors.length, '个');
-      return response.selectors;
+      console.log('[隐藏元素] ✓ 从 content script 获取默认选择器:', response.selectors.length, '个')
+      return response.selectors
     } else {
-      console.log('[隐藏元素] 收到响应但选择器为空');
+      console.log('[隐藏元素] 收到响应但选择器为空')
     }
   } catch (error) {
-    console.log('[隐藏元素] 获取失败:', error.message);
+    console.log('[隐藏元素] 获取失败:', error.message)
   }
 
   // 失败时使用硬编码数据
-  console.log('[隐藏元素] 使用硬编码默认选择器');
-  const domain = await getCurrentDomain();
+  console.log('[隐藏元素] 使用硬编码默认选择器')
+  const domain = await getCurrentDomain()
   if (domain && DEFAULT_SELECTORS_BY_DOMAIN[domain]) {
-    console.log('[隐藏元素] 硬编码数据:', domain, DEFAULT_SELECTORS_BY_DOMAIN[domain].length, '个');
-    return DEFAULT_SELECTORS_BY_DOMAIN[domain];
+    console.log('[隐藏元素] 硬编码数据:', domain, DEFAULT_SELECTORS_BY_DOMAIN[domain].length, '个')
+    return DEFAULT_SELECTORS_BY_DOMAIN[domain]
   }
 
-  console.log('[隐藏元素] 无默认选择器');
-  return [];
+  console.log('[隐藏元素] 无默认选择器')
+  return []
 }
 
 /**
  * Load hide elements settings from storage (domain-specific)
  */
 async function loadHideElementsSettings() {
-  const domain = await getCurrentDomain();
-  const result = await chrome.storage.local.get(['hideElementsSettings']);
-  const allSettings = result.hideElementsSettings || {};
+  const domain = await getCurrentDomain()
+  const result = await chrome.storage.local.get(['hideElementsSettings'])
+  const allSettings = result.hideElementsSettings || {}
 
   // Get default selectors from content script
-  const defaultSelectors = await getDefaultHideSelectors();
-  console.log('[隐藏元素] 默认选择器:', defaultSelectors);
+  const defaultSelectors = await getDefaultHideSelectors()
+  console.log('[隐藏元素] 默认选择器:', defaultSelectors)
 
   // 尝试从本地服务器加载数据
-  let localServerSelectors = [];
+  let localServerSelectors = []
   if (domain) {
     try {
       // 尝试两种域名格式：原始格式 和 带/不带 www. 的格式
-      const domainsToTry = [domain];
+      const domainsToTry = [domain]
       if (domain.startsWith('www.')) {
-        domainsToTry.push(domain.slice(4)); // 移除 www.
+        domainsToTry.push(domain.slice(4)) // 移除 www.
       } else {
-        domainsToTry.push('www.' + domain); // 添加 www.
+        domainsToTry.push('www.' + domain) // 添加 www.
       }
 
       for (const tryDomain of domainsToTry) {
         const response = await fetch(`http://localhost:3000/api/data/selectors/${tryDomain}`, {
-          signal: AbortSignal.timeout(2000)
-        });
-        const data = await response.json();
-        if (data.success && data.data && (Array.isArray(data.data) || typeof data.data === 'string')) {
+          signal: AbortSignal.timeout(2000),
+        })
+        const data = await response.json()
+        if (
+          data.success &&
+          data.data &&
+          (Array.isArray(data.data) || typeof data.data === 'string')
+        ) {
           if (Array.isArray(data.data)) {
-            localServerSelectors = data.data;
+            localServerSelectors = data.data
           } else if (typeof data.data === 'string' && data.data.trim()) {
-            localServerSelectors = data.data.split(',').map(s => s.trim()).filter(s => s);
+            localServerSelectors = data.data
+              .split(',')
+              .map((s) => s.trim())
+              .filter((s) => s)
           }
-          console.log('[隐藏元素] 从本地服务器加载:', tryDomain, localServerSelectors.length, '个选择器');
-          break; // 找到数据就停止
+          console.log(
+            '[隐藏元素] 从本地服务器加载:',
+            tryDomain,
+            localServerSelectors.length,
+            '个选择器'
+          )
+          break // 找到数据就停止
         }
       }
     } catch (e) {
-      console.log('[隐藏元素] 本地服务器加载失败:', e.message);
+      console.log('[隐藏元素] 本地服务器加载失败:', e.message)
     }
   }
 
   // Get settings for current domain
-  const hasCustomSettings = domain && allSettings[domain];
-  let settings;
+  const hasCustomSettings = domain && allSettings[domain]
+  let settings
   if (hasCustomSettings) {
-    settings = allSettings[domain];
+    settings = allSettings[domain]
     // Merge: default + chrome storage + local server (remove duplicates)
-    const mergedSelectors = [...new Set([...defaultSelectors, ...(settings.selectors || []), ...localServerSelectors])];
-    settings.selectors = mergedSelectors;
-    console.log('[隐藏元素] 从存储加载:', domain, settings);
+    const mergedSelectors = [
+      ...new Set([...defaultSelectors, ...(settings.selectors || []), ...localServerSelectors]),
+    ]
+    settings.selectors = mergedSelectors
+    console.log('[隐藏元素] 从存储加载:', domain, settings)
   } else if (localServerSelectors.length > 0) {
     // 有本地服务器数据但没有 Chrome 存储数据
     settings = {
       enabled: true,
-      selectors: [...new Set([...defaultSelectors, ...localServerSelectors])]
-    };
-    console.log('[隐藏元素] 从本地服务器加载:', domain, settings);
+      selectors: [...new Set([...defaultSelectors, ...localServerSelectors])],
+    }
+    console.log('[隐藏元素] 从本地服务器加载:', domain, settings)
   } else {
     // Use default selectors, but don't auto-enable
     settings = {
       enabled: false,
-      selectors: defaultSelectors
-    };
+      selectors: defaultSelectors,
+    }
   }
 
   // Update UI
   if (hideElementsEnabledCheckbox) {
-    hideElementsEnabledCheckbox.checked = settings.enabled;
+    hideElementsEnabledCheckbox.checked = settings.enabled
   }
 
   // 调用 loadSelectorsEditor 来正确加载编辑器和列表
   // （编辑器只显示用户选择器，列表显示所有合并后的选择器）
-  await loadSelectorsEditor();
+  await loadSelectorsEditor()
 
   // Show manager only if enabled or has selectors to display
-  const shouldShowManager = settings.enabled || (settings.selectors && settings.selectors.length > 0);
-  const manager = document.getElementById('hide-elements-manager');
+  const shouldShowManager =
+    settings.enabled || (settings.selectors && settings.selectors.length > 0)
+  const manager = document.getElementById('hide-elements-manager')
   if (manager) {
-    manager.style.display = shouldShowManager ? 'block' : 'none';
+    manager.style.display = shouldShowManager ? 'block' : 'none'
   }
 }
 
@@ -1196,30 +1304,33 @@ async function loadHideElementsSettings() {
  * @param {string[]} userSelectors - 用户选择器数组（可选，不传则从编辑器读取）
  */
 async function saveHideElementsSettings(userSelectors = null) {
-  const enabled = hideElementsEnabledCheckbox ? hideElementsEnabledCheckbox.checked : false;
-  const domain = await getCurrentDomain();
+  const enabled = hideElementsEnabledCheckbox ? hideElementsEnabledCheckbox.checked : false
+  const domain = await getCurrentDomain()
 
   if (!domain) {
-    console.error('Failed to save hide elements settings: unable to get current domain');
-    return;
+    console.error('Failed to save hide elements settings: unable to get current domain')
+    return
   }
 
   // 获取默认选择器
-  const defaultSelectors = await getDefaultHideSelectors();
+  const defaultSelectors = await getDefaultHideSelectors()
 
   // 获取本地服务器选择器
-  let localServerSelectors = [];
+  let localServerSelectors = []
   try {
-    const normalizedDomain = domain.startsWith('www.') ? domain.slice(4) : domain;
+    const normalizedDomain = domain.startsWith('www.') ? domain.slice(4) : domain
     const response = await fetch(`http://localhost:3000/api/data/selectors/${normalizedDomain}`, {
-      signal: AbortSignal.timeout(1000)
-    });
-    const data = await response.json();
+      signal: AbortSignal.timeout(1000),
+    })
+    const data = await response.json()
     if (data.success && data.data) {
       if (Array.isArray(data.data)) {
-        localServerSelectors = data.data;
+        localServerSelectors = data.data
       } else if (typeof data.data === 'string' && data.data.trim()) {
-        localServerSelectors = data.data.split(',').map(s => s.trim()).filter(s => s);
+        localServerSelectors = data.data
+          .split(',')
+          .map((s) => s.trim())
+          .filter((s) => s)
       }
     }
   } catch (e) {
@@ -1228,38 +1339,40 @@ async function saveHideElementsSettings(userSelectors = null) {
 
   // 如果没有传入 userSelectors，从编辑器读取（只包含用户添加的）
   if (userSelectors === null) {
-    userSelectors = parseSelectorsFromEditor();
+    userSelectors = parseSelectorsFromEditor()
   }
 
   // 用户选择器去重
-  userSelectors = [...new Set(userSelectors)];
+  userSelectors = [...new Set(userSelectors)]
 
   // 合并所有选择器（默认 + 本地服务器 + 用户），用于发送给 content script
-  const mergedSelectors = [...new Set([...defaultSelectors, ...localServerSelectors, ...userSelectors])];
+  const mergedSelectors = [
+    ...new Set([...defaultSelectors, ...localServerSelectors, ...userSelectors]),
+  ]
 
   // 获取所有现有设置
-  const result = await chrome.storage.local.get(['hideElementsSettings']);
-  const allSettings = result.hideElementsSettings || {};
+  const result = await chrome.storage.local.get(['hideElementsSettings'])
+  const allSettings = result.hideElementsSettings || {}
 
   // 只保存用户选择器到存储（不包含默认和本地服务器的）
-  allSettings[domain] = { enabled, selectors: userSelectors };
+  allSettings[domain] = { enabled, selectors: userSelectors }
 
   // 保存到 Chrome 存储
   await chrome.storage.local.set({
-    hideElementsSettings: allSettings
-  });
+    hideElementsSettings: allSettings,
+  })
 
   // 同步用户选择器到本地服务器
   try {
-    const normalizedDomain = domain.startsWith('www.') ? domain.slice(4) : domain;
+    const normalizedDomain = domain.startsWith('www.') ? domain.slice(4) : domain
     await fetch(`http://localhost:3000/api/data/selectors/${normalizedDomain}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(userSelectors)
-    });
-    console.log('已同步用户选择器到本地服务器:', normalizedDomain);
+      body: JSON.stringify(userSelectors),
+    })
+    console.log('已同步用户选择器到本地服务器:', normalizedDomain)
   } catch (e) {
-    console.log('同步到本地服务器失败:', e.message);
+    console.log('同步到本地服务器失败:', e.message)
   }
 
   console.log('隐藏元素设置已保存:', {
@@ -1267,24 +1380,26 @@ async function saveHideElementsSettings(userSelectors = null) {
     default: defaultSelectors.length,
     localServer: localServerSelectors.length,
     user: userSelectors.length,
-    total: mergedSelectors.length
-  });
+    total: mergedSelectors.length,
+  })
 
   // 更新列表显示和编辑器
-  await loadSelectorsEditor();
+  await loadSelectorsEditor()
 
   // Notify content script to update hide elements (发送合并后的选择器)
   try {
-    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
     if (tabs[0]?.id) {
-      chrome.tabs.sendMessage(tabs[0].id, {
-        type: 'UPDATE_HIDE_ELEMENTS',
-        enabled,
-        selectors: mergedSelectors
-      }).catch(() => {});
+      chrome.tabs
+        .sendMessage(tabs[0].id, {
+          type: 'UPDATE_HIDE_ELEMENTS',
+          enabled,
+          selectors: mergedSelectors,
+        })
+        .catch(() => {})
     }
   } catch (error) {
-    console.error('Failed to notify content script:', error);
+    console.error('Failed to notify content script:', error)
   }
 }
 
@@ -1292,31 +1407,34 @@ async function saveHideElementsSettings(userSelectors = null) {
  * 渲染隐藏选择器列表
  */
 async function renderHideSelectorsList() {
-  const domain = await getCurrentDomain();
-  if (!domain) return;
+  const domain = await getCurrentDomain()
+  if (!domain) return
 
   // 获取默认选择器
-  const defaultSelectors = await getDefaultHideSelectors();
+  const defaultSelectors = await getDefaultHideSelectors()
 
   // 从存储获取用户选择器
-  const result = await chrome.storage.local.get(['hideElementsSettings']);
-  const allSettings = result.hideElementsSettings || {};
-  const domainSettings = allSettings[domain] || {};
-  const userSelectors = domainSettings.selectors || [];
+  const result = await chrome.storage.local.get(['hideElementsSettings'])
+  const allSettings = result.hideElementsSettings || {}
+  const domainSettings = allSettings[domain] || {}
+  const userSelectors = domainSettings.selectors || []
 
   // 从本地服务器获取选择器
-  let localServerSelectors = [];
+  let localServerSelectors = []
   try {
-    const normalizedDomain = domain.startsWith('www.') ? domain.slice(4) : domain;
+    const normalizedDomain = domain.startsWith('www.') ? domain.slice(4) : domain
     const response = await fetch(`http://localhost:3000/api/data/selectors/${normalizedDomain}`, {
-      signal: AbortSignal.timeout(1000)
-    });
-    const data = await response.json();
+      signal: AbortSignal.timeout(1000),
+    })
+    const data = await response.json()
     if (data.success && data.data) {
       if (Array.isArray(data.data)) {
-        localServerSelectors = data.data;
+        localServerSelectors = data.data
       } else if (typeof data.data === 'string' && data.data.trim()) {
-        localServerSelectors = data.data.split(',').map(s => s.trim()).filter(s => s);
+        localServerSelectors = data.data
+          .split(',')
+          .map((s) => s.trim())
+          .filter((s) => s)
       }
     }
   } catch (e) {
@@ -1324,77 +1442,82 @@ async function renderHideSelectorsList() {
   }
 
   // 合并所有选择器并去重
-  const allSelectors = [...new Set([...defaultSelectors, ...localServerSelectors, ...userSelectors])];
+  const allSelectors = [
+    ...new Set([...defaultSelectors, ...localServerSelectors, ...userSelectors]),
+  ]
 
   // 获取编辑器容器
-  const editor = document.getElementById('hide-elements-editor');
-  if (!editor) return;
+  const editor = document.getElementById('hide-elements-editor')
+  if (!editor) return
 
   // 清空现有内容
-  editor.innerHTML = '';
+  editor.innerHTML = ''
 
   // 渲染选择器列表
-  allSelectors.forEach(selector => {
-    const item = document.createElement('div');
-    item.className = 'selector-item';
+  allSelectors.forEach((selector) => {
+    const item = document.createElement('div')
+    item.className = 'selector-item'
 
     // 判断选择器来源
-    let source = '用户添加';
+    let source = '用户添加'
     if (defaultSelectors.includes(selector)) {
-      source = '默认';
-      item.classList.add('default-selector');
+      source = '默认'
+      item.classList.add('default-selector')
     } else if (localServerSelectors.includes(selector)) {
-      source = '本地服务器';
-      item.classList.add('local-server-selector');
+      source = '本地服务器'
+      item.classList.add('local-server-selector')
     }
 
     item.innerHTML = `
       <span class="selector-text">${escapeHtml(selector)}</span>
       <span class="selector-source">${source}</span>
       <button class="selector-delete" data-selector="${escapeHtml(selector)}" title="删除">×</button>
-    `;
+    `
 
-    editor.appendChild(item);
-  });
+    editor.appendChild(item)
+  })
 
   // 添加删除事件监听
-  editor.querySelectorAll('.selector-delete').forEach(btn => {
+  editor.querySelectorAll('.selector-delete').forEach((btn) => {
     btn.addEventListener('click', async () => {
-      const selectorToDelete = btn.getAttribute('data-selector');
-      await deleteSelector(selectorToDelete);
-    });
-  });
+      const selectorToDelete = btn.getAttribute('data-selector')
+      await deleteSelector(selectorToDelete)
+    })
+  })
 
-  console.log('[隐藏元素] 已渲染选择器列表:', allSelectors.length, '个');
+  console.log('[隐藏元素] 已渲染选择器列表:', allSelectors.length, '个')
 }
 
 /**
  * 删除选择器
  */
 async function deleteSelector(selector) {
-  const domain = await getCurrentDomain();
-  if (!domain) return;
+  const domain = await getCurrentDomain()
+  if (!domain) return
 
   // 获取当前设置
-  const result = await chrome.storage.local.get(['hideElementsSettings']);
-  const allSettings = result.hideElementsSettings || {};
-  const domainSettings = allSettings[domain] || {};
-  const currentSelectors = domainSettings.selectors || [];
+  const result = await chrome.storage.local.get(['hideElementsSettings'])
+  const allSettings = result.hideElementsSettings || {}
+  const domainSettings = allSettings[domain] || {}
+  const currentSelectors = domainSettings.selectors || []
 
   // 获取默认选择器和本地服务器选择器
-  const defaultSelectors = await getDefaultHideSelectors();
-  let localServerSelectors = [];
+  const defaultSelectors = await getDefaultHideSelectors()
+  let localServerSelectors = []
   try {
-    const normalizedDomain = domain.startsWith('www.') ? domain.slice(4) : domain;
+    const normalizedDomain = domain.startsWith('www.') ? domain.slice(4) : domain
     const response = await fetch(`http://localhost:3000/api/data/selectors/${normalizedDomain}`, {
-      signal: AbortSignal.timeout(1000)
-    });
-    const data = await response.json();
+      signal: AbortSignal.timeout(1000),
+    })
+    const data = await response.json()
     if (data.success && data.data) {
       if (Array.isArray(data.data)) {
-        localServerSelectors = data.data;
+        localServerSelectors = data.data
       } else if (typeof data.data === 'string' && data.data.trim()) {
-        localServerSelectors = data.data.split(',').map(s => s.trim()).filter(s => s);
+        localServerSelectors = data.data
+          .split(',')
+          .map((s) => s.trim())
+          .filter((s) => s)
       }
     }
   } catch (e) {
@@ -1403,687 +1526,718 @@ async function deleteSelector(selector) {
 
   // 只能删除用户添加的选择器，不能删除默认和本地服务器的
   if (defaultSelectors.includes(selector) || localServerSelectors.includes(selector)) {
-    console.log('[隐藏元素] 不能删除默认或本地服务器选择器:', selector);
-    return;
+    console.log('[隐藏元素] 不能删除默认或本地服务器选择器:', selector)
+    return
   }
 
   // 从用户选择器中删除
-  const newSelectors = currentSelectors.filter(s => s !== selector);
+  const newSelectors = currentSelectors.filter((s) => s !== selector)
 
   // 保存
-  await saveHideElementsSettings(newSelectors);
+  await saveHideElementsSettings(newSelectors)
 
   // 重新渲染列表
-  await renderHideSelectorsList();
+  await renderHideSelectorsList()
 }
 
 // Add event listeners for hide elements
 if (hideElementsEnabledCheckbox) {
   hideElementsEnabledCheckbox.addEventListener('change', () => {
-    saveHideElementsSettings();
-  });
+    saveHideElementsSettings()
+  })
 }
 
 // 批量添加面板事件
 if (batchAddBtn) {
   batchAddBtn.addEventListener('click', () => {
     if (batchAddPanel) {
-      batchAddPanel.style.display = batchAddPanel.style.display === 'none' ? 'block' : 'none';
-      if (batchSelectorsInput) batchSelectorsInput.focus();
+      batchAddPanel.style.display = batchAddPanel.style.display === 'none' ? 'block' : 'none'
+      if (batchSelectorsInput) batchSelectorsInput.focus()
     }
-  });
+  })
 }
 
 if (closeBatchPanelBtn) {
   closeBatchPanelBtn.addEventListener('click', () => {
     if (batchAddPanel) {
-      batchAddPanel.style.display = 'none';
-      if (batchSelectorsInput) batchSelectorsInput.value = '';
+      batchAddPanel.style.display = 'none'
+      if (batchSelectorsInput) batchSelectorsInput.value = ''
     }
-  });
+  })
 }
 
 if (confirmBatchAddBtn) {
   confirmBatchAddBtn.addEventListener('click', async () => {
-    if (!batchSelectorsInput) return;
-    const inputText = batchSelectorsInput.value.trim();
-    if (!inputText) return;
+    if (!batchSelectorsInput) return
+    const inputText = batchSelectorsInput.value.trim()
+    if (!inputText) return
 
-    const newSelectors = parseSelectors(inputText);
-    if (newSelectors.length === 0) return;
+    const newSelectors = parseSelectors(inputText)
+    if (newSelectors.length === 0) return
 
     // 添加到现有选择器
-    const domain = await getCurrentDomain();
-    const result = await chrome.storage.local.get(['hideElementsSettings']);
-    const allSettings = result.hideElementsSettings || {};
-    const domainSettings = allSettings[domain] || { enabled: false, selectors: [] };
-    const existingSelectors = domainSettings.selectors || [];
+    const domain = await getCurrentDomain()
+    const result = await chrome.storage.local.get(['hideElementsSettings'])
+    const allSettings = result.hideElementsSettings || {}
+    const domainSettings = allSettings[domain] || { enabled: false, selectors: [] }
+    const existingSelectors = domainSettings.selectors || []
 
     // 合并并去重
-    const mergedSelectors = [...new Set([...existingSelectors, ...newSelectors])];
+    const mergedSelectors = [...new Set([...existingSelectors, ...newSelectors])]
 
     // 保存
-    await saveHideElementsSettings(mergedSelectors);
+    await saveHideElementsSettings(mergedSelectors)
 
     // 清空并关闭面板
-    batchSelectorsInput.value = '';
-    batchAddPanel.style.display = 'none';
+    batchSelectorsInput.value = ''
+    batchAddPanel.style.display = 'none'
 
     // 刷新列表
-    await renderHideSelectorsList();
-  });
+    await renderHideSelectorsList()
+  })
 }
 
 // Load hide elements settings when popup opens
 document.addEventListener('DOMContentLoaded', async () => {
-  console.log('[Popup] DOM加载完成，开始统一初始化');
+  console.log('[Popup] DOM加载完成，开始统一初始化')
 
   // 1. 基础初始化（无依赖）
-  loadHideElementsSettings().catch(console.error);
-  checkLocalServerStatus();
-  checkPendingPickedElement();
+  loadHideElementsSettings().catch(console.error)
+  checkLocalServerStatus()
+  checkPendingPickedElement()
 
   // 2. 数据加载（可并行）
   await Promise.all([
     loadKeywords().catch(console.error),
     loadBiliKeywords().catch(console.error),
-    loadBlockedDomains().catch(console.error)
-  ]);
+    loadBlockedDomains().catch(console.error),
+  ])
 
   // 3. UI初始化（依赖数据）
-  updateDouyinKeywordsVisibility().catch(console.error);
-  updateBilibiliKeywordsVisibility().catch(console.error);
+  updateDouyinKeywordsVisibility().catch(console.error)
+  updateBilibiliKeywordsVisibility().catch(console.error)
 
   // 4. 核心功能初始化
-  loadSelectorsEditor();
-  initNavigation();
-  initResourceAccelerator();
+  loadSelectorsEditor()
+  initNavigation()
+  initResourceAccelerator()
 
   // 5. 事件绑定
-  initStatsButtons();
-  initNotificationPanel();
-  initQuickNote();
-  initClipboardHistory();
-  initShortcutsHelp();
+  initStatsButtons()
+  initNotificationPanel()
+  initQuickNote()
+  initClipboardHistory()
+  initShortcutsHelp()
 
   // 空格键点击支持
   document.addEventListener('keydown', (e) => {
     if (e.key === ' ' && !e.ctrlKey && !e.altKey && !e.metaKey) {
-      const active = document.activeElement;
-      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT')) return;
-      if (active && active.isContentEditable) return;
-      e.preventDefault();
-      active?.click();
+      const active = document.activeElement
+      if (
+        active &&
+        (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT')
+      )
+        return
+      if (active && active.isContentEditable) return
+      e.preventDefault()
+      active?.click()
     }
-  });
-  initTemplateButtons();
-  initThemeToggle();
-  initImportExport();
+  })
+  initTemplateButtons()
+  initThemeToggle()
+  initImportExport()
 
-  console.log('[Popup] 初始化完成');
-});
+  console.log('[Popup] 初始化完成')
+})
 
 /**
  * 检查是否有待处理的选中元素（popup 重新打开时）
  */
 async function checkPendingPickedElement() {
   try {
-    const result = await chrome.storage.local.get(['pendingPickedElement']);
+    const result = await chrome.storage.local.get(['pendingPickedElement'])
     if (result.pendingPickedElement) {
-      const pending = result.pendingPickedElement;
+      const pending = result.pendingPickedElement
       // 检查是否是最近5秒内的选择
       if (Date.now() - pending.timestamp < 5000) {
-        handlePickedElement(pending);
+        handlePickedElement(pending)
       }
       // 清除待处理元素
-      await chrome.storage.local.remove(['pendingPickedElement']);
+      await chrome.storage.local.remove(['pendingPickedElement'])
     }
   } catch (error) {
-    console.error('[Popup] 检查待处理元素失败:', error);
+    console.error('[Popup] 检查待处理元素失败:', error)
   }
 }
 
 // ========== 本地服务状态检测 ==========
-const LOCAL_SERVER_URL = 'http://localhost:3000';
+const LOCAL_SERVER_URL = 'http://localhost:3000'
 
 async function checkLocalServerStatus() {
-  const statusDot = document.getElementById('server-status-dot');
-  const statusText = document.getElementById('server-status-text');
-  const statusDetail = document.getElementById('server-status-detail');
+  const statusDot = document.getElementById('server-status-dot')
+  const statusText = document.getElementById('server-status-text')
+  const statusDetail = document.getElementById('server-status-detail')
 
-  if (!statusDot || !statusText) return;
+  if (!statusDot || !statusText) return
 
   try {
     const response = await fetch(`${LOCAL_SERVER_URL}/api/health`, {
       method: 'GET',
-      signal: AbortSignal.timeout(2000)
-    });
-    const result = await response.json();
+      signal: AbortSignal.timeout(2000),
+    })
+    const result = await response.json()
 
     if (result.status === 'ok') {
-      statusDot.style.background = '#28a745';
-      statusText.textContent = '本地服务: 已连接';
+      statusDot.style.background = '#28a745'
+      statusText.textContent = '本地服务: 已连接'
 
       // 获取详细数据
       try {
-        let domain = await getCurrentDomain();
+        let domain = await getCurrentDomain()
         if (domain) {
           // 尝试两种域名格式
-          const domainsToTry = [domain];
+          const domainsToTry = [domain]
           if (domain.startsWith('www.')) {
-            domainsToTry.push(domain.slice(4));
+            domainsToTry.push(domain.slice(4))
           } else {
-            domainsToTry.push('www.' + domain);
+            domainsToTry.push('www.' + domain)
           }
 
-          let keywordsData = null;
+          let keywordsData = null
           for (const tryDomain of domainsToTry) {
-            const keywordsRes = await fetch(`${LOCAL_SERVER_URL}/api/data/keywords/${tryDomain}`);
-            const data = await keywordsRes.json();
+            const keywordsRes = await fetch(`${LOCAL_SERVER_URL}/api/data/keywords/${tryDomain}`)
+            const data = await keywordsRes.json()
             if (data.success && data.data) {
-              keywordsData = data;
-              domain = tryDomain; // 使用找到数据的域名
-              break;
+              keywordsData = data
+              domain = tryDomain // 使用找到数据的域名
+              break
             }
           }
 
-          console.log('[本地服务] 关键词响应:', JSON.stringify(keywordsData));
-          const count = keywordsData?.data?.notInterested?.length || 0;
-          statusDetail.textContent = `域名: ${domain} | 关键词: ${count}个`;
+          console.log('[本地服务] 关键词响应:', JSON.stringify(keywordsData))
+          const count = keywordsData?.data?.notInterested?.length || 0
+          statusDetail.textContent = `域名: ${domain} | 关键词: ${count}个`
         }
       } catch (e) {
-        console.log('[本地服务] 获取关键词失败:', e);
-        statusDetail.textContent = '';
+        console.log('[本地服务] 获取关键词失败:', e)
+        statusDetail.textContent = ''
       }
     } else {
-      throw new Error('服务异常');
+      throw new Error('服务异常')
     }
   } catch (error) {
-    statusDot.style.background = '#dc3545';
-    statusText.textContent = '本地服务: 未连接';
-    statusDetail.textContent = '请启动 local-data-server';
+    statusDot.style.background = '#dc3545'
+    statusText.textContent = '本地服务: 未连接'
+    statusDetail.textContent = '请启动 local-data-server'
   }
 }
 
 // Add copy event listener for keywords textareas - copy as array format
 function setupCopyAsArray(textarea) {
-  if (!textarea) return;
+  if (!textarea) return
 
   textarea.addEventListener('copy', (e) => {
-    const selection = window.getSelection();
-    if (!selection.rangeCount) return;
+    const selection = window.getSelection()
+    if (!selection.rangeCount) return
 
     // Get selected text, or full textarea value if no selection
-    let selectedText = selection.toString();
+    let selectedText = selection.toString()
     if (!selectedText) {
-      selectedText = textarea.value;
+      selectedText = textarea.value
     }
 
     // Parse as keywords array
-    const keywords = parseKeywords(selectedText);
+    const keywords = parseKeywords(selectedText)
 
     // Format as comma-separated quoted strings: "a","b","c"
-    const arrayFormat = keywords.map(k => `"${k}"`).join(',');
+    const arrayFormat = keywords.map((k) => `"${k}"`).join(',')
 
     // Set clipboard data
-    e.preventDefault();
-    e.clipboardData.setData('text/plain', arrayFormat);
-    console.log('[复制] 已转换为数组格式:', arrayFormat);
-  });
+    e.preventDefault()
+    e.clipboardData.setData('text/plain', arrayFormat)
+    console.log('[复制] 已转换为数组格式:', arrayFormat)
+  })
 }
 
 // Setup copy listeners for keywords textareas
-setupCopyAsArray(notInterestedKeywordsTextarea);
-setupCopyAsArray(autoFollowKeywordsTextarea);
+setupCopyAsArray(notInterestedKeywordsTextarea)
+setupCopyAsArray(autoFollowKeywordsTextarea)
 
 // Add paste event listener - auto convert JSON array to space-separated format
 function setupPasteFromArray(textarea) {
-  if (!textarea) return;
+  if (!textarea) return
 
   textarea.addEventListener('paste', (e) => {
-    const pastedText = e.clipboardData.getData('text');
+    const pastedText = e.clipboardData.getData('text')
 
     // Try to parse as JSON array
     try {
-      const parsed = JSON.parse(pastedText);
+      const parsed = JSON.parse(pastedText)
       if (Array.isArray(parsed) && parsed.length > 0) {
         // Convert to space-separated format, remove spaces from each item
         const formatted = parsed
-          .filter(item => typeof item === 'string' && item.trim())
-          .map(item => item.replace(/\s+/g, ''))
-          .join(' ');
+          .filter((item) => typeof item === 'string' && item.trim())
+          .map((item) => item.replace(/\s+/g, ''))
+          .join(' ')
         if (formatted) {
-          e.preventDefault();
+          e.preventDefault()
 
           // Insert at cursor position or replace selection
-          const start = textarea.selectionStart;
-          const end = textarea.selectionEnd;
-          const before = textarea.value.substring(0, start);
-          const after = textarea.value.substring(end);
+          const start = textarea.selectionStart
+          const end = textarea.selectionEnd
+          const before = textarea.value.substring(0, start)
+          const after = textarea.value.substring(end)
 
-          textarea.value = before + formatted + after;
+          textarea.value = before + formatted + after
 
           // Move cursor to end of pasted content
-          const newPos = start + formatted.length;
-          textarea.selectionStart = newPos;
-          textarea.selectionEnd = newPos;
+          const newPos = start + formatted.length
+          textarea.selectionStart = newPos
+          textarea.selectionEnd = newPos
 
-          console.log('[粘贴] 已从数组格式转换:', formatted);
+          console.log('[粘贴] 已从数组格式转换:', formatted)
         }
       }
     } catch (e) {
       // Not a JSON array, use default paste behavior
     }
-  });
+  })
 }
 
 // Setup paste listeners for keywords textareas
-setupPasteFromArray(notInterestedKeywordsTextarea);
-setupPasteFromArray(autoFollowKeywordsTextarea);
+setupPasteFromArray(notInterestedKeywordsTextarea)
+setupPasteFromArray(autoFollowKeywordsTextarea)
 
 // Add event listeners for save buttons
 if (saveKeywordsBtn) {
-  saveKeywordsBtn.addEventListener('click', saveKeywords);
+  saveKeywordsBtn.addEventListener('click', saveKeywords)
 }
 if (saveFollowKeywordsBtn) {
-  saveFollowKeywordsBtn.addEventListener('click', saveAutoFollowKeywords);
+  saveFollowKeywordsBtn.addEventListener('click', saveAutoFollowKeywords)
 }
 
 // Check if current domain is Douyin-related
 function isDouyinDomain(domain) {
-  if (!domain) return false;
-  const douyinDomains = ['douyin.com', 'www.douyin.com', 'iesdouyin.com'];
-  return douyinDomains.some(d => domain === d || domain.endsWith('.' + d));
+  if (!domain) return false
+  const douyinDomains = ['douyin.com', 'www.douyin.com', 'iesdouyin.com']
+  return douyinDomains.some((d) => domain === d || domain.endsWith('.' + d))
 }
 
 // Check if current domain is Bilibili-related
 function isBilibiliDomain(domain) {
-  if (!domain) return false;
-  const biliDomains = ['bilibili.com', 'www.bilibili.com'];
-  return biliDomains.some(d => domain === d || domain.endsWith('.' + d));
+  if (!domain) return false
+  const biliDomains = ['bilibili.com', 'www.bilibili.com']
+  return biliDomains.some((d) => domain === d || domain.endsWith('.' + d))
 }
 
 // Show/hide Douyin keywords section based on current domain
 async function updateDouyinKeywordsVisibility() {
-  const domain = await getCurrentDomain();
-  const douyinSection = document.getElementById('douyin-keywords-section');
+  const domain = await getCurrentDomain()
+  const douyinSection = document.getElementById('douyin-keywords-section')
   if (douyinSection) {
     if (isDouyinDomain(domain)) {
-      douyinSection.style.display = 'block';
+      douyinSection.style.display = 'block'
     } else {
-      douyinSection.style.display = 'none';
+      douyinSection.style.display = 'none'
     }
   }
 }
 
 // ========== Bilibili Keywords Management ==========
-const biliNotInterestedKeywordsTextarea = document.getElementById('bili-not-interested-keywords');
-const biliSaveKeywordsBtn = document.getElementById('bili-save-keywords-btn');
+const biliNotInterestedKeywordsTextarea = document.getElementById('bili-not-interested-keywords')
+const biliSaveKeywordsBtn = document.getElementById('bili-save-keywords-btn')
 
 // Default keywords from bili.js
 const defaultBiliNotInterestedKeywords = [
-  "原神", "崩坏", "星铁", "鸣潮", "王者", "荣耀", "LOL", "英雄联盟", "绝区零",
-  "火影", "海贼", "柯南", "漫威", "DC", "漫展", "cos", "COS", "Cos",
-  "直播", "带货", "广告", "推广"
-];
+  '原神',
+  '崩坏',
+  '星铁',
+  '鸣潮',
+  '王者',
+  '荣耀',
+  'LOL',
+  '英雄联盟',
+  '绝区零',
+  '火影',
+  '海贼',
+  '柯南',
+  '漫威',
+  'DC',
+  '漫展',
+  'cos',
+  'COS',
+  'Cos',
+  '直播',
+  '带货',
+  '广告',
+  '推广',
+]
 
 /**
  * Load Bilibili keywords from storage
  */
 async function loadBiliKeywords() {
   // Only load keywords for Bilibili domains
-  const domain = await getCurrentDomain();
+  const domain = await getCurrentDomain()
   if (!isBilibiliDomain(domain)) {
-    return;
+    return
   }
 
-  const result = await chrome.storage.local.get(['biliKeywords']);
+  const result = await chrome.storage.local.get(['biliKeywords'])
   const keywords = result.biliKeywords || {
-    notInterested: defaultBiliNotInterestedKeywords
-  };
+    notInterested: defaultBiliNotInterestedKeywords,
+  }
 
   // Update textarea
   if (biliNotInterestedKeywordsTextarea) {
-    biliNotInterestedKeywordsTextarea.value = formatKeywords(keywords.notInterested);
+    biliNotInterestedKeywordsTextarea.value = formatKeywords(keywords.notInterested)
   }
 
   // Update keywords count
-  updateKeywordsCount();
+  updateKeywordsCount()
 }
 
 /**
  * Save Bilibili keywords to storage and notify content script
  */
 async function saveBiliKeywords() {
-  if (!biliNotInterestedKeywordsTextarea) return;
+  if (!biliNotInterestedKeywordsTextarea) return
 
   // Only save keywords for Bilibili domains
-  const domain = await getCurrentDomain();
+  const domain = await getCurrentDomain()
   if (!isBilibiliDomain(domain)) {
-    console.log('非B站域名，跳过保存关键词');
-    return;
+    console.log('非B站域名，跳过保存关键词')
+    return
   }
 
   // Parse textarea content
-  const keywords = parseKeywords(biliNotInterestedKeywordsTextarea.value);
+  const keywords = parseKeywords(biliNotInterestedKeywordsTextarea.value)
 
   await chrome.storage.local.set({
     biliKeywords: {
-      notInterested: keywords
-    }
-  });
+      notInterested: keywords,
+    },
+  })
 
-  console.log('B站不感兴趣关键词已保存:', keywords.length, '个');
+  console.log('B站不感兴趣关键词已保存:', keywords.length, '个')
 
   // Update textarea with deduplicated keywords
-  biliNotInterestedKeywordsTextarea.value = formatKeywords(keywords);
+  biliNotInterestedKeywordsTextarea.value = formatKeywords(keywords)
 
   // Update keywords count
-  updateKeywordsCount();
+  updateKeywordsCount()
 
   // Notify content script to update keywords
   try {
-    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
     if (tabs[0]?.id) {
-      chrome.tabs.sendMessage(tabs[0].id, {
-        type: 'UPDATE_KEYWORDS',
-        keywords: {
-          NOT_INTERESTED_KEYWORDS: keywords
-        }
-      }).catch(() => {
-        // Content script may not be loaded
-      });
+      chrome.tabs
+        .sendMessage(tabs[0].id, {
+          type: 'UPDATE_KEYWORDS',
+          keywords: {
+            NOT_INTERESTED_KEYWORDS: keywords,
+          },
+        })
+        .catch(() => {
+          // Content script may not be loaded
+        })
     }
   } catch (error) {
-    console.error('Failed to notify content script:', error);
+    console.error('Failed to notify content script:', error)
   }
 }
 
 // Show/hide Bilibili keywords section based on current domain
 async function updateBilibiliKeywordsVisibility() {
-  const domain = await getCurrentDomain();
-  const biliSection = document.getElementById('bili-keywords-section');
+  const domain = await getCurrentDomain()
+  const biliSection = document.getElementById('bili-keywords-section')
   if (biliSection) {
     if (isBilibiliDomain(domain)) {
-      biliSection.style.display = 'block';
+      biliSection.style.display = 'block'
     } else {
-      biliSection.style.display = 'none';
+      biliSection.style.display = 'none'
     }
   }
 }
 
 // Add event listener for Bilibili save button
 if (biliSaveKeywordsBtn) {
-  biliSaveKeywordsBtn.addEventListener('click', saveBiliKeywords);
+  biliSaveKeywordsBtn.addEventListener('click', saveBiliKeywords)
 }
 
 // Setup copy listener for Bilibili keywords textarea
-setupCopyAsArray(biliNotInterestedKeywordsTextarea);
-setupPasteFromArray(biliNotInterestedKeywordsTextarea);
+setupCopyAsArray(biliNotInterestedKeywordsTextarea)
+setupPasteFromArray(biliNotInterestedKeywordsTextarea)
 
 // Load keywords when popup opens
 // ========== 辅助初始化函数 ==========
 
 function initStatsButtons() {
-  const refreshBtn = document.getElementById('refresh-stats');
-  const resetBtn = document.getElementById('reset-stats');
-  const exportCsvBtn = document.getElementById('export-stats-csv');
+  const refreshBtn = document.getElementById('refresh-stats')
+  const resetBtn = document.getElementById('reset-stats')
+  const exportCsvBtn = document.getElementById('export-stats-csv')
 
   if (refreshBtn) {
     refreshBtn.addEventListener('click', () => {
-      loadStatsData();
-      drawStatsChart();
+      loadStatsData()
+      drawStatsChart()
       // 刷新性能图表
-      switchChart(currentChartType);
-    });
+      switchChart(currentChartType)
+    })
   }
 
   if (resetBtn) {
     resetBtn.addEventListener('click', async () => {
       if (confirm('确定要重置所有统计数据吗？')) {
-        await chrome.storage.local.remove('usageStats');
-        loadStatsData();
-        drawStatsChart();
+        await chrome.storage.local.remove('usageStats')
+        loadStatsData()
+        drawStatsChart()
         // 刷新性能图表
-        switchChart(currentChartType);
+        switchChart(currentChartType)
       }
-    });
+    })
   }
 
   if (exportCsvBtn) {
-    exportCsvBtn.addEventListener('click', exportStatsToCSV);
+    exportCsvBtn.addEventListener('click', exportStatsToCSV)
   }
 
   // 初始化性能图表
-  initPerformanceCharts();
+  initPerformanceCharts()
 }
 
 async function initNotificationPanel() {
-  const bellBtn = document.getElementById('notification-bell');
-  const panel = document.getElementById('notification-panel');
-  const closeBtn = document.getElementById('close-notifications');
-  const clearBtn = document.getElementById('clear-notifications');
-  const badge = document.getElementById('notification-badge');
+  const bellBtn = document.getElementById('notification-bell')
+  const panel = document.getElementById('notification-panel')
+  const closeBtn = document.getElementById('close-notifications')
+  const clearBtn = document.getElementById('clear-notifications')
+  const badge = document.getElementById('notification-badge')
 
-  await loadNotifications();
+  await loadNotifications()
 
   if (bellBtn && panel) {
     bellBtn.addEventListener('click', () => {
-      panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
-    });
+      panel.style.display = panel.style.display === 'block' ? 'none' : 'block'
+    })
   }
 
   if (closeBtn) {
     closeBtn.addEventListener('click', () => {
-      panel.style.display = 'none';
-    });
+      panel.style.display = 'none'
+    })
   }
 
   if (clearBtn) {
-    clearBtn.addEventListener('click', clearNotifications);
+    clearBtn.addEventListener('click', clearNotifications)
   }
 }
 
 async function initQuickNote() {
-  const noteArea = document.getElementById('quick-note');
-  const saveBtn = document.getElementById('save-note');
-  const clearBtn = document.getElementById('clear-note');
+  const noteArea = document.getElementById('quick-note')
+  const saveBtn = document.getElementById('save-note')
+  const clearBtn = document.getElementById('clear-note')
 
-  const result = await chrome.storage.local.get('quickNote');
+  const result = await chrome.storage.local.get('quickNote')
   if (noteArea && result.quickNote) {
-    noteArea.value = result.quickNote;
+    noteArea.value = result.quickNote
   }
 
   if (saveBtn && noteArea) {
     saveBtn.addEventListener('click', async () => {
-      await chrome.storage.local.set({ quickNote: noteArea.value });
-      saveBtn.textContent = '已保存';
-      setTimeout(() => saveBtn.textContent = '保存', 1500);
-    });
+      await chrome.storage.local.set({ quickNote: noteArea.value })
+      saveBtn.textContent = '已保存'
+      setTimeout(() => (saveBtn.textContent = '保存'), 1500)
+    })
   }
 
   if (clearBtn && noteArea) {
     clearBtn.addEventListener('click', async () => {
-      noteArea.value = '';
-      await chrome.storage.local.remove('quickNote');
-    });
+      noteArea.value = ''
+      await chrome.storage.local.remove('quickNote')
+    })
   }
 }
 
 async function initClipboardHistory() {
-  const list = document.getElementById('clipboard-list');
-  const clearBtn = document.getElementById('clear-clipboard');
+  const list = document.getElementById('clipboard-list')
+  const clearBtn = document.getElementById('clear-clipboard')
 
   if (list && !document.getElementById('clipboard-search')) {
-    const searchContainer = document.createElement('div');
+    const searchContainer = document.createElement('div')
     searchContainer.innerHTML = `
       <input type="text" id="clipboard-search" placeholder="搜索剪贴板历史..."
         style="width: 100%; padding: 6px 8px; margin-bottom: 8px; border: 1px solid #dee2e6; border-radius: 4px; font-size: 12px;">
       <div id="clipboard-filters" style="display: flex; gap: 4px; margin-bottom: 8px;">
       </div>
-    `;
-    list.parentNode.insertBefore(searchContainer, list);
+    `
+    list.parentNode.insertBefore(searchContainer, list)
 
-    const searchInput = document.getElementById('clipboard-search');
+    const searchInput = document.getElementById('clipboard-search')
     searchInput?.addEventListener('input', (e) => {
-      filterClipboardHistory(e.target.value);
-    });
+      filterClipboardHistory(e.target.value)
+    })
   }
 
   if (clearBtn) {
     clearBtn.addEventListener('click', async () => {
       if (confirm('确定要清空剪贴板历史吗？')) {
-        await chrome.storage.local.remove('clipboardHistory');
-        loadClipboardHistory();
+        await chrome.storage.local.remove('clipboardHistory')
+        loadClipboardHistory()
       }
-    });
+    })
   }
 
-  loadClipboardHistory();
+  loadClipboardHistory()
 }
 
 function initShortcutsHelp() {
-  const helpBtn = document.getElementById('shortcuts-help');
-  const panel = document.getElementById('shortcuts-panel');
-  const closeBtn = document.getElementById('close-shortcuts');
+  const helpBtn = document.getElementById('shortcuts-help')
+  const panel = document.getElementById('shortcuts-panel')
+  const closeBtn = document.getElementById('close-shortcuts')
 
   if (helpBtn && panel) {
     helpBtn.addEventListener('click', () => {
-      panel.style.display = 'block';
-    });
+      panel.style.display = 'block'
+    })
   }
 
   if (closeBtn) {
     closeBtn.addEventListener('click', () => {
-      panel.style.display = 'none';
-    });
+      panel.style.display = 'none'
+    })
   }
 }
 
 function initTemplateButtons() {
-  const templateBtns = document.querySelectorAll('.template-btn');
-  templateBtns.forEach(btn => {
+  const templateBtns = document.querySelectorAll('.template-btn')
+  templateBtns.forEach((btn) => {
     btn.addEventListener('click', async () => {
-      const templateKey = btn.dataset.template;
-      const template = RULE_TEMPLATES[templateKey];
-      if (!template) return;
+      const templateKey = btn.dataset.template
+      const template = RULE_TEMPLATES[templateKey]
+      if (!template) return
 
-      const result = await chrome.storage.sync.get('settings');
-      const settings = result.settings || {};
-      const blockedDomains = settings.blockedDomains || [];
+      const result = await chrome.storage.sync.get('settings')
+      const settings = result.settings || {}
+      const blockedDomains = settings.blockedDomains || []
 
       if (!blockedDomains.includes(template.domain)) {
-        blockedDomains.push(template.domain);
-        settings.blockedDomains = blockedDomains;
-        await chrome.storage.sync.set({ settings });
+        blockedDomains.push(template.domain)
+        settings.blockedDomains = blockedDomains
+        await chrome.storage.sync.set({ settings })
       }
 
-      const domainRules = await chrome.storage.local.get(`${template.domain}Rules`) || {};
-      domainRules[`${template.domain}Rules`] = template.rules;
-      await chrome.storage.local.set(domainRules);
+      const domainRules = (await chrome.storage.local.get(`${template.domain}Rules`)) || {}
+      domainRules[`${template.domain}Rules`] = template.rules
+      await chrome.storage.local.set(domainRules)
 
-      alert(`已应用 ${template.name} 规则模板`);
-      loadBlockedDomains();
-    });
-  });
+      alert(`已应用 ${template.name} 规则模板`)
+      loadBlockedDomains()
+    })
+  })
 }
 
 async function initThemeToggle() {
-  const themeToggle = document.getElementById('theme-toggle');
-  if (!themeToggle) return;
+  const themeToggle = document.getElementById('theme-toggle')
+  if (!themeToggle) return
 
-  const result = await chrome.storage.local.get('theme');
-  const savedTheme = result.theme || 'light';
-  applyTheme(savedTheme);
+  const result = await chrome.storage.local.get('theme')
+  const savedTheme = result.theme || 'light'
+  applyTheme(savedTheme)
 
   themeToggle.addEventListener('click', async () => {
-    const currentTheme = document.body.classList.contains('dark-mode') ? 'dark' : 'light';
-    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-    applyTheme(newTheme);
-    await chrome.storage.local.set({ theme: newTheme });
-  });
+    const currentTheme = document.body.classList.contains('dark-mode') ? 'dark' : 'light'
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark'
+    applyTheme(newTheme)
+    await chrome.storage.local.set({ theme: newTheme })
+  })
 }
 
 function initImportExport() {
-  const exportBtn = document.getElementById('export-settings-btn');
-  const importBtn = document.getElementById('import-settings-btn');
-  const importInput = document.getElementById('import-file-input');
+  const exportBtn = document.getElementById('export-settings-btn')
+  const importBtn = document.getElementById('import-settings-btn')
+  const importInput = document.getElementById('import-file-input')
 
   if (exportBtn) {
-    exportBtn.addEventListener('click', exportSettings);
+    exportBtn.addEventListener('click', exportSettings)
   }
 
   if (importBtn && importInput) {
-    importBtn.addEventListener('click', () => importInput.click());
-    importInput.addEventListener('change', importSettings);
+    importBtn.addEventListener('click', () => importInput.click())
+    importInput.addEventListener('change', importSettings)
   }
 }
 
-
 // ========== 隐藏选择器编辑器 ==========
-const selectorsEditor = document.getElementById('selectors-editor');
-const selectorsCount = document.getElementById('selectors-count');
-const currentDomainName = document.getElementById('current-domain-name');
-const saveSelectorsBtn = document.getElementById('save-selectors-btn');
+const selectorsEditor = document.getElementById('selectors-editor')
+const selectorsCount = document.getElementById('selectors-count')
+const currentDomainName = document.getElementById('current-domain-name')
+const saveSelectorsBtn = document.getElementById('save-selectors-btn')
 
 /**
  * 加载选择器到编辑器
  */
 async function loadSelectorsEditor() {
-  const domain = await getCurrentDomain();
-  if (!domain) return;
+  const domain = await getCurrentDomain()
+  if (!domain) return
 
   // 更新当前域名显示
   if (currentDomainName) {
-    currentDomainName.textContent = domain;
+    currentDomainName.textContent = domain
   }
 
   // 获取默认选择器
-  const defaultSelectors = await getDefaultHideSelectors();
+  const defaultSelectors = await getDefaultHideSelectors()
 
   // 尝试从本地服务器加载数据
-  let localServerSelectors = [];
+  let localServerSelectors = []
   try {
-    const domainsToTry = [domain];
+    const domainsToTry = [domain]
     if (domain.startsWith('www.')) {
-      domainsToTry.push(domain.slice(4));
+      domainsToTry.push(domain.slice(4))
     } else {
-      domainsToTry.push('www.' + domain);
+      domainsToTry.push('www.' + domain)
     }
 
     for (const tryDomain of domainsToTry) {
       const response = await fetch(`http://localhost:3000/api/data/selectors/${tryDomain}`, {
-        signal: AbortSignal.timeout(2000)
-      });
-      const data = await response.json();
+        signal: AbortSignal.timeout(2000),
+      })
+      const data = await response.json()
       if (data.success && data.data && Array.isArray(data.data)) {
-        localServerSelectors = data.data;
-        console.log('[隐藏选择器] 从本地服务器加载:', tryDomain, localServerSelectors.length, '个');
-        break;
+        localServerSelectors = data.data
+        console.log('[隐藏选择器] 从本地服务器加载:', tryDomain, localServerSelectors.length, '个')
+        break
       }
     }
   } catch (e) {
-    console.log('[隐藏选择器] 本地服务器加载失败:', e.message);
+    console.log('[隐藏选择器] 本地服务器加载失败:', e.message)
   }
 
   // 从 Chrome 存储加载（仅用户添加的选择器）
-  const result = await chrome.storage.local.get(['hideElementsSettings']);
-  const allSettings = result.hideElementsSettings || {};
-  const domainSettings = allSettings[domain] || { selectors: [] };
-  const userSelectors = domainSettings.selectors || [];
+  const result = await chrome.storage.local.get(['hideElementsSettings'])
+  const allSettings = result.hideElementsSettings || {}
+  const domainSettings = allSettings[domain] || { selectors: [] }
+  const userSelectors = domainSettings.selectors || []
 
   // 编辑器只显示用户添加的选择器（不包含默认和本地服务器的）
   // 这样用户编辑时不会意外修改默认或本地服务器的选择器
   if (selectorsEditor) {
-    selectorsEditor.value = userSelectors.join('\n');
+    selectorsEditor.value = userSelectors.join('\n')
   }
 
   // 更新计数显示总选择器数（默认+本地服务器+用户）
-  const totalSelectors = [...new Set([...defaultSelectors, ...localServerSelectors, ...userSelectors])];
-  updateSelectorsCount(totalSelectors.length, defaultSelectors.length, localServerSelectors.length, userSelectors.length);
+  const totalSelectors = [
+    ...new Set([...defaultSelectors, ...localServerSelectors, ...userSelectors]),
+  ]
+  updateSelectorsCount(
+    totalSelectors.length,
+    defaultSelectors.length,
+    localServerSelectors.length,
+    userSelectors.length
+  )
 
   // 同时渲染列表（显示所有合并后的选择器）
-  await renderHideSelectorsList();
+  await renderHideSelectorsList()
 }
 
 /**
@@ -2093,14 +2247,24 @@ async function loadSelectorsEditor() {
  * @param {number} localServerCount - 本地服务器选择器数
  * @param {number} userCount - 用户选择器数
  */
-function updateSelectorsCount(total = null, defaultCount = null, localServerCount = null, userCount = null) {
+function updateSelectorsCount(
+  total = null,
+  defaultCount = null,
+  localServerCount = null,
+  userCount = null
+) {
   if (selectorsCount) {
-    if (total !== null && defaultCount !== null && localServerCount !== null && userCount !== null) {
-      selectorsCount.textContent = `(${total}个 - 默认${defaultCount}+服务器${localServerCount}+用户${userCount})`;
+    if (
+      total !== null &&
+      defaultCount !== null &&
+      localServerCount !== null &&
+      userCount !== null
+    ) {
+      selectorsCount.textContent = `(${total}个 - 默认${defaultCount}+服务器${localServerCount}+用户${userCount})`
     } else if (selectorsEditor) {
       // Fallback: parse from editor (only user selectors)
-      const selectors = parseSelectorsFromEditor();
-      selectorsCount.textContent = `(${selectors.length}个用户选择器)`;
+      const selectors = parseSelectorsFromEditor()
+      selectorsCount.textContent = `(${selectors.length}个用户选择器)`
     }
   }
 }
@@ -2109,41 +2273,45 @@ function updateSelectorsCount(total = null, defaultCount = null, localServerCoun
  * 从编辑器解析选择器（每行一个）
  */
 function parseSelectorsFromEditor() {
-  if (!selectorsEditor) return [];
-  const text = selectorsEditor.value.trim();
-  if (!text) return [];
+  if (!selectorsEditor) return []
+  const text = selectorsEditor.value.trim()
+  if (!text) return []
 
   // 按换行分割，去重，过滤空行
-  const lines = text.split('\n')
-    .map(line => line.trim())
-    .filter(line => line);
-  return [...new Set(lines)];
+  const lines = text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line)
+  return [...new Set(lines)]
 }
 
 /**
  * 保存选择器
  */
 async function saveSelectors() {
-  const domain = await getCurrentDomain();
-  if (!domain) return;
+  const domain = await getCurrentDomain()
+  if (!domain) return
 
   // 用户选择器（从编辑器读取）
-  const userSelectors = parseSelectorsFromEditor();
+  const userSelectors = parseSelectorsFromEditor()
 
   // 获取默认选择器和本地服务器选择器
-  const defaultSelectors = await getDefaultHideSelectors();
-  let localServerSelectors = [];
+  const defaultSelectors = await getDefaultHideSelectors()
+  let localServerSelectors = []
   try {
-    const normalizedDomain = domain.startsWith('www.') ? domain.slice(4) : domain;
+    const normalizedDomain = domain.startsWith('www.') ? domain.slice(4) : domain
     const response = await fetch(`http://localhost:3000/api/data/selectors/${normalizedDomain}`, {
-      signal: AbortSignal.timeout(1000)
-    });
-    const data = await response.json();
+      signal: AbortSignal.timeout(1000),
+    })
+    const data = await response.json()
     if (data.success && data.data) {
       if (Array.isArray(data.data)) {
-        localServerSelectors = data.data;
+        localServerSelectors = data.data
       } else if (typeof data.data === 'string' && data.data.trim()) {
-        localServerSelectors = data.data.split(',').map(s => s.trim()).filter(s => s);
+        localServerSelectors = data.data
+          .split(',')
+          .map((s) => s.trim())
+          .filter((s) => s)
       }
     }
   } catch (e) {
@@ -2151,215 +2319,235 @@ async function saveSelectors() {
   }
 
   // 合并所有选择器（用于发送给 content script）
-  const mergedSelectors = [...new Set([...defaultSelectors, ...localServerSelectors, ...userSelectors])];
+  const mergedSelectors = [
+    ...new Set([...defaultSelectors, ...localServerSelectors, ...userSelectors]),
+  ]
 
   // 保存用户选择器到 Chrome 存储
-  const result = await chrome.storage.local.get(['hideElementsSettings']);
-  const allSettings = result.hideElementsSettings || {};
-  allSettings[domain] = { enabled: userSelectors.length > 0 || defaultSelectors.length > 0 || localServerSelectors.length > 0, selectors: userSelectors };
-  await chrome.storage.local.set({ hideElementsSettings: allSettings });
+  const result = await chrome.storage.local.get(['hideElementsSettings'])
+  const allSettings = result.hideElementsSettings || {}
+  allSettings[domain] = {
+    enabled:
+      userSelectors.length > 0 || defaultSelectors.length > 0 || localServerSelectors.length > 0,
+    selectors: userSelectors,
+  }
+  await chrome.storage.local.set({ hideElementsSettings: allSettings })
 
   // 同步用户选择器到本地服务器
   try {
-    const normalizedDomain = domain.startsWith('www.') ? domain.slice(4) : domain;
+    const normalizedDomain = domain.startsWith('www.') ? domain.slice(4) : domain
     await fetch(`http://localhost:3000/api/data/selectors/${normalizedDomain}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(userSelectors)
-    });
-    console.log('[隐藏选择器] 已同步到本地服务器:', normalizedDomain);
+      body: JSON.stringify(userSelectors),
+    })
+    console.log('[隐藏选择器] 已同步到本地服务器:', normalizedDomain)
   } catch (e) {
-    console.log('[隐藏选择器] 同步到本地服务器失败:', e.message);
+    console.log('[隐藏选择器] 同步到本地服务器失败:', e.message)
   }
 
   // 通知 content script（发送合并后的选择器）
   try {
-    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
     if (tabs[0]?.id) {
-      chrome.tabs.sendMessage(tabs[0].id, {
-        type: 'UPDATE_HIDE_ELEMENTS',
-        enabled: mergedSelectors.length > 0,
-        selectors: mergedSelectors
-      }).catch(() => {});
+      chrome.tabs
+        .sendMessage(tabs[0].id, {
+          type: 'UPDATE_HIDE_ELEMENTS',
+          enabled: mergedSelectors.length > 0,
+          selectors: mergedSelectors,
+        })
+        .catch(() => {})
     }
   } catch (error) {
-    console.error('[隐藏选择器] 通知 content script 失败:', error);
+    console.error('[隐藏选择器] 通知 content script 失败:', error)
   }
 
   // 更新计数和列表
-  await loadSelectorsEditor();
+  await loadSelectorsEditor()
 
   // 显示保存成功提示
-  const btn = document.getElementById('save-selectors-btn');
+  const btn = document.getElementById('save-selectors-btn')
   if (btn) {
-    const originalText = btn.textContent;
-    btn.textContent = '已保存 ✓';
-    btn.style.background = '#28a745';
+    const originalText = btn.textContent
+    btn.textContent = '已保存 ✓'
+    btn.style.background = '#28a745'
     setTimeout(() => {
-      btn.textContent = originalText;
-      btn.style.background = '';
-    }, 1500);
+      btn.textContent = originalText
+      btn.style.background = ''
+    }, 1500)
   }
 
   console.log('[隐藏选择器] 已保存:', {
     default: defaultSelectors.length,
     localServer: localServerSelectors.length,
     user: userSelectors.length,
-    total: mergedSelectors.length
-  });
+    total: mergedSelectors.length,
+  })
 }
 
 // 事件监听
 if (saveSelectorsBtn) {
-  saveSelectorsBtn.addEventListener('click', saveSelectors);
+  saveSelectorsBtn.addEventListener('click', saveSelectors)
 }
 
 if (selectorsEditor) {
   // 实时更新计数（需要重新获取默认和本地服务器选择器来计算总数）
   selectorsEditor.addEventListener('input', async () => {
-    const domain = await getCurrentDomain();
-    if (!domain) return;
+    const domain = await getCurrentDomain()
+    if (!domain) return
 
-    const defaultSelectors = await getDefaultHideSelectors();
-    let localServerSelectors = [];
+    const defaultSelectors = await getDefaultHideSelectors()
+    let localServerSelectors = []
     try {
-      const normalizedDomain = domain.startsWith('www.') ? domain.slice(4) : domain;
+      const normalizedDomain = domain.startsWith('www.') ? domain.slice(4) : domain
       const response = await fetch(`http://localhost:3000/api/data/selectors/${normalizedDomain}`, {
-        signal: AbortSignal.timeout(500)
-      });
-      const data = await response.json();
+        signal: AbortSignal.timeout(500),
+      })
+      const data = await response.json()
       if (data.success && data.data) {
         if (Array.isArray(data.data)) {
-          localServerSelectors = data.data;
+          localServerSelectors = data.data
         } else if (typeof data.data === 'string' && data.data.trim()) {
-          localServerSelectors = data.data.split(',').map(s => s.trim()).filter(s => s);
+          localServerSelectors = data.data
+            .split(',')
+            .map((s) => s.trim())
+            .filter((s) => s)
         }
       }
     } catch (e) {
       // 忽略本地服务器错误
     }
 
-    const userSelectors = parseSelectorsFromEditor();
-    const totalSelectors = [...new Set([...defaultSelectors, ...localServerSelectors, ...userSelectors])];
-    updateSelectorsCount(totalSelectors.length, defaultSelectors.length, localServerSelectors.length, userSelectors.length);
-  });
+    const userSelectors = parseSelectorsFromEditor()
+    const totalSelectors = [
+      ...new Set([...defaultSelectors, ...localServerSelectors, ...userSelectors]),
+    ]
+    updateSelectorsCount(
+      totalSelectors.length,
+      defaultSelectors.length,
+      localServerSelectors.length,
+      userSelectors.length
+    )
+  })
 }
 
 // ========== Tab切换 ==========
 function initNavigation() {
-  const tabBtns = document.querySelectorAll('.tab-btn');
-  const tabPanels = document.querySelectorAll('.tab-panel');
+  const tabBtns = document.querySelectorAll('.tab-btn')
+  const tabPanels = document.querySelectorAll('.tab-panel')
 
-  console.log('[Tab] tabBtns:', tabBtns.length);
-  console.log('[Tab] tabPanels:', tabPanels.length);
+  console.log('[Tab] tabBtns:', tabBtns.length)
+  console.log('[Tab] tabPanels:', tabPanels.length)
 
   if (tabBtns.length === 0) {
-    console.error('[Tab] No tab buttons found!');
-    return;
+    console.error('[Tab] No tab buttons found!')
+    return
   }
 
   function showTab(tabName) {
     // 隐藏所有面板
-    tabPanels.forEach(panel => panel.classList.remove('active'));
+    tabPanels.forEach((panel) => panel.classList.remove('active'))
     // 移除所有按钮active
-    tabBtns.forEach(btn => btn.classList.remove('active'));
+    tabBtns.forEach((btn) => btn.classList.remove('active'))
 
     // 显示目标面板
-    const targetPanel = document.getElementById(`${tabName}-tab`);
-    const targetBtn = document.querySelector(`[data-tab="${tabName}"]`);
+    const targetPanel = document.getElementById(`${tabName}-tab`)
+    const targetBtn = document.querySelector(`[data-tab="${tabName}"]`)
 
     if (targetPanel) {
-      targetPanel.classList.add('active');
+      targetPanel.classList.add('active')
     }
     if (targetBtn) {
-      targetBtn.classList.add('active');
+      targetBtn.classList.add('active')
     }
 
     // 加载对应数据
     if (tabName === 'global') {
-      loadGlobalSettings();
+      loadGlobalSettings()
     } else if (tabName === 'stats') {
-      loadStatsData();
-      drawStatsChart();
+      loadStatsData()
+      drawStatsChart()
     } else if (tabName === 'home') {
-      loadClipboardHistory();
+      loadClipboardHistory()
     } else if (tabName === 'page') {
-      loadBlockedDomains();
-      loadHideElementsSettings();
+      loadBlockedDomains()
+      loadHideElementsSettings()
     }
   }
 
   // 为每个Tab按钮添加点击事件
-  tabBtns.forEach(btn => {
-    console.log('[Tab] Adding click listener to:', btn.dataset.tab);
+  tabBtns.forEach((btn) => {
+    console.log('[Tab] Adding click listener to:', btn.dataset.tab)
     btn.addEventListener('click', (e) => {
-      console.log('[Tab] Clicked:', btn.dataset.tab);
-      const tabName = btn.dataset.tab;
-      showTab(tabName);
-    });
-  });
+      console.log('[Tab] Clicked:', btn.dataset.tab)
+      const tabName = btn.dataset.tab
+      showTab(tabName)
+    })
+  })
 
   // 初始加载首页数据
-  showTab('home');
+  showTab('home')
 }
 
 // ========== 统计面板 ==========
 async function loadStatsData() {
   try {
-    const response = await chrome.runtime.sendMessage({ type: 'GET_STATS' });
+    const response = await chrome.runtime.sendMessage({ type: 'GET_STATS' })
     if (response?.success && response.stats) {
-      renderStats(response.stats);
+      renderStats(response.stats)
     }
   } catch (error) {
-    console.error('[Stats] 加载统计数据失败:', error);
+    console.error('[Stats] 加载统计数据失败:', error)
   }
 }
 
 function renderStats(stats) {
   // 今日数据
-  const todayBlocked = document.getElementById('today-blocked');
-  const todayHidden = document.getElementById('today-hidden');
-  const todayBytes = document.getElementById('today-bytes');
+  const todayBlocked = document.getElementById('today-blocked')
+  const todayHidden = document.getElementById('today-hidden')
+  const todayBytes = document.getElementById('today-bytes')
 
-  if (todayBlocked) todayBlocked.textContent = formatNumber(stats.today?.blocked || 0);
-  if (todayHidden) todayHidden.textContent = formatNumber(stats.today?.hidden || 0);
-  if (todayBytes) todayBytes.textContent = formatBytes(stats.today?.bytes || 0);
+  if (todayBlocked) todayBlocked.textContent = formatNumber(stats.today?.blocked || 0)
+  if (todayHidden) todayHidden.textContent = formatNumber(stats.today?.hidden || 0)
+  if (todayBytes) todayBytes.textContent = formatBytes(stats.today?.bytes || 0)
 
   // 累计数据
-  const totalBlocked = document.getElementById('total-blocked');
-  const totalHidden = document.getElementById('total-hidden');
-  const totalBytes = document.getElementById('total-bytes');
+  const totalBlocked = document.getElementById('total-blocked')
+  const totalHidden = document.getElementById('total-hidden')
+  const totalBytes = document.getElementById('total-bytes')
 
-  if (totalBlocked) totalBlocked.textContent = formatNumber(stats.totalBlocked || 0);
-  if (totalHidden) totalHidden.textContent = formatNumber(stats.totalHidden || 0);
-  if (totalBytes) totalBytes.textContent = formatBytes(stats.estimatedBytesSaved || 0);
+  if (totalBlocked) totalBlocked.textContent = formatNumber(stats.totalBlocked || 0)
+  if (totalHidden) totalHidden.textContent = formatNumber(stats.totalHidden || 0)
+  if (totalBytes) totalBytes.textContent = formatBytes(stats.estimatedBytesSaved || 0)
 
   // 域名排行
-  renderDomainRanking(stats.domainStats || {});
+  renderDomainRanking(stats.domainStats || {})
 }
 
 function renderDomainRanking(domainStats) {
-  const container = document.getElementById('domain-ranking');
-  if (!container) return;
+  const container = document.getElementById('domain-ranking')
+  if (!container) return
 
   const entries = Object.entries(domainStats)
     .map(([domain, data]) => ({
       domain,
-      total: (data.blocked || 0) + (data.hidden || 0)
+      total: (data.blocked || 0) + (data.hidden || 0),
     }))
-    .filter(e => e.total > 0)
+    .filter((e) => e.total > 0)
     .sort((a, b) => b.total - a.total)
-    .slice(0, 5);
+    .slice(0, 5)
 
   if (entries.length === 0) {
-    container.innerHTML = '<div style="color: #999; text-align: center; padding: 20px;">暂无数据</div>';
-    return;
+    container.innerHTML =
+      '<div style="color: #999; text-align: center; padding: 20px;">暂无数据</div>'
+    return
   }
 
-  const maxTotal = entries[0].total;
-  container.innerHTML = entries.map((e, i) => {
-    const percent = Math.round((e.total / maxTotal) * 100);
-    return `
+  const maxTotal = entries[0].total
+  container.innerHTML = entries
+    .map((e, i) => {
+      const percent = Math.round((e.total / maxTotal) * 100)
+      return `
       <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
         <span style="width: 16px; color: #666; font-size: 11px;">${i + 1}.</span>
         <div style="flex: 1;">
@@ -2372,21 +2560,22 @@ function renderDomainRanking(domainStats) {
           </div>
         </div>
       </div>
-    `;
-  }).join('');
+    `
+    })
+    .join('')
 }
 
 function formatNumber(num) {
-  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
-  if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
-  return String(num);
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M'
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'K'
+  return String(num)
 }
 
 function formatBytes(bytes) {
-  if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(1) + 'GB';
-  if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + 'MB';
-  if (bytes >= 1024) return (bytes / 1024).toFixed(1) + 'KB';
-  return bytes + 'B';
+  if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(1) + 'GB'
+  if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + 'MB'
+  if (bytes >= 1024) return (bytes / 1024).toFixed(1) + 'KB'
+  return bytes + 'B'
 }
 
 // 统计面板事件绑定（已在统一初始化中调用 initStatsButtons）
@@ -2394,290 +2583,317 @@ function formatBytes(bytes) {
 
 // ========== 统计图表绘制 ==========
 function drawStatsChart() {
-  const canvas = document.getElementById('stats-chart');
-  if (!canvas) return;
+  const canvas = document.getElementById('stats-chart')
+  if (!canvas) return
 
-  const ctx = canvas.getContext('2d');
-  const width = canvas.offsetWidth;
-  const height = canvas.offsetHeight;
+  const ctx = canvas.getContext('2d')
+  const width = canvas.offsetWidth
+  const height = canvas.offsetHeight
 
   // 设置canvas实际尺寸
-  canvas.width = width * 2;
-  canvas.height = height * 2;
-  ctx.scale(2, 2);
+  canvas.width = width * 2
+  canvas.height = height * 2
+  ctx.scale(2, 2)
 
   // 清空画布
-  ctx.clearRect(0, 0, width, height);
+  ctx.clearRect(0, 0, width, height)
 
   // 模拟7天数据（实际应从存储加载）
-  const days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-  const data = [120, 150, 80, 200, 180, 90, 140]; // 示例数据
+  const days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+  const data = [120, 150, 80, 200, 180, 90, 140] // 示例数据
 
-  const maxVal = Math.max(...data, 1);
-  const padding = 30;
-  const chartWidth = width - padding * 2;
-  const chartHeight = height - padding * 2;
-  const barWidth = chartWidth / days.length - 10;
+  const maxVal = Math.max(...data, 1)
+  const padding = 30
+  const chartWidth = width - padding * 2
+  const chartHeight = height - padding * 2
+  const barWidth = chartWidth / days.length - 10
 
   // 绘制背景网格
-  ctx.strokeStyle = '#e9ecef';
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = '#e9ecef'
+  ctx.lineWidth = 1
   for (let i = 0; i <= 4; i++) {
-    const y = padding + (chartHeight / 4) * i;
-    ctx.beginPath();
-    ctx.moveTo(padding, y);
-    ctx.lineTo(width - padding, y);
-    ctx.stroke();
+    const y = padding + (chartHeight / 4) * i
+    ctx.beginPath()
+    ctx.moveTo(padding, y)
+    ctx.lineTo(width - padding, y)
+    ctx.stroke()
   }
 
   // 绘制柱状图
-  const gradient = ctx.createLinearGradient(0, height, 0, 0);
-  gradient.addColorStop(0, '#007bff');
-  gradient.addColorStop(1, '#0056b3');
+  const gradient = ctx.createLinearGradient(0, height, 0, 0)
+  gradient.addColorStop(0, '#007bff')
+  gradient.addColorStop(1, '#0056b3')
 
   data.forEach((val, i) => {
-    const barHeight = (val / maxVal) * chartHeight;
-    const x = padding + i * (chartWidth / days.length) + 5;
-    const y = height - padding - barHeight;
+    const barHeight = (val / maxVal) * chartHeight
+    const x = padding + i * (chartWidth / days.length) + 5
+    const y = height - padding - barHeight
 
-    ctx.fillStyle = gradient;
-    ctx.fillRect(x, y, barWidth, barHeight);
+    ctx.fillStyle = gradient
+    ctx.fillRect(x, y, barWidth, barHeight)
 
     // 绘制标签
-    ctx.fillStyle = '#666';
-    ctx.font = '10px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(days[i], x + barWidth / 2, height - 10);
-  });
+    ctx.fillStyle = '#666'
+    ctx.font = '10px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillText(days[i], x + barWidth / 2, height - 10)
+  })
 }
 
 // ========== 性能图表绘制 ==========
 
 // 当前图表类型
-let currentChartType = 'compare';
+let currentChartType = 'compare'
 
 // 初始化性能图表
 async function initPerformanceCharts() {
   // 绑定图表切换按钮
-  const chartTabs = document.querySelectorAll('.ra-chart-tab');
-  chartTabs.forEach(tab => {
+  const chartTabs = document.querySelectorAll('.ra-chart-tab')
+  chartTabs.forEach((tab) => {
     tab.addEventListener('click', (e) => {
-      const type = e.target.id.replace('ra-chart-', '');
-      switchChart(type);
-    });
-  });
+      const type = e.target.id.replace('ra-chart-', '')
+      switchChart(type)
+    })
+  })
 
   // 绑定导出按钮
-  const exportBtn = document.getElementById('ra-chart-export');
+  const exportBtn = document.getElementById('ra-chart-export')
   if (exportBtn) {
-    exportBtn.addEventListener('click', exportChartAsImage);
+    exportBtn.addEventListener('click', exportChartAsImage)
   }
 
   // 监听窗口大小变化，重新绘制图表（防抖处理）
   window.addEventListener('resize', () => {
-    clearTimeout(window._chartResizeTimer);
+    clearTimeout(window._chartResizeTimer)
     window._chartResizeTimer = setTimeout(() => {
-      switchChart(currentChartType);
-    }, 200);
-  });
+      switchChart(currentChartType)
+    }, 200)
+  })
 
   // 默认绘制对比图
-  await drawCompareChart();
+  await drawCompareChart()
 }
 
 // 切换图表类型
 async function switchChart(type) {
-  currentChartType = type;
+  currentChartType = type
 
   // 更新按钮样式 - 使用CSS class而非内联样式
-  document.querySelectorAll('.ra-chart-tab').forEach(btn => {
-    btn.classList.remove('active');
-  });
-  const activeBtn = document.getElementById(`ra-chart-${type}`);
+  document.querySelectorAll('.ra-chart-tab').forEach((btn) => {
+    btn.classList.remove('active')
+  })
+  const activeBtn = document.getElementById(`ra-chart-${type}`)
   if (activeBtn) {
-    activeBtn.classList.add('active');
+    activeBtn.classList.add('active')
   }
 
   // 切换 canvas 显示
-  document.getElementById('ra-chart-compare-canvas').style.display = type === 'compare' ? 'block' : 'none';
-  document.getElementById('ra-chart-distribution-canvas').style.display = type === 'distribution' ? 'block' : 'none';
-  document.getElementById('ra-chart-trend-canvas').style.display = type === 'trend' ? 'block' : 'none';
+  document.getElementById('ra-chart-compare-canvas').style.display =
+    type === 'compare' ? 'block' : 'none'
+  document.getElementById('ra-chart-distribution-canvas').style.display =
+    type === 'distribution' ? 'block' : 'none'
+  document.getElementById('ra-chart-trend-canvas').style.display =
+    type === 'trend' ? 'block' : 'none'
 
   // 绘制对应图表
   switch (type) {
     case 'compare':
-      await drawCompareChart();
-      break;
+      await drawCompareChart()
+      break
     case 'distribution':
-      await drawDistributionChart();
-      break;
+      await drawDistributionChart()
+      break
     case 'trend':
-      await drawTrendChart();
-      break;
+      await drawTrendChart()
+      break
   }
 }
 
 // 绘制加速前后对比柱状图
 async function drawCompareChart() {
-  const canvas = document.getElementById('ra-chart-compare-canvas');
-  if (!canvas) return;
+  const canvas = document.getElementById('ra-chart-compare-canvas')
+  if (!canvas) return
 
-  const ctx = canvas.getContext('2d');
-  const width = canvas.offsetWidth;
-  const height = canvas.offsetHeight;
+  const ctx = canvas.getContext('2d')
+  const width = canvas.offsetWidth
+  const height = canvas.offsetHeight
 
   // 设置canvas实际尺寸（支持高清屏）
-  canvas.width = width * 2;
-  canvas.height = height * 2;
-  ctx.scale(2, 2);
+  canvas.width = width * 2
+  canvas.height = height * 2
+  ctx.scale(2, 2)
 
   // 清空画布
-  ctx.clearRect(0, 0, width, height);
+  ctx.clearRect(0, 0, width, height)
 
   // 获取对比数据
-  let comparison = null;
+  let comparison = null
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
     if (tab?.id) {
-      const response = await chrome.tabs.sendMessage(tab.id, { type: 'RESOURCE_ACCELERATOR_GET_COMPARISON' });
+      const response = await chrome.tabs.sendMessage(tab.id, {
+        type: 'RESOURCE_ACCELERATOR_GET_COMPARISON',
+      })
       if (response?.success && response.data) {
-        comparison = response.data;
+        comparison = response.data
       }
     }
   } catch (error) {
-    console.warn('[drawCompareChart] 获取对比数据失败:', error);
+    console.warn('[drawCompareChart] 获取对比数据失败:', error)
   }
 
   if (!comparison) {
     // 无数据时显示提示
-    ctx.fillStyle = '#999';
-    ctx.font = '12px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('暂无对比数据，请先保存基线', width / 2, height / 2);
-    return;
+    ctx.fillStyle = '#999'
+    ctx.font = '12px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillText('暂无对比数据，请先保存基线', width / 2, height / 2)
+    return
   }
 
-  const padding = CHART_LAYOUT.compare.padding;
-  const chartWidth = width - padding.left - padding.right;
-  const chartHeight = height - padding.top - padding.bottom;
+  const padding = CHART_LAYOUT.compare.padding
+  const chartWidth = width - padding.left - padding.right
+  const chartHeight = height - padding.top - padding.bottom
 
   // 数据准备
   const metrics = [
-    { label: '页面加载', before: comparison.baseline.loadEvent, after: comparison.current.loadEvent, unit: 'ms' },
-    { label: '资源请求', before: comparison.baseline.totalResources, after: comparison.current.totalResources, unit: '' },
-    { label: '传输体积', before: comparison.baseline.totalTransferSize / 1024, after: comparison.current.totalTransferSize / 1024, unit: 'KB' },
-  ];
+    {
+      label: '页面加载',
+      before: comparison.baseline.loadEvent,
+      after: comparison.current.loadEvent,
+      unit: 'ms',
+    },
+    {
+      label: '资源请求',
+      before: comparison.baseline.totalResources,
+      after: comparison.current.totalResources,
+      unit: '',
+    },
+    {
+      label: '传输体积',
+      before: comparison.baseline.totalTransferSize / 1024,
+      after: comparison.current.totalTransferSize / 1024,
+      unit: 'KB',
+    },
+  ]
 
-  const maxVal = Math.max(...metrics.map(m => Math.max(m.before, m.after)), 1);
-  const barGroupWidth = chartWidth / metrics.length;
-  const barWidth = barGroupWidth * CHART_LAYOUT.compare.barGroupRatio;
-  const barGap = barGroupWidth * CHART_LAYOUT.compare.barGapRatio;
+  const maxVal = Math.max(...metrics.map((m) => Math.max(m.before, m.after)), 1)
+  const barGroupWidth = chartWidth / metrics.length
+  const barWidth = barGroupWidth * CHART_LAYOUT.compare.barGroupRatio
+  const barGap = barGroupWidth * CHART_LAYOUT.compare.barGapRatio
 
   // 绘制背景网格
-  ctx.strokeStyle = CHART_COLORS.gridLine;
-  ctx.lineWidth = CHART_LAYOUT.compare.lineWidth;
+  ctx.strokeStyle = CHART_COLORS.gridLine
+  ctx.lineWidth = CHART_LAYOUT.compare.lineWidth
   for (let i = 0; i <= CHART_LAYOUT.gridLines; i++) {
-    const y = padding.top + (chartHeight / 4) * i;
-    ctx.beginPath();
-    ctx.moveTo(padding.left, y);
-    ctx.lineTo(width - padding.right, y);
-    ctx.stroke();
+    const y = padding.top + (chartHeight / 4) * i
+    ctx.beginPath()
+    ctx.moveTo(padding.left, y)
+    ctx.lineTo(width - padding.right, y)
+    ctx.stroke()
 
     // Y轴标签
-    ctx.fillStyle = CHART_COLORS.textSecondary;
-    ctx.font = '9px sans-serif';
-    ctx.textAlign = 'right';
-    const val = Math.round(maxVal * (1 - i / CHART_LAYOUT.gridLines));
-    ctx.fillText(val + '', padding.left - 4, y + 3);
+    ctx.fillStyle = CHART_COLORS.textSecondary
+    ctx.font = '9px sans-serif'
+    ctx.textAlign = 'right'
+    const val = Math.round(maxVal * (1 - i / CHART_LAYOUT.gridLines))
+    ctx.fillText(val + '', padding.left - 4, y + 3)
   }
 
   // 绘制柱状图
-  const beforeColor = CHART_COLORS.beforeColor;
-  const afterColor = CHART_COLORS.afterColor;
+  const beforeColor = CHART_COLORS.beforeColor
+  const afterColor = CHART_COLORS.afterColor
 
   metrics.forEach((m, i) => {
-    const groupX = padding.left + i * barGroupWidth + barGap;
-    const beforeHeight = (m.before / maxVal) * chartHeight;
-    const afterHeight = (m.after / maxVal) * chartHeight;
+    const groupX = padding.left + i * barGroupWidth + barGap
+    const beforeHeight = (m.before / maxVal) * chartHeight
+    const afterHeight = (m.after / maxVal) * chartHeight
 
     // 加速前柱子
-    ctx.fillStyle = beforeColor;
-    ctx.fillRect(groupX, padding.top + chartHeight - beforeHeight, barWidth, beforeHeight);
+    ctx.fillStyle = beforeColor
+    ctx.fillRect(groupX, padding.top + chartHeight - beforeHeight, barWidth, beforeHeight)
 
     // 加速后柱子
-    ctx.fillStyle = afterColor;
-    ctx.fillRect(groupX + barWidth + 2, padding.top + chartHeight - afterHeight, barWidth, afterHeight);
+    ctx.fillStyle = afterColor
+    ctx.fillRect(
+      groupX + barWidth + 2,
+      padding.top + chartHeight - afterHeight,
+      barWidth,
+      afterHeight
+    )
 
     // X轴标签
-    ctx.fillStyle = CHART_COLORS.textPrimary;
-    ctx.font = '10px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(m.label, groupX + barWidth, height - padding.bottom + 15);
-  });
+    ctx.fillStyle = CHART_COLORS.textPrimary
+    ctx.font = '10px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillText(m.label, groupX + barWidth, height - padding.bottom + 15)
+  })
 
   // 绘制图例
-  ctx.fillStyle = beforeColor;
-  ctx.fillRect(padding.left, 5, 10, 10);
-  ctx.fillStyle = CHART_COLORS.textPrimary;
-  ctx.font = '9px sans-serif';
-  ctx.textAlign = 'left';
-  ctx.fillText('加速前', padding.left + 14, 14);
+  ctx.fillStyle = beforeColor
+  ctx.fillRect(padding.left, 5, 10, 10)
+  ctx.fillStyle = CHART_COLORS.textPrimary
+  ctx.font = '9px sans-serif'
+  ctx.textAlign = 'left'
+  ctx.fillText('加速前', padding.left + 14, 14)
 
-  ctx.fillStyle = afterColor;
-  ctx.fillRect(padding.left + 60, 5, 10, 10);
-  ctx.fillStyle = CHART_COLORS.textPrimary;
-  ctx.fillText('加速后', padding.left + 74, 14);
+  ctx.fillStyle = afterColor
+  ctx.fillRect(padding.left + 60, 5, 10, 10)
+  ctx.fillStyle = CHART_COLORS.textPrimary
+  ctx.fillText('加速后', padding.left + 74, 14)
 }
 
 // 绘制替换类型分布饼图
 async function drawDistributionChart() {
-  const canvas = document.getElementById('ra-chart-distribution-canvas');
-  if (!canvas) return;
+  const canvas = document.getElementById('ra-chart-distribution-canvas')
+  if (!canvas) return
 
-  const ctx = canvas.getContext('2d');
-  const width = canvas.offsetWidth;
-  const height = canvas.offsetHeight;
+  const ctx = canvas.getContext('2d')
+  const width = canvas.offsetWidth
+  const height = canvas.offsetHeight
 
-  canvas.width = width * 2;
-  canvas.height = height * 2;
-  ctx.scale(2, 2);
+  canvas.width = width * 2
+  canvas.height = height * 2
+  ctx.scale(2, 2)
 
-  ctx.clearRect(0, 0, width, height);
+  ctx.clearRect(0, 0, width, height)
 
   // 获取分布数据
-  let distribution = null;
+  let distribution = null
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
     if (tab?.id) {
-      const response = await chrome.tabs.sendMessage(tab.id, { type: 'RESOURCE_ACCELERATOR_GET_DISTRIBUTION' });
+      const response = await chrome.tabs.sendMessage(tab.id, {
+        type: 'RESOURCE_ACCELERATOR_GET_DISTRIBUTION',
+      })
       if (response?.success && response.data) {
-        distribution = response.data;
+        distribution = response.data
       }
     }
   } catch (error) {
-    console.warn('[drawDistributionChart] 获取分布数据失败:', error);
+    console.warn('[drawDistributionChart] 获取分布数据失败:', error)
   }
 
   if (!distribution) {
-    ctx.fillStyle = '#999';
-    ctx.font = '12px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('暂无分布数据', width / 2, height / 2);
-    return;
+    ctx.fillStyle = '#999'
+    ctx.font = '12px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillText('暂无分布数据', width / 2, height / 2)
+    return
   }
 
-  const total = distribution.js + distribution.css + distribution.fonts + distribution.images;
+  const total = distribution.js + distribution.css + distribution.fonts + distribution.images
   if (total === 0) {
-    ctx.fillStyle = '#999';
-    ctx.font = '12px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('暂无替换记录', width / 2, height / 2);
-    return;
+    ctx.fillStyle = '#999'
+    ctx.font = '12px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillText('暂无替换记录', width / 2, height / 2)
+    return
   }
 
-  const centerX = width * CHART_LAYOUT.distribution.centerXRatio;
-  const centerY = height / 2;
-  const radius = Math.min(width * CHART_LAYOUT.distribution.radiusRatio, height * 0.4);
+  const centerX = width * CHART_LAYOUT.distribution.centerXRatio
+  const centerY = height / 2
+  const radius = Math.min(width * CHART_LAYOUT.distribution.radiusRatio, height * 0.4)
 
   const data = [
     { label: 'JS', value: distribution.js, color: CHART_COLORS.distribution.js },
@@ -2685,252 +2901,255 @@ async function drawDistributionChart() {
     { label: '字体', value: distribution.fonts, color: CHART_COLORS.distribution.fonts },
     { label: '图片', value: distribution.images, color: CHART_COLORS.distribution.images },
     { label: 'SVG', value: distribution.svg || 0, color: CHART_COLORS.distribution.svg },
-  ].filter(d => d.value > 0);
+  ].filter((d) => d.value > 0)
 
-  let startAngle = -Math.PI / 2;
-  data.forEach(d => {
-    const sliceAngle = (d.value / total) * 2 * Math.PI;
+  let startAngle = -Math.PI / 2
+  data.forEach((d) => {
+    const sliceAngle = (d.value / total) * 2 * Math.PI
 
-    ctx.beginPath();
-    ctx.moveTo(centerX, centerY);
-    ctx.arc(centerX, centerY, radius, startAngle, startAngle + sliceAngle);
-    ctx.closePath();
-    ctx.fillStyle = d.color;
-    ctx.fill();
+    ctx.beginPath()
+    ctx.moveTo(centerX, centerY)
+    ctx.arc(centerX, centerY, radius, startAngle, startAngle + sliceAngle)
+    ctx.closePath()
+    ctx.fillStyle = d.color
+    ctx.fill()
 
-    startAngle += sliceAngle;
-  });
+    startAngle += sliceAngle
+  })
 
   // 绘制图例
-  const legendX = width * CHART_LAYOUT.distribution.legendXRatio;
-  let legendY = height * CHART_LAYOUT.distribution.legendYRatio;
-  data.forEach(d => {
-    ctx.fillStyle = d.color;
-    ctx.fillRect(legendX, legendY, 12, 12);
+  const legendX = width * CHART_LAYOUT.distribution.legendXRatio
+  let legendY = height * CHART_LAYOUT.distribution.legendYRatio
+  data.forEach((d) => {
+    ctx.fillStyle = d.color
+    ctx.fillRect(legendX, legendY, 12, 12)
 
-    ctx.fillStyle = CHART_COLORS.textPrimary;
-    ctx.font = '10px sans-serif';
-    ctx.textAlign = 'left';
-    const percent = Math.round((d.value / total) * 100);
-    ctx.fillText(`${d.label}: ${d.value} (${percent}%)`, legendX + 16, legendY + 10);
+    ctx.fillStyle = CHART_COLORS.textPrimary
+    ctx.font = '10px sans-serif'
+    ctx.textAlign = 'left'
+    const percent = Math.round((d.value / total) * 100)
+    ctx.fillText(`${d.label}: ${d.value} (${percent}%)`, legendX + 16, legendY + 10)
 
-    legendY += CHART_LAYOUT.distribution.legendSpacing;
-  });
+    legendY += CHART_LAYOUT.distribution.legendSpacing
+  })
 }
 
 // 绘制近7天趋势折线图
 async function drawTrendChart() {
-  const canvas = document.getElementById('ra-chart-trend-canvas');
-  if (!canvas) return;
+  const canvas = document.getElementById('ra-chart-trend-canvas')
+  if (!canvas) return
 
-  const ctx = canvas.getContext('2d');
-  const width = canvas.offsetWidth;
-  const height = canvas.offsetHeight;
+  const ctx = canvas.getContext('2d')
+  const width = canvas.offsetWidth
+  const height = canvas.offsetHeight
 
-  canvas.width = width * 2;
-  canvas.height = height * 2;
-  ctx.scale(2, 2);
+  canvas.width = width * 2
+  canvas.height = height * 2
+  ctx.scale(2, 2)
 
-  ctx.clearRect(0, 0, width, height);
+  ctx.clearRect(0, 0, width, height)
 
   // 获取趋势数据
-  let trendData = null;
+  let trendData = null
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
     if (tab?.id) {
-      const response = await chrome.tabs.sendMessage(tab.id, { type: 'RESOURCE_ACCELERATOR_GET_TREND' });
+      const response = await chrome.tabs.sendMessage(tab.id, {
+        type: 'RESOURCE_ACCELERATOR_GET_TREND',
+      })
       if (response?.success && response.data) {
-        trendData = response.data;
+        trendData = response.data
       }
     }
   } catch (error) {
-    console.warn('[drawTrendChart] 获取趋势数据失败:', error);
+    console.warn('[drawTrendChart] 获取趋势数据失败:', error)
   }
 
   if (!trendData || trendData.length === 0) {
-    ctx.fillStyle = '#999';
-    ctx.font = '12px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('暂无趋势数据', width / 2, height / 2);
-    return;
+    ctx.fillStyle = '#999'
+    ctx.font = '12px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillText('暂无趋势数据', width / 2, height / 2)
+    return
   }
 
-  const padding = CHART_LAYOUT.trend.padding;
-  const chartWidth = width - padding.left - padding.right;
-  const chartHeight = height - padding.top - padding.bottom;
+  const padding = CHART_LAYOUT.trend.padding
+  const chartWidth = width - padding.left - padding.right
+  const chartHeight = height - padding.top - padding.bottom
 
   // 数据
-  const labels = trendData.map(d => d.dayLabel);
-  const replacedData = trendData.map(d => d.totalReplaced);
-  const bytesData = trendData.map(d => Math.round(d.bytesSaved / 1024)); // 转换为KB
+  const labels = trendData.map((d) => d.dayLabel)
+  const replacedData = trendData.map((d) => d.totalReplaced)
+  const bytesData = trendData.map((d) => Math.round(d.bytesSaved / 1024)) // 转换为KB
 
-  const maxReplaced = Math.max(...replacedData, 1);
-  const maxBytes = Math.max(...bytesData, 1);
+  const maxReplaced = Math.max(...replacedData, 1)
+  const maxBytes = Math.max(...bytesData, 1)
 
   // 绘制背景网格
-  ctx.strokeStyle = CHART_COLORS.gridLine;
-  ctx.lineWidth = CHART_LAYOUT.trend.lineWidth;
+  ctx.strokeStyle = CHART_COLORS.gridLine
+  ctx.lineWidth = CHART_LAYOUT.trend.lineWidth
   for (let i = 0; i <= CHART_LAYOUT.gridLines; i++) {
-    const y = padding.top + (chartHeight / CHART_LAYOUT.gridLines) * i;
-    ctx.beginPath();
-    ctx.moveTo(padding.left, y);
-    ctx.lineTo(width - padding.right, y);
-    ctx.stroke();
+    const y = padding.top + (chartHeight / CHART_LAYOUT.gridLines) * i
+    ctx.beginPath()
+    ctx.moveTo(padding.left, y)
+    ctx.lineTo(width - padding.right, y)
+    ctx.stroke()
   }
 
   // 绘制折线（替换数量）
-  const lineColor = CHART_COLORS.lineColor;
-  ctx.strokeStyle = lineColor;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
+  const lineColor = CHART_COLORS.lineColor
+  ctx.strokeStyle = lineColor
+  ctx.lineWidth = 2
+  ctx.beginPath()
 
   // 处理只有一个数据点的情况，避免除零错误
   const calculateX = (index) => {
     if (labels.length === 1) {
-      return padding.left + chartWidth / 2; // 居中显示
+      return padding.left + chartWidth / 2 // 居中显示
     }
-    return padding.left + (index / (labels.length - 1)) * chartWidth;
-  };
+    return padding.left + (index / (labels.length - 1)) * chartWidth
+  }
 
   replacedData.forEach((val, i) => {
-    const x = calculateX(i);
-    const y = padding.top + chartHeight - (val / maxReplaced) * chartHeight;
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  });
-  ctx.stroke();
+    const x = calculateX(i)
+    const y = padding.top + chartHeight - (val / maxReplaced) * chartHeight
+    if (i === 0) ctx.moveTo(x, y)
+    else ctx.lineTo(x, y)
+  })
+  ctx.stroke()
 
   // 绘制数据点
   replacedData.forEach((val, i) => {
-    const x = calculateX(i);
-    const y = padding.top + chartHeight - (val / maxReplaced) * chartHeight;
+    const x = calculateX(i)
+    const y = padding.top + chartHeight - (val / maxReplaced) * chartHeight
 
-    ctx.beginPath();
-    ctx.arc(x, y, CHART_LAYOUT.trend.pointRadius, 0, 2 * Math.PI);
-    ctx.fillStyle = lineColor;
-    ctx.fill();
+    ctx.beginPath()
+    ctx.arc(x, y, CHART_LAYOUT.trend.pointRadius, 0, 2 * Math.PI)
+    ctx.fillStyle = lineColor
+    ctx.fill()
 
     // 数据标签
-    ctx.fillStyle = CHART_COLORS.textPrimary;
-    ctx.font = '8px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(val + '', x, y - 6);
-  });
+    ctx.fillStyle = CHART_COLORS.textPrimary
+    ctx.font = '8px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillText(val + '', x, y - 6)
+  })
 
   // 绘制柱状图（节省流量）
-  const barColor = CHART_COLORS.barColor;
-  const barWidth = chartWidth / labels.length * 0.4;
+  const barColor = CHART_COLORS.barColor
+  const barWidth = (chartWidth / labels.length) * 0.4
   bytesData.forEach((val, i) => {
-    const x = padding.left + (i / labels.length) * chartWidth + (chartWidth / labels.length - barWidth) / 2;
-    const barHeight = (val / maxBytes) * chartHeight * CHART_LAYOUT.trend.barHeightRatio;
-    ctx.fillStyle = barColor;
-    ctx.fillRect(x, padding.top + chartHeight - barHeight, barWidth, barHeight);
-  });
+    const x =
+      padding.left + (i / labels.length) * chartWidth + (chartWidth / labels.length - barWidth) / 2
+    const barHeight = (val / maxBytes) * chartHeight * CHART_LAYOUT.trend.barHeightRatio
+    ctx.fillStyle = barColor
+    ctx.fillRect(x, padding.top + chartHeight - barHeight, barWidth, barHeight)
+  })
 
   // X轴标签
   labels.forEach((label, i) => {
-    const x = calculateX(i);
-    ctx.fillStyle = CHART_COLORS.textPrimary;
-    ctx.font = '9px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(label, x, height - padding.bottom + 15);
-  });
+    const x = calculateX(i)
+    ctx.fillStyle = CHART_COLORS.textPrimary
+    ctx.font = '9px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillText(label, x, height - padding.bottom + 15)
+  })
 
   // 绘制图例
-  ctx.strokeStyle = lineColor;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(padding.left, 8);
-  ctx.lineTo(padding.left + 20, 8);
-  ctx.stroke();
-  ctx.fillStyle = CHART_COLORS.textPrimary;
-  ctx.font = '9px sans-serif';
-  ctx.textAlign = 'left';
-  ctx.fillText('替换数量', padding.left + 24, 12);
+  ctx.strokeStyle = lineColor
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.moveTo(padding.left, 8)
+  ctx.lineTo(padding.left + 20, 8)
+  ctx.stroke()
+  ctx.fillStyle = CHART_COLORS.textPrimary
+  ctx.font = '9px sans-serif'
+  ctx.textAlign = 'left'
+  ctx.fillText('替换数量', padding.left + 24, 12)
 
-  ctx.fillStyle = barColor;
-  ctx.fillRect(padding.left + 80, 3, 12, 10);
-  ctx.fillStyle = CHART_COLORS.textPrimary;
-  ctx.fillText('节省流量(KB)', padding.left + 96, 12);
+  ctx.fillStyle = barColor
+  ctx.fillRect(padding.left + 80, 3, 12, 10)
+  ctx.fillStyle = CHART_COLORS.textPrimary
+  ctx.fillText('节省流量(KB)', padding.left + 96, 12)
 }
 
 // 导出图表为图片
 function exportChartAsImage() {
   try {
-    let canvas;
+    let canvas
     switch (currentChartType) {
       case 'compare':
-        canvas = document.getElementById('ra-chart-compare-canvas');
-        break;
+        canvas = document.getElementById('ra-chart-compare-canvas')
+        break
       case 'distribution':
-        canvas = document.getElementById('ra-chart-distribution-canvas');
-        break;
+        canvas = document.getElementById('ra-chart-distribution-canvas')
+        break
       case 'trend':
-        canvas = document.getElementById('ra-chart-trend-canvas');
-        break;
+        canvas = document.getElementById('ra-chart-trend-canvas')
+        break
       default:
-        canvas = document.getElementById('ra-chart-compare-canvas');
+        canvas = document.getElementById('ra-chart-compare-canvas')
     }
 
     if (!canvas) {
-      console.warn('[exportChartAsImage] 未找到画布元素');
-      return;
+      console.warn('[exportChartAsImage] 未找到画布元素')
+      return
     }
 
     // 创建临时canvas用于导出（合并2倍分辨率）
-    const exportCanvas = document.createElement('canvas');
-    exportCanvas.width = canvas.width;
-    exportCanvas.height = canvas.height;
-    const exportCtx = exportCanvas.getContext('2d');
+    const exportCanvas = document.createElement('canvas')
+    exportCanvas.width = canvas.width
+    exportCanvas.height = canvas.height
+    const exportCtx = exportCanvas.getContext('2d')
 
     // 白色背景
-    exportCtx.fillStyle = CHART_COLORS.background;
-    exportCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+    exportCtx.fillStyle = CHART_COLORS.background
+    exportCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height)
 
     // 绘制图表
-    exportCtx.drawImage(canvas, 0, 0);
+    exportCtx.drawImage(canvas, 0, 0)
 
     // 下载图片
-    const link = document.createElement('a');
-    link.download = `performance-chart-${currentChartType}-${new Date().toISOString().split('T')[0]}.png`;
-    link.href = exportCanvas.toDataURL('image/png');
-    link.click();
+    const link = document.createElement('a')
+    link.download = `performance-chart-${currentChartType}-${new Date().toISOString().split('T')[0]}.png`
+    link.href = exportCanvas.toDataURL('image/png')
+    link.click()
   } catch (error) {
-    console.error('[exportChartAsImage] 导出图表失败:', error);
-    alert('导出图表失败: ' + error.message);
+    console.error('[exportChartAsImage] 导出图表失败:', error)
+    alert('导出图表失败: ' + error.message)
   }
 }
 
 // ========== 导出统计CSV ==========
 async function exportStatsToCSV() {
   try {
-    const response = await chrome.runtime.sendMessage({ type: 'GET_STATS' });
+    const response = await chrome.runtime.sendMessage({ type: 'GET_STATS' })
     if (!response?.stats) {
-      alert('暂无数据可导出');
-      return;
+      alert('暂无数据可导出')
+      return
     }
 
-    const stats = response.stats;
-    let csv = '日期,拦截请求,隐藏元素,节省流量\n';
+    const stats = response.stats
+    let csv = '日期,拦截请求,隐藏元素,节省流量\n'
 
     // 添加今日数据
-    const today = new Date().toISOString().split('T')[0];
-    csv += `${today},${stats.today?.blocked || 0},${stats.today?.hidden || 0},${stats.today?.bytes || 0}\n`;
+    const today = new Date().toISOString().split('T')[0]
+    csv += `${today},${stats.today?.blocked || 0},${stats.today?.hidden || 0},${stats.today?.bytes || 0}\n`
 
     // 添加累计数据
-    csv += `累计,${stats.totalBlocked || 0},${stats.totalHidden || 0},${stats.estimatedBytesSaved || 0}\n`;
+    csv += `累计,${stats.totalBlocked || 0},${stats.totalHidden || 0},${stats.estimatedBytesSaved || 0}\n`
 
     // 下载CSV
-    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `extension-stats-${today}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `extension-stats-${today}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
   } catch (error) {
-    console.error('[导出CSV] 失败:', error);
-    alert('导出失败: ' + error.message);
+    console.error('[导出CSV] 失败:', error)
+    alert('导出失败: ' + error.message)
   }
 }
 
@@ -2938,103 +3157,112 @@ async function exportStatsToCSV() {
 // 以下代码已废弃
 
 async function loadNotifications() {
-  const list = document.getElementById('notification-list');
-  const badge = document.getElementById('notification-badge');
-  if (!list) return;
+  const list = document.getElementById('notification-list')
+  const badge = document.getElementById('notification-badge')
+  if (!list) return
 
-  const result = await chrome.storage.local.get('notifications');
-  const notifications = result.notifications || [];
+  const result = await chrome.storage.local.get('notifications')
+  const notifications = result.notifications || []
 
   if (notifications.length === 0) {
-    list.innerHTML = '<div style="color: #999; text-align: center; padding: 20px;">暂无通知</div>';
-    if (badge) badge.style.display = 'none';
-    return;
+    list.innerHTML = '<div style="color: #999; text-align: center; padding: 20px;">暂无通知</div>'
+    if (badge) badge.style.display = 'none'
+    return
   }
 
   // 显示未读数量
-  const unreadCount = notifications.filter(n => !n.read).length;
-  if (badge) badge.style.display = unreadCount > 0 ? 'block' : 'none';
+  const unreadCount = notifications.filter((n) => !n.read).length
+  if (badge) badge.style.display = unreadCount > 0 ? 'block' : 'none'
 
-  list.innerHTML = notifications.map((n, i) => `
+  list.innerHTML = notifications
+    .map(
+      (n, i) => `
     <div style="padding: 8px; margin-bottom: 8px; background: ${n.read ? '#f8f9fa' : '#e3f2fd'}; border-radius: 6px; border-left: 3px solid ${n.type === 'success' ? '#28a745' : n.type === 'warning' ? '#ffc107' : '#007bff'};">
       <div style="font-size: 12px; color: #666; margin-bottom: 4px;">${new Date(n.time).toLocaleString('zh-CN')}</div>
       <div style="font-size: 13px;">${escapeHtml(n.message)}</div>
     </div>
-  `).join('');
+  `
+    )
+    .join('')
 }
 
 async function markNotificationsRead() {
-  const result = await chrome.storage.local.get('notifications');
-  const notifications = result.notifications || [];
-  notifications.forEach(n => n.read = true);
-  await chrome.storage.local.set({ notifications });
+  const result = await chrome.storage.local.get('notifications')
+  const notifications = result.notifications || []
+  notifications.forEach((n) => (n.read = true))
+  await chrome.storage.local.set({ notifications })
 
-  const badge = document.getElementById('notification-badge');
-  if (badge) badge.style.display = 'none';
+  const badge = document.getElementById('notification-badge')
+  if (badge) badge.style.display = 'none'
 }
 
 // 添加通知（供其他模块调用）
 async function addNotification(message, type = 'info') {
-  const result = await chrome.storage.local.get('notifications');
-  const notifications = result.notifications || [];
+  const result = await chrome.storage.local.get('notifications')
+  const notifications = result.notifications || []
   notifications.unshift({
     message,
     type,
     time: Date.now(),
-    read: false
-  });
+    read: false,
+  })
   // 最多保留20条
-  await chrome.storage.local.set({ notifications: notifications.slice(0, 20) });
+  await chrome.storage.local.set({ notifications: notifications.slice(0, 20) })
 }
 
 // ========== 快速笔记 ==========（已在统一初始化中调用 initQuickNote）
 // ========== 剪贴板历史（增强版） ==========（已在统一初始化中调用 initClipboardHistory）
 
-let currentClipboardFilter = 'all';
+let currentClipboardFilter = 'all'
 
 async function loadClipboardHistory(searchQuery = '', filter = 'all') {
-  const list = document.getElementById('clipboard-list');
-  if (!list) return;
+  const list = document.getElementById('clipboard-list')
+  if (!list) return
 
-  const result = await chrome.storage.local.get('clipboardHistory');
-  let history = result.clipboardHistory || [];
+  const result = await chrome.storage.local.get('clipboardHistory')
+  let history = result.clipboardHistory || []
 
   // 分类检测
   const categorize = (text) => {
-    if (/^https?:\/\//i.test(text)) return 'url';
-    if (/[\{\}\[\]\(\);=>]/.test(text) && text.includes('\n')) return 'code';
-    return 'text';
-  };
+    if (/^https?:\/\//i.test(text)) return 'url'
+    if (/[\{\}\[\]\(\);=>]/.test(text) && text.includes('\n')) return 'code'
+    return 'text'
+  }
 
   // 筛选
   if (filter !== 'all') {
-    history = history.filter(item => categorize(item.text) === filter);
+    history = history.filter((item) => categorize(item.text) === filter)
   }
 
   // 搜索
   if (searchQuery) {
-    const query = searchQuery.toLowerCase();
-    history = history.filter(item => item.text.toLowerCase().includes(query));
+    const query = searchQuery.toLowerCase()
+    history = history.filter((item) => item.text.toLowerCase().includes(query))
   }
 
   if (history.length === 0) {
-    list.innerHTML = '<div style="color: #999; text-align: center; padding: 20px;">暂无记录</div>';
-    return;
+    list.innerHTML = '<div style="color: #999; text-align: center; padding: 20px;">暂无记录</div>'
+    return
   }
 
-  list.innerHTML = history.map((item, i) => {
-    const category = categorize(item.text);
-    const categoryColor = category === 'url' ? '#17a2b8' : category === 'code' ? '#28a745' : '#6c757d';
-    const categoryLabel = category === 'url' ? 'URL' : category === 'code' ? '代码' : '文本';
+  list.innerHTML = history
+    .map((item, i) => {
+      const category = categorize(item.text)
+      const categoryColor =
+        category === 'url' ? '#17a2b8' : category === 'code' ? '#28a745' : '#6c757d'
+      const categoryLabel = category === 'url' ? 'URL' : category === 'code' ? '代码' : '文本'
 
-    // 高亮搜索词
-    let displayText = escapeHtml(item.text.slice(0, 100));
-    if (searchQuery) {
-      const regex = new RegExp(`(${escapeRegex(searchQuery)})`, 'gi');
-      displayText = displayText.replace(regex, '<mark style="background: #fff3cd; padding: 0 2px;">$1</mark>');
-    }
+      // 高亮搜索词
+      let displayText = escapeHtml(item.text.slice(0, 100))
+      if (searchQuery) {
+        const regex = new RegExp(`(${escapeRegex(searchQuery)})`, 'gi')
+        displayText = displayText.replace(
+          regex,
+          '<mark style="background: #fff3cd; padding: 0 2px;">$1</mark>'
+        )
+      }
 
-    return `
+      return `
       <div class="clipboard-item" style="padding: 8px; margin-bottom: 4px; background: #f8f9fa; border-radius: 4px; cursor: pointer; overflow: hidden; position: relative;" data-index="${i}">
         <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${displayText}</div>
         <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
@@ -3042,39 +3270,40 @@ async function loadClipboardHistory(searchQuery = '', filter = 'all') {
           <span style="font-size: 10px; padding: 2px 6px; background: ${categoryColor}; color: white; border-radius: 3px;">${categoryLabel}</span>
         </div>
       </div>
-    `;
-  }).join('');
+    `
+    })
+    .join('')
 
   // 点击复制
-  list.querySelectorAll('.clipboard-item').forEach(el => {
+  list.querySelectorAll('.clipboard-item').forEach((el) => {
     el.addEventListener('click', async () => {
-      const index = parseInt(el.dataset.index);
-      const text = history[index]?.text;
+      const index = parseInt(el.dataset.index)
+      const text = history[index]?.text
       if (text) {
-        await navigator.clipboard.writeText(text);
-        el.style.background = '#d4edda';
-        setTimeout(() => el.style.background = '', 500);
+        await navigator.clipboard.writeText(text)
+        el.style.background = '#d4edda'
+        setTimeout(() => (el.style.background = ''), 500)
       }
-    });
-  });
+    })
+  })
 }
 
 function escapeRegex(string) {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 // 记录剪贴板内容（供content script调用）
 async function recordClipboard(text) {
-  if (!text || text.length > 1000) return;
+  if (!text || text.length > 1000) return
 
-  const result = await chrome.storage.local.get('clipboardHistory');
-  const history = result.clipboardHistory || [];
+  const result = await chrome.storage.local.get('clipboardHistory')
+  const history = result.clipboardHistory || []
 
   // 去重
-  if (history.some(h => h.text === text)) return;
+  if (history.some((h) => h.text === text)) return
 
-  history.unshift({ text, time: Date.now() });
-  await chrome.storage.local.set({ clipboardHistory: history.slice(0, 20) });
+  history.unshift({ text, time: Date.now() })
+  await chrome.storage.local.set({ clipboardHistory: history.slice(0, 20) })
 }
 
 // ========== 快捷键帮助面板 ==========（已在统一初始化中调用 initShortcutsHelp）
@@ -3088,8 +3317,8 @@ const RULE_TEMPLATES = {
       'doubleclick.net',
       'googleadservices.com',
       'ads.google.com',
-      'pagead2.googlesyndication.com'
-    ]
+      'pagead2.googlesyndication.com',
+    ],
   },
   trackers: {
     name: '隐私追踪',
@@ -3098,8 +3327,8 @@ const RULE_TEMPLATES = {
       'googletagmanager.com',
       'facebook.net/tr',
       'connect.facebook.net',
-      'analytics.twitter.com'
-    ]
+      'analytics.twitter.com',
+    ],
   },
   social: {
     name: '社交组件',
@@ -3107,8 +3336,8 @@ const RULE_TEMPLATES = {
       'platform.twitter.com/widgets',
       'connect.facebook.net/zh_CN/sdk',
       'assets.pinterest.com/js/pinit',
-      'platform.linkedin.com/in.js'
-    ]
+      'platform.linkedin.com/in.js',
+    ],
   },
   'video-ads': {
     name: '视频广告',
@@ -3116,8 +3345,8 @@ const RULE_TEMPLATES = {
       'ads.youtube.com',
       'googleads.g.doubleclick.net',
       'static.doubleclick.net/instream/ad_status',
-      'pagead2.googlesyndication.com/pagead/ads'
-    ]
+      'pagead2.googlesyndication.com/pagead/ads',
+    ],
   },
   // 扩展模板
   'video-sites': {
@@ -3127,8 +3356,8 @@ const RULE_TEMPLATES = {
       'api.bilibili.com/x/web-show/res/loc',
       'awp.taobao.com',
       'mmstat.com',
-      'atm.youku.com'
-    ]
+      'atm.youku.com',
+    ],
   },
   'social-media': {
     name: '社交媒体',
@@ -3136,10 +3365,10 @@ const RULE_TEMPLATES = {
       'weibo.com/ajax/statuses/hotsearch',
       'zhihu.com/commercial',
       'xiaohongshu.com/api/sns/v1/note/',
-      'tieba.baidu.com/tb/tml/ad'
-    ]
+      'tieba.baidu.com/tb/tml/ad',
+    ],
   },
-  'shopping': {
+  shopping: {
     name: '购物网站',
     domains: [
       'alicdn.com',
@@ -3147,8 +3376,8 @@ const RULE_TEMPLATES = {
       'mmstat.com',
       'atm.youku.com',
       'cm.ipinyou.com',
-      'ad.toutiao.com'
-    ]
+      'ad.toutiao.com',
+    ],
   },
   'news-sites': {
     name: '新闻网站',
@@ -3157,40 +3386,40 @@ const RULE_TEMPLATES = {
       'pos.baidu.com',
       'eclick.baidu.com',
       'hm.baidu.com',
-      'tanx.com/m/ad'
-    ]
-  }
-};
+      'tanx.com/m/ad',
+    ],
+  },
+}
 
 // 保存自定义模板
 async function saveCustomTemplate(name, domains) {
-  const result = await chrome.storage.local.get('customTemplates');
-  const customTemplates = result.customTemplates || {};
+  const result = await chrome.storage.local.get('customTemplates')
+  const customTemplates = result.customTemplates || {}
   customTemplates[name] = {
     name,
     domains,
-    createdAt: Date.now()
-  };
-  await chrome.storage.local.set({ customTemplates });
+    createdAt: Date.now(),
+  }
+  await chrome.storage.local.set({ customTemplates })
 }
 
 // 加载自定义模板
 async function loadCustomTemplates() {
-  const result = await chrome.storage.local.get('customTemplates');
-  return result.customTemplates || {};
+  const result = await chrome.storage.local.get('customTemplates')
+  return result.customTemplates || {}
 }
 
 // 模板按钮事件（已在统一初始化中调用 initTemplateButtons）
 
 // ========== 暗黑模式 ==========（已在统一初始化中调用 initThemeToggle）
 function applyTheme(theme) {
-  const themeToggle = document.getElementById('theme-toggle');
+  const themeToggle = document.getElementById('theme-toggle')
   if (theme === 'dark') {
-    document.body.classList.add('dark-mode');
-    if (themeToggle) themeToggle.textContent = '☀️';
+    document.body.classList.add('dark-mode')
+    if (themeToggle) themeToggle.textContent = '☀️'
   } else {
-    document.body.classList.remove('dark-mode');
-    if (themeToggle) themeToggle.textContent = '🌙';
+    document.body.classList.remove('dark-mode')
+    if (themeToggle) themeToggle.textContent = '🌙'
   }
 }
 
@@ -3199,236 +3428,245 @@ function applyTheme(theme) {
 async function exportSettings() {
   try {
     // 收集所有设置
-    const syncData = await chrome.storage.sync.get(null);
-    const localData = await chrome.storage.local.get(null);
+    const syncData = await chrome.storage.sync.get(null)
+    const localData = await chrome.storage.local.get(null)
 
     // 排除统计数据（太大）
-    delete localData.extensionStats;
+    delete localData.extensionStats
 
     const exportData = {
       version: '1.0.0',
       exportTime: new Date().toISOString(),
       sync: syncData,
-      local: localData
-    };
+      local: localData,
+    }
 
     // 下载JSON文件
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `chrome-extension-settings-${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `chrome-extension-settings-${new Date().toISOString().split('T')[0]}.json`
+    a.click()
+    URL.revokeObjectURL(url)
 
     // 提示成功
-    alert('设置已导出成功！');
+    alert('设置已导出成功！')
   } catch (error) {
-    console.error('[导出设置] 失败:', error);
-    alert('导出失败: ' + error.message);
+    console.error('[导出设置] 失败:', error)
+    alert('导出失败: ' + error.message)
   }
 }
 
 async function importSettings(event) {
-  const file = event.target.files?.[0];
-  if (!file) return;
+  const file = event.target.files?.[0]
+  if (!file) return
 
   try {
-    const text = await file.text();
-    const data = JSON.parse(text);
+    const text = await file.text()
+    const data = JSON.parse(text)
 
     // 验证格式
     if (!data.version || !data.sync || !data.local) {
-      throw new Error('无效的设置文件格式');
+      throw new Error('无效的设置文件格式')
     }
 
     // 确认导入
     if (!confirm('导入设置将覆盖当前所有设置，确定继续吗？')) {
-      return;
+      return
     }
 
     // 导入sync设置
     if (Object.keys(data.sync).length > 0) {
-      await chrome.storage.sync.clear();
-      await chrome.storage.sync.set(data.sync);
+      await chrome.storage.sync.clear()
+      await chrome.storage.sync.set(data.sync)
     }
 
     // 导入local设置（保留统计数据）
-    const currentLocal = await chrome.storage.local.get('extensionStats');
-    await chrome.storage.local.clear();
-    await chrome.storage.local.set({ ...data.local, extensionStats: currentLocal.extensionStats });
+    const currentLocal = await chrome.storage.local.get('extensionStats')
+    await chrome.storage.local.clear()
+    await chrome.storage.local.set({ ...data.local, extensionStats: currentLocal.extensionStats })
 
-    alert('设置已导入成功！页面将刷新。');
-    location.reload();
+    alert('设置已导入成功！页面将刷新。')
+    location.reload()
   } catch (error) {
-    console.error('[导入设置] 失败:', error);
-    alert('导入失败: ' + error.message);
+    console.error('[导入设置] 失败:', error)
+    alert('导入失败: ' + error.message)
   } finally {
     // 清空input，允许重复导入同一文件
-    event.target.value = '';
+    event.target.value = ''
   }
 }
 
 // ========== 全局设置 ==========
-let currentKeywordCategory = 'notInterested';
+let currentKeywordCategory = 'notInterested'
 
 async function loadGlobalSettings() {
-  const domainSelect = document.getElementById('global-domain-select');
-  const keywordsEditor = document.getElementById('global-keywords-editor');
-  const keywordsTextarea = document.getElementById('global-keywords-textarea');
+  const domainSelect = document.getElementById('global-domain-select')
+  const keywordsEditor = document.getElementById('global-keywords-editor')
+  const keywordsTextarea = document.getElementById('global-keywords-textarea')
 
-  if (!domainSelect || !keywordsEditor || !keywordsTextarea) return;
+  if (!domainSelect || !keywordsEditor || !keywordsTextarea) return
 
   // 关键词分类切换
-  document.querySelectorAll('.keyword-category-btn').forEach(btn => {
+  document.querySelectorAll('.keyword-category-btn').forEach((btn) => {
     btn.addEventListener('click', async () => {
-      document.querySelectorAll('.keyword-category-btn').forEach(b => {
-        b.classList.remove('active');
-        b.style.background = '';
-        b.style.color = '';
-      });
-      btn.classList.add('active');
-      btn.style.background = '#007bff';
-      btn.style.color = 'white';
+      document.querySelectorAll('.keyword-category-btn').forEach((b) => {
+        b.classList.remove('active')
+        b.style.background = ''
+        b.style.color = ''
+      })
+      btn.classList.add('active')
+      btn.style.background = '#007bff'
+      btn.style.color = 'white'
 
-      currentKeywordCategory = btn.dataset.category;
-      await loadKeywordsForCategory();
-    });
-  });
+      currentKeywordCategory = btn.dataset.category
+      await loadKeywordsForCategory()
+    })
+  })
 
   domainSelect.addEventListener('change', async () => {
-    const domain = domainSelect.value;
+    const domain = domainSelect.value
     if (!domain) {
-      keywordsEditor.style.display = 'none';
-      return;
+      keywordsEditor.style.display = 'none'
+      return
     }
 
-    keywordsEditor.style.display = 'block';
-    await loadKeywordsForCategory();
-  });
+    keywordsEditor.style.display = 'block'
+    await loadKeywordsForCategory()
+  })
 
   // 导入关键词
-  const importKeywordsBtn = document.getElementById('import-keywords-btn');
-  const keywordsImportFile = document.getElementById('keywords-import-file');
+  const importKeywordsBtn = document.getElementById('import-keywords-btn')
+  const keywordsImportFile = document.getElementById('keywords-import-file')
 
   if (importKeywordsBtn && keywordsImportFile) {
-    importKeywordsBtn.addEventListener('click', () => keywordsImportFile.click());
+    importKeywordsBtn.addEventListener('click', () => keywordsImportFile.click())
     keywordsImportFile.addEventListener('change', async (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
+      const file = e.target.files?.[0]
+      if (!file) return
 
       try {
-        const text = await file.text();
-        let keywords = [];
+        const text = await file.text()
+        let keywords = []
 
         if (file.name.endsWith('.json')) {
-          const data = JSON.parse(text);
-          keywords = Array.isArray(data) ? data : (data.keywords || []);
+          const data = JSON.parse(text)
+          keywords = Array.isArray(data) ? data : data.keywords || []
         } else {
-          keywords = text.split('\n').map(k => k.trim()).filter(k => k);
+          keywords = text
+            .split('\n')
+            .map((k) => k.trim())
+            .filter((k) => k)
         }
 
         // 合并现有关键词
-        const existingKeywords = keywordsTextarea.value.split('\n').map(k => k.trim()).filter(k => k);
-        const merged = [...new Set([...existingKeywords, ...keywords])];
-        keywordsTextarea.value = merged.join('\n');
+        const existingKeywords = keywordsTextarea.value
+          .split('\n')
+          .map((k) => k.trim())
+          .filter((k) => k)
+        const merged = [...new Set([...existingKeywords, ...keywords])]
+        keywordsTextarea.value = merged.join('\n')
 
-        const countEl = document.getElementById('keyword-count');
-        if (countEl) countEl.textContent = merged.length;
+        const countEl = document.getElementById('keyword-count')
+        if (countEl) countEl.textContent = merged.length
 
-        alert(`成功导入 ${keywords.length} 个关键词`);
+        alert(`成功导入 ${keywords.length} 个关键词`)
       } catch (error) {
-        alert('导入失败: ' + error.message);
+        alert('导入失败: ' + error.message)
       }
-      e.target.value = '';
-    });
+      e.target.value = ''
+    })
   }
 
   // 导出关键词
-  const exportKeywordsBtn = document.getElementById('export-keywords-btn');
+  const exportKeywordsBtn = document.getElementById('export-keywords-btn')
   if (exportKeywordsBtn) {
     exportKeywordsBtn.addEventListener('click', () => {
-      const keywords = keywordsTextarea.value.split('\n').map(k => k.trim()).filter(k => k);
+      const keywords = keywordsTextarea.value
+        .split('\n')
+        .map((k) => k.trim())
+        .filter((k) => k)
       const data = {
         category: currentKeywordCategory,
         domain: domainSelect.value,
         keywords,
-        exportTime: new Date().toISOString()
-      };
+        exportTime: new Date().toISOString(),
+      }
 
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `keywords-${currentKeywordCategory}-${Date.now()}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-    });
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `keywords-${currentKeywordCategory}-${Date.now()}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+    })
   }
 
   // 保存按钮
-  const saveBtn = document.getElementById('global-save-keywords-btn');
+  const saveBtn = document.getElementById('global-save-keywords-btn')
   if (saveBtn) {
     saveBtn.addEventListener('click', async () => {
-      const domain = domainSelect.value;
-      if (!domain) return;
+      const domain = domainSelect.value
+      if (!domain) return
 
       const keywords = keywordsTextarea.value
         .split('\n')
-        .map(k => k.trim())
-        .filter(k => k);
+        .map((k) => k.trim())
+        .filter((k) => k)
 
       try {
         // 保存到KeywordManager格式
-        const storageKey = `${domain}Keywords`;
-        const existingResult = await chrome.storage.local.get(storageKey);
-        const existingKeywords = existingResult[storageKey] || {};
+        const storageKey = `${domain}Keywords`
+        const existingResult = await chrome.storage.local.get(storageKey)
+        const existingKeywords = existingResult[storageKey] || {}
 
-        existingKeywords[currentKeywordCategory] = keywords;
-        await chrome.storage.local.set({ [storageKey]: existingKeywords });
+        existingKeywords[currentKeywordCategory] = keywords
+        await chrome.storage.local.set({ [storageKey]: existingKeywords })
 
         // 显示成功提示
-        const originalText = saveBtn.textContent;
-        saveBtn.textContent = '已保存 ✓';
-        saveBtn.style.background = '#28a745';
+        const originalText = saveBtn.textContent
+        saveBtn.textContent = '已保存 ✓'
+        saveBtn.style.background = '#28a745'
         setTimeout(() => {
-          saveBtn.textContent = originalText;
-          saveBtn.style.background = '';
-        }, 1500);
+          saveBtn.textContent = originalText
+          saveBtn.style.background = ''
+        }, 1500)
 
-        console.log('[全局设置] 已保存关键词:', domain, currentKeywordCategory, keywords.length);
+        console.log('[全局设置] 已保存关键词:', domain, currentKeywordCategory, keywords.length)
       } catch (error) {
-        console.error('[全局设置] 保存关键词失败:', error);
+        console.error('[全局设置] 保存关键词失败:', error)
       }
-    });
+    })
   }
 }
 
 async function loadKeywordsForCategory() {
-  const domainSelect = document.getElementById('global-domain-select');
-  const keywordsTextarea = document.getElementById('global-keywords-textarea');
-  const countEl = document.getElementById('keyword-count');
+  const domainSelect = document.getElementById('global-domain-select')
+  const keywordsTextarea = document.getElementById('global-keywords-textarea')
+  const countEl = document.getElementById('keyword-count')
 
-  const domain = domainSelect?.value;
-  if (!domain || !keywordsTextarea) return;
+  const domain = domainSelect?.value
+  if (!domain || !keywordsTextarea) return
 
   try {
-    const storageKey = `${domain}Keywords`;
-    const result = await chrome.storage.local.get(storageKey);
-    const allKeywords = result[storageKey] || {};
-    const keywords = allKeywords[currentKeywordCategory] || [];
+    const storageKey = `${domain}Keywords`
+    const result = await chrome.storage.local.get(storageKey)
+    const allKeywords = result[storageKey] || {}
+    const keywords = allKeywords[currentKeywordCategory] || []
 
-    keywordsTextarea.value = keywords.join('\n');
-    if (countEl) countEl.textContent = keywords.length;
+    keywordsTextarea.value = keywords.join('\n')
+    if (countEl) countEl.textContent = keywords.length
   } catch (error) {
-    console.error('[全局设置] 加载关键词失败:', error);
-    keywordsTextarea.value = '';
+    console.error('[全局设置] 加载关键词失败:', error)
+    keywordsTextarea.value = ''
   }
 }
 
 // ========== 资源加速器控制 ==========
 async function initResourceAccelerator() {
-  const result = await chrome.storage.local.get('resourceAcceleratorConfig');
+  const result = await chrome.storage.local.get('resourceAcceleratorConfig')
   const config = result.resourceAcceleratorConfig || {
     enabled: true,
     jsReplace: true,
@@ -3439,282 +3677,304 @@ async function initResourceAccelerator() {
     imageQuality: 0.8,
     preloadEnabled: true,
     dedupEnabled: true,
-    excludeDomains: []
-  };
+    excludeDomains: [],
+  }
 
-  const enabledEl = document.getElementById('ra-enabled');
-  const siteEnabledEl = document.getElementById('ra-site-enabled');
-  const jsReplaceEl = document.getElementById('ra-js-replace');
-  const fontReplaceEl = document.getElementById('ra-font-replace');
-  const cssReplaceEl = document.getElementById('ra-css-replace');
-  const imageLazyEl = document.getElementById('ra-image-lazy');
-  const imageCompressEl = document.getElementById('ra-image-compress');
-  const preloadEl = document.getElementById('ra-preload');
-  const dedupEl = document.getElementById('ra-dedup');
-  const thirdPartyDeferEl = document.getElementById('ra-third-party-defer');
-  const thirdPartySettingsEl = document.getElementById('ra-third-party-settings');
-  const deferralStrategyEl = document.getElementById('ra-deferral-strategy');
-  const qualityEl = document.getElementById('ra-quality');
-  const qualityValueEl = document.getElementById('ra-quality-value');
-  const settingsPanel = document.getElementById('ra-settings');
+  const enabledEl = document.getElementById('ra-enabled')
+  const siteEnabledEl = document.getElementById('ra-site-enabled')
+  const jsReplaceEl = document.getElementById('ra-js-replace')
+  const fontReplaceEl = document.getElementById('ra-font-replace')
+  const cssReplaceEl = document.getElementById('ra-css-replace')
+  const imageLazyEl = document.getElementById('ra-image-lazy')
+  const imageCompressEl = document.getElementById('ra-image-compress')
+  const preloadEl = document.getElementById('ra-preload')
+  const dedupEl = document.getElementById('ra-dedup')
+  const thirdPartyDeferEl = document.getElementById('ra-third-party-defer')
+  const thirdPartySettingsEl = document.getElementById('ra-third-party-settings')
+  const deferralStrategyEl = document.getElementById('ra-deferral-strategy')
+  const qualityEl = document.getElementById('ra-quality')
+  const qualityValueEl = document.getElementById('ra-quality-value')
+  const settingsPanel = document.getElementById('ra-settings')
 
-  if (!enabledEl) return;
+  if (!enabledEl) return
 
   // 检查当前站点是否被排除
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  let currentHost = '';
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+  let currentHost = ''
   if (tab?.url) {
     try {
-      currentHost = new URL(tab.url).hostname;
+      currentHost = new URL(tab.url).hostname
     } catch (error) {
-      console.warn('[updateSiteExclude] 解析URL失败:', error);
+      console.warn('[updateSiteExclude] 解析URL失败:', error)
     }
   }
-  const isSiteExcluded = config.excludeDomains?.some(d =>
-    currentHost === d || currentHost.endsWith('.' + d)
-  );
+  const isSiteExcluded = config.excludeDomains?.some(
+    (d) => currentHost === d || currentHost.endsWith('.' + d)
+  )
 
-  enabledEl.checked = config.enabled;
-  if (siteEnabledEl) siteEnabledEl.checked = !isSiteExcluded;
-  jsReplaceEl.checked = config.jsReplace;
-  fontReplaceEl.checked = config.fontReplace;
-  if (cssReplaceEl) cssReplaceEl.checked = config.cssReplace !== false;
-  imageLazyEl.checked = config.imageLazyLoad;
-  imageCompressEl.checked = config.imageCompress;
-  if (preloadEl) preloadEl.checked = config.preloadEnabled !== false;
-  if (dedupEl) dedupEl.checked = config.dedupEnabled !== false;
-  qualityEl.value = config.imageQuality * 100;
-  qualityValueEl.textContent = Math.round(config.imageQuality * 100);
+  enabledEl.checked = config.enabled
+  if (siteEnabledEl) siteEnabledEl.checked = !isSiteExcluded
+  jsReplaceEl.checked = config.jsReplace
+  fontReplaceEl.checked = config.fontReplace
+  if (cssReplaceEl) cssReplaceEl.checked = config.cssReplace !== false
+  imageLazyEl.checked = config.imageLazyLoad
+  imageCompressEl.checked = config.imageCompress
+  if (preloadEl) preloadEl.checked = config.preloadEnabled !== false
+  if (dedupEl) dedupEl.checked = config.dedupEnabled !== false
+  qualityEl.value = config.imageQuality * 100
+  qualityValueEl.textContent = Math.round(config.imageQuality * 100)
   // 初始化压缩质量提示
-  const qualityHintInit = document.getElementById('ra-quality-hint');
+  const qualityHintInit = document.getElementById('ra-quality-hint')
   if (qualityHintInit) {
-    const savedPct = Math.round((1 - config.imageQuality) * 60);
-    qualityHintInit.textContent = savedPct > 0 ? `(预估节省 ~${savedPct}%)` : '';
+    const savedPct = Math.round((1 - config.imageQuality) * 60)
+    qualityHintInit.textContent = savedPct > 0 ? `(预估节省 ~${savedPct}%)` : ''
   }
-  settingsPanel.style.display = config.enabled ? 'block' : 'none';
+  settingsPanel.style.display = config.enabled ? 'block' : 'none'
 
   // 通用配置保存函数
   const saveAndNotify = async () => {
-    await chrome.storage.local.set({ resourceAcceleratorConfig: config });
-    notifyResourceAccelerator(config);
-  };
+    await chrome.storage.local.set({ resourceAcceleratorConfig: config })
+    notifyResourceAccelerator(config)
+  }
 
   enabledEl.addEventListener('change', async (e) => {
-    config.enabled = e.target.checked;
-    settingsPanel.style.display = config.enabled ? 'block' : 'none';
-    await saveAndNotify();
-  });
+    config.enabled = e.target.checked
+    settingsPanel.style.display = config.enabled ? 'block' : 'none'
+    await saveAndNotify()
+  })
 
   // 站点级开关
   if (siteEnabledEl) {
     // 初始化 siteConfig
-    if (!config.siteConfig) config.siteConfig = { enabled: true, rules: [] };
+    if (!config.siteConfig) config.siteConfig = { enabled: true, rules: [] }
 
     // 检查当前站点是否有规则
-    const existingRule = config.siteConfig.rules.find(r => r.domain === currentHost);
-    siteEnabledEl.checked = existingRule ? existingRule.enabled !== false : true;
+    const existingRule = config.siteConfig.rules.find((r) => r.domain === currentHost)
+    siteEnabledEl.checked = existingRule ? existingRule.enabled !== false : true
 
     siteEnabledEl.addEventListener('change', async (e) => {
-      if (!config.siteConfig) config.siteConfig = { enabled: true, rules: [] };
+      if (!config.siteConfig) config.siteConfig = { enabled: true, rules: [] }
 
-      const existingIdx = config.siteConfig.rules.findIndex(r => r.domain === currentHost);
+      const existingIdx = config.siteConfig.rules.findIndex((r) => r.domain === currentHost)
       if (e.target.checked) {
         // 启用：如果存在规则且 enabled 为 false，则设置为 true；否则删除规则（使用全局配置）
         if (existingIdx !== -1) {
           if (config.siteConfig.rules[existingIdx].enabled === false) {
-            config.siteConfig.rules[existingIdx].enabled = true;
+            config.siteConfig.rules[existingIdx].enabled = true
           } else {
-            config.siteConfig.rules.splice(existingIdx, 1);
+            config.siteConfig.rules.splice(existingIdx, 1)
           }
         }
       } else {
         // 禁用：添加或更新规则
         if (existingIdx !== -1) {
-          config.siteConfig.rules[existingIdx].enabled = false;
+          config.siteConfig.rules[existingIdx].enabled = false
         } else {
-          config.siteConfig.rules.push({ domain: currentHost, enabled: false });
+          config.siteConfig.rules.push({ domain: currentHost, enabled: false })
         }
       }
-      await saveAndNotify();
-    });
+      await saveAndNotify()
+    })
   }
 
   jsReplaceEl.addEventListener('change', async (e) => {
-    config.jsReplace = e.target.checked;
-    await saveAndNotify();
-  });
+    config.jsReplace = e.target.checked
+    await saveAndNotify()
+  })
 
   fontReplaceEl.addEventListener('change', async (e) => {
-    config.fontReplace = e.target.checked;
-    await saveAndNotify();
-  });
+    config.fontReplace = e.target.checked
+    await saveAndNotify()
+  })
 
   if (cssReplaceEl) {
     cssReplaceEl.addEventListener('change', async (e) => {
-      config.cssReplace = e.target.checked;
-      await saveAndNotify();
-    });
+      config.cssReplace = e.target.checked
+      await saveAndNotify()
+    })
   }
 
   imageLazyEl.addEventListener('change', async (e) => {
-    config.imageLazyLoad = e.target.checked;
-    await saveAndNotify();
-  });
+    config.imageLazyLoad = e.target.checked
+    await saveAndNotify()
+  })
 
   imageCompressEl.addEventListener('change', async (e) => {
-    config.imageCompress = e.target.checked;
-    await saveAndNotify();
-  });
+    config.imageCompress = e.target.checked
+    await saveAndNotify()
+  })
 
   // SVG 优化开关
-  const svgOptimizeEl = document.getElementById('ra-svg-optimize');
+  const svgOptimizeEl = document.getElementById('ra-svg-optimize')
   if (svgOptimizeEl) {
     if (!config.svgOptimize) {
-      config.svgOptimize = { enabled: true, maxInlineSize: 10240, removeComments: true, removeMetadata: true, minify: true };
+      config.svgOptimize = {
+        enabled: true,
+        maxInlineSize: 10240,
+        removeComments: true,
+        removeMetadata: true,
+        minify: true,
+      }
     }
-    svgOptimizeEl.checked = config.svgOptimize.enabled !== false;
+    svgOptimizeEl.checked = config.svgOptimize.enabled !== false
     svgOptimizeEl.addEventListener('change', async (e) => {
-      config.svgOptimize.enabled = e.target.checked;
-      await saveAndNotify();
-    });
+      config.svgOptimize.enabled = e.target.checked
+      await saveAndNotify()
+    })
   }
 
   if (preloadEl) {
     preloadEl.addEventListener('change', async (e) => {
-      config.preloadEnabled = e.target.checked;
-      await saveAndNotify();
-    });
+      config.preloadEnabled = e.target.checked
+      await saveAndNotify()
+    })
   }
 
   if (dedupEl) {
     dedupEl.addEventListener('change', async (e) => {
-      config.dedupEnabled = e.target.checked;
-      await saveAndNotify();
-    });
+      config.dedupEnabled = e.target.checked
+      await saveAndNotify()
+    })
   }
 
   // 第三方脚本延迟配置
   if (thirdPartyDeferEl) {
     if (!config.thirdPartyDeferral) {
-      config.thirdPartyDeferral = { enabled: false, strategy: 'idle', rules: [], userRules: [], maxDeferralMs: 10000 };
+      config.thirdPartyDeferral = {
+        enabled: false,
+        strategy: 'idle',
+        rules: [],
+        userRules: [],
+        maxDeferralMs: 10000,
+      }
     }
-    thirdPartyDeferEl.checked = config.thirdPartyDeferral.enabled;
+    thirdPartyDeferEl.checked = config.thirdPartyDeferral.enabled
     if (thirdPartySettingsEl) {
-      thirdPartySettingsEl.style.display = config.thirdPartyDeferral.enabled ? 'block' : 'none';
+      thirdPartySettingsEl.style.display = config.thirdPartyDeferral.enabled ? 'block' : 'none'
     }
     if (deferralStrategyEl) {
-      deferralStrategyEl.value = config.thirdPartyDeferral.strategy || 'idle';
+      deferralStrategyEl.value = config.thirdPartyDeferral.strategy || 'idle'
     }
 
     thirdPartyDeferEl.addEventListener('change', async (e) => {
-      config.thirdPartyDeferral.enabled = e.target.checked;
+      config.thirdPartyDeferral.enabled = e.target.checked
       if (thirdPartySettingsEl) {
-        thirdPartySettingsEl.style.display = e.target.checked ? 'block' : 'none';
+        thirdPartySettingsEl.style.display = e.target.checked ? 'block' : 'none'
       }
-      await saveAndNotify();
-    });
+      await saveAndNotify()
+    })
 
     if (deferralStrategyEl) {
       deferralStrategyEl.addEventListener('change', async (e) => {
-        config.thirdPartyDeferral.strategy = e.target.value;
-        await saveAndNotify();
-      });
+        config.thirdPartyDeferral.strategy = e.target.value
+        await saveAndNotify()
+      })
     }
 
     // 渲染自定义规则列表
     function render3pUserRules() {
-      const listEl = document.getElementById('ra-3p-user-rules-list');
-      if (!listEl) return;
-      const userRules = config.thirdPartyDeferral.userRules || [];
-      listEl.innerHTML = userRules.map((r, i) =>
-        `<div style="display:flex;align-items:center;gap:4px;padding:2px 0;">
+      const listEl = document.getElementById('ra-3p-user-rules-list')
+      if (!listEl) return
+      const userRules = config.thirdPartyDeferral.userRules || []
+      listEl.innerHTML = userRules
+        .map(
+          (r, i) =>
+            `<div style="display:flex;align-items:center;gap:4px;padding:2px 0;">
           <span style="flex:1;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${r.pattern}">${r.pattern}</span>
           <span style="color:#666;font-size:10px;">${r.strategy}</span>
           <button data-3p-rule-remove="${i}" style="background:#dc3545;color:white;border:none;border-radius:3px;cursor:pointer;font-size:10px;padding:1px 4px;line-height:1;">×</button>
         </div>`
-      ).join('');
+        )
+        .join('')
     }
-    render3pUserRules();
+    render3pUserRules()
 
     // 添加自定义规则
-    const ruleAddBtn = document.getElementById('ra-3p-rule-add');
-    const rulePatternInput = document.getElementById('ra-3p-rule-pattern');
-    const ruleStrategySelect = document.getElementById('ra-3p-rule-strategy');
+    const ruleAddBtn = document.getElementById('ra-3p-rule-add')
+    const rulePatternInput = document.getElementById('ra-3p-rule-pattern')
+    const ruleStrategySelect = document.getElementById('ra-3p-rule-strategy')
     if (ruleAddBtn) {
       ruleAddBtn.addEventListener('click', async () => {
-        const pattern = rulePatternInput?.value?.trim();
-        const strategy = ruleStrategySelect?.value || 'idle';
-        if (!pattern) return;
-        try { new RegExp(pattern); } catch { alert('Invalid regex'); return; }
-        if (!config.thirdPartyDeferral.userRules) config.thirdPartyDeferral.userRules = [];
-        config.thirdPartyDeferral.userRules.push({ pattern, strategy });
-        rulePatternInput.value = '';
-        render3pUserRules();
-        await saveAndNotify();
-      });
+        const pattern = rulePatternInput?.value?.trim()
+        const strategy = ruleStrategySelect?.value || 'idle'
+        if (!pattern) return
+        try {
+          new RegExp(pattern)
+        } catch {
+          alert('Invalid regex')
+          return
+        }
+        if (!config.thirdPartyDeferral.userRules) config.thirdPartyDeferral.userRules = []
+        config.thirdPartyDeferral.userRules.push({ pattern, strategy })
+        rulePatternInput.value = ''
+        render3pUserRules()
+        await saveAndNotify()
+      })
     }
 
     // 删除自定义规则（事件委托）
-    const rulesListEl = document.getElementById('ra-3p-user-rules-list');
+    const rulesListEl = document.getElementById('ra-3p-user-rules-list')
     if (rulesListEl) {
       rulesListEl.addEventListener('click', async (e) => {
-        const idx = e.target.dataset['3pRuleRemove'];
+        const idx = e.target.dataset['3pRuleRemove']
         if (idx !== undefined && config.thirdPartyDeferral?.userRules) {
-          config.thirdPartyDeferral.userRules.splice(parseInt(idx), 1);
-          render3pUserRules();
-          await saveAndNotify();
+          config.thirdPartyDeferral.userRules.splice(parseInt(idx), 1)
+          render3pUserRules()
+          await saveAndNotify()
         }
-      });
+      })
     }
   }
 
   // 站点配置管理
-  const siteConfigToggle = document.getElementById('ra-site-config-toggle');
-  const siteConfigPanel = document.getElementById('ra-site-config-panel');
-  const siteRulesList = document.getElementById('ra-site-rules-list');
-  const siteRuleDomainInput = document.getElementById('ra-site-rule-domain');
-  const siteRuleAddBtn = document.getElementById('ra-site-rule-add');
+  const siteConfigToggle = document.getElementById('ra-site-config-toggle')
+  const siteConfigPanel = document.getElementById('ra-site-config-panel')
+  const siteRulesList = document.getElementById('ra-site-rules-list')
+  const siteRuleDomainInput = document.getElementById('ra-site-rule-domain')
+  const siteRuleAddBtn = document.getElementById('ra-site-rule-add')
 
   if (siteConfigToggle && siteConfigPanel) {
     // 初始化 siteConfig
-    if (!config.siteConfig) config.siteConfig = { enabled: true, rules: [] };
+    if (!config.siteConfig) config.siteConfig = { enabled: true, rules: [] }
 
     // 渲染站点规则列表
     function renderSiteRules() {
-      if (!siteRulesList) return;
-      const rules = config.siteConfig.rules || [];
-      siteRulesList.innerHTML = rules.map((r, i) => {
-        const isCurrentSite = r.domain === currentHost;
-        const statusColor = r.enabled !== false ? '#28a745' : '#dc3545';
-        const statusText = r.enabled !== false ? '启用' : '禁用';
-        return `<div style="display:flex;align-items:center;gap:4px;padding:2px 0;${isCurrentSite ? 'background:#e3f2fd;border-radius:3px;padding:2px 4px;' : ''}">
+      if (!siteRulesList) return
+      const rules = config.siteConfig.rules || []
+      siteRulesList.innerHTML = rules
+        .map((r, i) => {
+          const isCurrentSite = r.domain === currentHost
+          const statusColor = r.enabled !== false ? '#28a745' : '#dc3545'
+          const statusText = r.enabled !== false ? '启用' : '禁用'
+          return `<div style="display:flex;align-items:center;gap:4px;padding:2px 0;${isCurrentSite ? 'background:#e3f2fd;border-radius:3px;padding:2px 4px;' : ''}">
           <span style="flex:1;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${r.domain}">${r.domain}${isCurrentSite ? ' (当前)' : ''}</span>
           <span style="color:${statusColor};font-size:10px;">${statusText}</span>
           <button data-site-rule-edit="${i}" style="background:#ffc107;color:#333;border:none;border-radius:3px;cursor:pointer;font-size:10px;padding:1px 4px;line-height:1;">编辑</button>
           <button data-site-rule-remove="${i}" style="background:#dc3545;color:white;border:none;border-radius:3px;cursor:pointer;font-size:10px;padding:1px 4px;line-height:1;">×</button>
-        </div>`;
-      }).join('');
+        </div>`
+        })
+        .join('')
     }
-    renderSiteRules();
+    renderSiteRules()
 
     // 切换面板显示
     siteConfigToggle.addEventListener('click', () => {
-      const isVisible = siteConfigPanel.style.display !== 'none';
-      siteConfigPanel.style.display = isVisible ? 'none' : 'block';
-      siteConfigToggle.textContent = isVisible ? '站点配置管理 ▼' : '站点配置管理 ▲';
-    });
+      const isVisible = siteConfigPanel.style.display !== 'none'
+      siteConfigPanel.style.display = isVisible ? 'none' : 'block'
+      siteConfigToggle.textContent = isVisible ? '站点配置管理 ▼' : '站点配置管理 ▲'
+    })
 
     // 添加站点规则
     if (siteRuleAddBtn) {
       siteRuleAddBtn.addEventListener('click', async () => {
-        const domain = siteRuleDomainInput?.value?.trim();
-        if (!domain) return;
+        const domain = siteRuleDomainInput?.value?.trim()
+        if (!domain) return
 
         // 检查是否已存在
-        const existingIdx = config.siteConfig.rules.findIndex(r => r.domain === domain);
+        const existingIdx = config.siteConfig.rules.findIndex((r) => r.domain === domain)
         if (existingIdx !== -1) {
-          alert('该域名已存在规则');
-          return;
+          alert('该域名已存在规则')
+          return
         }
 
         // 添加新规则
@@ -3725,58 +3985,58 @@ async function initResourceAccelerator() {
           fontReplace: true,
           cssReplace: true,
           imageLazyLoad: true,
-          imageCompress: true
-        });
+          imageCompress: true,
+        })
 
-        siteRuleDomainInput.value = '';
-        renderSiteRules();
-        await saveAndNotify();
-      });
+        siteRuleDomainInput.value = ''
+        renderSiteRules()
+        await saveAndNotify()
+      })
     }
 
     // 编辑/删除站点规则（事件委托）
     if (siteRulesList) {
       siteRulesList.addEventListener('click', async (e) => {
-        const editIdx = e.target.dataset.siteRuleEdit;
-        const removeIdx = e.target.dataset.siteRuleRemove;
+        const editIdx = e.target.dataset.siteRuleEdit
+        const removeIdx = e.target.dataset.siteRuleRemove
 
         if (editIdx !== undefined) {
           // 编辑规则：切换 enabled 状态
-          const idx = parseInt(editIdx);
-          const rule = config.siteConfig.rules[idx];
+          const idx = parseInt(editIdx)
+          const rule = config.siteConfig.rules[idx]
           if (rule) {
-            rule.enabled = rule.enabled === false ? true : false;
-            renderSiteRules();
-            await saveAndNotify();
+            rule.enabled = rule.enabled === false ? true : false
+            renderSiteRules()
+            await saveAndNotify()
           }
         }
 
         if (removeIdx !== undefined) {
           // 删除规则
-          const idx = parseInt(removeIdx);
-          config.siteConfig.rules.splice(idx, 1);
-          renderSiteRules();
-          await saveAndNotify();
+          const idx = parseInt(removeIdx)
+          config.siteConfig.rules.splice(idx, 1)
+          renderSiteRules()
+          await saveAndNotify()
         }
-      });
+      })
     }
   }
 
   // 配置管理
-  const configToggle = document.getElementById('ra-config-toggle');
-  const configPanel = document.getElementById('ra-config-panel');
-  const configExportBtn = document.getElementById('ra-config-export');
-  const configImportBtn = document.getElementById('ra-config-import');
-  const configResetBtn = document.getElementById('ra-config-reset');
-  const configFileInput = document.getElementById('ra-config-file-input');
+  const configToggle = document.getElementById('ra-config-toggle')
+  const configPanel = document.getElementById('ra-config-panel')
+  const configExportBtn = document.getElementById('ra-config-export')
+  const configImportBtn = document.getElementById('ra-config-import')
+  const configResetBtn = document.getElementById('ra-config-reset')
+  const configFileInput = document.getElementById('ra-config-file-input')
 
   if (configToggle && configPanel) {
     // 切换面板显示
     configToggle.addEventListener('click', () => {
-      const isVisible = configPanel.style.display !== 'none';
-      configPanel.style.display = isVisible ? 'none' : 'block';
-      configToggle.textContent = isVisible ? '配置管理 ▼' : '配置管理 ▲';
-    });
+      const isVisible = configPanel.style.display !== 'none'
+      configPanel.style.display = isVisible ? 'none' : 'block'
+      configToggle.textContent = isVisible ? '配置管理 ▼' : '配置管理 ▲'
+    })
 
     // 导出配置
     if (configExportBtn) {
@@ -3784,77 +4044,77 @@ async function initResourceAccelerator() {
         const exportData = {
           version: '1.0',
           exportTime: new Date().toISOString(),
-          config: config
-        };
-        const jsonString = JSON.stringify(exportData, null, 2);
-        const blob = new Blob([jsonString], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
+          config: config,
+        }
+        const jsonString = JSON.stringify(exportData, null, 2)
+        const blob = new Blob([jsonString], { type: 'application/json' })
+        const url = URL.createObjectURL(blob)
 
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `resource-accelerator-config-${new Date().toISOString().slice(0, 10)}.json`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `resource-accelerator-config-${new Date().toISOString().slice(0, 10)}.json`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
 
-        alert('配置已导出');
-      });
+        alert('配置已导出')
+      })
     }
 
     // 导入配置
     if (configImportBtn && configFileInput) {
       configImportBtn.addEventListener('click', () => {
-        configFileInput.click();
-      });
+        configFileInput.click()
+      })
 
       configFileInput.addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+        const file = e.target.files[0]
+        if (!file) return
 
-        const reader = new FileReader();
+        const reader = new FileReader()
         reader.onload = async (event) => {
           try {
-            const importData = JSON.parse(event.target.result);
+            const importData = JSON.parse(event.target.result)
 
             // 验证格式
             if (!importData.version || !importData.config) {
-              alert('无效的配置格式');
-              return;
+              alert('无效的配置格式')
+              return
             }
 
             // 验证版本
             if (importData.version !== '1.0') {
-              alert(`不支持的配置版本: ${importData.version}`);
-              return;
+              alert(`不支持的配置版本: ${importData.version}`)
+              return
             }
 
             // 合并配置
-            const mergedConfig = { ...config, ...importData.config };
-            config = mergedConfig;
+            const mergedConfig = { ...config, ...importData.config }
+            config = mergedConfig
 
             // 保存到 storage
-            await chrome.storage.local.set({ resourceAcceleratorConfig: config });
+            await chrome.storage.local.set({ resourceAcceleratorConfig: config })
 
             // 重新加载页面以应用新配置
-            alert('配置已导入，页面将刷新以应用新配置');
-            window.location.reload();
+            alert('配置已导入，页面将刷新以应用新配置')
+            window.location.reload()
           } catch (err) {
-            alert(`导入配置失败: ${err.message}`);
+            alert(`导入配置失败: ${err.message}`)
           }
-        };
-        reader.readAsText(file);
+        }
+        reader.readAsText(file)
 
         // 清空 input
-        configFileInput.value = '';
-      });
+        configFileInput.value = ''
+      })
     }
 
     // 重置配置
     if (configResetBtn) {
       configResetBtn.addEventListener('click', async () => {
         if (!confirm('确定要重置为默认配置吗？这将清除所有自定义设置。')) {
-          return;
+          return
         }
 
         config = {
@@ -3868,77 +4128,84 @@ async function initResourceAccelerator() {
           preloadEnabled: true,
           dedupEnabled: true,
           excludeDomains: [],
-          siteConfig: { enabled: true, rules: [] }
-        };
+          siteConfig: { enabled: true, rules: [] },
+        }
 
-        await chrome.storage.local.set({ resourceAcceleratorConfig: config });
-        alert('配置已重置，页面将刷新');
-        window.location.reload();
-      });
+        await chrome.storage.local.set({ resourceAcceleratorConfig: config })
+        alert('配置已重置，页面将刷新')
+        window.location.reload()
+      })
     }
   }
 
   // 高级过滤规则管理
-  const filterToggle = document.getElementById('ra-filter-toggle');
-  const filterPanel = document.getElementById('ra-filter-panel');
-  const filterEnabledEl = document.getElementById('ra-filter-enabled');
-  const filterRulesList = document.getElementById('ra-filter-rules-list');
-  const filterTypeEl = document.getElementById('ra-filter-type');
-  const filterMatchEl = document.getElementById('ra-filter-match');
-  const filterValueEl = document.getElementById('ra-filter-value');
-  const filterActionEl = document.getElementById('ra-filter-action');
-  const filterAddBtn = document.getElementById('ra-filter-add');
+  const filterToggle = document.getElementById('ra-filter-toggle')
+  const filterPanel = document.getElementById('ra-filter-panel')
+  const filterEnabledEl = document.getElementById('ra-filter-enabled')
+  const filterRulesList = document.getElementById('ra-filter-rules-list')
+  const filterTypeEl = document.getElementById('ra-filter-type')
+  const filterMatchEl = document.getElementById('ra-filter-match')
+  const filterValueEl = document.getElementById('ra-filter-value')
+  const filterActionEl = document.getElementById('ra-filter-action')
+  const filterAddBtn = document.getElementById('ra-filter-add')
 
   if (filterToggle && filterPanel) {
     // 初始化 advancedFilter
-    if (!config.advancedFilter) config.advancedFilter = { enabled: false, rules: [] };
+    if (!config.advancedFilter) config.advancedFilter = { enabled: false, rules: [] }
 
     // 渲染过滤规则列表
     function renderFilterRules() {
-      if (!filterRulesList) return;
-      const rules = config.advancedFilter.rules || [];
-      filterRulesList.innerHTML = rules.map((r, i) => {
-        const typeColor = r.type === 'exclude' ? '#dc3545' : '#28a745';
-        const typeText = r.type === 'exclude' ? '排除' : '包含';
-        return `<div style="display:flex;align-items:center;gap:4px;padding:2px 0;">
+      if (!filterRulesList) return
+      const rules = config.advancedFilter.rules || []
+      filterRulesList.innerHTML = rules
+        .map((r, i) => {
+          const typeColor = r.type === 'exclude' ? '#dc3545' : '#28a745'
+          const typeText = r.type === 'exclude' ? '排除' : '包含'
+          return `<div style="display:flex;align-items:center;gap:4px;padding:2px 0;">
           <span style="color:${typeColor};font-size:10px;width:30px;">${typeText}</span>
           <span style="flex:1;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${r.description || r.value}">${r.match}:${r.value}</span>
           <span style="color:#666;font-size:10px;">${r.action}</span>
           <button data-filter-rule-remove="${i}" style="background:#dc3545;color:white;border:none;border-radius:3px;cursor:pointer;font-size:10px;padding:1px 4px;line-height:1;">×</button>
-        </div>`;
-      }).join('');
+        </div>`
+        })
+        .join('')
     }
-    renderFilterRules();
+    renderFilterRules()
 
     // 设置启用状态
     if (filterEnabledEl) {
-      filterEnabledEl.checked = config.advancedFilter.enabled;
+      filterEnabledEl.checked = config.advancedFilter.enabled
       filterEnabledEl.addEventListener('change', async (e) => {
-        config.advancedFilter.enabled = e.target.checked;
-        await saveAndNotify();
-      });
+        config.advancedFilter.enabled = e.target.checked
+        await saveAndNotify()
+      })
     }
 
     // 切换面板显示
     filterToggle.addEventListener('click', () => {
-      const isVisible = filterPanel.style.display !== 'none';
-      filterPanel.style.display = isVisible ? 'none' : 'block';
-      filterToggle.textContent = isVisible ? '高级过滤规则 ▼' : '高级过滤规则 ▲';
-    });
+      const isVisible = filterPanel.style.display !== 'none'
+      filterPanel.style.display = isVisible ? 'none' : 'block'
+      filterToggle.textContent = isVisible ? '高级过滤规则 ▼' : '高级过滤规则 ▲'
+    })
 
     // 添加过滤规则
     if (filterAddBtn) {
       filterAddBtn.addEventListener('click', async () => {
-        const type = filterTypeEl?.value || 'exclude';
-        const match = filterMatchEl?.value || 'extension';
-        const value = filterValueEl?.value?.trim();
-        const action = filterActionEl?.value || 'skipAll';
+        const type = filterTypeEl?.value || 'exclude'
+        const match = filterMatchEl?.value || 'extension'
+        const value = filterValueEl?.value?.trim()
+        const action = filterActionEl?.value || 'skipAll'
 
-        if (!value) return;
+        if (!value) return
 
         // 验证正则
         if (match === 'regex') {
-          try { new RegExp(value); } catch { alert('无效的正则表达式'); return; }
+          try {
+            new RegExp(value)
+          } catch {
+            alert('无效的正则表达式')
+            return
+          }
         }
 
         config.advancedFilter.rules.push({
@@ -3946,194 +4213,211 @@ async function initResourceAccelerator() {
           match,
           value,
           action,
-          description: `${type === 'exclude' ? '排除' : '包含'} ${match}=${value}`
-        });
+          description: `${type === 'exclude' ? '排除' : '包含'} ${match}=${value}`,
+        })
 
-        filterValueEl.value = '';
-        renderFilterRules();
-        await saveAndNotify();
-      });
+        filterValueEl.value = ''
+        renderFilterRules()
+        await saveAndNotify()
+      })
     }
 
     // 删除过滤规则（事件委托）
     if (filterRulesList) {
       filterRulesList.addEventListener('click', async (e) => {
-        const idx = e.target.dataset.filterRuleRemove;
+        const idx = e.target.dataset.filterRuleRemove
         if (idx !== undefined && config.advancedFilter?.rules) {
-          config.advancedFilter.rules.splice(parseInt(idx), 1);
-          renderFilterRules();
-          await saveAndNotify();
+          config.advancedFilter.rules.splice(parseInt(idx), 1)
+          renderFilterRules()
+          await saveAndNotify()
         }
-      });
+      })
     }
   }
 
-  const qualityHintEl = document.getElementById('ra-quality-hint');
+  const qualityHintEl = document.getElementById('ra-quality-hint')
 
   qualityEl.addEventListener('input', async (e) => {
-    const value = parseInt(e.target.value);
-    qualityValueEl.textContent = value;
-    config.imageQuality = value / 100;
+    const value = parseInt(e.target.value)
+    qualityValueEl.textContent = value
+    config.imageQuality = value / 100
     // 根据历史压缩率估算节省比例
     if (qualityHintEl) {
-      const savedPct = Math.round((1 - value / 100) * 60);  // 粗略估算
-      qualityHintEl.textContent = savedPct > 0 ? `(预估节省 ~${savedPct}%)` : '';
+      const savedPct = Math.round((1 - value / 100) * 60) // 粗略估算
+      qualityHintEl.textContent = savedPct > 0 ? `(预估节省 ~${savedPct}%)` : ''
     }
-    await chrome.storage.local.set({ resourceAcceleratorConfig: config });
-  });
+    await chrome.storage.local.set({ resourceAcceleratorConfig: config })
+  })
 
   // 缓存管理
-  const cacheViewEl = document.getElementById('ra-cache-view');
-  const cacheClearEl = document.getElementById('ra-cache-clear');
+  const cacheViewEl = document.getElementById('ra-cache-view')
+  const cacheClearEl = document.getElementById('ra-cache-clear')
   if (cacheViewEl) {
     cacheViewEl.addEventListener('click', () => {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs[0]?.id) {
-          chrome.tabs.sendMessage(tabs[0].id, { type: 'RESOURCE_ACCELERATOR_GET_STATS' }).then(response => {
-            showCacheDetails(response);
-          }).catch(() => {
-            alert('无法获取缓存信息，请确认页面已加载');
-          });
+          chrome.tabs
+            .sendMessage(tabs[0].id, { type: 'RESOURCE_ACCELERATOR_GET_STATS' })
+            .then((response) => {
+              showCacheDetails(response)
+            })
+            .catch(() => {
+              alert('无法获取缓存信息，请确认页面已加载')
+            })
         }
-      });
-    });
+      })
+    })
   }
   if (cacheClearEl) {
     cacheClearEl.addEventListener('click', async () => {
       if (confirm('确认清除所有资源加速缓存？')) {
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
           if (tabs[0]?.id) {
-            chrome.tabs.sendMessage(tabs[0].id, { type: 'RESOURCE_ACCELERATOR_CLEAR_CACHE' }).catch(() => {});
+            chrome.tabs
+              .sendMessage(tabs[0].id, { type: 'RESOURCE_ACCELERATOR_CLEAR_CACHE' })
+              .catch(() => {})
           }
-        });
+        })
       }
-    });
+    })
   }
 
   // 排除域名管理
-  const excludeToggle = document.getElementById('ra-exclude-toggle');
-  const excludePanel = document.getElementById('ra-exclude-panel');
-  const excludeList = document.getElementById('ra-exclude-list');
-  const excludeInput = document.getElementById('ra-exclude-input');
-  const excludeAdd = document.getElementById('ra-exclude-add');
+  const excludeToggle = document.getElementById('ra-exclude-toggle')
+  const excludePanel = document.getElementById('ra-exclude-panel')
+  const excludeList = document.getElementById('ra-exclude-list')
+  const excludeInput = document.getElementById('ra-exclude-input')
+  const excludeAdd = document.getElementById('ra-exclude-add')
 
   if (excludeToggle && excludePanel) {
     excludeToggle.addEventListener('click', () => {
-      const isOpen = excludePanel.style.display !== 'none';
-      excludePanel.style.display = isOpen ? 'none' : 'block';
-      excludeToggle.textContent = isOpen ? '排除域名 ▼' : '排除域名 ▲';
-      if (!isOpen) renderExcludeList();
-    });
+      const isOpen = excludePanel.style.display !== 'none'
+      excludePanel.style.display = isOpen ? 'none' : 'block'
+      excludeToggle.textContent = isOpen ? '排除域名 ▼' : '排除域名 ▲'
+      if (!isOpen) renderExcludeList()
+    })
   }
 
   function renderExcludeList() {
-    if (!excludeList) return;
-    const domains = config.excludeDomains || [];
+    if (!excludeList) return
+    const domains = config.excludeDomains || []
     if (domains.length === 0) {
-      excludeList.innerHTML = '<div style="color: #999;">暂无排除域名</div>';
-      return;
+      excludeList.innerHTML = '<div style="color: #999;">暂无排除域名</div>'
+      return
     }
-    excludeList.innerHTML = domains.map(d => `
+    excludeList.innerHTML = domains
+      .map(
+        (d) => `
       <div style="display: flex; justify-content: space-between; padding: 2px 0;">
         <span>${d}</span>
         <button class="ra-remove-domain" data-domain="${d}" style="border: none; background: none; color: #dc3545; cursor: pointer; font-size: 11px;">✕</button>
       </div>
-    `).join('');
+    `
+      )
+      .join('')
 
-    excludeList.querySelectorAll('.ra-remove-domain').forEach(btn => {
+    excludeList.querySelectorAll('.ra-remove-domain').forEach((btn) => {
       btn.addEventListener('click', async () => {
-        const domain = btn.dataset.domain;
-        config.excludeDomains = (config.excludeDomains || []).filter(d => d !== domain);
-        await saveAndNotify();
-        renderExcludeList();
-      });
-    });
+        const domain = btn.dataset.domain
+        config.excludeDomains = (config.excludeDomains || []).filter((d) => d !== domain)
+        await saveAndNotify()
+        renderExcludeList()
+      })
+    })
   }
 
   if (excludeAdd && excludeInput) {
     excludeAdd.addEventListener('click', async () => {
-      const domain = excludeInput.value.trim();
-      if (!domain) return;
-      if (!config.excludeDomains) config.excludeDomains = [];
+      const domain = excludeInput.value.trim()
+      if (!domain) return
+      if (!config.excludeDomains) config.excludeDomains = []
       if (!config.excludeDomains.includes(domain)) {
-        config.excludeDomains.push(domain);
-        await saveAndNotify();
-        excludeInput.value = '';
-        renderExcludeList();
+        config.excludeDomains.push(domain)
+        await saveAndNotify()
+        excludeInput.value = ''
+        renderExcludeList()
       }
-    });
+    })
   }
 
   // CDN状态展示
-  const cdnToggle = document.getElementById('ra-cdn-toggle');
-  const cdnPanel = document.getElementById('ra-cdn-panel');
-  const cdnList = document.getElementById('ra-cdn-list');
+  const cdnToggle = document.getElementById('ra-cdn-toggle')
+  const cdnPanel = document.getElementById('ra-cdn-panel')
+  const cdnList = document.getElementById('ra-cdn-list')
 
   if (cdnToggle && cdnPanel) {
     cdnToggle.addEventListener('click', () => {
-      const isOpen = cdnPanel.style.display !== 'none';
-      cdnPanel.style.display = isOpen ? 'none' : 'block';
-      cdnToggle.textContent = isOpen ? 'CDN状态 ▼' : 'CDN状态 ▲';
-      if (!isOpen) loadCDNStatus();
-    });
+      const isOpen = cdnPanel.style.display !== 'none'
+      cdnPanel.style.display = isOpen ? 'none' : 'block'
+      cdnToggle.textContent = isOpen ? 'CDN状态 ▼' : 'CDN状态 ▲'
+      if (!isOpen) loadCDNStatus()
+    })
   }
 
   function loadCDNStatus() {
-    if (!cdnList) return;
+    if (!cdnList) return
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs[0]?.id) {
-        chrome.tabs.sendMessage(tabs[0].id, { type: 'RESOURCE_ACCELERATOR_GET_CDN_HEALTH' }).then(health => {
-          if (!health) { cdnList.innerHTML = '<div style="color: #999;">加载中...</div>'; return; }
-          const html = Object.entries(health).map(([id, data]) => {
-            const status = data.healthy ? '✅' : '⚠️';
-            const rtt = data.healthy ? `${data.rtt}ms` : '超时';
-            return `<div style="display: flex; justify-content: space-between; padding: 2px 0;"><span>${status} ${id}</span><span>${rtt}</span></div>`;
-          }).join('');
-          cdnList.innerHTML = html || '<div style="color: #999;">暂无数据</div>';
-        }).catch(() => {
-          cdnList.innerHTML = '<div style="color: #999;">无法获取</div>';
-        });
+        chrome.tabs
+          .sendMessage(tabs[0].id, { type: 'RESOURCE_ACCELERATOR_GET_CDN_HEALTH' })
+          .then((health) => {
+            if (!health) {
+              cdnList.innerHTML = '<div style="color: #999;">加载中...</div>'
+              return
+            }
+            const html = Object.entries(health)
+              .map(([id, data]) => {
+                const status = data.healthy ? '✅' : '⚠️'
+                const rtt = data.healthy ? `${data.rtt}ms` : '超时'
+                return `<div style="display: flex; justify-content: space-between; padding: 2px 0;"><span>${status} ${id}</span><span>${rtt}</span></div>`
+              })
+              .join('')
+            cdnList.innerHTML = html || '<div style="color: #999;">暂无数据</div>'
+          })
+          .catch(() => {
+            cdnList.innerHTML = '<div style="color: #999;">无法获取</div>'
+          })
       }
-    });
+    })
   }
 
   // 替换详情面板
-  const detailsToggle = document.getElementById('ra-details-toggle');
-  const detailsPanel = document.getElementById('ra-details-panel');
+  const detailsToggle = document.getElementById('ra-details-toggle')
+  const detailsPanel = document.getElementById('ra-details-panel')
   if (detailsToggle && detailsPanel) {
     detailsToggle.addEventListener('click', () => {
-      const isOpen = detailsPanel.style.display !== 'none';
-      detailsPanel.style.display = isOpen ? 'none' : 'block';
-      detailsToggle.textContent = isOpen ? '替换详情 ▼' : '替换详情 ▲';
-    });
+      const isOpen = detailsPanel.style.display !== 'none'
+      detailsPanel.style.display = isOpen ? 'none' : 'block'
+      detailsToggle.textContent = isOpen ? '替换详情 ▼' : '替换详情 ▲'
+    })
   }
 
-  loadResourceAcceleratorStats();
+  loadResourceAcceleratorStats()
 }
 
 function showCacheDetails(stats) {
-  const listEl = document.getElementById('ra-details-list');
-  if (!listEl || !stats) return;
+  const listEl = document.getElementById('ra-details-list')
+  if (!listEl || !stats) return
 
-  document.getElementById('ra-details-panel').style.display = 'block';
+  document.getElementById('ra-details-panel').style.display = 'block'
 
-  const replacements = stats.recentReplacements || [];
+  const replacements = stats.recentReplacements || []
   if (replacements.length === 0) {
-    listEl.innerHTML = '<div style="color: #999;">本次无替换</div>';
-    return;
+    listEl.innerHTML = '<div style="color: #999;">本次无替换</div>'
+    return
   }
 
-  const lines = replacements.map(r => {
-    const color = r.type === 'js' ? '#28a745' : r.type === 'font' ? '#17a2b8' : '#ffc107';
-    const label = r.type === 'js' ? 'JS' : r.type === 'font' ? '字体' : 'CSS';
-    return `<div style="color: ${color};">${label}: ${r.name} → ${r.cdn}</div>`;
-  });
+  const lines = replacements.map((r) => {
+    const color = r.type === 'js' ? '#28a745' : r.type === 'font' ? '#17a2b8' : '#ffc107'
+    const label = r.type === 'js' ? 'JS' : r.type === 'font' ? '字体' : 'CSS'
+    return `<div style="color: ${color};">${label}: ${r.name} → ${r.cdn}</div>`
+  })
 
-  listEl.innerHTML = lines.join('');
+  listEl.innerHTML = lines.join('')
 }
 
 async function loadResourceAcceleratorStats() {
-  const result = await chrome.storage.local.get('resourceAcceleratorStats');
+  const result = await chrome.storage.local.get('resourceAcceleratorStats')
   const stats = result.resourceAcceleratorStats || {
     totalJsReplaced: 0,
     totalFontsReplaced: 0,
@@ -4141,124 +4425,166 @@ async function loadResourceAcceleratorStats() {
     totalImagesOptimized: 0,
     totalImagesCompressed: 0,
     totalBytesSaved: 0,
-    totalDedupRemoved: 0
-  };
+    totalDedupRemoved: 0,
+  }
 
   // 累计统计（括号内）
-  const jsCountEl = document.getElementById('ra-js-count');
-  const fontCountEl = document.getElementById('ra-font-count');
-  const cssCountEl = document.getElementById('ra-css-count');
-  const lazyCountEl = document.getElementById('ra-lazy-count');
-  const compressCountEl = document.getElementById('ra-compress-count');
+  const jsCountEl = document.getElementById('ra-js-count')
+  const fontCountEl = document.getElementById('ra-font-count')
+  const cssCountEl = document.getElementById('ra-css-count')
+  const lazyCountEl = document.getElementById('ra-lazy-count')
+  const compressCountEl = document.getElementById('ra-compress-count')
 
-  if (jsCountEl) jsCountEl.textContent = stats.totalJsReplaced || 0;
-  if (fontCountEl) fontCountEl.textContent = stats.totalFontsReplaced || 0;
-  if (cssCountEl) cssCountEl.textContent = stats.totalCssReplaced || 0;
-  if (lazyCountEl) lazyCountEl.textContent = stats.totalImagesOptimized || 0;
-  if (compressCountEl) compressCountEl.textContent = stats.totalImagesCompressed || 0;
+  if (jsCountEl) jsCountEl.textContent = stats.totalJsReplaced || 0
+  if (fontCountEl) fontCountEl.textContent = stats.totalFontsReplaced || 0
+  if (cssCountEl) cssCountEl.textContent = stats.totalCssReplaced || 0
+  if (lazyCountEl) lazyCountEl.textContent = stats.totalImagesOptimized || 0
+  if (compressCountEl) compressCountEl.textContent = stats.totalImagesCompressed || 0
 
   // 累计次数
-  const totalCountEl = document.getElementById('ra-total-count');
+  const totalCountEl = document.getElementById('ra-total-count')
   if (totalCountEl) {
-    totalCountEl.textContent = (stats.totalJsReplaced || 0) + (stats.totalCssReplaced || 0) + (stats.totalFontsReplaced || 0) + (stats.totalImagesOptimized || 0);
+    totalCountEl.textContent =
+      (stats.totalJsReplaced || 0) +
+      (stats.totalCssReplaced || 0) +
+      (stats.totalFontsReplaced || 0) +
+      (stats.totalImagesOptimized || 0)
   }
 
   // 本次会话统计（新增卡片）
-  const jsSessionEl = document.getElementById('ra-js-count-session');
-  const cssSessionEl = document.getElementById('ra-css-count-session');
-  const fontSessionEl = document.getElementById('ra-font-count-session');
-  const imageSessionEl = document.getElementById('ra-image-count-session');
-  const compressSessionEl = document.getElementById('ra-compress-count-session');
-  const bytesSavedEl = document.getElementById('ra-bytes-saved');
+  const jsSessionEl = document.getElementById('ra-js-count-session')
+  const cssSessionEl = document.getElementById('ra-css-count-session')
+  const fontSessionEl = document.getElementById('ra-font-count-session')
+  const imageSessionEl = document.getElementById('ra-image-count-session')
+  const compressSessionEl = document.getElementById('ra-compress-count-session')
+  const bytesSavedEl = document.getElementById('ra-bytes-saved')
 
   // 获取content script会话统计
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     if (tabs[0]?.id) {
-      chrome.tabs.sendMessage(tabs[0]?.id, { type: 'RESOURCE_ACCELERATOR_GET_STATS' }).then(sessionStats => {
-        if (jsSessionEl) jsSessionEl.textContent = sessionStats.jsReplaced || 0;
-        if (cssSessionEl) cssSessionEl.textContent = sessionStats.cssReplaced || 0;
-        if (fontSessionEl) fontSessionEl.textContent = sessionStats.fontsReplaced || 0;
-        if (imageSessionEl) imageSessionEl.textContent = (sessionStats.imagesLazy || 0) + (sessionStats.imagesCompressed || 0);
-        if (compressSessionEl) compressSessionEl.textContent = sessionStats.imagesCompressed || 0;
-        if (bytesSavedEl) bytesSavedEl.textContent = Math.round(((sessionStats.imagesCompressBytesSaved || 0) + (sessionStats.svgBytesSaved || 0)) / 1024);
-        // SVG 优化统计
-        const svgSessionEl = document.getElementById('ra-svg-count-session');
-        const svgCountEl = document.getElementById('ra-svg-count');
-        if (svgSessionEl) svgSessionEl.textContent = sessionStats.svgOptimized || 0;
-        if (svgCountEl) svgCountEl.textContent = sessionStats.svgOptimized ? `(${sessionStats.svgOptimized})` : '';
-        // Performance metrics display
-        if (sessionStats?.performance) {
-          const perf = sessionStats.performance;
-          const perfPanel = document.getElementById('ra-performance-panel');
-          if (perfPanel) {
-            perfPanel.style.display = 'block';
-            const fmt = (ms) => ms > 1000 ? (ms / 1000).toFixed(1) + 's' : ms + 'ms';
-            const fmtBytes = (b) => b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.round(b / 1024) + ' KB';
-            const el = (id) => document.getElementById(id);
-            if (el('ra-perf-ttfb')) el('ra-perf-ttfb').textContent = perf.ttfb ? fmt(perf.ttfb) : '-';
-            if (el('ra-perf-dcl')) el('ra-perf-dcl').textContent = perf.domContentLoaded ? fmt(perf.domContentLoaded) : '-';
-            if (el('ra-perf-load')) el('ra-perf-load').textContent = perf.loadEvent ? fmt(perf.loadEvent) : '-';
-            if (el('ra-perf-js')) el('ra-perf-js').textContent = perf.replacedJs || 0;
-            if (el('ra-perf-css')) el('ra-perf-css').textContent = perf.replacedCss || 0;
-            if (el('ra-perf-font')) el('ra-perf-font').textContent = perf.replacedFonts || 0;
-            if (el('ra-perf-img')) el('ra-perf-img').textContent = perf.imagesCompressed || 0;
-            if (el('ra-perf-bytes')) el('ra-perf-bytes').textContent = perf.bytesSaved ? fmtBytes(perf.bytesSaved) : '0';
-            if (el('ra-perf-svg')) el('ra-perf-svg').textContent = perf.svgOptimized || 0;
-            if (el('ra-perf-time')) el('ra-perf-time').textContent = perf.estimatedTimeSaved ? (perf.estimatedTimeSaved / 1000).toFixed(1) : '0';
-          }
+      chrome.tabs
+        .sendMessage(tabs[0]?.id, { type: 'RESOURCE_ACCELERATOR_GET_STATS' })
+        .then((sessionStats) => {
+          if (jsSessionEl) jsSessionEl.textContent = sessionStats.jsReplaced || 0
+          if (cssSessionEl) cssSessionEl.textContent = sessionStats.cssReplaced || 0
+          if (fontSessionEl) fontSessionEl.textContent = sessionStats.fontsReplaced || 0
+          if (imageSessionEl)
+            imageSessionEl.textContent =
+              (sessionStats.imagesLazy || 0) + (sessionStats.imagesCompressed || 0)
+          if (compressSessionEl) compressSessionEl.textContent = sessionStats.imagesCompressed || 0
+          if (bytesSavedEl)
+            bytesSavedEl.textContent = Math.round(
+              ((sessionStats.imagesCompressBytesSaved || 0) + (sessionStats.svgBytesSaved || 0)) /
+                1024
+            )
+          // SVG 优化统计
+          const svgSessionEl = document.getElementById('ra-svg-count-session')
+          const svgCountEl = document.getElementById('ra-svg-count')
+          if (svgSessionEl) svgSessionEl.textContent = sessionStats.svgOptimized || 0
+          if (svgCountEl)
+            svgCountEl.textContent = sessionStats.svgOptimized
+              ? `(${sessionStats.svgOptimized})`
+              : ''
+          // Performance metrics display
+          if (sessionStats?.performance) {
+            const perf = sessionStats.performance
+            const perfPanel = document.getElementById('ra-performance-panel')
+            if (perfPanel) {
+              perfPanel.style.display = 'block'
+              const fmt = (ms) => (ms > 1000 ? (ms / 1000).toFixed(1) + 's' : ms + 'ms')
+              const fmtBytes = (b) =>
+                b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.round(b / 1024) + ' KB'
+              const el = (id) => document.getElementById(id)
+              if (el('ra-perf-ttfb'))
+                el('ra-perf-ttfb').textContent = perf.ttfb ? fmt(perf.ttfb) : '-'
+              if (el('ra-perf-dcl'))
+                el('ra-perf-dcl').textContent = perf.domContentLoaded
+                  ? fmt(perf.domContentLoaded)
+                  : '-'
+              if (el('ra-perf-load'))
+                el('ra-perf-load').textContent = perf.loadEvent ? fmt(perf.loadEvent) : '-'
+              if (el('ra-perf-js')) el('ra-perf-js').textContent = perf.replacedJs || 0
+              if (el('ra-perf-css')) el('ra-perf-css').textContent = perf.replacedCss || 0
+              if (el('ra-perf-font')) el('ra-perf-font').textContent = perf.replacedFonts || 0
+              if (el('ra-perf-img')) el('ra-perf-img').textContent = perf.imagesCompressed || 0
+              if (el('ra-perf-bytes'))
+                el('ra-perf-bytes').textContent = perf.bytesSaved ? fmtBytes(perf.bytesSaved) : '0'
+              if (el('ra-perf-svg')) el('ra-perf-svg').textContent = perf.svgOptimized || 0
+              if (el('ra-perf-time'))
+                el('ra-perf-time').textContent = perf.estimatedTimeSaved
+                  ? (perf.estimatedTimeSaved / 1000).toFixed(1)
+                  : '0'
+            }
 
-          // 加载性能对比
-          loadPerformanceComparison();
-        }
-        // 第三方延迟统计
-        const thirdPartyCountEl = document.getElementById('ra-third-party-count');
-        if (thirdPartyCountEl) {
-          const deferred = sessionStats.thirdPartyDeferred || 0;
-          const blocked = sessionStats.thirdPartyBlocked || 0;
-          thirdPartyCountEl.textContent = deferred + blocked > 0 ? `(延迟${deferred}/阻止${blocked})` : '';
-        }
-      }).catch(() => {
-        // 静默失败
-      });
+            // 加载性能对比
+            loadPerformanceComparison()
+          }
+          // 第三方延迟统计
+          const thirdPartyCountEl = document.getElementById('ra-third-party-count')
+          if (thirdPartyCountEl) {
+            const deferred = sessionStats.thirdPartyDeferred || 0
+            const blocked = sessionStats.thirdPartyBlocked || 0
+            thirdPartyCountEl.textContent =
+              deferred + blocked > 0 ? `(延迟${deferred}/阻止${blocked})` : ''
+          }
+        })
+        .catch(() => {
+          // 静默失败
+        })
     }
-  });
+  })
 }
 
 // 加载性能对比数据
 async function loadPerformanceComparison() {
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab?.id) return;
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+    if (!tab?.id) return
 
-    const response = await chrome.tabs.sendMessage(tab.id, { type: 'RESOURCE_ACCELERATOR_GET_STATS' });
-    if (!response?.success) return;
+    const response = await chrome.tabs.sendMessage(tab.id, {
+      type: 'RESOURCE_ACCELERATOR_GET_STATS',
+    })
+    if (!response?.success) return
 
     // 通过 content script 获取对比数据
-    const comparisonResponse = await chrome.tabs.sendMessage(tab.id, { type: 'RESOURCE_ACCELERATOR_GET_COMPARISON' });
-    if (!comparisonResponse?.success || !comparisonResponse.data) return;
+    const comparisonResponse = await chrome.tabs.sendMessage(tab.id, {
+      type: 'RESOURCE_ACCELERATOR_GET_COMPARISON',
+    })
+    if (!comparisonResponse?.success || !comparisonResponse.data) return
 
-    const comparison = comparisonResponse.data;
-    const comparisonPanel = document.getElementById('ra-comparison-panel');
-    if (!comparisonPanel) return;
+    const comparison = comparisonResponse.data
+    const comparisonPanel = document.getElementById('ra-comparison-panel')
+    if (!comparisonPanel) return
 
-    comparisonPanel.style.display = 'block';
+    comparisonPanel.style.display = 'block'
 
-    const fmt = (ms) => ms > 1000 ? (ms / 1000).toFixed(1) + 's' : ms + 'ms';
-    const fmtBytes = (b) => b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.round(b / 1024) + ' KB';
+    const fmt = (ms) => (ms > 1000 ? (ms / 1000).toFixed(1) + 's' : ms + 'ms')
+    const fmtBytes = (b) =>
+      b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.round(b / 1024) + ' KB'
 
-    const el = (id) => document.getElementById(id);
+    const el = (id) => document.getElementById(id)
 
     // 填充对比数据
-    if (el('ra-comp-load-before')) el('ra-comp-load-before').textContent = fmt(comparison.baseline.loadEvent);
-    if (el('ra-comp-load-after')) el('ra-comp-load-after').textContent = fmt(comparison.current.loadEvent);
-    if (el('ra-comp-resources-before')) el('ra-comp-resources-before').textContent = comparison.baseline.totalResources;
-    if (el('ra-comp-resources-after')) el('ra-comp-resources-after').textContent = comparison.current.totalResources;
-    if (el('ra-comp-size-before')) el('ra-comp-size-before').textContent = fmtBytes(comparison.baseline.totalTransferSize);
-    if (el('ra-comp-size-after')) el('ra-comp-size-after').textContent = fmtBytes(comparison.current.totalTransferSize);
-    if (el('ra-comp-time-saved')) el('ra-comp-time-saved').textContent = (comparison.savings.loadTimeSaved / 1000).toFixed(1);
-    if (el('ra-comp-time-percent')) el('ra-comp-time-percent').textContent = comparison.savings.loadTimePercent;
-    if (el('ra-comp-size-saved')) el('ra-comp-size-saved').textContent = fmtBytes(comparison.savings.transferSizeSaved);
-    if (el('ra-comp-size-percent')) el('ra-comp-size-percent').textContent = comparison.savings.transferSizePercent;
+    if (el('ra-comp-load-before'))
+      el('ra-comp-load-before').textContent = fmt(comparison.baseline.loadEvent)
+    if (el('ra-comp-load-after'))
+      el('ra-comp-load-after').textContent = fmt(comparison.current.loadEvent)
+    if (el('ra-comp-resources-before'))
+      el('ra-comp-resources-before').textContent = comparison.baseline.totalResources
+    if (el('ra-comp-resources-after'))
+      el('ra-comp-resources-after').textContent = comparison.current.totalResources
+    if (el('ra-comp-size-before'))
+      el('ra-comp-size-before').textContent = fmtBytes(comparison.baseline.totalTransferSize)
+    if (el('ra-comp-size-after'))
+      el('ra-comp-size-after').textContent = fmtBytes(comparison.current.totalTransferSize)
+    if (el('ra-comp-time-saved'))
+      el('ra-comp-time-saved').textContent = (comparison.savings.loadTimeSaved / 1000).toFixed(1)
+    if (el('ra-comp-time-percent'))
+      el('ra-comp-time-percent').textContent = comparison.savings.loadTimePercent
+    if (el('ra-comp-size-saved'))
+      el('ra-comp-size-saved').textContent = fmtBytes(comparison.savings.transferSizeSaved)
+    if (el('ra-comp-size-percent'))
+      el('ra-comp-size-percent').textContent = comparison.savings.transferSizePercent
   } catch {
     // 静默失败
   }
@@ -4266,130 +4592,142 @@ async function loadPerformanceComparison() {
 
 // 基线按钮事件
 document.addEventListener('DOMContentLoaded', () => {
-  const saveBaselineBtn = document.getElementById('ra-save-baseline');
-  const resetBaselineBtn = document.getElementById('ra-reset-baseline');
+  const saveBaselineBtn = document.getElementById('ra-save-baseline')
+  const resetBaselineBtn = document.getElementById('ra-reset-baseline')
 
   if (saveBaselineBtn) {
     saveBaselineBtn.addEventListener('click', async () => {
       try {
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        if (!tab?.id) return;
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+        if (!tab?.id) return
 
-        await chrome.tabs.sendMessage(tab.id, { type: 'RESOURCE_ACCELERATOR_SAVE_BASELINE' });
-        alert('基线已保存');
-        loadPerformanceComparison();
+        await chrome.tabs.sendMessage(tab.id, { type: 'RESOURCE_ACCELERATOR_SAVE_BASELINE' })
+        alert('基线已保存')
+        loadPerformanceComparison()
       } catch {
-        alert('保存基线失败');
+        alert('保存基线失败')
       }
-    });
+    })
   }
 
   if (resetBaselineBtn) {
     resetBaselineBtn.addEventListener('click', async () => {
-      if (!confirm('确定要重置基线数据吗？')) return;
+      if (!confirm('确定要重置基线数据吗？')) return
 
       try {
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        if (!tab?.id) return;
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+        if (!tab?.id) return
 
-        await chrome.tabs.sendMessage(tab.id, { type: 'RESOURCE_ACCELERATOR_RESET_BASELINE' });
-        alert('基线已重置');
-        const comparisonPanel = document.getElementById('ra-comparison-panel');
-        if (comparisonPanel) comparisonPanel.style.display = 'none';
+        await chrome.tabs.sendMessage(tab.id, { type: 'RESOURCE_ACCELERATOR_RESET_BASELINE' })
+        alert('基线已重置')
+        const comparisonPanel = document.getElementById('ra-comparison-panel')
+        if (comparisonPanel) comparisonPanel.style.display = 'none'
       } catch {
-        alert('重置基线失败');
+        alert('重置基线失败')
       }
-    });
+    })
   }
-});
+})
 
 function notifyResourceAccelerator(config) {
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     if (tabs[0]?.id) {
-      chrome.tabs.sendMessage(tabs[0].id, { type: 'RESOURCE_ACCELERATOR_CONFIG', data: config }).catch(() => {});
+      chrome.tabs
+        .sendMessage(tabs[0].id, { type: 'RESOURCE_ACCELERATOR_CONFIG', data: config })
+        .catch(() => {})
     }
-  });
+  })
 }
 
 // ========== 资源加速器日志系统 ==========
 
-let _raLogFilter = { level: 'all', module: 'all' };
+let _raLogFilter = { level: 'all', module: 'all' }
 
 /**
  * 加载并渲染日志
  */
 async function loadResourceAcceleratorLogs() {
-  const logListEl = document.getElementById('ra-log-list');
-  if (!logListEl) return;
+  const logListEl = document.getElementById('ra-log-list')
+  if (!logListEl) return
 
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
     if (!tab?.id) {
-      logListEl.innerHTML = '<div style="color: #999; text-align: center; padding: 12px;">无法获取当前标签页</div>';
-      return;
+      logListEl.innerHTML =
+        '<div style="color: #999; text-align: center; padding: 12px;">无法获取当前标签页</div>'
+      return
     }
 
     const response = await chrome.tabs.sendMessage(tab.id, {
       type: 'RESOURCE_ACCELERATOR_GET_LOGS',
-      filter: _raLogFilter
-    });
+      filter: _raLogFilter,
+    })
 
     if (!response?.success || !response.data) {
-      logListEl.innerHTML = '<div style="color: #999; text-align: center; padding: 12px;">暂无日志</div>';
-      return;
+      logListEl.innerHTML =
+        '<div style="color: #999; text-align: center; padding: 12px;">暂无日志</div>'
+      return
     }
 
-    const logs = response.data;
+    const logs = response.data
     if (logs.length === 0) {
-      logListEl.innerHTML = '<div style="color: #999; text-align: center; padding: 12px;">暂无日志</div>';
-      return;
+      logListEl.innerHTML =
+        '<div style="color: #999; text-align: center; padding: 12px;">暂无日志</div>'
+      return
     }
 
     // 渲染日志列表（最新的在前）
-    const logsHtml = logs.reverse().map(log => {
-      const time = new Date(log.timestamp).toLocaleTimeString('zh-CN', { hour12: false });
-      const levelColor = log.level === 'error' ? '#dc3545' : log.level === 'warn' ? '#ffc107' : '#28a745';
-      const moduleLabel = {
-        script: 'JS',
-        style: 'CSS',
-        image: 'IMG',
-        deferral: 'DEF',
-        system: 'SYS',
-        cdn: 'CDN'
-      }[log.module] || log.module;
+    const logsHtml = logs
+      .reverse()
+      .map((log) => {
+        const time = new Date(log.timestamp).toLocaleTimeString('zh-CN', { hour12: false })
+        const levelColor =
+          log.level === 'error' ? '#dc3545' : log.level === 'warn' ? '#ffc107' : '#28a745'
+        const moduleLabel =
+          {
+            script: 'JS',
+            style: 'CSS',
+            image: 'IMG',
+            deferral: 'DEF',
+            system: 'SYS',
+            cdn: 'CDN',
+          }[log.module] || log.module
 
-      const actionLabel = {
-        replace: '替换',
-        compress: '压缩',
-        lazy: '懒加载',
-        defer: '延迟',
-        skip: '跳过',
-        block: '阻止',
-        error: '错误',
-        init: '初始化'
-      }[log.action] || log.action;
+        const actionLabel =
+          {
+            replace: '替换',
+            compress: '压缩',
+            lazy: '懒加载',
+            defer: '延迟',
+            skip: '跳过',
+            block: '阻止',
+            error: '错误',
+            init: '初始化',
+          }[log.action] || log.action
 
-      let detail = '';
-      if (log.details?.url) {
-        const url = log.details.url;
-        detail = url.length > 40 ? url.substring(0, 40) + '...' : url;
-      }
-      if (log.details?.reason) {
-        detail += ` (${log.details.reason})`;
-      }
+        let detail = ''
+        if (log.details?.url) {
+          const url = log.details.url
+          detail = url.length > 40 ? url.substring(0, 40) + '...' : url
+        }
+        if (log.details?.reason) {
+          detail += ` (${log.details.reason})`
+        }
 
-      return `<div style="padding: 3px 0; border-bottom: 1px solid #e9ecef;">
+        return `<div style="padding: 3px 0; border-bottom: 1px solid #e9ecef;">
         <span style="color: #666;">${time}</span>
         <span style="color: ${levelColor}; font-weight: 500;">[${log.level.toUpperCase()}]</span>
         <span style="color: #007bff;">${moduleLabel}</span>
         <span style="color: #495057;">${actionLabel}</span>
         <div style="color: #666; font-size: 10px; margin-top: 2px; word-break: break-all;">${escapeHtml(detail)}</div>
-      </div>`;
-    }).join('');
+      </div>`
+      })
+      .join('')
 
-    logListEl.innerHTML = logsHtml;
+    logListEl.innerHTML = logsHtml
   } catch (error) {
-    logListEl.innerHTML = '<div style="color: #999; text-align: center; padding: 12px;">加载日志失败</div>';
+    logListEl.innerHTML =
+      '<div style="color: #999; text-align: center; padding: 12px;">加载日志失败</div>'
   }
 }
 
@@ -4398,42 +4736,42 @@ async function loadResourceAcceleratorLogs() {
  */
 async function exportResourceAcceleratorLogs() {
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab?.id) return;
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+    if (!tab?.id) return
 
     const response = await chrome.tabs.sendMessage(tab.id, {
       type: 'RESOURCE_ACCELERATOR_GET_LOGS',
-      filter: { level: 'all', module: 'all' }
-    });
+      filter: { level: 'all', module: 'all' },
+    })
 
     if (!response?.success || !response.data) {
-      alert('暂无日志可导出');
-      return;
+      alert('暂无日志可导出')
+      return
     }
 
-    const logs = response.data;
+    const logs = response.data
     const exportData = {
       exportTime: new Date().toISOString(),
       url: tab.url,
       totalLogs: logs.length,
-      logs: logs.map(log => ({
+      logs: logs.map((log) => ({
         time: new Date(log.timestamp).toISOString(),
         level: log.level,
         module: log.module,
         action: log.action,
-        ...log.details
-      }))
-    };
+        ...log.details,
+      })),
+    }
 
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `ra-logs-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `ra-logs-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
   } catch (error) {
-    alert('导出日志失败');
+    alert('导出日志失败')
   }
 }
 
@@ -4442,51 +4780,51 @@ async function exportResourceAcceleratorLogs() {
  */
 async function clearResourceAcceleratorLogs() {
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab?.id) return;
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+    if (!tab?.id) return
 
-    await chrome.tabs.sendMessage(tab.id, { type: 'RESOURCE_ACCELERATOR_CLEAR_LOGS' });
-    loadResourceAcceleratorLogs();
+    await chrome.tabs.sendMessage(tab.id, { type: 'RESOURCE_ACCELERATOR_CLEAR_LOGS' })
+    loadResourceAcceleratorLogs()
   } catch (error) {
-    alert('清空日志失败');
+    alert('清空日志失败')
   }
 }
 
 // 初始化日志面板事件监听
 document.addEventListener('DOMContentLoaded', () => {
-  const logLevelFilter = document.getElementById('ra-log-level-filter');
-  const logModuleFilter = document.getElementById('ra-log-module-filter');
-  const logRefreshBtn = document.getElementById('ra-log-refresh');
-  const logExportBtn = document.getElementById('ra-log-export');
-  const logClearBtn = document.getElementById('ra-log-clear');
+  const logLevelFilter = document.getElementById('ra-log-level-filter')
+  const logModuleFilter = document.getElementById('ra-log-module-filter')
+  const logRefreshBtn = document.getElementById('ra-log-refresh')
+  const logExportBtn = document.getElementById('ra-log-export')
+  const logClearBtn = document.getElementById('ra-log-clear')
 
   if (logLevelFilter) {
     logLevelFilter.addEventListener('change', (e) => {
-      _raLogFilter.level = e.target.value;
-      loadResourceAcceleratorLogs();
-    });
+      _raLogFilter.level = e.target.value
+      loadResourceAcceleratorLogs()
+    })
   }
 
   if (logModuleFilter) {
     logModuleFilter.addEventListener('change', (e) => {
-      _raLogFilter.module = e.target.value;
-      loadResourceAcceleratorLogs();
-    });
+      _raLogFilter.module = e.target.value
+      loadResourceAcceleratorLogs()
+    })
   }
 
   if (logRefreshBtn) {
-    logRefreshBtn.addEventListener('click', loadResourceAcceleratorLogs);
+    logRefreshBtn.addEventListener('click', loadResourceAcceleratorLogs)
   }
 
   if (logExportBtn) {
-    logExportBtn.addEventListener('click', exportResourceAcceleratorLogs);
+    logExportBtn.addEventListener('click', exportResourceAcceleratorLogs)
   }
 
   if (logClearBtn) {
     logClearBtn.addEventListener('click', () => {
       if (confirm('确定要清空所有日志吗？')) {
-        clearResourceAcceleratorLogs();
+        clearResourceAcceleratorLogs()
       }
-    });
+    })
   }
-});
+})

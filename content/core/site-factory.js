@@ -1,12 +1,12 @@
 // ========== 站点脚本工厂 ==========
 // 统一工厂模式创建和管理站点脚本实例
 
-(function () {
-  'use strict';
+;(function () {
+  'use strict'
 
   if (window.SiteFactory) {
-    console.log('[SiteFactory] 已存在，跳过初始化');
-    return;
+    console.log('[SiteFactory] 已存在，跳过初始化')
+    return
   }
 
   /**
@@ -30,7 +30,7 @@
     defaultOptions: {
       autoInit: true,
       localServerEnabled: true,
-      localServerUrl: 'http://localhost:3000'
+      localServerUrl: 'http://localhost:3000',
     },
 
     /**
@@ -41,8 +41,8 @@
      */
     register(name, SiteClass, options = {}) {
       if (!SiteClass || typeof SiteClass !== 'function') {
-        console.error(`[SiteFactory] 无效的站点类: ${name}`);
-        return false;
+        console.error(`[SiteFactory] 无效的站点类: ${name}`)
+        return false
       }
 
       const config = {
@@ -51,18 +51,18 @@
         priority: options.priority || 0,
         domains: options.domains || [],
         patterns: options.patterns || [],
-        enabled: options.enabled !== false
-      };
+        enabled: options.enabled !== false,
+      }
 
-      this.sites.set(name, config);
+      this.sites.set(name, config)
 
       // 建立域名映射
       for (const domain of config.domains) {
-        this.domainMap.set(domain, name);
+        this.domainMap.set(domain, name)
       }
 
-      console.log(`[SiteFactory] 注册站点: ${name}, 域名: ${config.domains.join(', ')}`);
-      return true;
+      console.log(`[SiteFactory] 注册站点: ${name}, 域名: ${config.domains.join(', ')}`)
+      return true
     },
 
     /**
@@ -71,7 +71,7 @@
      */
     registerAll(sites) {
       for (const [name, config] of Object.entries(sites)) {
-        this.register(name, config.class, config.options);
+        this.register(name, config.class, config.options)
       }
     },
 
@@ -80,18 +80,18 @@
      * @param {string} name - 站点名称
      */
     unregister(name) {
-      const config = this.sites.get(name);
-      if (!config) return false;
+      const config = this.sites.get(name)
+      if (!config) return false
 
       // 清理域名映射
       for (const domain of config.domains) {
-        this.domainMap.delete(domain);
+        this.domainMap.delete(domain)
       }
 
       // 清理实例
-      this.activeInstances.delete(name);
+      this.activeInstances.delete(name)
 
-      return this.sites.delete(name);
+      return this.sites.delete(name)
     },
 
     /**
@@ -102,31 +102,31 @@
     findSiteName(domain) {
       // 1. 精确匹配
       if (this.domainMap.has(domain)) {
-        return this.domainMap.get(domain);
+        return this.domainMap.get(domain)
       }
 
       // 2. 去掉 www. 前缀匹配
-      const normalizedDomain = domain.startsWith('www.') ? domain.slice(4) : domain;
+      const normalizedDomain = domain.startsWith('www.') ? domain.slice(4) : domain
       if (this.domainMap.has(normalizedDomain)) {
-        return this.domainMap.get(normalizedDomain);
+        return this.domainMap.get(normalizedDomain)
       }
 
       // 3. 添加 www. 前缀匹配
-      const wwwDomain = `www.${normalizedDomain}`;
+      const wwwDomain = `www.${normalizedDomain}`
       if (this.domainMap.has(wwwDomain)) {
-        return this.domainMap.get(wwwDomain);
+        return this.domainMap.get(wwwDomain)
       }
 
       // 4. 模式匹配（支持通配符）
       for (const [name, config] of this.sites) {
         for (const pattern of config.patterns) {
           if (this.matchPattern(domain, pattern)) {
-            return name;
+            return name
           }
         }
       }
 
-      return null;
+      return null
     },
 
     /**
@@ -136,14 +136,12 @@
      * @returns {boolean}
      */
     matchPattern(domain, pattern) {
-      if (pattern === '*') return true;
+      if (pattern === '*') return true
 
       // 转换为正则表达式
-      const regexStr = pattern
-        .replace(/\./g, '\\.')
-        .replace(/\*/g, '.*');
-      const regex = new RegExp(`^${regexStr}$`, 'i');
-      return regex.test(domain);
+      const regexStr = pattern.replace(/\./g, '\\.').replace(/\*/g, '.*')
+      const regex = new RegExp(`^${regexStr}$`, 'i')
+      return regex.test(domain)
     },
 
     /**
@@ -153,28 +151,28 @@
      * @returns {object|null}
      */
     create(name, options = {}) {
-      const config = this.sites.get(name);
+      const config = this.sites.get(name)
       if (!config || !config.enabled) {
-        console.warn(`[SiteFactory] 站点未找到或已禁用: ${name}`);
-        return null;
+        console.warn(`[SiteFactory] 站点未找到或已禁用: ${name}`)
+        return null
       }
 
       try {
         const mergedOptions = {
           ...this.defaultOptions,
-          ...options
-        };
+          ...options,
+        }
 
-        const instance = new config.SiteClass(mergedOptions);
+        const instance = new config.SiteClass(mergedOptions)
 
         // 记录活跃实例
-        this.activeInstances.set(name, instance);
+        this.activeInstances.set(name, instance)
 
-        console.log(`[SiteFactory] 创建站点实例: ${name}`);
-        return instance;
+        console.log(`[SiteFactory] 创建站点实例: ${name}`)
+        return instance
       } catch (error) {
-        console.error(`[SiteFactory] 创建站点实例失败: ${name}`, error);
-        return null;
+        console.error(`[SiteFactory] 创建站点实例失败: ${name}`, error)
+        return null
       }
     },
 
@@ -184,24 +182,24 @@
      * @returns {object|null}
      */
     async autoCreate(domain) {
-      const targetDomain = domain || this.getCurrentDomain();
+      const targetDomain = domain || this.getCurrentDomain()
       if (!targetDomain) {
-        console.warn('[SiteFactory] 无法获取当前域名');
-        return null;
+        console.warn('[SiteFactory] 无法获取当前域名')
+        return null
       }
 
-      const siteName = this.findSiteName(targetDomain);
+      const siteName = this.findSiteName(targetDomain)
       if (!siteName) {
-        console.log(`[SiteFactory] 未找到匹配的站点: ${targetDomain}`);
-        return null;
+        console.log(`[SiteFactory] 未找到匹配的站点: ${targetDomain}`)
+        return null
       }
 
-      const instance = this.create(siteName);
+      const instance = this.create(siteName)
       if (instance && this.defaultOptions.autoInit) {
-        await instance.init();
+        await instance.init()
       }
 
-      return instance;
+      return instance
     },
 
     /**
@@ -210,12 +208,12 @@
      */
     getCurrentDomain() {
       if (typeof DOMUtils !== 'undefined' && DOMUtils.getCurrentDomain) {
-        return DOMUtils.getCurrentDomain();
+        return DOMUtils.getCurrentDomain()
       }
       try {
-        return new URL(window.location.href).hostname;
+        return new URL(window.location.href).hostname
       } catch {
-        return '';
+        return ''
       }
     },
 
@@ -225,7 +223,7 @@
      * @returns {object|null}
      */
     getInstance(name) {
-      return this.activeInstances.get(name) || null;
+      return this.activeInstances.get(name) || null
     },
 
     /**
@@ -233,7 +231,7 @@
      * @returns {Map}
      */
     getAllInstances() {
-      return new Map(this.activeInstances);
+      return new Map(this.activeInstances)
     },
 
     /**
@@ -241,21 +239,21 @@
      * @param {string} name - 站点名称
      */
     async destroy(name) {
-      const instance = this.activeInstances.get(name);
-      if (!instance) return false;
+      const instance = this.activeInstances.get(name)
+      if (!instance) return false
 
       try {
         // 调用实例的清理方法
         if (typeof instance.cleanup === 'function') {
-          await instance.cleanup();
+          await instance.cleanup()
         }
 
-        this.activeInstances.delete(name);
-        console.log(`[SiteFactory] 销毁站点实例: ${name}`);
-        return true;
+        this.activeInstances.delete(name)
+        console.log(`[SiteFactory] 销毁站点实例: ${name}`)
+        return true
       } catch (error) {
-        console.error(`[SiteFactory] 销毁站点实例失败: ${name}`, error);
-        return false;
+        console.error(`[SiteFactory] 销毁站点实例失败: ${name}`, error)
+        return false
       }
     },
 
@@ -263,9 +261,9 @@
      * 销毁所有实例
      */
     async destroyAll() {
-      const names = Array.from(this.activeInstances.keys());
+      const names = Array.from(this.activeInstances.keys())
       for (const name of names) {
-        await this.destroy(name);
+        await this.destroy(name)
       }
     },
 
@@ -279,8 +277,8 @@
         domains: config.domains,
         patterns: config.patterns,
         priority: config.priority,
-        enabled: config.enabled
-      }));
+        enabled: config.enabled,
+      }))
     },
 
     /**
@@ -289,7 +287,7 @@
      * @returns {boolean}
      */
     hasSite(domain) {
-      return this.findSiteName(domain) !== null;
+      return this.findSiteName(domain) !== null
     },
 
     /**
@@ -298,11 +296,11 @@
      * @param {boolean} enabled - 是否启用
      */
     setEnabled(name, enabled) {
-      const config = this.sites.get(name);
-      if (!config) return false;
-      config.enabled = enabled;
-      console.log(`[SiteFactory] ${enabled ? '启用' : '禁用'}站点: ${name}`);
-      return true;
+      const config = this.sites.get(name)
+      if (!config) return false
+      config.enabled = enabled
+      console.log(`[SiteFactory] ${enabled ? '启用' : '禁用'}站点: ${name}`)
+      return true
     },
 
     /**
@@ -311,13 +309,13 @@
     exportConfig() {
       return {
         sites: this.listSites(),
-        defaultOptions: { ...this.defaultOptions }
-      };
-    }
-  };
+        defaultOptions: { ...this.defaultOptions },
+      }
+    },
+  }
 
   // 导出
-  window.SiteFactory = SiteScriptFactory;
+  window.SiteFactory = SiteScriptFactory
 
-  console.log('[SiteFactory] 站点脚本工厂已加载');
-})();
+  console.log('[SiteFactory] 站点脚本工厂已加载')
+})()

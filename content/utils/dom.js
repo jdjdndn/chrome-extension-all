@@ -1,7 +1,7 @@
 // ========== DOM 工具模块 ==========
 // 提供 DOM 操作相关的通用功能
 
-'use strict';
+'use strict'
 
 /**
  * 获取当前域名
@@ -9,10 +9,10 @@
  */
 function getCurrentDomain() {
   try {
-    return window.location.hostname;
+    return window.location.hostname
   } catch (error) {
-    console.error('[DOM] 获取域名失败:', error);
-    return null;
+    console.error('[DOM] 获取域名失败:', error)
+    return null
   }
 }
 
@@ -24,20 +24,20 @@ function getCurrentDomain() {
  */
 function upsertStyle(id, css) {
   // 移除已存在的样式标签
-  const existing = document.getElementById(id);
+  const existing = document.getElementById(id)
   if (existing) {
-    existing.remove();
+    existing.remove()
   }
 
   if (!css || !css.trim()) {
-    return null;
+    return null
   }
 
-  const style = document.createElement('style');
-  style.id = id;
-  style.textContent = css;
-  (document.head || document.documentElement).appendChild(style);
-  return style;
+  const style = document.createElement('style')
+  style.id = id
+  style.textContent = css
+  ;(document.head || document.documentElement).appendChild(style)
+  return style
 }
 
 /**
@@ -46,12 +46,12 @@ function upsertStyle(id, css) {
  * @returns {boolean} 是否成功移除
  */
 function removeStyle(id) {
-  const style = document.getElementById(id);
+  const style = document.getElementById(id)
   if (style) {
-    style.remove();
-    return true;
+    style.remove()
+    return true
   }
-  return false;
+  return false
 }
 
 /**
@@ -63,7 +63,7 @@ function generateHideCSS(selectors) {
   return selectors
     .filter((s) => s && s.trim())
     .map((selector) => `${selector} { display: none !important; }`)
-    .join('\n');
+    .join('\n')
 }
 
 /**
@@ -73,13 +73,13 @@ function generateHideCSS(selectors) {
  */
 function applyHideStyle(styleId, selectors) {
   if (!selectors || selectors.length === 0) {
-    removeStyle(styleId);
-    return;
+    removeStyle(styleId)
+    return
   }
 
-  const css = generateHideCSS(selectors);
-  upsertStyle(styleId, css);
-  console.log(`[DOM] 已应用隐藏样式，共 ${selectors.length} 个选择器`);
+  const css = generateHideCSS(selectors)
+  upsertStyle(styleId, css)
+  console.log(`[DOM] 已应用隐藏样式，共 ${selectors.length} 个选择器`)
 }
 
 /**
@@ -91,30 +91,30 @@ function applyHideStyle(styleId, selectors) {
  */
 function waitForElement(selector, timeout = 10000, parent = document) {
   return new Promise((resolve) => {
-    const element = parent.querySelector(selector);
+    const element = parent.querySelector(selector)
     if (element) {
-      resolve(element);
-      return;
+      resolve(element)
+      return
     }
 
     const observer = new MutationObserver(() => {
-      const el = parent.querySelector(selector);
+      const el = parent.querySelector(selector)
       if (el) {
-        observer.disconnect();
-        resolve(el);
+        observer.disconnect()
+        resolve(el)
       }
-    });
+    })
 
     observer.observe(parent === document ? document.body : parent, {
       childList: true,
       subtree: true,
-    });
+    })
 
     setTimeout(() => {
-      observer.disconnect();
-      resolve(null);
-    }, timeout);
-  });
+      observer.disconnect()
+      resolve(null)
+    }, timeout)
+  })
 }
 
 /**
@@ -124,10 +124,8 @@ function waitForElement(selector, timeout = 10000, parent = document) {
  * @returns {Promise<Element[]>}
  */
 async function waitForElements(selectors, timeout = 10000) {
-  const results = await Promise.all(
-    selectors.map((s) => waitForElement(s, timeout))
-  );
-  return results.filter(Boolean);
+  const results = await Promise.all(selectors.map((s) => waitForElement(s, timeout)))
+  return results.filter(Boolean)
 }
 
 /**
@@ -137,12 +135,12 @@ async function waitForElements(selectors, timeout = 10000) {
  * @returns {MutationObserver}
  */
 function createDebouncedObserver(callback, debounceMs = 300) {
-  let timer = null;
+  let timer = null
   const observer = new MutationObserver(() => {
-    if (timer) clearTimeout(timer);
-    timer = setTimeout(callback, debounceMs);
-  });
-  return observer;
+    if (timer) clearTimeout(timer)
+    timer = setTimeout(callback, debounceMs)
+  })
+  return observer
 }
 
 /**
@@ -152,11 +150,11 @@ function createDebouncedObserver(callback, debounceMs = 300) {
  * @returns {Function}
  */
 function debounce(func, delay = 300) {
-  let timer = null;
+  let timer = null
   return function (...args) {
-    if (timer) clearTimeout(timer);
-    timer = setTimeout(() => func.apply(this, args), delay);
-  };
+    if (timer) clearTimeout(timer)
+    timer = setTimeout(() => func.apply(this, args), delay)
+  }
 }
 
 /**
@@ -166,14 +164,14 @@ function debounce(func, delay = 300) {
  * @returns {Function}
  */
 function throttle(func, delay = 300) {
-  let lastCall = 0;
+  let lastCall = 0
   return function (...args) {
-    const now = Date.now();
+    const now = Date.now()
     if (now - lastCall >= delay) {
-      lastCall = now;
-      return func.apply(this, args);
+      lastCall = now
+      return func.apply(this, args)
     }
-  };
+  }
 }
 
 /**
@@ -181,20 +179,20 @@ function throttle(func, delay = 300) {
  * @returns {{ check: function, reset: function }}
  */
 function createThrottleState(delay = 500) {
-  let lastExecutionTime = 0;
+  let lastExecutionTime = 0
   return {
     check() {
-      const now = Date.now();
+      const now = Date.now()
       if (now - lastExecutionTime >= delay) {
-        lastExecutionTime = now;
-        return true;
+        lastExecutionTime = now
+        return true
       }
-      return false;
+      return false
     },
     reset() {
-      lastExecutionTime = 0;
-    }
-  };
+      lastExecutionTime = 0
+    },
+  }
 }
 
 /**
@@ -203,11 +201,11 @@ function createThrottleState(delay = 500) {
  */
 function onBodyReady(callback) {
   if (document.body) {
-    callback();
+    callback()
   } else if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', callback);
+    document.addEventListener('DOMContentLoaded', callback)
   } else {
-    setTimeout(() => onBodyReady(callback), 50);
+    setTimeout(() => onBodyReady(callback), 50)
   }
 }
 
@@ -220,37 +218,34 @@ function onBodyReady(callback) {
  * @returns {boolean}
  */
 function isElementInViewport(element, options = {}) {
-  if (!element) return false;
+  if (!element) return false
 
-  const { checkVisibility = false, checkDimensions = false } = options;
+  const { checkVisibility = false, checkDimensions = false } = options
 
   try {
-    const rect = element.getBoundingClientRect();
-    const windowHeight = window.innerHeight || document.documentElement.clientHeight;
-    const windowWidth = window.innerWidth || document.documentElement.clientWidth;
+    const rect = element.getBoundingClientRect()
+    const windowHeight = window.innerHeight || document.documentElement.clientHeight
+    const windowWidth = window.innerWidth || document.documentElement.clientWidth
 
     // 基本视口检查
-    let inViewport = (
-      rect.top >= 0 &&
-      rect.left >= 0 &&
-      rect.bottom <= windowHeight &&
-      rect.right <= windowWidth
-    );
+    let inViewport =
+      rect.top >= 0 && rect.left >= 0 && rect.bottom <= windowHeight && rect.right <= windowWidth
 
     // 可选：检查元素尺寸
     if (inViewport && checkDimensions) {
-      inViewport = rect.width > 0 && rect.height > 0;
+      inViewport = rect.width > 0 && rect.height > 0
     }
 
     // 可选：检查元素可见性
     if (inViewport && checkVisibility) {
-      const style = window.getComputedStyle(element);
-      inViewport = style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+      const style = window.getComputedStyle(element)
+      inViewport =
+        style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0'
     }
 
-    return inViewport;
+    return inViewport
   } catch (error) {
-    return false;
+    return false
   }
 }
 
@@ -261,10 +256,10 @@ function isElementInViewport(element, options = {}) {
  * @returns {Element|null}
  */
 function findOneInViewport(selector, options = {}) {
-  const elements = [...document.querySelectorAll(selector)].filter(el =>
+  const elements = [...document.querySelectorAll(selector)].filter((el) =>
     isElementInViewport(el, options)
-  );
-  return elements.length === 1 ? elements[0] : null;
+  )
+  return elements.length === 1 ? elements[0] : null
 }
 
 /**
@@ -274,9 +269,7 @@ function findOneInViewport(selector, options = {}) {
  * @returns {Element[]}
  */
 function findAllInViewport(selector, options = {}) {
-  return [...document.querySelectorAll(selector)].filter(el =>
-    isElementInViewport(el, options)
-  );
+  return [...document.querySelectorAll(selector)].filter((el) => isElementInViewport(el, options))
 }
 
 // 命名导出所有公共方法
@@ -296,7 +289,7 @@ export {
   isElementInViewport,
   findOneInViewport,
   findAllInViewport,
-};
+}
 
 const DOMUtils = {
   getCurrentDomain,
@@ -314,15 +307,15 @@ const DOMUtils = {
   isElementInViewport,
   findOneInViewport,
   findAllInViewport,
-};
-export default DOMUtils;
+}
+export default DOMUtils
 
 // 避免重复初始化
 if (typeof window !== 'undefined' && !window.DOMUtils) {
-  window.DOMUtils = DOMUtils;
+  window.DOMUtils = DOMUtils
   // 通知 ScriptLoader：DOMUtils 已就绪
   if (window.ScriptLoader) {
-    ScriptLoader.markReady('DOMUtils');
+    ScriptLoader.markReady('DOMUtils')
   }
-  console.log('[DOM] DOM工具模块已加载');
+  console.log('[DOM] DOM工具模块已加载')
 }

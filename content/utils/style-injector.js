@@ -3,7 +3,7 @@
  * 统一的样式注入和移除机制
  */
 
-'use strict';
+'use strict'
 
 /**
  * 创建样式注入器
@@ -11,7 +11,7 @@
  * @returns {{ inject: function, remove: function, update: function }}
  */
 export function createStyleInjector(styleId) {
-  let styleElement = null;
+  let styleElement = null
 
   return {
     /**
@@ -21,30 +21,30 @@ export function createStyleInjector(styleId) {
      */
     inject(css) {
       if (!css || !css.trim()) {
-        return null;
+        return null
       }
 
       // 移除已存在的样式
-      this.remove();
+      this.remove()
 
       // 创建新样式元素
-      styleElement = document.createElement('style');
-      styleElement.id = styleId;
-      styleElement.textContent = css;
-      (document.head || document.documentElement).appendChild(styleElement);
+      styleElement = document.createElement('style')
+      styleElement.id = styleId
+      styleElement.textContent = css
+      ;(document.head || document.documentElement).appendChild(styleElement)
 
-      return styleElement;
+      return styleElement
     },
 
     /**
      * 移除样式
      */
     remove() {
-      const existing = document.getElementById(styleId);
+      const existing = document.getElementById(styleId)
       if (existing) {
-        existing.remove();
+        existing.remove()
       }
-      styleElement = null;
+      styleElement = null
     },
 
     /**
@@ -53,9 +53,9 @@ export function createStyleInjector(styleId) {
      */
     update(css) {
       if (styleElement) {
-        styleElement.textContent = css;
+        styleElement.textContent = css
       } else {
-        this.inject(css);
+        this.inject(css)
       }
     },
 
@@ -64,9 +64,9 @@ export function createStyleInjector(styleId) {
      * @returns {HTMLStyleElement|null}
      */
     getElement() {
-      return styleElement || document.getElementById(styleId);
-    }
-  };
+      return styleElement || document.getElementById(styleId)
+    },
+  }
 }
 
 /**
@@ -76,9 +76,9 @@ export function createStyleInjector(styleId) {
  */
 export function generateHideCSS(selectors) {
   return selectors
-    .filter(s => s && s.trim())
-    .map(selector => `${selector} { display: none !important; }`)
-    .join('\n');
+    .filter((s) => s && s.trim())
+    .map((selector) => `${selector} { display: none !important; }`)
+    .join('\n')
 }
 
 /**
@@ -87,24 +87,24 @@ export function generateHideCSS(selectors) {
  * @param {string[]} selectors - 选择器数组
  */
 export function applyHideStyle(styleId, selectors) {
-  const injector = createStyleInjector(styleId);
+  const injector = createStyleInjector(styleId)
   if (!selectors || selectors.length === 0) {
-    injector.remove();
-    return;
+    injector.remove()
+    return
   }
-  injector.inject(generateHideCSS(selectors));
+  injector.inject(generateHideCSS(selectors))
 }
 
 const StyleInjector = {
   create: createStyleInjector,
   generateHideCSS,
-  applyHideStyle
-};
+  applyHideStyle,
+}
 
-export default StyleInjector;
+export default StyleInjector
 
 // 全局暴露
 if (typeof window !== 'undefined' && !window.StyleInjector) {
-  window.StyleInjector = StyleInjector;
-  console.log('[StyleInjector] 模块已加载');
+  window.StyleInjector = StyleInjector
+  console.log('[StyleInjector] 模块已加载')
 }

@@ -14,18 +14,20 @@
 
 三级策略：
 
-| 策略 | 行为 | 适用场景 |
-|------|------|---------|
-| `idle` | `requestIdleCallback` 注入，10s 超时强制加载 | analytics、统计类 |
-| `defer` | 页面 `load` 后 3 秒注入 | 社交 SDK、客服插件 |
-| `block` | 从 DOM 移除 `<script>` 元素，阻止加载 | 用户主动屏蔽 |
+| 策略    | 行为                                         | 适用场景           |
+| ------- | -------------------------------------------- | ------------------ |
+| `idle`  | `requestIdleCallback` 注入，10s 超时强制加载 | analytics、统计类  |
+| `defer` | 页面 `load` 后 3 秒注入                      | 社交 SDK、客服插件 |
+| `block` | 从 DOM 移除 `<script>` 元素，阻止加载        | 用户主动屏蔽       |
 
 **`idle` 策略实现约定**：
+
 - 使用 `requestIdleCallback(cb, { timeout: 10000 })` 形式，浏览器会在 10s 内确保回调执行
 - 不需要额外的 `setTimeout` 兜底（`requestIdleCallback` 的 `timeout` 参数已保证）
 - `requestIdleCallback` 不支持时（极少数情况）降级为 `setTimeout(cb, 100)`
 
 **`block` 策略实现约定**：
+
 - `script.remove()` 从 DOM 移除元素
 - 记录到 `state.stats.thirdPartyBlocked` 统计
 - 不保留 `onload` 回调
@@ -48,7 +50,7 @@ const BUILTIN_DEFERRAL_RULES = [
   { pattern: '51\\.la', strategy: 'idle', name: '51.la' },
   { pattern: 'hotjar\\.com', strategy: 'idle', name: 'Hotjar' },
   { pattern: 'sentry\\.io', strategy: 'idle', name: 'Sentry' },
-];
+]
 ```
 
 ### 自动检测逻辑
@@ -56,23 +58,23 @@ const BUILTIN_DEFERRAL_RULES = [
 ```javascript
 function isThirdPartyScript(url) {
   try {
-    const urlObj = new URL(url);
+    const urlObj = new URL(url)
     // 提取 base domain（example.com）进行比较，忽略子域名差异
-    const pageBase = getBaseDomain(location.hostname);
-    const scriptBase = getBaseDomain(urlObj.hostname);
-    if (pageBase === scriptBase) return false;
+    const pageBase = getBaseDomain(location.hostname)
+    const scriptBase = getBaseDomain(urlObj.hostname)
+    if (pageBase === scriptBase) return false
     // CDN 上的不算第三方（已在 CDN 替换流程中处理）
-    if (isCDNUrl(url)) return false;
-    return true;
+    if (isCDNUrl(url)) return false
+    return true
   } catch {
-    return false;
+    return false
   }
 }
 
 // 简单的 base domain 提取：取最后两段（co.uk 等特殊 TLD 不处理）
 function getBaseDomain(hostname) {
-  const parts = hostname.split('.');
-  return parts.slice(-2).join('.');
+  const parts = hostname.split('.')
+  return parts.slice(-2).join('.')
 }
 ```
 
@@ -110,11 +112,11 @@ processScript(script)
 
 ### 文件变更
 
-| 文件 | 变更 |
-|------|------|
+| 文件                                      | 变更                                                                                                           |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
 | `content/modules/resource-accelerator.js` | 新增 `deferScript()`、`matchDeferralRule()`、`isThirdPartyScript()`、`getBaseDomain()`，扩展 `processScript()` |
-| `popup.html` | 新增第三方脚本延迟配置区域 |
-| `popup.js` | 新增延迟策略 UI 交互（开关 + 默认策略 + 规则列表管理） |
+| `popup.html`                              | 新增第三方脚本延迟配置区域                                                                                     |
+| `popup.js`                                | 新增延迟策略 UI 交互（开关 + 默认策略 + 规则列表管理）                                                         |
 
 ---
 
@@ -192,11 +194,11 @@ UI 展示标注"预估"字样，避免误导
 
 ### 文件变更
 
-| 文件 | 变更 |
-|------|------|
+| 文件                                      | 变更                                                            |
+| ----------------------------------------- | --------------------------------------------------------------- |
 | `content/modules/resource-accelerator.js` | 新增 `collectPerformanceMetrics()`，在 `window.load` 事件中调用 |
-| `popup.html` | 新增性能度量展示区域 |
-| `popup.js` | 新增性能数据获取和展示逻辑 |
+| `popup.html`                              | 新增性能度量展示区域                                            |
+| `popup.js`                                | 新增性能数据获取和展示逻辑                                      |
 
 ---
 
@@ -220,8 +222,8 @@ AVIF → WebP → JPEG
 const IMAGE_FORMAT_PRIORITY = [
   { mime: 'image/avif', test: 'image/avif' },
   { mime: 'image/webp', test: 'image/webp' },
-  { mime: 'image/jpeg', test: null },  // 通用兜底
-];
+  { mime: 'image/jpeg', test: null }, // 通用兜底
+]
 ```
 
 ### 压缩流程修改
@@ -239,10 +241,10 @@ const IMAGE_FORMAT_PRIORITY = [
 
 ### 文件变更
 
-| 文件 | 变更 |
-|------|------|
+| 文件                                      | 变更                                                                      |
+| ----------------------------------------- | ------------------------------------------------------------------------- |
 | `content/modules/resource-accelerator.js` | 新增 `getSupportedImageFormat()`，修改 `compressImage()` 使用检测到的格式 |
-| `popup.js` | 统计展示中显示实际压缩格式 |
+| `popup.js`                                | 统计展示中显示实际压缩格式                                                |
 
 ---
 
@@ -254,11 +256,11 @@ const IMAGE_FORMAT_PRIORITY = [
 
 ### 字重优先级
 
-| 优先级 | 字重 | 说明 |
-|--------|------|------|
-| 0 | 400 / normal | 正文，最重要 |
-| 1 | 700 / bold | 标题，次重要 |
-| 2 | 其他 | 轻体、斜体等 |
+| 优先级 | 字重         | 说明         |
+| ------ | ------------ | ------------ |
+| 0      | 400 / normal | 正文，最重要 |
+| 1      | 700 / bold   | 标题，次重要 |
+| 2      | 其他         | 轻体、斜体等 |
 
 ### 策略
 
@@ -271,11 +273,11 @@ const IMAGE_FORMAT_PRIORITY = [
 
 从 URL 和 CSS 上下文中尝试提取字重：
 
-| 来源 | 解析方式 | 示例 |
-|------|---------|------|
-| Google Fonts CSS | 查询参数 `wght@400` 或 `weight=400` | `?family=Roboto:wght@400;700` |
-| Font 文件名 | 路径中的 `-Regular`、`-Bold`、`-Light` 等 | `Roboto-Regular.woff2` |
-| `@font-face` CSS | `font-weight` 属性 | `font-weight: 400;` |
+| 来源             | 解析方式                                  | 示例                          |
+| ---------------- | ----------------------------------------- | ----------------------------- |
+| Google Fonts CSS | 查询参数 `wght@400` 或 `weight=400`       | `?family=Roboto:wght@400;700` |
+| Font 文件名      | 路径中的 `-Regular`、`-Bold`、`-Light` 等 | `Roboto-Regular.woff2`        |
+| `@font-face` CSS | `font-weight` 属性                        | `font-weight: 400;`           |
 
 无法解析时，字重标记为 `unknown`，排在已知字重之后。
 
@@ -283,38 +285,37 @@ const IMAGE_FORMAT_PRIORITY = [
 
 ```javascript
 // state 中新增
-_fontCandidates: [],  // 待处理的字体候选列表
+_fontCandidates: ([], // 待处理的字体候选列表
+  function addPreloadHint(cdnUrl, type, fontInfo) {
+    if (state.stats.preloadHints >= state.config.maxPreloadHints) return
 
-function addPreloadHint(cdnUrl, type, fontInfo) {
-  if (state.stats.preloadHints >= state.config.maxPreloadHints) return;
+    if (type === 'font') {
+      // 收集候选，不立即 preload
+      state._fontCandidates.push({
+        url: cdnUrl,
+        priority: fontInfo?.weight ? getWeightPriority(fontInfo.weight) : 99,
+        weight: fontInfo?.weight || 'unknown',
+      })
+      // 排序：按优先级升序（0 最高），unknown 排末尾
+      state._fontCandidates.sort((a, b) => a.priority - b.priority)
+      // 只保留前 3 个
+      state._fontCandidates = state._fontCandidates.slice(0, 3)
+      // 重新执行 preload（可能有新的更高优先级字体替换了旧的）
+      _flushFontPreloads()
+      return
+    }
 
-  if (type === 'font') {
-    // 收集候选，不立即 preload
-    state._fontCandidates.push({
-      url: cdnUrl,
-      priority: fontInfo?.weight ? getWeightPriority(fontInfo.weight) : 99,
-      weight: fontInfo?.weight || 'unknown'
-    });
-    // 排序：按优先级升序（0 最高），unknown 排末尾
-    state._fontCandidates.sort((a, b) => a.priority - b.priority);
-    // 只保留前 3 个
-    state._fontCandidates = state._fontCandidates.slice(0, 3);
-    // 重新执行 preload（可能有新的更高优先级字体替换了旧的）
-    _flushFontPreloads();
-    return;
-  }
-
-  // 非字体类型：直接 preload（现有逻辑）
-  _insertPreloadLink(cdnUrl, type);
-}
+    // 非字体类型：直接 preload（现有逻辑）
+    _insertPreloadLink(cdnUrl, type)
+  })
 
 function _flushFontPreloads() {
   // 清除旧的字体 preload，重新插入前 3 个
   // （简化实现：只在首次 flush 时插入，后续候选追加时不重复插入）
   for (const candidate of state._fontCandidates) {
     if (!candidate._preloaded) {
-      _insertPreloadLink(candidate.url, 'font');
-      candidate._preloaded = true;
+      _insertPreloadLink(candidate.url, 'font')
+      candidate._preloaded = true
     }
   }
 }
@@ -322,8 +323,8 @@ function _flushFontPreloads() {
 
 ### 文件变更
 
-| 文件 | 变更 |
-|------|------|
+| 文件                                      | 变更                                                                                           |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | `content/modules/resource-accelerator.js` | 重构 `addPreloadHint()`，新增 `_fontCandidates`、`_flushFontPreloads()`、`getWeightPriority()` |
 
 ---
@@ -342,11 +343,11 @@ function _flushFontPreloads() {
 
 ## 风险
 
-| 风险 | 缓解 |
-|------|------|
-| 第三方脚本延迟导致功能异常 | 默认关闭 + `requestIdleCallback` timeout 兜底 |
-| AVIF 编码耗时 | 异步 + 并发限制 + 不做双重编码比较 |
-| 字体 preload 误判 | 降级为最多 3 个无差别 preload |
-| CSP 限制第三方脚本注入 | CSP 检测到时自动跳过延迟 |
-| 性能度量数据不准确 | 仅展示 + 标注"预估"，不做关键决策依据 |
+| 风险                                | 缓解                                                   |
+| ----------------------------------- | ------------------------------------------------------ |
+| 第三方脚本延迟导致功能异常          | 默认关闭 + `requestIdleCallback` timeout 兜底          |
+| AVIF 编码耗时                       | 异步 + 并发限制 + 不做双重编码比较                     |
+| 字体 preload 误判                   | 降级为最多 3 个无差别 preload                          |
+| CSP 限制第三方脚本注入              | CSP 检测到时自动跳过延迟                               |
+| 性能度量数据不准确                  | 仅展示 + 标注"预估"，不做关键决策依据                  |
 | 跨域 Resource Timing transferSize=0 | 不使用 transferSize 做流量统计，用图片压缩实际字节差值 |

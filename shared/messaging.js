@@ -4,16 +4,16 @@
  * 适用于 popup、background、devtools 等非 content script 环境
  */
 
-'use strict';
+'use strict'
 
 /**
  * 检查扩展上下文是否有效
  */
 export function isExtensionContextValid() {
   try {
-    return typeof chrome !== 'undefined' && chrome.runtime && !!chrome.runtime.id;
+    return typeof chrome !== 'undefined' && chrome.runtime && !!chrome.runtime.id
   } catch {
-    return false;
+    return false
   }
 }
 
@@ -25,17 +25,17 @@ export function isExtensionContextValid() {
  */
 export async function sendToBackground(type, data = {}) {
   if (!isExtensionContextValid()) {
-    console.warn('[Messaging] 扩展上下文已失效');
-    return null;
+    console.warn('[Messaging] 扩展上下文已失效')
+    return null
   }
 
   try {
-    return await chrome.runtime.sendMessage({ type, ...data });
+    return await chrome.runtime.sendMessage({ type, ...data })
   } catch (error) {
     if (!error.message?.includes('Extension context invalidated')) {
-      console.error('[Messaging] 发送失败:', error.message);
+      console.error('[Messaging] 发送失败:', error.message)
     }
-    return null;
+    return null
   }
 }
 
@@ -47,25 +47,25 @@ export async function sendToBackground(type, data = {}) {
  */
 export async function sendToContentScript(message, tabId = null) {
   if (!isExtensionContextValid()) {
-    return null;
+    return null
   }
 
   try {
-    let targetTabId = tabId;
+    let targetTabId = tabId
 
     if (!targetTabId) {
-      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (!tabs[0]?.id) return null;
-      targetTabId = tabs[0].id;
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
+      if (!tabs[0]?.id) return null
+      targetTabId = tabs[0].id
     }
 
-    return await chrome.tabs.sendMessage(targetTabId, message);
+    return await chrome.tabs.sendMessage(targetTabId, message)
   } catch (error) {
     // content script 未加载是正常情况
     if (!error.message?.includes('Receiving end does not exist')) {
-      console.warn('[Messaging] 发送到 content script 失败:', error.message);
+      console.warn('[Messaging] 发送到 content script 失败:', error.message)
     }
-    return null;
+    return null
   }
 }
 
@@ -75,17 +75,17 @@ export async function sendToContentScript(message, tabId = null) {
  * @returns {Promise<void>}
  */
 export async function broadcastToAllTabs(message) {
-  if (!isExtensionContextValid()) return;
+  if (!isExtensionContextValid()) return
 
   try {
-    const tabs = await chrome.tabs.query({});
+    const tabs = await chrome.tabs.query({})
     await Promise.all(
       tabs
-        .filter(tab => tab.id && tab.url?.startsWith('http'))
-        .map(tab => chrome.tabs.sendMessage(tab.id, message).catch(() => {}))
-    );
+        .filter((tab) => tab.id && tab.url?.startsWith('http'))
+        .map((tab) => chrome.tabs.sendMessage(tab.id, message).catch(() => {}))
+    )
   } catch (error) {
-    console.warn('[Messaging] 广播失败:', error.message);
+    console.warn('[Messaging] 广播失败:', error.message)
   }
 }
 
@@ -93,11 +93,11 @@ const SharedMessaging = {
   isExtensionContextValid,
   sendToBackground,
   sendToContentScript,
-  broadcastToAllTabs
-};
-export default SharedMessaging;
+  broadcastToAllTabs,
+}
+export default SharedMessaging
 
 // 全局暴露
 if (typeof window !== 'undefined' && !window.SharedMessaging) {
-  window.SharedMessaging = SharedMessaging;
+  window.SharedMessaging = SharedMessaging
 }

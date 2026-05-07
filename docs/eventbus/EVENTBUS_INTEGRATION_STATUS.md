@@ -3,6 +3,7 @@
 ## ✅ 已完成的集成
 
 ### 1. 核心文件
+
 - ✅ `event-bus.js` - EventBus 核心实现
 - ✅ `EVENTBUS_GUIDE.js` - 详细使用指南
 - ✅ `event-bus-integration.js` - 集成示例
@@ -10,42 +11,49 @@
 - ✅ `content/eventbus-integration-douyin.js` - Douyin EventBus 集成
 
 ### 2. Manifest 配置
+
 - ✅ 在 `manifest.json` 的 content_scripts 中添加了 `event-bus.js`
 - ✅ 设置 `run_at: "document_start"` 确保 EventBus 优先加载
 
 ### 3. Popup 集成
+
 - ✅ 更新 `popup.html` 引入 `event-bus.js`
 - ✅ 更新 `popup.js` 添加 `waitForEventBus()` 和 `sendMessageToContentScript()` 函数
 - ✅ 移除 `popup-bridge.js` 依赖
 
 ### 4. Content Scripts 集成
+
 - ✅ `content/eventbus-integration-douyin.js` - 为 Douyin 添加 EventBus 支持
 
 ## 🔄 通信方式对比
 
 ### 旧方式 (MessagingUtils)
+
 ```javascript
 // Content Script
 MessagingUtils.createMessageHandler('id', {
-  'MESSAGE_TYPE': (msg) => { return response; }
-});
+  MESSAGE_TYPE: (msg) => {
+    return response
+  },
+})
 
 // Popup
 chrome.tabs.sendMessage(tabId, { type: 'MESSAGE_TYPE' }, (response) => {
-  console.log(response);
-});
+  console.log(response)
+})
 ```
 
 ### 新方式 (EventBus)
+
 ```javascript
 // Content Script
 EventBus.on('MESSAGE_TYPE', (data) => {
-  return response;
-});
+  return response
+})
 
 // Popup
-const response = await EventBus.request('MESSAGE_TYPE', data);
-console.log(response);
+const response = await EventBus.request('MESSAGE_TYPE', data)
+console.log(response)
 ```
 
 ## 📋 待完成的集成
@@ -53,12 +61,14 @@ console.log(response);
 以下文件仍需更新以完全使用 EventBus：
 
 ### 高优先级
+
 1. **douyin.js** - 需要完全替换消息处理
 2. **bili.js** - 添加 EventBus 处理器
 3. **4hu.js** - 添加 EventBus 处理器
 4. **porn.js** - 添加 EventBus 处理器
 
 ### 中优先级
+
 5. **popup.js** - 更多函数使用 EventBus 替换
 6. **background.js** - 添加 EventBus 支持
 7. **content.js** - 添加 EventBus 支持
@@ -70,43 +80,46 @@ console.log(response);
 1. **重新加载扩展**
 2. **打开抖音页面**
 3. **在控制台执行**：
+
 ```javascript
 // 应该看到 EventBus 状态
-console.log(EventBus.getState());
+console.log(EventBus.getState())
 
 // 测试广播
-EventBus.publish('TEST', { message: 'Hello' });
+EventBus.publish('TEST', { message: 'Hello' })
 
 // 测试订阅
-EventBus.subscribe('TEST', (data) => console.log('收到:', data));
+EventBus.subscribe('TEST', (data) => console.log('收到:', data))
 ```
 
 4. **打开 Popup**
 5. **在 Popup 控制台执行**：
+
 ```javascript
 // 测试获取默认选择器
-const response = await EventBus.request('GET_DEFAULT_HIDE_SELECTORS', {});
-console.log(response);
+const response = await EventBus.request('GET_DEFAULT_HIDE_SELECTORS', {})
+console.log(response)
 ```
 
 ## ⚠️ 兼容性说明
 
 当前集成采用**双轨运行**策略：
+
 - ✅ **MessagingUtils** 继续工作（原有代码不受影响）
 - ✅ **EventBus** 提供新的通信能力
 - ✅ 两者可以并存，逐步迁移
 
 ## 📊 集成进度
 
-| 组件 | EventBus | 消息处理 | 测试 |
-|------|----------|----------|------|
-| event-bus.js | ✅ | ✅ | ⏳ |
-| popup.js | ✅ | 部分 | ⏳ |
-| douyin.js | ✅ | 待完整 | ⏳ |
-| bili.js | ⏳ | ⏳ | ⏳ |
-| 4hu.js | ⏳ | ⏳ | ⏳ |
-| porn.js | ⏳ | ⏳ | ⏳ |
-| background.js | ⏳ | ⏳ | ⏳ |
+| 组件          | EventBus | 消息处理 | 测试 |
+| ------------- | -------- | -------- | ---- |
+| event-bus.js  | ✅       | ✅       | ⏳   |
+| popup.js      | ✅       | 部分     | ⏳   |
+| douyin.js     | ✅       | 待完整   | ⏳   |
+| bili.js       | ⏳       | ⏳       | ⏳   |
+| 4hu.js        | ⏳       | ⏳       | ⏳   |
+| porn.js       | ⏳       | ⏳       | ⏳   |
+| background.js | ⏳       | ⏳       | ⏳   |
 
 ## 🔧 下一步操作
 
@@ -124,11 +137,11 @@ console.log(response);
 setTimeout(() => {
   if (window.EventBus) {
     EventBus.on('YOUR_MESSAGE', (data) => {
-      console.log('收到:', data);
-      return { success: true, result: '...' };
-    });
+      console.log('收到:', data)
+      return { success: true, result: '...' }
+    })
   }
-}, 100);
+}, 100)
 ```
 
 ### 在 Popup 中使用
@@ -146,7 +159,7 @@ async function getData() {
 
 ```javascript
 // 任何组件中
-await EventBus.publish('GLOBAL_UPDATE', { data: '...' });
+await EventBus.publish('GLOBAL_UPDATE', { data: '...' })
 ```
 
 ## ⚡ 性能提升

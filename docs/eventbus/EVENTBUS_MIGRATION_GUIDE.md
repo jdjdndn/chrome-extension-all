@@ -3,12 +3,14 @@
 ## ✅ 已完成的集成
 
 ### 1. 核心文件创建
+
 - ✅ `event-bus.js` - EventBus 核心实现
 - ✅ `content/eventbus-integration.js` - 通用集成模块（所有网站共用）
 - `content/eventbus-integration-douyin.js` - Douyin 专用集成
 - ✅ `eventbus-test.js` - 测试工具
 
 ### 2. Manifest 配置更新
+
 - ✅ 所有 content_scripts 已添加 `event-bus.js`（第一优先级加载）
 - ✅ 通用集成文件 `content/eventbus-integration.js` 添加到所有网站
 - ✅ 专用集成文件添加到特定网站（douyin, bili, 4hu, porn 等）
@@ -16,25 +18,32 @@
 - ✅ **移除 messaging.js 和 content-bridge.js**（避免与 EventBus 消息冲突）
 
 ### 3. Popup 更新
+
 - ✅ 添加 `waitForEventBus()` 函数
 - ✅ 更新 `sendMessageToContentScript()` 使用 EventBus
 - ✅ 添加 `broadcastMessage()` 函数
 
 ### 4. MessagingUtils 兼容层
+
 - ✅ `eventbus-integration.js` 提供 `MessagingUtils` 兼容接口
 - ✅ 现有代码可继续使用 `MessagingUtils.createMessageHandler()` 等方法
 - ✅ 内部使用 EventBus 实现，无消息冲突
 - ✅ 自动获得 EventBus 的重试、连接感知等增强功能
 
 **兼容层使用示例**：
+
 ```javascript
 // 原有代码无需修改，自动使用 EventBus
 MessagingUtils.createMessageHandler('my_handler', {
-  'MESSAGE_TYPE': (msg) => { return response; }
-});
+  MESSAGE_TYPE: (msg) => {
+    return response
+  },
+})
 
 // 等价于使用 EventBus
-EventBus.on('MESSAGE_TYPE', (data) => { return response; });
+EventBus.on('MESSAGE_TYPE', (data) => {
+  return response
+})
 ```
 
 ---
@@ -49,47 +58,53 @@ EventBus.on('MESSAGE_TYPE', (data) => { return response; });
 
 ```javascript
 // ❌ 旧方式 1: toggleExtension 通知
-const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
 if (tabs[0]?.id) {
-  chrome.tabs.sendMessage(tabs[0].id, {
-    type: 'TOGGLE_EXTENSION',
-    enabled: newSettings.enabled
-  }).catch(() => {});
+  chrome.tabs
+    .sendMessage(tabs[0].id, {
+      type: 'TOGGLE_EXTENSION',
+      enabled: newSettings.enabled,
+    })
+    .catch(() => {})
 }
 
 // ✅ 新方式 1
-await waitForEventBus();
+await waitForEventBus()
 await EventBus.publish('TOGGLE_EXTENSION', {
-  enabled: newSettings.enabled
-});
+  enabled: newSettings.enabled,
+})
 ```
 
 ```javascript
 // ❌ 旧方式 2: 更新关键词
-chrome.tabs.sendMessage(tabs[0].id, {
-  type: 'UPDATE_KEYWORDS',
-  keywords: { NOT_INTERESTED_KEYWORDS: keywords }
-}).catch(() => {});
+chrome.tabs
+  .sendMessage(tabs[0].id, {
+    type: 'UPDATE_KEYWORDS',
+    keywords: { NOT_INTERESTED_KEYWORDS: keywords },
+  })
+  .catch(() => {})
 
 // ✅ 新方式 2
 await EventBus.publish('UPDATE_KEYWORDS', {
-  keywords: { NOT_INTERESTED_KEYWORDS: keywords }
-});
+  keywords: { NOT_INTERESTED_KEYWORDS: keywords },
+})
 ```
 
 ```javascript
 // ❌ 旧方式 3: 更新隐藏元素
-chrome.tabs.sendMessage(tabs[0].id, {
-  type: 'UPDATE_HIDE_ELEMENTS',
-  enabled,
-  selectors: mergedSelectors
-}).catch(() => {});
+chrome.tabs
+  .sendMessage(tabs[0].id, {
+    type: 'UPDATE_HIDE_ELEMENTS',
+    enabled,
+    selectors: mergedSelectors,
+  })
+  .catch(() => {})
 
 // ✅ 新方式 3
 await EventBus.publish('UPDATE_HIDE_ELEMENTS', {
   enabled,
-  selectors: mergedSelectors
-});
+  selectors: mergedSelectors,
+})
 ```
 
 ---
@@ -100,14 +115,14 @@ await EventBus.publish('UPDATE_HIDE_ELEMENTS', {
 
 ```javascript
 // 等待 EventBus 就绪
-await waitForEventBus();
+await waitForEventBus()
 
 // 发送请求（等待响应）
-const response = await EventBus.request('GET_DEFAULT_HIDE_SELECTORS', {});
-console.log('收到选择器:', response.selectors);
+const response = await EventBus.request('GET_DEFAULT_HIDE_SELECTORS', {})
+console.log('收到选择器:', response.selectors)
 
 // 发布事件（不等待响应）
-await EventBus.publish('SETTINGS_UPDATED', { theme: 'dark' });
+await EventBus.publish('SETTINGS_UPDATED', { theme: 'dark' })
 ```
 
 ### 在 Content Script 中注册处理器
@@ -117,15 +132,15 @@ await EventBus.publish('SETTINGS_UPDATED', { theme: 'dark' });
 
 // 处理请求（需要返回值）
 EventBus.on('GET_DATA', (data) => {
-  console.log('收到请求:', data);
-  return { success: true, result: '...' };
-});
+  console.log('收到请求:', data)
+  return { success: true, result: '...' }
+})
 
 // 订阅事件（不需要返回值）
 EventBus.subscribe('SETTINGS_UPDATED', (settings) => {
-  console.log('设置已更新:', settings);
-  applySettings(settings);
-});
+  console.log('设置已更新:', settings)
+  applySettings(settings)
+})
 ```
 
 ---
@@ -147,22 +162,24 @@ EventBusTest.runAllTests()
 ### 2. 通信测试
 
 **在 Popup 控制台：**
+
 ```javascript
 // 检查状态
 EventBus.getState()
 
 // 发送请求
-const result = await EventBus.request('GET_DEFAULT_HIDE_SELECTORS', {});
-console.log('选择器:', result);
+const result = await EventBus.request('GET_DEFAULT_HIDE_SELECTORS', {})
+console.log('选择器:', result)
 ```
 
 **在抖音页面控制台：**
+
 ```javascript
 // 检查状态
 EventBus.getState()
 
 // 查看连接的组件
-console.log('连接数:', EventBus.getState().connections);
+console.log('连接数:', EventBus.getState().connections)
 ```
 
 ---
@@ -170,6 +187,7 @@ console.log('连接数:', EventBus.getState().connections);
 ## 📋 迁移检查清单
 
 ### 立即可用（已配置）
+
 - ✅ EventBus 已加载到所有页面
 - ✅ 通用集成模块已添加到所有网站
 - ✅ Popup 可以使用 EventBus 发送消息
@@ -178,6 +196,7 @@ console.log('连接数:', EventBus.getState().connections);
 ### 需要手动迁移的代码
 
 #### popup.js 中需要更新的函数：
+
 - [ ] `toggleExtension()` - 第 130-140 行
 - [ ] `saveNotInterestedKeywords()` - 第 620-650 行
 - [ ] `saveAutoFollowKeywords()` - 第 680-700 行
@@ -185,6 +204,7 @@ console.log('连接数:', EventBus.getState().connections);
 - [ ] `saveSelectors()` - 第 1555-1570 行
 
 #### 其他 Content Scripts（可选）：
+
 - [ ] `bili.js` - 已有通用集成，可选添加专用处理器
 - [ ] `4hu.js` - 已有通用集成，可选添加专用处理器
 - [ ] `porn.js` - 已有通用集成，可选添加专用处理器
@@ -196,22 +216,26 @@ console.log('连接数:', EventBus.getState().connections);
 ### 立即可用的功能
 
 1. **检查 EventBus 状态**
+
 ```javascript
 EventBus.getState()
 // 返回: { env, instanceId, isReady, connections, ... }
 ```
 
 2. **广播消息**
+
 ```javascript
 await EventBus.publish('TEST', { message: 'Hello' })
 ```
 
 3. **订阅事件**
+
 ```javascript
 EventBus.subscribe('TEST', (data) => console.log(data))
 ```
 
 4. **发送请求**
+
 ```javascript
 const result = await EventBus.request('GET_DATA', { query: '...' })
 ```
@@ -223,20 +247,22 @@ const result = await EventBus.request('GET_DATA', { query: '...' })
 ### 完整的函数迁移示例
 
 **旧代码：**
+
 ```javascript
 async function notifyContentScript(message) {
-  const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+  const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
   if (tabs[0]?.id) {
-    chrome.tabs.sendMessage(tabs[0].id, message).catch(() => {});
+    chrome.tabs.sendMessage(tabs[0].id, message).catch(() => {})
   }
 }
 ```
 
 **新代码：**
+
 ```javascript
 async function notifyContentScript(message) {
-  await waitForEventBus();
-  await EventBus.publish(message.type, message);
+  await waitForEventBus()
+  await EventBus.publish(message.type, message)
 }
 ```
 
@@ -261,6 +287,7 @@ async function notifyContentScript(message) {
 **原因**: event-bus.js 未加载
 
 **解决**:
+
 1. 检查 manifest.json 中是否包含 event-bus.js
 2. 重新加载扩展
 3. 刷新目标页面
@@ -270,19 +297,20 @@ async function notifyContentScript(message) {
 **原因**: 目标组件未注册处理器或 EventBus 未就绪
 
 **解决**:
+
 ```javascript
 // 确保等待 EventBus
-await waitForEventBus();
+await waitForEventBus()
 
 // 检查目标是否在线
-const state = EventBus.getState();
-console.log('连接的组件:', state.connections);
+const state = EventBus.getState()
+console.log('连接的组件:', state.connections)
 
 // 使用 try-catch
 try {
-  const result = await EventBus.request('TYPE', data);
+  const result = await EventBus.request('TYPE', data)
 } catch (error) {
-  console.error('请求失败:', error);
+  console.error('请求失败:', error)
 }
 ```
 
@@ -291,11 +319,12 @@ try {
 **原因**: 订阅者未正确订阅
 
 **解决**:
+
 ```javascript
 // 确保使用正确的订阅
 EventBus.subscribe('YOUR_EVENT', (data) => {
-  console.log('收到:', data);
-});
+  console.log('收到:', data)
+})
 
 // 检查事件类型是否匹配
 // 发布: EventBus.publish('YOUR_EVENT', {})
@@ -316,6 +345,7 @@ EventBus.subscribe('YOUR_EVENT', (data) => {
 **当前状态**: 🟢 核心已集成，可以开始使用 EventBus
 
 **下一步**:
+
 1. 测试基本功能
 2. 逐步迁移旧代码
 3. 移除不再需要的通信文件

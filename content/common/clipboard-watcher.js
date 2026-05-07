@@ -3,19 +3,18 @@
  * 监听 copy 事件，自动记录剪贴板内容到历史
  */
 
-'use strict';
-
-(function () {
+'use strict'
+;(function () {
   // 避免重复初始化
-  if (window.ClipboardWatcherInitialized) return;
-  window.ClipboardWatcherInitialized = true;
+  if (window.ClipboardWatcherInitialized) return
+  window.ClipboardWatcherInitialized = true
 
   /**
    * 记录剪贴板内容到历史
    * @param {string} text - 剪贴板内容
    */
   async function recordClipboard(text) {
-    if (!text || text.trim().length === 0) return;
+    if (!text || text.trim().length === 0) return
 
     try {
       // 发送到 background 记录
@@ -23,16 +22,16 @@
         type: 'RECORD_CLIPBOARD',
         text: text,
         timestamp: Date.now(),
-        url: window.location.href
-      });
+        url: window.location.href,
+      })
 
       if (response?.success) {
-        console.log('[ClipboardWatcher] 已记录剪贴板内容');
+        console.log('[ClipboardWatcher] 已记录剪贴板内容')
       }
     } catch (error) {
       // 扩展上下文失效或未加载，静默失败
       if (!error.message?.includes('Extension context invalidated')) {
-        console.warn('[ClipboardWatcher] 记录失败:', error.message);
+        console.warn('[ClipboardWatcher] 记录失败:', error.message)
       }
     }
   }
@@ -46,20 +45,20 @@
       try {
         // 尝试从剪贴板 API 读取
         if (navigator.clipboard && navigator.clipboard.readText) {
-          const text = await navigator.clipboard.readText();
+          const text = await navigator.clipboard.readText()
           if (text) {
-            await recordClipboard(text);
+            await recordClipboard(text)
           }
         }
       } catch (error) {
         // 权限被拒绝，尝试从 selection 读取
-        const selection = document.getSelection();
+        const selection = document.getSelection()
         if (selection && selection.toString()) {
-          await recordClipboard(selection.toString());
+          await recordClipboard(selection.toString())
         }
       }
-    }, 100);
-  });
+    }, 100)
+  })
 
   /**
    * 监听 cut 事件
@@ -68,19 +67,19 @@
     setTimeout(async () => {
       try {
         if (navigator.clipboard && navigator.clipboard.readText) {
-          const text = await navigator.clipboard.readText();
+          const text = await navigator.clipboard.readText()
           if (text) {
-            await recordClipboard(text);
+            await recordClipboard(text)
           }
         }
       } catch (error) {
-        const selection = document.getSelection();
+        const selection = document.getSelection()
         if (selection && selection.toString()) {
-          await recordClipboard(selection.toString());
+          await recordClipboard(selection.toString())
         }
       }
-    }, 100);
-  });
+    }, 100)
+  })
 
-  console.log('[ClipboardWatcher] 已初始化');
-})();
+  console.log('[ClipboardWatcher] 已初始化')
+})()

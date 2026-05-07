@@ -433,6 +433,7 @@
 
     return analysis;
   }
+  }
 
   // 导出
   window.SelectorEngine = SelectorEngine;

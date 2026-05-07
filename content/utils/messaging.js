@@ -2,14 +2,14 @@
 // 封装 Chrome Runtime 消息通信（基于 EventBus）
 // 使用 ScriptLoader 进行依赖管理
 
-'use strict';
+'use strict'
 
 /**
  * 检查是否在扩展环境中
  * @returns {boolean}
  */
 export function isExtensionContext() {
-  return typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id;
+  return typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id
 }
 
 /**
@@ -18,9 +18,9 @@ export function isExtensionContext() {
  */
 export function isExtensionContextValid() {
   try {
-    return typeof chrome !== 'undefined' && chrome.runtime && !!chrome.runtime.id;
+    return typeof chrome !== 'undefined' && chrome.runtime && !!chrome.runtime.id
   } catch {
-    return false;
+    return false
   }
 }
 
@@ -29,7 +29,7 @@ export function isExtensionContextValid() {
  * @returns {boolean}
  */
 export function isEventBusReady() {
-  return typeof EventBus !== 'undefined' && EventBus.getState && EventBus.getState().isReady;
+  return typeof EventBus !== 'undefined' && EventBus.getState && EventBus.getState().isReady
 }
 
 /**
@@ -40,27 +40,27 @@ export function isEventBusReady() {
 export function waitForEventBus(timeout = 3000) {
   // 如果已就绪，立即返回
   if (isEventBusReady()) {
-    return Promise.resolve(true);
+    return Promise.resolve(true)
   }
 
   // 优先使用 ScriptLoader 的事件驱动机制
   if (window.ScriptLoader) {
-    return ScriptLoader.waitFor(['EventBus'], timeout);
+    return ScriptLoader.waitFor(['EventBus'], timeout)
   }
 
   // 降级到轮询（兼容旧代码）
   return new Promise((resolve) => {
-    const startTime = Date.now();
+    const startTime = Date.now()
     const checkInterval = setInterval(() => {
       if (isEventBusReady()) {
-        clearInterval(checkInterval);
-        resolve(true);
+        clearInterval(checkInterval)
+        resolve(true)
       } else if (Date.now() - startTime > timeout) {
-        clearInterval(checkInterval);
-        resolve(false);
+        clearInterval(checkInterval)
+        resolve(false)
       }
-    }, 100);
-  });
+    }, 100)
+  })
 }
 
 /**
@@ -73,64 +73,64 @@ export function waitForEventBus(timeout = 3000) {
  * @returns {Promise<any>}
  */
 export async function sendToBackground(message, options = {}) {
-  const { retries = 2, retryDelay = 1000, timeout = 5000 } = options;
+  const { retries = 2, retryDelay = 1000, timeout = 5000 } = options
 
   if (!isExtensionContextValid()) {
-    console.warn('[Messaging] 扩展上下文已失效，请刷新页面');
-    return null;
+    console.warn('[Messaging] 扩展上下文已失效，请刷新页面')
+    return null
   }
 
-  let lastError = null;
+  let lastError = null
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     // 检查扩展上下文是否仍然有效
     if (!isExtensionContextValid()) {
-      console.warn('[Messaging] 扩展上下文已失效，请刷新页面');
-      return null;
+      console.warn('[Messaging] 扩展上下文已失效，请刷新页面')
+      return null
     }
 
     // 优先使用 EventBus
     if (isEventBusReady()) {
       try {
-        return await EventBus.request(message.type, message, { timeout });
+        return await EventBus.request(message.type, message, { timeout })
       } catch (error) {
-        lastError = error;
+        lastError = error
         // 扩展上下文失效，静默返回（扩展刷新后的正常情况）
         if (error.message?.includes('Extension context invalidated')) {
-          return null;
+          return null
         }
         // 超时错误，尝试重试
         if (error.message?.includes('Timeout') && attempt < retries) {
-          console.log(`[Messaging] ${message.type} 超时，第 ${attempt + 1}/${retries} 次重试...`);
-          await new Promise(resolve => setTimeout(resolve, retryDelay));
-          continue;
+          console.log(`[Messaging] ${message.type} 超时，第 ${attempt + 1}/${retries} 次重试...`)
+          await new Promise((resolve) => setTimeout(resolve, retryDelay))
+          continue
         }
         // 降级到原生 API
-        console.warn('[Messaging] EventBus 发送失败，降级到原生:', error.message);
+        console.warn('[Messaging] EventBus 发送失败，降级到原生:', error.message)
       }
     }
 
     // 降级到原生 chrome.runtime
     try {
-      return await chrome.runtime.sendMessage(message);
+      return await chrome.runtime.sendMessage(message)
     } catch (error) {
-      lastError = error;
+      lastError = error
       // 扩展上下文失效，静默返回
       if (error.message?.includes('Extension context invalidated')) {
-        return null;
+        return null
       }
       if (attempt < retries) {
-        console.log(`[Messaging] 原生 API 失败，第 ${attempt + 1}/${retries} 次重试...`);
-        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        console.log(`[Messaging] 原生 API 失败，第 ${attempt + 1}/${retries} 次重试...`)
+        await new Promise((resolve) => setTimeout(resolve, retryDelay))
       }
     }
   }
 
   // 只在非上下文失效错误时打印错误
   if (lastError && !lastError.message?.includes('Extension context invalidated')) {
-    console.error('[Messaging] 发送消息失败:', lastError?.message || '未知错误');
+    console.error('[Messaging] 发送消息失败:', lastError?.message || '未知错误')
   }
-  return null;
+  return null
 }
 
 /**
@@ -142,45 +142,45 @@ export async function sendToBackground(message, options = {}) {
  */
 export function createMessageHandler(handlerId, handlers) {
   if (!isExtensionContext()) {
-    console.warn('[Messaging] 非扩展环境，无法注册消息处理器');
-    return false;
+    console.warn('[Messaging] 非扩展环境，无法注册消息处理器')
+    return false
   }
 
   // 检查是否已注册
   if (window[handlerId]) {
-    console.log(`[Messaging] 处理器 ${handlerId} 已存在，跳过注册`);
-    return false;
+    console.log(`[Messaging] 处理器 ${handlerId} 已存在，跳过注册`)
+    return false
   }
 
-  window[handlerId] = true;
-  console.log(`[Messaging] 注册消息处理器: ${handlerId}`);
+  window[handlerId] = true
+  console.log(`[Messaging] 注册消息处理器: ${handlerId}`)
 
   // 如果 EventBus 就绪，使用 EventBus 注册
   if (isEventBusReady()) {
     for (const [type, handler] of Object.entries(handlers)) {
       EventBus.on(type, async (data, context) => {
-        return await handler(data, context);
-      });
+        return await handler(data, context)
+      })
     }
   } else {
     // 降级到原生 chrome.runtime.onMessage
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-      const handler = handlers[message.type];
+      const handler = handlers[message.type]
       if (handler) {
-        const result = handler(message, sender);
+        const result = handler(message, sender)
         // 支持异步处理
         if (result instanceof Promise) {
-          result.then(sendResponse);
-          return true; // 保持通道开放
+          result.then(sendResponse)
+          return true // 保持通道开放
         }
-        sendResponse(result);
-        return true;
+        sendResponse(result)
+        return true
       }
-      return false; // 未处理，让其他处理器处理
-    });
+      return false // 未处理，让其他处理器处理
+    })
   }
 
-  return true;
+  return true
 }
 
 /**
@@ -194,7 +194,7 @@ export async function checkDomainBlocked(currentDomain, requestDomain) {
     type: 'CHECK_DOMAIN_BLOCKED',
     currentDomain,
     requestDomain,
-  });
+  })
 }
 
 /**
@@ -205,23 +205,26 @@ export async function checkDomainBlocked(currentDomain, requestDomain) {
  */
 export async function registerBlockedDomains(domain, blockedDomains) {
   // 等待 EventBus 就绪
-  const isReady = await waitForEventBus(3000);
+  const isReady = await waitForEventBus(3000)
   if (!isReady) {
-    console.warn('[Messaging] EventBus 未就绪，跳过注册域名');
-    return { success: false, reason: 'EventBus not ready' };
+    console.warn('[Messaging] EventBus 未就绪，跳过注册域名')
+    return { success: false, reason: 'EventBus not ready' }
   }
 
   // 检查扩展上下文
   if (!isExtensionContextValid()) {
-    console.warn('[Messaging] 扩展上下文已失效，跳过注册域名');
-    return { success: false, reason: 'Extension context invalidated' };
+    console.warn('[Messaging] 扩展上下文已失效，跳过注册域名')
+    return { success: false, reason: 'Extension context invalidated' }
   }
 
-  return sendToBackground({
-    type: 'REGISTER_BLOCKED_DOMAINS',
-    domain,
-    blockedDomains,
-  }, { retries: 3, retryDelay: 500, timeout: 8000 });
+  return sendToBackground(
+    {
+      type: 'REGISTER_BLOCKED_DOMAINS',
+      domain,
+      blockedDomains,
+    },
+    { retries: 3, retryDelay: 500, timeout: 8000 }
+  )
 }
 
 /**
@@ -232,10 +235,10 @@ export async function registerBlockedDomains(domain, blockedDomains) {
  */
 export function subscribe(type, callback) {
   if (isEventBusReady()) {
-    return EventBus.subscribe(type, callback);
+    return EventBus.subscribe(type, callback)
   }
   // 降级：返回空函数
-  return () => {};
+  return () => {}
 }
 
 /**
@@ -245,7 +248,7 @@ export function subscribe(type, callback) {
  */
 export async function publish(type, data) {
   if (isEventBusReady()) {
-    await EventBus.publish(type, data);
+    await EventBus.publish(type, data)
   }
 }
 
@@ -260,15 +263,15 @@ const MessagingUtils = {
   registerBlockedDomains,
   subscribe,
   publish,
-};
-export default MessagingUtils;
+}
+export default MessagingUtils
 
 // 避免重复初始化 + 通知 ScriptLoader
 if (typeof window !== 'undefined' && !window.MessagingUtils) {
-  window.MessagingUtils = MessagingUtils;
+  window.MessagingUtils = MessagingUtils
   if (window.ScriptLoader) {
-    ScriptLoader.markReady('MessagingUtils');
+    ScriptLoader.markReady('MessagingUtils')
   }
 }
 
-console.log('[Messaging] 消息通信模块已加载 (EventBus 增强版)');
+console.log('[Messaging] 消息通信模块已加载 (EventBus 增强版)')

@@ -1,12 +1,12 @@
 // ========== 关键词分组管理模块 ==========
 // 支持关键词按站点/类型分类管理
 
-(function () {
-  'use strict';
+;(function () {
+  'use strict'
 
   if (window.KeywordManager) {
-    console.log('[KeywordManager] 已存在，跳过初始化');
-    return;
+    console.log('[KeywordManager] 已存在，跳过初始化')
+    return
   }
 
   /**
@@ -24,16 +24,16 @@
         notInterested: [],
         blocked: [],
         highlighted: [],
-        filtered: []
+        filtered: [],
       },
-      global: []
+      global: [],
     },
 
     // 配置
     config: {
       storageKey: 'keywordManager',
       maxKeywords: 1000,
-      caseSensitive: false
+      caseSensitive: false,
     },
 
     // 初始化状态
@@ -43,12 +43,12 @@
      * 初始化
      */
     async init(options = {}) {
-      if (this.initialized) return true;
-      this.config = { ...this.config, ...options };
-      await this._loadFromStorage();
-      this.initialized = true;
-      console.log('[KeywordManager] 初始化完成');
-      return true;
+      if (this.initialized) return true
+      this.config = { ...this.config, ...options }
+      await this._loadFromStorage()
+      this.initialized = true
+      console.log('[KeywordManager] 初始化完成')
+      return true
     },
 
     /**
@@ -57,13 +57,13 @@
     async _loadFromStorage() {
       try {
         if (typeof StorageUtils !== 'undefined') {
-          const result = await StorageUtils.getLocal(this.config.storageKey);
+          const result = await StorageUtils.getLocal(this.config.storageKey)
           if (result?.[this.config.storageKey]) {
-            this.keywords = { ...this.keywords, ...result[this.config.storageKey] };
+            this.keywords = { ...this.keywords, ...result[this.config.storageKey] }
           }
         }
       } catch (error) {
-        console.error('[KeywordManager] 加载失败:', error);
+        console.error('[KeywordManager] 加载失败:', error)
       }
     },
 
@@ -73,10 +73,10 @@
     async _saveToStorage() {
       try {
         if (typeof StorageUtils !== 'undefined') {
-          await StorageUtils.setLocal({ [this.config.storageKey]: this.keywords });
+          await StorageUtils.setLocal({ [this.config.storageKey]: this.keywords })
         }
       } catch (error) {
-        console.error('[KeywordManager] 保存失败:', error);
+        console.error('[KeywordManager] 保存失败:', error)
       }
     },
 
@@ -84,9 +84,9 @@
      * 标准化关键词
      */
     _normalize(keyword) {
-      if (!keyword || typeof keyword !== 'string') return '';
-      const normalized = keyword.trim();
-      return this.config.caseSensitive ? normalized : normalized.toLowerCase();
+      if (!keyword || typeof keyword !== 'string') return ''
+      const normalized = keyword.trim()
+      return this.config.caseSensitive ? normalized : normalized.toLowerCase()
     },
 
     // ========== 站点分组操作 ==========
@@ -96,53 +96,54 @@
      */
     async addForSite(site, keywords, type = 'default') {
       if (!this.keywords.bySite[site]) {
-        this.keywords.bySite[site] = {};
+        this.keywords.bySite[site] = {}
       }
       if (!this.keywords.bySite[site][type]) {
-        this.keywords.bySite[site][type] = [];
+        this.keywords.bySite[site][type] = []
       }
 
-      const words = Array.isArray(keywords) ? keywords : [keywords];
-      const normalized = words.map(w => this._normalize(w)).filter(w => w);
+      const words = Array.isArray(keywords) ? keywords : [keywords]
+      const normalized = words.map((w) => this._normalize(w)).filter((w) => w)
 
       this.keywords.bySite[site][type] = [
-        ...new Set([...this.keywords.bySite[site][type], ...normalized])
-      ];
+        ...new Set([...this.keywords.bySite[site][type], ...normalized]),
+      ]
 
-      await this._saveToStorage();
-      return this.keywords.bySite[site][type];
+      await this._saveToStorage()
+      return this.keywords.bySite[site][type]
     },
 
     /**
      * 从站点移除关键词
      */
     async removeFromSite(site, keywords, type = 'default') {
-      if (!this.keywords.bySite[site]?.[type]) return [];
+      if (!this.keywords.bySite[site]?.[type]) return []
 
-      const words = Array.isArray(keywords) ? keywords : [keywords];
-      const normalized = words.map(w => this._normalize(w));
+      const words = Array.isArray(keywords) ? keywords : [keywords]
+      const normalized = words.map((w) => this._normalize(w))
 
-      this.keywords.bySite[site][type] = this.keywords.bySite[site][type]
-        .filter(k => !normalized.includes(k));
+      this.keywords.bySite[site][type] = this.keywords.bySite[site][type].filter(
+        (k) => !normalized.includes(k)
+      )
 
-      await this._saveToStorage();
-      return this.keywords.bySite[site][type];
+      await this._saveToStorage()
+      return this.keywords.bySite[site][type]
     },
 
     /**
      * 获取站点关键词
      */
     getSiteKeywords(site, type = null) {
-      if (!this.keywords.bySite[site]) return [];
+      if (!this.keywords.bySite[site]) return []
       if (type) {
-        return this.keywords.bySite[site][type] || [];
+        return this.keywords.bySite[site][type] || []
       }
       // 返回所有类型
-      const allKeywords = [];
+      const allKeywords = []
       for (const keywords of Object.values(this.keywords.bySite[site])) {
-        allKeywords.push(...keywords);
+        allKeywords.push(...keywords)
       }
-      return [...new Set(allKeywords)];
+      return [...new Set(allKeywords)]
     },
 
     // ========== 类型分组操作 ==========
@@ -152,41 +153,38 @@
      */
     async addForType(type, keywords) {
       if (!this.keywords.byType[type]) {
-        this.keywords.byType[type] = [];
+        this.keywords.byType[type] = []
       }
 
-      const words = Array.isArray(keywords) ? keywords : [keywords];
-      const normalized = words.map(w => this._normalize(w)).filter(w => w);
+      const words = Array.isArray(keywords) ? keywords : [keywords]
+      const normalized = words.map((w) => this._normalize(w)).filter((w) => w)
 
-      this.keywords.byType[type] = [
-        ...new Set([...this.keywords.byType[type], ...normalized])
-      ];
+      this.keywords.byType[type] = [...new Set([...this.keywords.byType[type], ...normalized])]
 
-      await this._saveToStorage();
-      return this.keywords.byType[type];
+      await this._saveToStorage()
+      return this.keywords.byType[type]
     },
 
     /**
      * 从类型分组移除
      */
     async removeFromType(type, keywords) {
-      if (!this.keywords.byType[type]) return [];
+      if (!this.keywords.byType[type]) return []
 
-      const words = Array.isArray(keywords) ? keywords : [keywords];
-      const normalized = words.map(w => this._normalize(w));
+      const words = Array.isArray(keywords) ? keywords : [keywords]
+      const normalized = words.map((w) => this._normalize(w))
 
-      this.keywords.byType[type] = this.keywords.byType[type]
-        .filter(k => !normalized.includes(k));
+      this.keywords.byType[type] = this.keywords.byType[type].filter((k) => !normalized.includes(k))
 
-      await this._saveToStorage();
-      return this.keywords.byType[type];
+      await this._saveToStorage()
+      return this.keywords.byType[type]
     },
 
     /**
      * 获取类型关键词
      */
     getTypeKeywords(type) {
-      return this.keywords.byType[type] || [];
+      return this.keywords.byType[type] || []
     },
 
     // ========== 全局关键词操作 ==========
@@ -195,29 +193,26 @@
      * 添加全局关键词
      */
     async addGlobal(keywords) {
-      const words = Array.isArray(keywords) ? keywords : [keywords];
-      const normalized = words.map(w => this._normalize(w)).filter(w => w);
+      const words = Array.isArray(keywords) ? keywords : [keywords]
+      const normalized = words.map((w) => this._normalize(w)).filter((w) => w)
 
-      this.keywords.global = [
-        ...new Set([...this.keywords.global, ...normalized])
-      ];
+      this.keywords.global = [...new Set([...this.keywords.global, ...normalized])]
 
-      await this._saveToStorage();
-      return this.keywords.global;
+      await this._saveToStorage()
+      return this.keywords.global
     },
 
     /**
      * 移除全局关键词
      */
     async removeGlobal(keywords) {
-      const words = Array.isArray(keywords) ? keywords : [keywords];
-      const normalized = words.map(w => this._normalize(w));
+      const words = Array.isArray(keywords) ? keywords : [keywords]
+      const normalized = words.map((w) => this._normalize(w))
 
-      this.keywords.global = this.keywords.global
-        .filter(k => !normalized.includes(k));
+      this.keywords.global = this.keywords.global.filter((k) => !normalized.includes(k))
 
-      await this._saveToStorage();
-      return this.keywords.global;
+      await this._saveToStorage()
+      return this.keywords.global
     },
 
     // ========== 搜索和匹配 ==========
@@ -226,17 +221,17 @@
      * 搜索关键词
      */
     search(query, options = {}) {
-      const { site, type, includeGlobal = true } = options;
-      const results = [];
-      const normalizedQuery = this._normalize(query);
+      const { site, type, includeGlobal = true } = options
+      const results = []
+      const normalizedQuery = this._normalize(query)
 
       // 搜索站点关键词
       if (site && this.keywords.bySite[site]) {
         for (const [kwType, keywords] of Object.entries(this.keywords.bySite[site])) {
-          if (type && kwType !== type) continue;
+          if (type && kwType !== type) continue
           for (const keyword of keywords) {
             if (keyword.includes(normalizedQuery)) {
-              results.push({ keyword, source: `site:${site}:${kwType}` });
+              results.push({ keyword, source: `site:${site}:${kwType}` })
             }
           }
         }
@@ -244,10 +239,10 @@
 
       // 搜索类型关键词
       for (const [kwType, keywords] of Object.entries(this.keywords.byType)) {
-        if (type && kwType !== type) continue;
+        if (type && kwType !== type) continue
         for (const keyword of keywords) {
           if (keyword.includes(normalizedQuery)) {
-            results.push({ keyword, source: `type:${kwType}` });
+            results.push({ keyword, source: `type:${kwType}` })
           }
         }
       }
@@ -256,29 +251,29 @@
       if (includeGlobal) {
         for (const keyword of this.keywords.global) {
           if (keyword.includes(normalizedQuery)) {
-            results.push({ keyword, source: 'global' });
+            results.push({ keyword, source: 'global' })
           }
         }
       }
 
-      return results;
+      return results
     },
 
     /**
      * 检查文本是否匹配关键词
      */
     match(text, options = {}) {
-      const { site, types, includeGlobal = true, notify = false } = options;
-      const normalizedText = this._normalize(text);
-      const matchedKeywords = [];
+      const { site, types, includeGlobal = true, notify = false } = options
+      const normalizedText = this._normalize(text)
+      const matchedKeywords = []
 
       // 检查站点关键词
       if (site && this.keywords.bySite[site]) {
         for (const [type, keywords] of Object.entries(this.keywords.bySite[site])) {
-          if (types && !types.includes(type)) continue;
+          if (types && !types.includes(type)) continue
           for (const keyword of keywords) {
             if (normalizedText.includes(keyword)) {
-              matchedKeywords.push({ keyword, type, source: 'site' });
+              matchedKeywords.push({ keyword, type, source: 'site' })
             }
           }
         }
@@ -286,10 +281,10 @@
 
       // 检查类型关键词
       for (const [type, keywords] of Object.entries(this.keywords.byType)) {
-        if (types && !types.includes(type)) continue;
+        if (types && !types.includes(type)) continue
         for (const keyword of keywords) {
           if (normalizedText.includes(keyword)) {
-            matchedKeywords.push({ keyword, type, source: 'type' });
+            matchedKeywords.push({ keyword, type, source: 'type' })
           }
         }
       }
@@ -298,17 +293,17 @@
       if (includeGlobal) {
         for (const keyword of this.keywords.global) {
           if (normalizedText.includes(keyword)) {
-            matchedKeywords.push({ keyword, type: 'global', source: 'global' });
+            matchedKeywords.push({ keyword, type: 'global', source: 'global' })
           }
         }
       }
 
       // 触发通知
       if (notify && matchedKeywords.length > 0) {
-        this._triggerNotification(matchedKeywords, text);
+        this._triggerNotification(matchedKeywords, text)
       }
 
-      return matchedKeywords;
+      return matchedKeywords
     },
 
     /**
@@ -316,8 +311,8 @@
      */
     async _triggerNotification(matchedKeywords, text) {
       try {
-        const keywordList = matchedKeywords.map(m => m.keyword).join(', ');
-        const message = `匹配到 ${matchedKeywords.length} 个关键词: ${keywordList}`;
+        const keywordList = matchedKeywords.map((m) => m.keyword).join(', ')
+        const message = `匹配到 ${matchedKeywords.length} 个关键词: ${keywordList}`
 
         // 使用 MessagingUtils 发送通知
         if (typeof MessagingUtils !== 'undefined' && MessagingUtils.sendToBackground) {
@@ -330,15 +325,15 @@
               timestamp: Date.now(),
               data: {
                 keywords: matchedKeywords,
-                textPreview: text.slice(0, 100)
-              }
-            }
-          });
+                textPreview: text.slice(0, 100),
+              },
+            },
+          })
         }
       } catch (error) {
         // 静默失败，不影响主流程
         if (!error.message?.includes('Extension context invalidated')) {
-          console.warn('[KeywordManager] 通知发送失败:', error.message);
+          console.warn('[KeywordManager] 通知发送失败:', error.message)
         }
       }
     },
@@ -352,8 +347,8 @@
       return {
         version: '1.0',
         timestamp: Date.now(),
-        keywords: JSON.parse(JSON.stringify(this.keywords))
-      };
+        keywords: JSON.parse(JSON.stringify(this.keywords)),
+      }
     },
 
     /**
@@ -361,32 +356,32 @@
      */
     async importKeywords(data, merge = true) {
       try {
-        const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+        const parsed = typeof data === 'string' ? JSON.parse(data) : data
 
         if (!parsed.keywords) {
-          throw new Error('无效的关键词数据格式');
+          throw new Error('无效的关键词数据格式')
         }
 
         if (merge) {
           for (const [site, types] of Object.entries(parsed.keywords.bySite || {})) {
             for (const [type, keywords] of Object.entries(types)) {
-              await this.addForSite(site, keywords, type);
+              await this.addForSite(site, keywords, type)
             }
           }
           for (const [type, keywords] of Object.entries(parsed.keywords.byType || {})) {
-            await this.addForType(type, keywords);
+            await this.addForType(type, keywords)
           }
-          await this.addGlobal(parsed.keywords.global || []);
+          await this.addGlobal(parsed.keywords.global || [])
         } else {
-          this.keywords = parsed.keywords;
-          await this._saveToStorage();
+          this.keywords = parsed.keywords
+          await this._saveToStorage()
         }
 
-        console.log('[KeywordManager] 导入成功');
-        return true;
+        console.log('[KeywordManager] 导入成功')
+        return true
       } catch (error) {
-        console.error('[KeywordManager] 导入失败:', error);
-        return false;
+        console.error('[KeywordManager] 导入失败:', error)
+        return false
       }
     },
 
@@ -396,24 +391,24 @@
      * 获取统计信息
      */
     getStats() {
-      let totalKeywords = 0;
-      const siteStats = {};
-      const typeStats = {};
+      let totalKeywords = 0
+      const siteStats = {}
+      const typeStats = {}
 
       for (const [site, types] of Object.entries(this.keywords.bySite)) {
-        siteStats[site] = 0;
+        siteStats[site] = 0
         for (const keywords of Object.values(types)) {
-          siteStats[site] += keywords.length;
-          totalKeywords += keywords.length;
+          siteStats[site] += keywords.length
+          totalKeywords += keywords.length
         }
       }
 
       for (const [type, keywords] of Object.entries(this.keywords.byType)) {
-        typeStats[type] = keywords.length;
-        totalKeywords += keywords.length;
+        typeStats[type] = keywords.length
+        totalKeywords += keywords.length
       }
 
-      totalKeywords += this.keywords.global.length;
+      totalKeywords += this.keywords.global.length
 
       return {
         total: totalKeywords,
@@ -421,8 +416,8 @@
         types: Object.keys(this.keywords.byType).length,
         global: this.keywords.global.length,
         siteStats,
-        typeStats
-      };
+        typeStats,
+      }
     },
 
     /**
@@ -435,17 +430,17 @@
           notInterested: [],
           blocked: [],
           highlighted: [],
-          filtered: []
+          filtered: [],
         },
-        global: []
-      };
-      await this._saveToStorage();
-      console.log('[KeywordManager] 已清空所有数据');
-    }
-  };
+        global: [],
+      }
+      await this._saveToStorage()
+      console.log('[KeywordManager] 已清空所有数据')
+    },
+  }
 
   // 导出
-  window.KeywordManager = KeywordManager;
+  window.KeywordManager = KeywordManager
 
-  console.log('[KeywordManager] 关键词管理模块已加载');
-})();
+  console.log('[KeywordManager] 关键词管理模块已加载')
+})()

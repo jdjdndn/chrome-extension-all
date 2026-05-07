@@ -6,25 +6,25 @@
 
 ## 当前状态 (v6)
 
-| 模块 | 状态 | 说明 |
-|------|------|------|
-| JS库替换 | ✅ | 30+ 库，API 拦截 + CDN 降级链 + jsDelivr 动态查询 |
-| CSS框架替换 | ✅ | 14+ CSS 库，独立开关 |
-| 字体替换 | ✅ | Google Fonts / FontAwesome 镜像 |
-| 图片懒加载 | ✅ | 原生 `loading="lazy"` + `fetchPriority="low"` |
-| 图片压缩 | ✅ | Canvas 重绘 WebP/JPEG，2048px 缩放，队列控制 |
-| AVIF 支持 | ✅ | 浏览器支持时优先使用 AVIF 格式 |
-| CDN健康探测 | ✅ | HEAD 探测，5 分钟缓存，RTT 记录，降级链集成 |
-| CDN Preconnect | ✅ | 优先 preconnect，其余 dns-prefetch |
-| API 拦截 | ✅ | 拦截 createElement / appendChild / insertBefore |
-| MutationObserver 兜底 | ✅ | 50ms 批量，每次 100 节点 |
-| 统计持久化 | ✅ | 防抖 + 增量写入 chrome.storage.local |
-| 替换详情记录 | ✅ | 最近 50 条，含类型/库名/CDN/时间 |
-| 资源去重 | ✅ | 页面内 Set 去重 |
-| 压缩结果缓存 | ✅ | 页面内 Map 缓存压缩决策 |
-| 第三方脚本延迟 | ✅ | 自动检测 + 用户规则 + 三级策略（idle/defer/block） |
-| 性能度量 | ✅ | Navigation Timing + 资源统计 + 预估节省时间 |
-| 字体预加载优化 | ✅ | 按字重优先级，最多 3 个 |
+| 模块                  | 状态 | 说明                                               |
+| --------------------- | ---- | -------------------------------------------------- |
+| JS库替换              | ✅   | 30+ 库，API 拦截 + CDN 降级链 + jsDelivr 动态查询  |
+| CSS框架替换           | ✅   | 14+ CSS 库，独立开关                               |
+| 字体替换              | ✅   | Google Fonts / FontAwesome 镜像                    |
+| 图片懒加载            | ✅   | 原生 `loading="lazy"` + `fetchPriority="low"`      |
+| 图片压缩              | ✅   | Canvas 重绘 WebP/JPEG，2048px 缩放，队列控制       |
+| AVIF 支持             | ✅   | 浏览器支持时优先使用 AVIF 格式                     |
+| CDN健康探测           | ✅   | HEAD 探测，5 分钟缓存，RTT 记录，降级链集成        |
+| CDN Preconnect        | ✅   | 优先 preconnect，其余 dns-prefetch                 |
+| API 拦截              | ✅   | 拦截 createElement / appendChild / insertBefore    |
+| MutationObserver 兜底 | ✅   | 50ms 批量，每次 100 节点                           |
+| 统计持久化            | ✅   | 防抖 + 增量写入 chrome.storage.local               |
+| 替换详情记录          | ✅   | 最近 50 条，含类型/库名/CDN/时间                   |
+| 资源去重              | ✅   | 页面内 Set 去重                                    |
+| 压缩结果缓存          | ✅   | 页面内 Map 缓存压缩决策                            |
+| 第三方脚本延迟        | ✅   | 自动检测 + 用户规则 + 三级策略（idle/defer/block） |
+| 性能度量              | ✅   | Navigation Timing + 资源统计 + 预估节省时间        |
+| 字体预加载优化        | ✅   | 按字重优先级，最多 3 个                            |
 
 ### v6 遗留问题
 
@@ -41,6 +41,7 @@
 **目标**：增强用户可控性 + 提升压缩准确性 + 配置可移植性
 
 **原则**：
+
 - 高 ROI 优先：站点配置 > 精准压缩 > 配置导入导出
 - 不改变现有核心拦截架构，增量扩展
 - 每个迭代独立可交付、可验证
@@ -55,6 +56,7 @@
 ### 问题分析
 
 当前加速器是全局生效的，但某些站点可能：
+
 - 自身已有 CDN 加速，不需要替换
 - 有特殊 CSP 限制，替换会导致功能异常
 - 图片压缩不适用（如图片编辑网站）
@@ -94,6 +96,7 @@
 ```
 
 **配置优先级**：
+
 1. 站点规则中明确指定的功能开关 → 最高优先级
 2. 站点规则的 `enabled` 字段 → 控制该站点是否启用
 3. 全局配置 → 默认行为
@@ -102,33 +105,33 @@
 
 ```javascript
 function getSiteConfig(hostname) {
-  const rules = state.config.siteConfig?.rules || [];
+  const rules = state.config.siteConfig?.rules || []
 
   // 精确匹配优先
-  const exact = rules.find(r => r.domain === hostname);
-  if (exact) return exact;
+  const exact = rules.find((r) => r.domain === hostname)
+  if (exact) return exact
 
   // 通配符匹配 (*.domain.com)
-  const wildcard = rules.find(r => {
-    if (!r.domain.startsWith('*')) return false;
-    const suffix = r.domain.slice(1);
-    return hostname.endsWith(suffix);
-  });
+  const wildcard = rules.find((r) => {
+    if (!r.domain.startsWith('*')) return false
+    const suffix = r.domain.slice(1)
+    return hostname.endsWith(suffix)
+  })
 
-  return wildcard || null;
+  return wildcard || null
 }
 
 function isSiteEnabled(feature) {
-  const site = getSiteConfig(location.hostname);
+  const site = getSiteConfig(location.hostname)
 
   // 站点级别完全禁用
-  if (site && site.enabled === false) return false;
+  if (site && site.enabled === false) return false
 
   // 站点级别功能开关
-  if (site && feature in site) return site[feature];
+  if (site && feature in site) return site[feature]
 
   // 回退到全局配置
-  return state.config[feature];
+  return state.config[feature]
 }
 ```
 
@@ -137,36 +140,36 @@ function isSiteEnabled(feature) {
 ```javascript
 // processScript 开头
 function processScript(script) {
-  if (!isSiteEnabled('jsReplace')) return;
+  if (!isSiteEnabled('jsReplace')) return
   // ... 现有逻辑 ...
 }
 
 // processLink 开头
 function processLink(link) {
-  if (!isSiteEnabled('fontReplace') && !isSiteEnabled('cssReplace')) return;
+  if (!isSiteEnabled('fontReplace') && !isSiteEnabled('cssReplace')) return
   // ... 现有逻辑 ...
 }
 
 // processImage 开头
 function processImage(img) {
-  if (!isSiteEnabled('imageLazyLoad')) return;
+  if (!isSiteEnabled('imageLazyLoad')) return
   // ... 现有逻辑 ...
 }
 
 // compressImage 开头
 function compressImage(url) {
-  if (!isSiteEnabled('imageCompress')) return null;
+  if (!isSiteEnabled('imageCompress')) return null
   // ... 现有逻辑 ...
 }
 ```
 
 ### 文件变更
 
-| 文件 | 变更 |
-|------|------|
+| 文件                                      | 变更                                                          |
+| ----------------------------------------- | ------------------------------------------------------------- |
 | `content/modules/resource-accelerator.js` | 新增 `getSiteConfig()`、`isSiteEnabled()`，各处理函数开头调用 |
-| `popup.html` | 新增站点配置管理 UI |
-| `popup.js` | 新增站点配置 CRUD 逻辑 |
+| `popup.html`                              | 新增站点配置管理 UI                                           |
+| `popup.js`                                | 新增站点配置 CRUD 逻辑                                        |
 
 ### 配置项
 
@@ -191,11 +194,11 @@ function compressImage(url) {
 
 ### 风险
 
-| 风险 | 影响 | 缓解 |
-|------|------|------|
-| 规则过多导致匹配性能下降 | 规则匹配耗时增加 | 规则数量限制（最多 50 条）+ 精确匹配优先 |
-| 用户配置错误导致功能异常 | 某些站点功能被意外禁用 | 提供重置按钮 + 默认值恢复 |
-| 通配符匹配过于宽泛 | 意外匹配到不相关站点 | 提示用户确认通配符规则 |
+| 风险                     | 影响                   | 缓解                                     |
+| ------------------------ | ---------------------- | ---------------------------------------- |
+| 规则过多导致匹配性能下降 | 规则匹配耗时增加       | 规则数量限制（最多 50 条）+ 精确匹配优先 |
+| 用户配置错误导致功能异常 | 某些站点功能被意外禁用 | 提供重置按钮 + 默认值恢复                |
+| 通配符匹配过于宽泛       | 意外匹配到不相关站点   | 提示用户确认通配符规则                   |
 
 ---
 
@@ -206,6 +209,7 @@ function compressImage(url) {
 ### 问题分析
 
 当前图片压缩使用 `naturalWidth × naturalHeight × 4` 估算文件大小，但：
+
 - PNG 无损格式实际体积可能远大于估算
 - 已压缩的 JPEG 实际体积可能小于估算
 - 导致部分小体积图片被误压缩，或大体积图片被跳过
@@ -217,28 +221,28 @@ function compressImage(url) {
 ```javascript
 async function getImageActualSize(url) {
   try {
-    const response = await fetch(url, { method: 'HEAD', mode: 'no-cors' });
-    const contentLength = response.headers.get('content-length');
+    const response = await fetch(url, { method: 'HEAD', mode: 'no-cors' })
+    const contentLength = response.headers.get('content-length')
     if (contentLength) {
-      return parseInt(contentLength, 10);
+      return parseInt(contentLength, 10)
     }
   } catch {
     // CORS 限制或其他错误，降级到估算
   }
-  return null;
+  return null
 }
 
 async function compressImage(url) {
   // ... 缓存检查 ...
 
   // 优先获取实际大小
-  const actualSize = await getImageActualSize(url);
-  const bytes = actualSize || (img.naturalWidth * img.naturalHeight * 4);
+  const actualSize = await getImageActualSize(url)
+  const bytes = actualSize || img.naturalWidth * img.naturalHeight * 4
 
   if (bytes < state.config.imageMinSize) {
-    state._compressCache.set(url, { skip: true });
-    resolve(null);
-    return;
+    state._compressCache.set(url, { skip: true })
+    resolve(null)
+    return
   }
 
   // ... 后续压缩逻辑 ...
@@ -246,14 +250,15 @@ async function compressImage(url) {
 ```
 
 **优化策略**：
+
 - HEAD 请求缓存结果 30 秒，避免重复请求
 - CORS 限制时降级到像素估算
 - 并发限制：最多 5 个并发 HEAD 请求
 
 ### 文件变更
 
-| 文件 | 变更 |
-|------|------|
+| 文件                                      | 变更                                                |
+| ----------------------------------------- | --------------------------------------------------- |
 | `content/modules/resource-accelerator.js` | 新增 `getImageActualSize()`，修改 `compressImage()` |
 
 ### 验收标准
@@ -266,11 +271,11 @@ async function compressImage(url) {
 
 ### 风险
 
-| 风险 | 影响 | 缓解 |
-|------|------|------|
+| 风险                  | 影响             | 缓解                               |
+| --------------------- | ---------------- | ---------------------------------- |
 | HEAD 请求增加网络开销 | 额外请求消耗带宽 | 缓存 + 并发限制 + 仅对潜在大图请求 |
-| CORS 限制导致失败 | 无法获取实际大小 | 降级到像素估算 |
-| HEAD 请求延迟 | 压缩决策延迟 | 设置超时（3 秒）+ 降级 |
+| CORS 限制导致失败     | 无法获取实际大小 | 降级到像素估算                     |
+| HEAD 请求延迟         | 压缩决策延迟     | 设置超时（3 秒）+ 降级             |
 
 ---
 
@@ -281,6 +286,7 @@ async function compressImage(url) {
 ### 问题分析
 
 用户配置（站点规则、第三方延迟规则、排除域名等）无法导出，导致：
+
 - 换设备时需要重新配置
 - 无法分享配置给其他用户
 - 无法备份配置防止丢失
@@ -308,6 +314,7 @@ async function compressImage(url) {
 ```
 
 **导入逻辑**：
+
 1. 读取 JSON 文件
 2. 验证版本号和结构
 3. 合并到现有配置（用户选择覆盖或合并）
@@ -327,11 +334,11 @@ async function compressImage(url) {
 
 ### 文件变更
 
-| 文件 | 变更 |
-|------|------|
+| 文件                                      | 变更                                    |
+| ----------------------------------------- | --------------------------------------- |
 | `content/modules/resource-accelerator.js` | 新增 `exportConfig()`、`importConfig()` |
-| `popup.html` | 新增配置管理按钮区域 |
-| `popup.js` | 新增导入导出逻辑 |
+| `popup.html`                              | 新增配置管理按钮区域                    |
+| `popup.js`                                | 新增导入导出逻辑                        |
 
 ### 验收标准
 
@@ -343,11 +350,11 @@ async function compressImage(url) {
 
 ### 风险
 
-| 风险 | 影响 | 缓解 |
-|------|------|------|
-| 导入配置格式错误 | 导入失败或配置损坏 | 严格验证 + 错误提示 |
-| 配置版本不兼容 | 导入旧版配置失败 | 版本号检查 + 兼容性处理 |
-| 导入恶意配置 | 安全风险 | 仅导入 JSON + 验证结构 |
+| 风险             | 影响               | 缓解                    |
+| ---------------- | ------------------ | ----------------------- |
+| 导入配置格式错误 | 导入失败或配置损坏 | 严格验证 + 错误提示     |
+| 配置版本不兼容   | 导入旧版配置失败   | 版本号检查 + 兼容性处理 |
+| 导入恶意配置     | 安全风险           | 仅导入 JSON + 验证结构  |
 
 ---
 
@@ -407,46 +414,50 @@ async function compressImage(url) {
 ```javascript
 // 保存基线数据（加速器关闭时）
 function savePerformanceBaseline() {
-  const metrics = collectPerformanceMetrics();
-  chrome.storage.local.set({ performanceBaseline: metrics });
+  const metrics = collectPerformanceMetrics()
+  chrome.storage.local.set({ performanceBaseline: metrics })
 }
 
 // 对比当前数据与基线
 function getPerformanceComparison() {
-  const baseline = chrome.storage.local.get('performanceBaseline');
-  const current = state.performance;
+  const baseline = chrome.storage.local.get('performanceBaseline')
+  const current = state.performance
 
-  if (!baseline || !current) return null;
+  if (!baseline || !current) return null
 
   return {
     loadTime: {
       before: baseline.loadEvent,
       after: current.loadEvent,
       saved: baseline.loadEvent - current.loadEvent,
-      percent: Math.round((baseline.loadEvent - current.loadEvent) / baseline.loadEvent * 100),
+      percent: Math.round(((baseline.loadEvent - current.loadEvent) / baseline.loadEvent) * 100),
     },
     transferSize: {
       before: baseline.totalTransferSize,
       after: current.totalTransferSize || estimateTransferSize(),
       saved: baseline.totalTransferSize - (current.totalTransferSize || estimateTransferSize()),
-      percent: Math.round((baseline.totalTransferSize - (current.totalTransferSize || estimateTransferSize())) / baseline.totalTransferSize * 100),
+      percent: Math.round(
+        ((baseline.totalTransferSize - (current.totalTransferSize || estimateTransferSize())) /
+          baseline.totalTransferSize) *
+          100
+      ),
     },
     resources: {
       before: baseline.totalResources,
       after: current.totalResources,
       replaced: baseline.totalResources - current.totalResources,
-    }
-  };
+    },
+  }
 }
 ```
 
 ### 文件变更
 
-| 文件 | 变更 |
-|------|------|
+| 文件                                      | 变更                                                           |
+| ----------------------------------------- | -------------------------------------------------------------- |
 | `content/modules/resource-accelerator.js` | 新增 `savePerformanceBaseline()`、`getPerformanceComparison()` |
-| `popup.html` | 新增性能对比展示区域 |
-| `popup.js` | 新增性能对比逻辑 |
+| `popup.html`                              | 新增性能对比展示区域                                           |
+| `popup.js`                                | 新增性能对比逻辑                                               |
 
 ### 验收标准
 
@@ -458,11 +469,11 @@ function getPerformanceComparison() {
 
 ### 风险
 
-| 风险 | 影响 | 缓解 |
-|------|------|------|
-| 基线数据不准确 | 对比结果失真 | 多次采集取平均 + 用户可手动重置 |
-| 首次使用无基线 | 无法对比 | 首次使用提示用户关闭加速器采集基线 |
-| 性能数据波动 | 对比结果不稳定 | 采集多次取中位数 |
+| 风险           | 影响           | 缓解                               |
+| -------------- | -------------- | ---------------------------------- |
+| 基线数据不准确 | 对比结果失真   | 多次采集取平均 + 用户可手动重置    |
+| 首次使用无基线 | 无法对比       | 首次使用提示用户关闭加速器采集基线 |
+| 性能数据波动   | 对比结果不稳定 | 采集多次取中位数                   |
 
 ---
 
@@ -473,6 +484,7 @@ function getPerformanceComparison() {
 ### 问题分析
 
 当前排除功能只支持域名和 URL 模式匹配，无法满足：
+
 - 按文件类型过滤（如不压缩 PNG）
 - 按 URL 路径过滤（如不处理 /api/ 路径）
 - 按请求方法过滤（如不处理 POST 请求）
@@ -513,6 +525,7 @@ function getPerformanceComparison() {
 ```
 
 **匹配类型**：
+
 - `extension`：文件扩展名
 - `path`：URL 路径
 - `domain`：域名
@@ -520,6 +533,7 @@ function getPerformanceComparison() {
 - `regex`：正则表达式
 
 **动作类型**：
+
 - `skipAll`：跳过所有处理
 - `skipCompress`：跳过压缩
 - `skipReplace`：跳过替换
@@ -527,11 +541,11 @@ function getPerformanceComparison() {
 
 ### 文件变更
 
-| 文件 | 变更 |
-|------|------|
+| 文件                                      | 变更                                         |
+| ----------------------------------------- | -------------------------------------------- |
 | `content/modules/resource-accelerator.js` | 新增 `matchAdvancedFilter()`，各处理函数调用 |
-| `popup.html` | 新增高级过滤规则管理 UI |
-| `popup.js` | 新增规则 CRUD 逻辑 |
+| `popup.html`                              | 新增高级过滤规则管理 UI                      |
+| `popup.js`                                | 新增规则 CRUD 逻辑                           |
 
 ### 验收标准
 
@@ -543,11 +557,11 @@ function getPerformanceComparison() {
 
 ### 风险
 
-| 风险 | 影响 | 缓解 |
-|------|------|------|
-| 规则过于复杂 | 用户难以理解和配置 | 提供预设模板 + 清晰的描述 |
-| 规则冲突 | 行为不确定 | 明确的优先级规则 + 文档说明 |
-| 性能影响 | 规则匹配耗时 | 规则数量限制 + 简单规则优先 |
+| 风险         | 影响               | 缓解                        |
+| ------------ | ------------------ | --------------------------- |
+| 规则过于复杂 | 用户难以理解和配置 | 提供预设模板 + 清晰的描述   |
+| 规则冲突     | 行为不确定         | 明确的优先级规则 + 文档说明 |
+| 性能影响     | 规则匹配耗时       | 规则数量限制 + 简单规则优先 |
 
 ---
 
@@ -560,6 +574,7 @@ function getPerformanceComparison() {
 **优先级**：迭代 1 > 迭代 2 > 迭代 3 > 迭代 4 > 迭代 5
 
 **理由**：
+
 - 迭代 1（站点配置）ROI 最高：解决用户可控性问题，是长期使用的基础设施
 - 迭代 2（精准压缩）提升压缩准确性，减少误判
 - 迭代 3（配置导入导出）提升用户体验，支持配置迁移
@@ -570,23 +585,23 @@ function getPerformanceComparison() {
 
 ## 风险评估
 
-| 风险 | 影响 | 缓解措施 |
-|------|------|---------|
-| 站点配置规则过多导致性能问题 | 规则匹配耗时 | 规则数量限制（50 条）+ 精确匹配优先 |
-| HEAD 请求增加网络开销 | 额外请求消耗带宽 | 缓存 + 并发限制 + 仅对潜在大图请求 |
-| 导入配置格式错误 | 导入失败或配置损坏 | 严格验证 + 错误提示 + 版本号检查 |
-| 基线数据不准确 | 对比结果失真 | 多次采集取平均 + 用户可手动重置 |
-| 高级规则过于复杂 | 用户难以理解和配置 | 提供预设模板 + 清晰的描述 + 规则数量限制 |
+| 风险                         | 影响               | 缓解措施                                 |
+| ---------------------------- | ------------------ | ---------------------------------------- |
+| 站点配置规则过多导致性能问题 | 规则匹配耗时       | 规则数量限制（50 条）+ 精确匹配优先      |
+| HEAD 请求增加网络开销        | 额外请求消耗带宽   | 缓存 + 并发限制 + 仅对潜在大图请求       |
+| 导入配置格式错误             | 导入失败或配置损坏 | 严格验证 + 错误提示 + 版本号检查         |
+| 基线数据不准确               | 对比结果失真       | 多次采集取平均 + 用户可手动重置          |
+| 高级规则过于复杂             | 用户难以理解和配置 | 提供预设模板 + 清晰的描述 + 规则数量限制 |
 
 ---
 
 ## 文件变更汇总
 
-| 文件 | 迭代1 | 迭代2 | 迭代3 | 迭代4 | 迭代5 |
-|------|-------|-------|-------|-------|-------|
-| `content/modules/resource-accelerator.js` | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `popup.html` | ✅ | - | ✅ | ✅ | ✅ |
-| `popup.js` | ✅ | - | ✅ | ✅ | ✅ |
+| 文件                                      | 迭代1 | 迭代2 | 迭代3 | 迭代4 | 迭代5 |
+| ----------------------------------------- | ----- | ----- | ----- | ----- | ----- |
+| `content/modules/resource-accelerator.js` | ✅    | ✅    | ✅    | ✅    | ✅    |
+| `popup.html`                              | ✅    | -     | ✅    | ✅    | ✅    |
+| `popup.js`                                | ✅    | -     | ✅    | ✅    | ✅    |
 
 ---
 
@@ -594,13 +609,13 @@ function getPerformanceComparison() {
 
 v6 完成了第三方脚本延迟、性能度量、AVIF 压缩、字体预加载优化。v7 在此基础上：
 
-| v6 基础设施 | v7 扩展 |
-|-------------|---------|
-| 全局配置 `DEFAULT_CONFIG` | 扩展为支持站点级配置覆盖 |
+| v6 基础设施                | v7 扩展                  |
+| -------------------------- | ------------------------ |
+| 全局配置 `DEFAULT_CONFIG`  | 扩展为支持站点级配置覆盖 |
 | `compressImage()` 像素估算 | 扩展为 HEAD 获取实际大小 |
-| `state.stats` 统计收集 | 扩展为性能基线对比 |
-| 排除域名/URL | 扩展为高级过滤规则 |
-| 配置存储在 chrome.storage | 扩展为支持导入导出 |
+| `state.stats` 统计收集     | 扩展为性能基线对比       |
+| 排除域名/URL               | 扩展为高级过滤规则       |
+| 配置存储在 chrome.storage  | 扩展为支持导入导出       |
 
 ---
 

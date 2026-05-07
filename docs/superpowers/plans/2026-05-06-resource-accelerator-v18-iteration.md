@@ -14,11 +14,13 @@
 ### 功能设计
 
 扫描页面中的 `<iframe[src]>`，对第三方 iframe：
+
 - 移除 `src`，存到 `data-src`
 - 设置 `loading="lazy"`
 - 通过 IntersectionObserver 在进入可视区 200px 时恢复 `src`
 
 **配置：**
+
 ```javascript
 iframeLazyLoad: {
   enabled: true,
@@ -30,6 +32,7 @@ iframeLazyLoad: {
 ### 集成代码
 
 **1. 添加配置到 DEFAULT_CONFIG：**
+
 ```javascript
 // 第三方iframe懒加载
 iframeLazyLoad: {
@@ -40,54 +43,59 @@ iframeLazyLoad: {
 ```
 
 **2. 添加处理函数（在 processImage 之后）：**
+
 ```javascript
 // ========== 第三方iframe懒加载 ==========
 function processIframeLazyLoad() {
-  if (!isSiteEnabled('iframeLazyLoad')) return;
-  const config = state.config.iframeLazyLoad;
-  const threshold = config.threshold || 200;
+  if (!isSiteEnabled('iframeLazyLoad')) return
+  const config = state.config.iframeLazyLoad
+  const threshold = config.threshold || 200
 
-  const iframes = document.querySelectorAll('iframe[src]');
-  iframes.forEach(iframe => {
+  const iframes = document.querySelectorAll('iframe[src]')
+  iframes.forEach((iframe) => {
     try {
-      const url = new URL(iframe.src, location.href);
+      const url = new URL(iframe.src, location.href)
       // 跳过同源 iframe
-      if (url.hostname === location.hostname) return;
+      if (url.hostname === location.hostname) return
       // 跳过排除的域名
-      if (config.excludePatterns?.some(p => url.hostname.includes(p))) return;
+      if (config.excludePatterns?.some((p) => url.hostname.includes(p))) return
       // 跳过已经处理过的
-      if (iframe.dataset._raIframeProcessed) return;
+      if (iframe.dataset._raIframeProcessed) return
 
-      iframe.dataset._raIframeProcessed = '1';
-      iframe.dataset.src = iframe.src;
-      iframe.removeAttribute('src');
-      iframe.loading = 'lazy';
+      iframe.dataset._raIframeProcessed = '1'
+      iframe.dataset.src = iframe.src
+      iframe.removeAttribute('src')
+      iframe.loading = 'lazy'
 
       // IntersectionObserver 恢复 src
-      const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            const el = entry.target;
-            if (el.dataset.src) {
-              el.src = el.dataset.src;
-              delete el.dataset.src;
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              const el = entry.target
+              if (el.dataset.src) {
+                el.src = el.dataset.src
+                delete el.dataset.src
+              }
+              observer.unobserve(el)
             }
-            observer.unobserve(el);
-          }
-        });
-      }, { rootMargin: `0px 0px ${threshold}px 0px` });
-      observer.observe(iframe);
+          })
+        },
+        { rootMargin: `0px 0px ${threshold}px 0px` }
+      )
+      observer.observe(iframe)
     } catch {
       // URL 解析失败，跳过
     }
-  });
+  })
 }
 ```
 
 **3. 在 init() 中调用（处理已有资源部分）：**
+
 ```javascript
 // 处理已有iframe
-processIframeLazyLoad();
+processIframeLazyLoad()
 ```
 
 **4. MutationObserver 中添加 iframe 处理：**
@@ -104,6 +112,7 @@ processIframeLazyLoad();
 扫描页面中所有 `<script src>` / `<link href>` / `<img src>` / `<iframe src>` 的外部域名，对未添加 dns-prefetch 的域名自动添加。
 
 **配置：**
+
 ```javascript
 dnsPrefetch: {
   enabled: true,
@@ -114,6 +123,7 @@ dnsPrefetch: {
 ### 集成代码
 
 **1. 添加配置到 DEFAULT_CONFIG：**
+
 ```javascript
 // 全站DNS prefetch
 dnsPrefetch: {
@@ -123,47 +133,49 @@ dnsPrefetch: {
 ```
 
 **2. 添加处理函数：**
+
 ```javascript
 // ========== 全站DNS prefetch ==========
 function _addGlobalDnsPrefetch() {
-  if (!isSiteEnabled('dnsPrefetch')) return;
-  const config = state.config.dnsPrefetch;
-  const maxDomains = config.maxDomains || 15;
-  const origins = new Set();
-  const head = document.head || document.documentElement;
+  if (!isSiteEnabled('dnsPrefetch')) return
+  const config = state.config.dnsPrefetch
+  const maxDomains = config.maxDomains || 15
+  const origins = new Set()
+  const head = document.head || document.documentElement
 
   // 扫描所有外部资源
-  document.querySelectorAll('script[src], link[href], img[src], iframe[src]').forEach(el => {
-    const url = el.src || el.href;
-    if (!url) return;
+  document.querySelectorAll('script[src], link[href], img[src], iframe[src]').forEach((el) => {
+    const url = el.src || el.href
+    if (!url) return
     try {
-      const origin = new URL(url, location.href).origin;
+      const origin = new URL(url, location.href).origin
       if (origin !== location.origin) {
-        origins.add(origin);
+        origins.add(origin)
       }
     } catch {}
-  });
+  })
 
   // 添加 dns-prefetch（排除已有 preconnect 的）
-  let count = 0;
-  origins.forEach(origin => {
-    if (count >= maxDomains) return;
-    if (head.querySelector(`link[rel="preconnect"][href="${origin}"]`)) return;
-    if (head.querySelector(`link[rel="dns-prefetch"][href="${origin}"]`)) return;
+  let count = 0
+  origins.forEach((origin) => {
+    if (count >= maxDomains) return
+    if (head.querySelector(`link[rel="preconnect"][href="${origin}"]`)) return
+    if (head.querySelector(`link[rel="dns-prefetch"][href="${origin}"]`)) return
 
-    const link = document.createElement('link');
-    link.rel = 'dns-prefetch';
-    link.href = origin;
-    head.appendChild(link);
-    count++;
-  });
+    const link = document.createElement('link')
+    link.rel = 'dns-prefetch'
+    link.href = origin
+    head.appendChild(link)
+    count++
+  })
 }
 ```
 
-**3. 在 init() 中调用（在 _addCDNPreconnect 之后）：**
+**3. 在 init() 中调用（在 \_addCDNPreconnect 之后）：**
+
 ```javascript
 // 全站DNS prefetch
-_addGlobalDnsPrefetch();
+_addGlobalDnsPrefetch()
 ```
 
 ---

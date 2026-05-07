@@ -5,6 +5,7 @@
 ## 主要功能
 
 ### 核心功能
+
 - **EventBus 消息系统** - 高性能跨组件通信 (v4.6)
 - **懒初始化架构** - 分层加载，按需初始化
 - **元素选择器** - DevTools 面板可视化选择页面元素
@@ -13,20 +14,22 @@
 - **脚本开关** - 独立控制各功能模块的启用/禁用
 
 ### 支持的网站
-| 网站 | 功能 |
-|------|------|
-| 抖音 (douyin.com) | 关键词过滤、自动关注、视频控制 |
-| B站 (bilibili.com) | 关键词过滤、视频推荐过滤 |
-| YouTube | 视频控制、广告跳过 |
-| GitHub | 仓库增强 |
-| 小红书 | 内容过滤 |
-| 夸克网盘 | 下载增强 |
-| 阿里云盘 | 下载增强 |
-| 百度网盘 | 下载增强 |
-| Boss直聘 | 求职辅助 |
-| 4hu、18comic 等 | 内容增强 |
+
+| 网站               | 功能                           |
+| ------------------ | ------------------------------ |
+| 抖音 (douyin.com)  | 关键词过滤、自动关注、视频控制 |
+| B站 (bilibili.com) | 关键词过滤、视频推荐过滤       |
+| YouTube            | 视频控制、广告跳过             |
+| GitHub             | 仓库增强                       |
+| 小红书             | 内容过滤                       |
+| 夸克网盘           | 下载增强                       |
+| 阿里云盘           | 下载增强                       |
+| 百度网盘           | 下载增强                       |
+| Boss直聘           | 求职辅助                       |
+| 4hu、18comic 等    | 内容增强                       |
 
 ### 通用功能
+
 - 重定向链接替换
 - 文本转链接
 - 非同源链接新窗口打开
@@ -37,6 +40,7 @@
 - 面板位置管理
 
 ### 新标签页
+
 - 快捷链接管理
 - 历史记录展示
 - 学习资源分类
@@ -154,6 +158,7 @@ chrome-extension-template/
 ## 使用
 
 ### Popup 面板
+
 - 启用/禁用扩展
 - 管理阻止域名
 - 配置隐藏元素选择器
@@ -161,11 +166,13 @@ chrome-extension-template/
 - 配置站点关键词（抖音、B站）
 
 ### DevTools 面板
+
 - EventBus 事件监控
 - 元素选择器
 - 隐藏元素管理
 
 ### 新标签页
+
 - 快捷链接：点击 "+" 添加
 - 右键菜单：页面任意位置 "添加到新标签页"
 - 学习资源：分类管理常用学习链接
@@ -173,57 +180,62 @@ chrome-extension-template/
 ## 配置
 
 ### 脚本开关
+
 通过 Popup 或代码控制：
+
 ```javascript
 // 获取开关状态
-getScriptSwitch('redirect-links'); // 同步，使用缓存
-await getScriptSwitchAsync('redirect-links'); // 异步
+getScriptSwitch('redirect-links') // 同步，使用缓存
+await getScriptSwitchAsync('redirect-links') // 异步
 
 // 设置开关
-await setScriptSwitch('redirect-links', false);
+await setScriptSwitch('redirect-links', false)
 ```
 
 ### 隐藏元素
+
 ```javascript
 // 通过消息更新
 chrome.runtime.sendMessage({
   type: 'UPDATE_HIDE_ELEMENTS',
   enabled: true,
-  selectors: ['.ad-banner', '#popup']
-});
+  selectors: ['.ad-banner', '#popup'],
+})
 ```
 
 ### 域名阻止
+
 ```javascript
 // 添加阻止域名
 chrome.runtime.sendMessage({
   type: 'ADD_BLOCKED_DOMAIN',
-  domain: 'tracking.example.com'
-});
+  domain: 'tracking.example.com',
+})
 ```
 
 ## EventBus API
 
 ```javascript
 // 发送事件
-EventBus.emit('EVENT_NAME', { data: 'value' });
+EventBus.emit('EVENT_NAME', { data: 'value' })
 
 // 监听事件
 EventBus.on('EVENT_NAME', (data) => {
-  console.log('Received:', data);
-});
+  console.log('Received:', data)
+})
 
 // 请求-响应模式
-const response = await EventBus.request('GET_STATE');
+const response = await EventBus.request('GET_STATE')
 
 // 跨环境通信
-EventBus.requestToBackground('GET_BLOCKED_DOMAINS');
-EventBus.emitToContent('UPDATE_HIDE_ELEMENTS', data);
+EventBus.requestToBackground('GET_BLOCKED_DOMAINS')
+EventBus.emitToContent('UPDATE_HIDE_ELEMENTS', data)
 ```
 
 ## 开发
 
 ### 构建命令
+
 ```bash
 # 清理 dist
 npm run clean
@@ -236,26 +248,27 @@ npm run watch
 ```
 
 ### 调试
+
 - Popup: 右键扩展图标 → 检查弹出内容
 - Content Script: 页面 DevTools → Console
 - Service Worker: chrome://extensions/ → 检查视图
 
 ## 权限说明
 
-| 权限 | 用途 |
-|------|------|
-| tabs | 标签页管理 |
-| storage | 配置存储 |
-| activeTab | 当前标签页访问 |
-| scripting | 脚本注入 |
-| declarativeNetRequest | 网络请求拦截 |
-| cookies | Cookie 管理 |
-| browsingData | 浏览数据清理 |
-| bookmarks | 书签导入 |
-| history | 历史记录展示 |
-| notifications | 通知推送 |
-| contextMenus | 右键菜单 |
-| downloads | 文件下载 |
+| 权限                  | 用途           |
+| --------------------- | -------------- |
+| tabs                  | 标签页管理     |
+| storage               | 配置存储       |
+| activeTab             | 当前标签页访问 |
+| scripting             | 脚本注入       |
+| declarativeNetRequest | 网络请求拦截   |
+| cookies               | Cookie 管理    |
+| browsingData          | 浏览数据清理   |
+| bookmarks             | 书签导入       |
+| history               | 历史记录展示   |
+| notifications         | 通知推送       |
+| contextMenus          | 右键菜单       |
+| downloads             | 文件下载       |
 
 ## 注意事项
 

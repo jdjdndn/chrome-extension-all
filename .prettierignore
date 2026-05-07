@@ -1,0 +1,12 @@
+dist/
+node_modules/
+coverage/
+*.min.js
+*.bundle.js
+event-bus-*.js
+content/bundled/
+content/core-bundle.js
+content/common-bundle.js
+data/
+*.d.ts
+content/modules/SelectorEngine.js

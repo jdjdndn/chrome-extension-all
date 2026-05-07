@@ -16,7 +16,7 @@ export const ConsoleAPIDefinitions = {
     ? document.querySelectorAll(selector)
     : document.querySelector(selector);
   return elements;
-}`
+}`,
     },
     {
       name: '$xpath',
@@ -36,7 +36,7 @@ export const ConsoleAPIDefinitions = {
     elements.push(result.snapshotItem(i));
   }
   return elements.length === 1 ? elements[0] : elements;
-}`
+}`,
     },
     {
       name: '$parent',
@@ -50,7 +50,7 @@ export const ConsoleAPIDefinitions = {
     el = el.parentElement;
   }
   return null;
-}`
+}`,
     },
     {
       name: '$children',
@@ -61,7 +61,7 @@ export const ConsoleAPIDefinitions = {
   if (!element) return [];
   const children = Array.from(element.children);
   return selector ? children.filter(c => c.matches(selector)) : children;
-}`
+}`,
     },
     {
       name: '$siblings',
@@ -72,7 +72,7 @@ export const ConsoleAPIDefinitions = {
   if (!element?.parentElement) return [];
   const siblings = Array.from(element.parentElement.children).filter(c => c !== element);
   return selector ? siblings.filter(c => c.matches(selector)) : siblings;
-}`
+}`,
     },
     {
       name: 'extractLinks',
@@ -83,7 +83,7 @@ export const ConsoleAPIDefinitions = {
   return Array.from(document.querySelectorAll('a[href]'))
     .filter(a => !filter || a.href.includes(filter))
     .map(a => ({ text: a.textContent.trim(), href: a.href }));
-}`
+}`,
     },
     {
       name: 'extractImages',
@@ -98,7 +98,7 @@ export const ConsoleAPIDefinitions = {
       width: img.naturalWidth,
       height: img.naturalHeight
     }));
-}`
+}`,
     },
     {
       name: 'extractText',
@@ -108,7 +108,7 @@ export const ConsoleAPIDefinitions = {
       code: `function extractText(selector = "body") {
   const el = document.querySelector(selector);
   return el ? el.textContent.trim() : '';
-}`
+}`,
     },
     {
       name: 'extractTable',
@@ -130,7 +130,7 @@ export const ConsoleAPIDefinitions = {
     });
     return obj;
   });
-}`
+}`,
     },
     {
       name: 'highlight',
@@ -145,7 +145,7 @@ export const ConsoleAPIDefinitions = {
   });
   console.log(\`已高亮 \${elements.length} 个元素\`);
   return elements;
-}`
+}`,
     },
     {
       name: 'unhighlight',
@@ -158,7 +158,7 @@ export const ConsoleAPIDefinitions = {
     el.style.outlineOffset = '';
   });
   console.log('已取消高亮');
-}`
+}`,
     },
     {
       name: 'hideElements',
@@ -170,7 +170,7 @@ export const ConsoleAPIDefinitions = {
   elements.forEach(el => el.style.display = 'none');
   console.log(\`已隐藏 \${elements.length} 个元素\`);
   return elements.length;
-}`
+}`,
     },
     {
       name: 'showElements',
@@ -182,7 +182,7 @@ export const ConsoleAPIDefinitions = {
   elements.forEach(el => el.style.display = '');
   console.log(\`已显示 \${elements.length} 个元素\`);
   return elements.length;
-}`
+}`,
     },
     {
       name: 'removeElements',
@@ -194,7 +194,7 @@ export const ConsoleAPIDefinitions = {
   elements.forEach(el => el.remove());
   console.log(\`已删除 \${elements.length} 个元素\`);
   return elements.length;
-}`
+}`,
     },
     {
       name: 'clickElements',
@@ -209,7 +209,7 @@ export const ConsoleAPIDefinitions = {
   }
   console.log(\`已点击 \${elements.length} 个元素\`);
   return elements.length;
-}`
+}`,
     },
     {
       name: 'copyToClipboard',
@@ -219,7 +219,7 @@ export const ConsoleAPIDefinitions = {
       code: `async function copyToClipboard(text) {
   await navigator.clipboard.writeText(text);
   console.log('已复制到剪贴板');
-}`
+}`,
     },
     {
       name: 'downloadJSON',
@@ -235,7 +235,7 @@ export const ConsoleAPIDefinitions = {
   a.click();
   URL.revokeObjectURL(url);
   console.log(\`已下载: \${filename}\`);
-}`
+}`,
     },
     {
       name: 'downloadCSV',
@@ -264,7 +264,7 @@ export const ConsoleAPIDefinitions = {
   a.click();
   URL.revokeObjectURL(url);
   console.log(\`已下载: \${filename}\`);
-}`
+}`,
     },
     {
       name: 'logJSON',
@@ -273,7 +273,7 @@ export const ConsoleAPIDefinitions = {
       signature: 'logJSON(obj)',
       code: `function logJSON(obj) {
   console.log(JSON.stringify(obj, null, 2));
-}`
+}`,
     },
     {
       name: 'logTable',
@@ -291,7 +291,7 @@ export const ConsoleAPIDefinitions = {
   } else {
     console.table(data);
   }
-}`
+}`,
     },
     {
       name: 'getPageInfo',
@@ -310,7 +310,7 @@ export const ConsoleAPIDefinitions = {
     },
     elementCount: document.querySelectorAll('*').length
   };
-}`
+}`,
     },
     {
       name: 'getPerformance',
@@ -332,7 +332,7 @@ export const ConsoleAPIDefinitions = {
     resourceCount: resources.length,
     resourceSize: Math.round(resources.reduce((sum, r) => sum + (r.transferSize || 0), 0) / 1024) + 'KB'
   };
-}`
+}`,
     },
     {
       name: 'waitFor',
@@ -359,7 +359,7 @@ export const ConsoleAPIDefinitions = {
       reject(new Error(\`等待元素超时: \${selector}\`));
     }, timeout);
   });
-}`
+}`,
     },
     {
       name: 'wait',
@@ -368,7 +368,7 @@ export const ConsoleAPIDefinitions = {
       signature: 'wait(ms)',
       code: `function wait(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
-}`
+}`,
     },
     {
       name: 'scrollTo',
@@ -384,50 +384,51 @@ export const ConsoleAPIDefinitions = {
   } else if (target instanceof Element) {
     target.scrollIntoView({ behavior });
   }
-}`
-    }
+}`,
+    },
   ],
 
   // 获取所有分类
   getCategories() {
-    const categories = new Set(this.apis.map(a => a.category));
-    return [...categories];
+    const categories = new Set(this.apis.map((a) => a.category))
+    return [...categories]
   },
 
   // 按分类获取 API
   getByCategory(category) {
-    return this.apis.filter(a => a.category === category);
+    return this.apis.filter((a) => a.category === category)
   },
 
   // 按名称获取 API
   getByName(name) {
-    return this.apis.find(a => a.name === name);
+    return this.apis.find((a) => a.name === name)
   },
 
   // 搜索 API
   search(keyword) {
-    const kw = keyword.toLowerCase();
-    return this.apis.filter(a =>
-      a.name.toLowerCase().includes(kw) ||
-      a.description.toLowerCase().includes(kw) ||
-      a.category.toLowerCase().includes(kw)
-    );
+    const kw = keyword.toLowerCase()
+    return this.apis.filter(
+      (a) =>
+        a.name.toLowerCase().includes(kw) ||
+        a.description.toLowerCase().includes(kw) ||
+        a.category.toLowerCase().includes(kw)
+    )
   },
 
   // 生成注入脚本
   generateInjectionScript(selectedApis = null) {
     const apisToInject = selectedApis
-      ? this.apis.filter(a => selectedApis.includes(a.name))
-      : this.apis;
+      ? this.apis.filter((a) => selectedApis.includes(a.name))
+      : this.apis
 
     return `
 (function() {
   'use strict';
-  ${apisToInject.map(api => api.code).join('\n\n')}
+  ${apisToInject.map((api) => api.code).join('\n\n')}
   console.log('[DevTools Helper] 已注入 ${apisToInject.length} 个工具函数');
 })();
-`;
-  }
-};
+`
+  },
+}
 
-export default ConsoleAPIDefinitions;
+export default ConsoleAPIDefinitions

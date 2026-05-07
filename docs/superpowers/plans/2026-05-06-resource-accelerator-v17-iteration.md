@@ -24,11 +24,13 @@
 ### 功能设计
 
 注入 CSS 规则，对以下元素应用 `content-visibility: auto`：
+
 - `article` / `section` / `aside` — 内容区块
 - `.sidebar` / `.footer` / `.comments` — 非关键区域
 - `nav` — 导航（折叠时跳过）
 
 **配置：**
+
 ```javascript
 contentVisibility: {
   enabled: true,
@@ -53,6 +55,7 @@ contentVisibility: {
 ### 集成代码
 
 **1. 添加配置到 DEFAULT_CONFIG**（在 `lqip` 配置之后）：
+
 ```javascript
 // content-visibility 渲染优化
 contentVisibility: {
@@ -63,35 +66,37 @@ contentVisibility: {
 ```
 
 **2. 添加 CSS 注入函数**（在 `_injectLqipCSS` 函数之后）：
+
 ```javascript
 // ========== content-visibility 渲染优化 ==========
-let _contentVisibilityInjected = false;
+let _contentVisibilityInjected = false
 
 function _injectContentVisibilityCSS() {
-  if (_contentVisibilityInjected) return;
-  const config = state.config.contentVisibility;
-  if (!config?.enabled) return;
+  if (_contentVisibilityInjected) return
+  const config = state.config.contentVisibility
+  if (!config?.enabled) return
 
-  const includeSelector = config.selectors.join(', ');
-  const excludeSelector = config.excludeSelectors.map(s => `:not(${s})`).join('');
+  const includeSelector = config.selectors.join(', ')
+  const excludeSelector = config.excludeSelectors.map((s) => `:not(${s})`).join('')
 
-  const style = document.createElement('style');
+  const style = document.createElement('style')
   style.textContent = `
     ${includeSelector}${excludeSelector} {
       content-visibility: auto;
       contain-intrinsic-size: 0 500px;
     }
-  `;
-  const head = document.head || document.documentElement;
-  head.appendChild(style);
-  _contentVisibilityInjected = true;
+  `
+  const head = document.head || document.documentElement
+  head.appendChild(style)
+  _contentVisibilityInjected = true
 }
 ```
 
 **3. 在 init() 中调用**（在 `_injectLqipCSS()` 之后）：
+
 ```javascript
 // 注入 content-visibility 样式
-_injectContentVisibilityCSS();
+_injectContentVisibilityCSS()
 ```
 
 ### 验收标准
@@ -103,10 +108,10 @@ _injectContentVisibilityCSS();
 
 ### 风险
 
-| 风险 | 影响 | 缓解 |
-|------|------|------|
+| 风险               | 影响     | 缓解                                |
+| ------------------ | -------- | ----------------------------------- |
 | 可视区边界计算不准 | 内容闪烁 | contain-intrinsic-size 提供预估高度 |
-| 固定定位元素被跳过 | 布局错乱 | excludeSelectors 排除关键元素 |
+| 固定定位元素被跳过 | 布局错乱 | excludeSelectors 排除关键元素       |
 
 ---
 
@@ -121,11 +126,13 @@ _injectContentVisibilityCSS();
 ### 功能设计
 
 PriorityOptimizer 新增 `applyToExistingElements()` 方法，在 init 时扫描：
+
 - 所有 `<script src>` — 根据类型和位置设置 fetchPriority
 - 所有 `<link rel="stylesheet">` — 首屏样式 high，其余 auto
 - 所有 `<img src>` — 首屏 high，可视区下方 lazy + low
 
 **配置：**
+
 ```javascript
 priorityOptimizer: {
   // ...existing...
@@ -139,6 +146,7 @@ priorityOptimizer: {
 ### 集成代码
 
 **1. 添加配置到 DEFAULT_CONFIG**（在 `priorityOptimizer` 中添加 `scanExisting`）：
+
 ```javascript
 priorityOptimizer: {
   // ...existing config...
@@ -150,6 +158,7 @@ priorityOptimizer: {
 ```
 
 **2. PriorityOptimizer 新增方法**（在 `applyPriorityToResource` 之后）：
+
 ```javascript
 applyToExistingElements() {
   if (!this.config.scanExisting?.enabled) return;
@@ -191,6 +200,7 @@ applyToExistingElements() {
 ```
 
 **3. 在 PriorityOptimizer.init() 中调用**（在 `this.calculatePriority()` 之后）：
+
 ```javascript
 init() {
   if (!this.config.enabled) return;
@@ -213,10 +223,10 @@ init() {
 
 ### 风险
 
-| 风险 | 影响 | 缓解 |
-|------|------|------|
-| 扫描时机过早 | 部分元素尚未加载 | MutationObserver 兜底 |
-| 与 processImage 冲突 | 重复设置 | PriorityOptimizer 有 enabled 判断 |
+| 风险                 | 影响             | 缓解                              |
+| -------------------- | ---------------- | --------------------------------- |
+| 扫描时机过早         | 部分元素尚未加载 | MutationObserver 兜底             |
+| 与 processImage 冲突 | 重复设置         | PriorityOptimizer 有 enabled 判断 |
 
 ---
 

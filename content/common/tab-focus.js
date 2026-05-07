@@ -3,36 +3,36 @@
 // 使用 visibilitychange API，无需 background 消息
 // @match *://*/*
 
-'use strict';
+'use strict'
 
 if (window.ScriptLoader) {
   ScriptLoader.declare({
     name: 'tab-focus',
     dependencies: [],
-    onReady: () => initTabFocus()
-  });
+    onReady: () => initTabFocus(),
+  })
 } else {
-  initTabFocus();
+  initTabFocus()
 }
 
 function initTabFocus() {
   if (window.TabFocusLoaded) {
-    console.log('[通用脚本] Tab焦点激活已加载，跳过');
-    return;
+    console.log('[通用脚本] Tab焦点激活已加载，跳过')
+    return
   }
 
   if (!window.getScriptSwitch || !window.getScriptSwitch('tab-focus')) {
-    console.log('[通用脚本] Tab焦点激活已禁用');
-    return;
+    console.log('[通用脚本] Tab焦点激活已禁用')
+    return
   }
 
-  window.TabFocusLoaded = true;
+  window.TabFocusLoaded = true
 
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
-      window.focus();
+      window.focus()
     }
-  });
+  })
 
-  console.log('[通用脚本] Tab焦点激活已加载');
+  console.log('[通用脚本] Tab焦点激活已加载')
 }

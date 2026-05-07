@@ -9,12 +9,12 @@
  * - L4 功能层：首次使用时初始化
  */
 
-(function () {
-  'use strict';
+;(function () {
+  'use strict'
 
   if (window.LazyInitManager) {
-    console.log('[LazyInitManager] 已存在，跳过初始化');
-    return;
+    console.log('[LazyInitManager] 已存在，跳过初始化')
+    return
   }
 
   // 初始化状态
@@ -25,25 +25,25 @@
     activationSource: null,
     // 各层初始化状态
     layers: {
-      L1: { initialized: true, name: '基础层' },  // L1 立即初始化
+      L1: { initialized: true, name: '基础层' }, // L1 立即初始化
       L2: { initialized: false, name: '核心层' },
       L3: { initialized: false, name: 'DevTools层' },
-      L4: { initialized: false, name: '功能层' }
+      L4: { initialized: false, name: '功能层' },
     },
     // 待执行的初始化回调
     pendingCallbacks: {
       L2: [],
       L3: [],
-      L4: []
-    }
-  };
+      L4: [],
+    },
+  }
 
   const LazyInitManager = {
     /**
      * 检查是否已激活
      */
     isActivated() {
-      return initState.activated;
+      return initState.activated
     },
 
     /**
@@ -51,7 +51,7 @@
      * @param {string} layer - 层级 (L1, L2, L3, L4)
      */
     isLayerInitialized(layer) {
-      return initState.layers[layer]?.initialized || false;
+      return initState.layers[layer]?.initialized || false
     },
 
     /**
@@ -62,19 +62,19 @@
      */
     registerInitCallback(layer, callback, name = 'unnamed') {
       if (!initState.pendingCallbacks[layer]) {
-        console.warn(`[LazyInitManager] 未知层级: ${layer}`);
-        return;
+        console.warn(`[LazyInitManager] 未知层级: ${layer}`)
+        return
       }
 
       // 如果该层已初始化，直接执行
       if (initState.layers[layer].initialized) {
-        console.log(`[LazyInitManager] ${layer} 已初始化，直接执行: ${name}`);
-        callback();
-        return;
+        console.log(`[LazyInitManager] ${layer} 已初始化，直接执行: ${name}`)
+        callback()
+        return
       }
 
-      initState.pendingCallbacks[layer].push({ callback, name });
-      console.log(`[LazyInitManager] 注册 ${layer} 初始化回调: ${name}`);
+      initState.pendingCallbacks[layer].push({ callback, name })
+      console.log(`[LazyInitManager] 注册 ${layer} 初始化回调: ${name}`)
     },
 
     /**
@@ -83,23 +83,23 @@
      */
     async activate(source = 'unknown') {
       if (initState.activated) {
-        console.log(`[LazyInitManager] 已激活，跳过 (来源: ${source})`);
-        return { alreadyActivated: true };
+        console.log(`[LazyInitManager] 已激活，跳过 (来源: ${source})`)
+        return { alreadyActivated: true }
       }
 
-      console.log(`[LazyInitManager] 激活扩展 (来源: ${source})`);
-      initState.activated = true;
-      initState.activationSource = source;
+      console.log(`[LazyInitManager] 激活扩展 (来源: ${source})`)
+      initState.activated = true
+      initState.activationSource = source
 
       // 初始化 L2 核心层
-      await this._initLayer('L2');
+      await this._initLayer('L2')
 
       // 如果是 DevTools 激活，同时初始化 L3
       if (source === 'devtools') {
-        await this._initLayer('L3');
+        await this._initLayer('L3')
       }
 
-      return { activated: true, source };
+      return { activated: true, source }
     },
 
     /**
@@ -107,29 +107,29 @@
      * @param {string} layer - 层级
      */
     async _initLayer(layer) {
-      const layerState = initState.layers[layer];
+      const layerState = initState.layers[layer]
       if (!layerState) {
-        console.warn(`[LazyInitManager] 未知层级: ${layer}`);
-        return;
+        console.warn(`[LazyInitManager] 未知层级: ${layer}`)
+        return
       }
 
       if (layerState.initialized) {
-        return;
+        return
       }
 
-      console.log(`[LazyInitManager] 初始化 ${layer} (${layerState.name})`);
-      layerState.initialized = true;
+      console.log(`[LazyInitManager] 初始化 ${layer} (${layerState.name})`)
+      layerState.initialized = true
 
       // 执行所有待处理的回调
-      const callbacks = initState.pendingCallbacks[layer] || [];
-      initState.pendingCallbacks[layer] = [];
+      const callbacks = initState.pendingCallbacks[layer] || []
+      initState.pendingCallbacks[layer] = []
 
       for (const { callback, name } of callbacks) {
         try {
-          await callback();
-          console.log(`[LazyInitManager] ${layer} 回调执行完成: ${name}`);
+          await callback()
+          console.log(`[LazyInitManager] ${layer} 回调执行完成: ${name}`)
         } catch (error) {
-          console.error(`[LazyInitManager] ${layer} 回调执行失败: ${name}`, error);
+          console.error(`[LazyInitManager] ${layer} 回调执行失败: ${name}`, error)
         }
       }
     },
@@ -141,14 +141,14 @@
     async initFeature(featureName) {
       if (!initState.activated) {
         // 如果未激活，先激活
-        await this.activate('feature-' + featureName);
+        await this.activate('feature-' + featureName)
       }
 
       if (!initState.layers.L4.initialized) {
-        await this._initLayer('L4');
+        await this._initLayer('L4')
       }
 
-      console.log(`[LazyInitManager] 功能初始化: ${featureName}`);
+      console.log(`[LazyInitManager] 功能初始化: ${featureName}`)
     },
 
     /**
@@ -156,9 +156,9 @@
      */
     async onDevToolsOpen() {
       if (!initState.activated) {
-        await this.activate('devtools');
+        await this.activate('devtools')
       }
-      await this._initLayer('L3');
+      await this._initLayer('L3')
     },
 
     /**
@@ -171,31 +171,30 @@
         layers: Object.entries(initState.layers).reduce((obj, [key, val]) => {
           obj[key] = {
             initialized: val.initialized,
-            pendingCount: initState.pendingCallbacks[key]?.length || 0
-          };
-          return obj;
-        }, {})
-      };
+            pendingCount: initState.pendingCallbacks[key]?.length || 0,
+          }
+          return obj
+        }, {}),
+      }
     },
 
     /**
      * 重置状态（用于测试）
      */
     _reset() {
-      initState.activated = false;
-      initState.activationSource = null;
+      initState.activated = false
+      initState.activationSource = null
       for (const key of Object.keys(initState.layers)) {
         if (key !== 'L1') {
-          initState.layers[key].initialized = false;
+          initState.layers[key].initialized = false
         }
       }
-      initState.pendingCallbacks = { L2: [], L3: [], L4: [] };
-    }
-  };
+      initState.pendingCallbacks = { L2: [], L3: [], L4: [] }
+    },
+  }
 
   // 导出
-  window.LazyInitManager = LazyInitManager;
+  window.LazyInitManager = LazyInitManager
 
-  console.log('[LazyInitManager] 懒初始化管理器已加载');
-
-})();
+  console.log('[LazyInitManager] 懒初始化管理器已加载')
+})()

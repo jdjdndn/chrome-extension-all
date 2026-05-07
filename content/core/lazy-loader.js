@@ -1,12 +1,12 @@
 // ========== 延迟加载模块 ==========
 // 按需加载核心模块，减少初始加载时间
 
-(function () {
-  'use strict';
+;(function () {
+  'use strict'
 
   if (window.LazyLoader) {
-    console.log('[LazyLoader] 已存在，跳过初始化');
-    return;
+    console.log('[LazyLoader] 已存在，跳过初始化')
+    return
   }
 
   /**
@@ -30,7 +30,7 @@
       'config-manager': [],
       'selector-merger': [],
       'keyword-manager': [],
-      'rule-manager': ['keyword-manager', 'selector-merger']
+      'rule-manager': ['keyword-manager', 'selector-merger'],
     },
 
     // 模块路径映射
@@ -42,16 +42,16 @@
       'selector-merger': 'content/core/selector-merger.js',
       'keyword-manager': 'content/core/keyword-manager.js',
       'rule-manager': 'content/core/rule-manager.js',
-      'store': 'content/core/store.js',
-      'services': 'content/core/services.js',
-      'pipeline': 'content/core/pipeline.js'
+      store: 'content/core/store.js',
+      services: 'content/core/services.js',
+      pipeline: 'content/core/pipeline.js',
     },
 
     // 配置
     config: {
       timeout: 10000,
       retryCount: 2,
-      debug: false
+      debug: false,
     },
 
     /**
@@ -61,20 +61,20 @@
      * @returns {Promise<boolean>}
      */
     async load(modules, options = {}) {
-      const moduleList = Array.isArray(modules) ? modules : [modules];
-      const results = {};
+      const moduleList = Array.isArray(modules) ? modules : [modules]
+      const results = {}
 
       for (const moduleName of moduleList) {
-        results[moduleName] = await this._loadModule(moduleName, options);
+        results[moduleName] = await this._loadModule(moduleName, options)
       }
 
-      const allSuccess = Object.values(results).every(v => v);
+      const allSuccess = Object.values(results).every((v) => v)
 
       if (this.config.debug) {
-        console.log('[LazyLoader] 加载结果:', results);
+        console.log('[LazyLoader] 加载结果:', results)
       }
 
-      return allSuccess;
+      return allSuccess
     },
 
     /**
@@ -83,26 +83,26 @@
     async _loadModule(moduleName, options = {}) {
       // 已加载
       if (this.loaded.has(moduleName)) {
-        return true;
+        return true
       }
 
       // 正在加载
       if (this.loading.has(moduleName)) {
-        return this.loading.get(moduleName);
+        return this.loading.get(moduleName)
       }
 
       // 创建加载 Promise
-      const loadPromise = this._createLoadPromise(moduleName, options);
-      this.loading.set(moduleName, loadPromise);
+      const loadPromise = this._createLoadPromise(moduleName, options)
+      this.loading.set(moduleName, loadPromise)
 
       try {
-        const result = await loadPromise;
+        const result = await loadPromise
         if (result) {
-          this.loaded.add(moduleName);
+          this.loaded.add(moduleName)
         }
-        return result;
+        return result
       } finally {
-        this.loading.delete(moduleName);
+        this.loading.delete(moduleName)
       }
     },
 
@@ -110,53 +110,53 @@
      * 创建加载 Promise
      */
     async _createLoadPromise(moduleName, options) {
-      const { timeout = this.config.timeout, retry = this.config.retryCount } = options;
+      const { timeout = this.config.timeout, retry = this.config.retryCount } = options
 
       // 1. 加载依赖
-      const deps = this.dependencies[moduleName] || [];
+      const deps = this.dependencies[moduleName] || []
       for (const dep of deps) {
-        const depLoaded = await this._loadModule(dep, options);
+        const depLoaded = await this._loadModule(dep, options)
         if (!depLoaded) {
-          console.error(`[LazyLoader] 依赖加载失败: ${dep}`);
-          return false;
+          console.error(`[LazyLoader] 依赖加载失败: ${dep}`)
+          return false
         }
       }
 
       // 2. 检查是否已通过 script 标签加载
       if (this._checkModuleReady(moduleName)) {
-        this.loaded.add(moduleName);
-        return true;
+        this.loaded.add(moduleName)
+        return true
       }
 
       // 3. 动态加载脚本
-      const path = this.modulePaths[moduleName];
+      const path = this.modulePaths[moduleName]
       if (!path) {
-        console.error(`[LazyLoader] 未知模块: ${moduleName}`);
-        return false;
+        console.error(`[LazyLoader] 未知模块: ${moduleName}`)
+        return false
       }
 
       // 4. 执行加载
       for (let i = 0; i <= retry; i++) {
         try {
-          const result = await this._loadScript(path, timeout);
+          const result = await this._loadScript(path, timeout)
           if (result) {
             // 验证模块是否正确加载
             if (this._checkModuleReady(moduleName)) {
-              return true;
+              return true
             }
           }
         } catch (error) {
           if (i < retry) {
-            console.warn(`[LazyLoader] 重试加载: ${moduleName}`);
-            await new Promise(r => setTimeout(r, 100));
+            console.warn(`[LazyLoader] 重试加载: ${moduleName}`)
+            await new Promise((r) => setTimeout(r, 100))
           } else {
-            console.error(`[LazyLoader] 加载失败: ${moduleName}`, error);
-            return false;
+            console.error(`[LazyLoader] 加载失败: ${moduleName}`, error)
+            return false
           }
         }
       }
 
-      return false;
+      return false
     },
 
     /**
@@ -171,13 +171,13 @@
         'selector-merger': 'SelectorMerger',
         'keyword-manager': 'KeywordManager',
         'rule-manager': 'RuleManager',
-        'store': 'AppStore',
-        'services': 'Services',
-        'pipeline': 'Pipeline'
-      };
+        store: 'AppStore',
+        services: 'Services',
+        pipeline: 'Pipeline',
+      }
 
-      const globalName = globalNames[moduleName];
-      return globalName && typeof window[globalName] !== 'undefined';
+      const globalName = globalNames[moduleName]
+      return globalName && typeof window[globalName] !== 'undefined'
     },
 
     /**
@@ -186,23 +186,22 @@
     async _loadScript(path, timeout) {
       return new Promise((resolve, reject) => {
         const timer = setTimeout(() => {
-          reject(new Error(`加载超时: ${path}`));
-        }, timeout);
+          reject(new Error(`加载超时: ${path}`))
+        }, timeout)
 
-        const script = document.createElement('script');
-        script.src = chrome.runtime.getURL(path);
+        const script = document.createElement('script')
+        script.src = chrome.runtime.getURL(path)
         script.onload = () => {
-          clearTimeout(timer);
-          script.remove();
-          resolve(true);
-        };
+          clearTimeout(timer)
+          script.remove()
+          resolve(true)
+        }
         script.onerror = () => {
-          clearTimeout(timer);
-          reject(new Error(`加载失败: ${path}`));
-        };
-
-        (document.head || document.documentElement).appendChild(script);
-      });
+          clearTimeout(timer)
+          reject(new Error(`加载失败: ${path}`))
+        }
+        ;(document.head || document.documentElement).appendChild(script)
+      })
     },
 
     /**
@@ -210,8 +209,8 @@
      * @param {array} modules - 模块列表
      */
     async preload(modules) {
-      console.log(`[LazyLoader] 预加载模块: ${modules.join(', ')}`);
-      await this.load(modules);
+      console.log(`[LazyLoader] 预加载模块: ${modules.join(', ')}`)
+      await this.load(modules)
     },
 
     /**
@@ -219,21 +218,21 @@
      * @param {string} moduleName - 模块名称
      */
     isLoaded(moduleName) {
-      return this.loaded.has(moduleName);
+      return this.loaded.has(moduleName)
     },
 
     /**
      * 获取已加载模块列表
      */
     getLoadedModules() {
-      return Array.from(this.loaded);
+      return Array.from(this.loaded)
     },
 
     /**
      * 设置调试模式
      */
     setDebug(enabled) {
-      this.config.debug = enabled;
+      this.config.debug = enabled
     },
 
     /**
@@ -242,23 +241,23 @@
      * @param {object} config - 模块配置
      */
     registerModule(name, config) {
-      const { path, dependencies = [], globalName } = config;
+      const { path, dependencies = [], globalName } = config
 
-      this.modulePaths[name] = path;
-      this.dependencies[name] = dependencies;
+      this.modulePaths[name] = path
+      this.dependencies[name] = dependencies
 
       if (globalName) {
         // 更新检查函数
-        const originalChecker = this._checkModuleReady.bind(this);
+        const originalChecker = this._checkModuleReady.bind(this)
         this._checkModuleReady = (moduleName) => {
           if (moduleName === name) {
-            return typeof window[globalName] !== 'undefined';
+            return typeof window[globalName] !== 'undefined'
           }
-          return originalChecker(moduleName);
-        };
+          return originalChecker(moduleName)
+        }
       }
 
-      console.log(`[LazyLoader] 注册模块: ${name}`);
+      console.log(`[LazyLoader] 注册模块: ${name}`)
     },
 
     /**
@@ -268,13 +267,13 @@
       return {
         loaded: this.loaded.size,
         loading: this.loading.size,
-        totalModules: Object.keys(this.modulePaths).length
-      };
-    }
-  };
+        totalModules: Object.keys(this.modulePaths).length,
+      }
+    },
+  }
 
   // 导出
-  window.LazyLoader = LazyLoader;
+  window.LazyLoader = LazyLoader
 
-  console.log('[LazyLoader] 延迟加载器已加载');
-})();
+  console.log('[LazyLoader] 延迟加载器已加载')
+})()

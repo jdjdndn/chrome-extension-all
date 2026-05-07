@@ -17,7 +17,7 @@ export const SnippetTemplates = {
   }))
   .filter(l => l.href && !l.href.startsWith('javascript:'));
 console.table(links);
-return links;`
+return links;`,
     },
     {
       id: 'extract-images',
@@ -33,7 +33,7 @@ return links;`
   }))
   .filter(img => img.src);
 console.table(images);
-return images;`
+return images;`,
     },
     {
       id: 'extract-forms',
@@ -55,7 +55,7 @@ forms.forEach((f, i) => {
   console.log(\`表单 \${i + 1}: \${f.action}\`);
   console.table(f.fields);
 });
-return forms;`
+return forms;`,
     },
     {
       id: 'extract-scripts',
@@ -66,7 +66,7 @@ return forms;`
   .map(s => s.src);
 console.log('外部脚本:', scripts.length);
 scripts.forEach((s, i) => console.log(\`\${i + 1}. \${s}\`));
-return scripts;`
+return scripts;`,
     },
     {
       id: 'extract-stylesheets',
@@ -77,7 +77,7 @@ return scripts;`
   .map(l => l.href);
 console.log('样式表:', styles.length);
 styles.forEach((s, i) => console.log(\`\${i + 1}. \${s}\`));
-return styles;`
+return styles;`,
     },
     {
       id: 'extract-meta',
@@ -91,7 +91,7 @@ return styles;`
   }))
   .filter(m => m.name);
 console.table(metas);
-return metas;`
+return metas;`,
     },
     {
       id: 'extract-localStorage',
@@ -106,7 +106,7 @@ return metas;`
   }));
 console.table(data);
 console.log('总大小:', data.reduce((a, b) => a + b.size, 0), 'bytes');
-return data;`
+return data;`,
     },
     {
       id: 'extract-cookies',
@@ -120,7 +120,7 @@ return data;`
     return { name, value: values.join('=')?.slice(0, 100) };
   });
 console.table(cookies);
-return cookies;`
+return cookies;`,
     },
     {
       id: 'highlight-links',
@@ -131,7 +131,7 @@ return cookies;`
   a.style.outline = '2px solid red';
   a.style.background = 'rgba(255,0,0,0.1)';
 });
-console.log('已高亮', document.querySelectorAll('a[href]').length, '个链接');`
+console.log('已高亮', document.querySelectorAll('a[href]').length, '个链接');`,
     },
     {
       id: 'highlight-images',
@@ -142,7 +142,7 @@ console.log('已高亮', document.querySelectorAll('a[href]').length, '个链接
   img.style.outline = '3px solid blue';
   img.style.background = 'rgba(0,0,255,0.1)';
 });
-console.log('已高亮', document.querySelectorAll('img').length, '张图片');`
+console.log('已高亮', document.querySelectorAll('img').length, '张图片');`,
     },
     {
       id: 'remove-hidden',
@@ -152,7 +152,7 @@ console.log('已高亮', document.querySelectorAll('img').length, '张图片');`
       code: `const hidden = Array.from(document.querySelectorAll('*'))
   .filter(el => getComputedStyle(el).display === 'none');
 hidden.forEach(el => el.remove());
-console.log('已移除', hidden.length, '个隐藏元素');`
+console.log('已移除', hidden.length, '个隐藏元素');`,
     },
     {
       id: 'show-invisible',
@@ -170,7 +170,7 @@ console.log('已移除', hidden.length, '个隐藏元素');`
     el.style.outline = '2px dashed purple';
   }
 });
-console.log('已显示隐藏内容');`
+console.log('已显示隐藏内容');`,
     },
     {
       id: 'click-all-buttons',
@@ -183,7 +183,7 @@ console.log('找到', buttons.length, '个可见按钮');
 buttons.forEach((btn, i) => {
   console.log(\`点击按钮 \${i + 1}:\`, btn.textContent?.trim().slice(0, 30) || btn.value);
   btn.click();
-});`
+});`,
     },
     {
       id: 'scroll-to-bottom',
@@ -194,7 +194,7 @@ buttons.forEach((btn, i) => {
   top: document.body.scrollHeight,
   behavior: 'smooth'
 });
-console.log('正在滚动到底部...');`
+console.log('正在滚动到底部...');`,
     },
     {
       id: 'get-page-info',
@@ -221,7 +221,7 @@ console.log('正在滚动到底部...');`
   links: document.querySelectorAll('a').length
 };
 console.table(info);
-return info;`
+return info;`,
     },
     {
       id: 'find-event-listeners',
@@ -232,7 +232,7 @@ return info;`
 const elements = document.querySelectorAll('button, a, input');
 console.log('常见交互元素:', elements.length);
 console.log('请在 DevTools 中使用 getEventListeners(element) 查看具体监听器');
-console.log('示例: getEventListeners(document.querySelector("button"))');`
+console.log('示例: getEventListeners(document.querySelector("button"))');`,
     },
     {
       id: 'measure-performance',
@@ -258,7 +258,7 @@ const resources = performance.getEntriesByType('resource')
     size: r.transferSize ? (r.transferSize / 1024).toFixed(1) + 'KB' : '未知'
   }));
 console.log('加载时间最长的资源:');
-console.table(resources);`
+console.table(resources);`,
     },
     {
       id: 'json-stringify',
@@ -276,7 +276,7 @@ navigator.clipboard.readText().then(text => {
   } catch (e) {
     console.error('解析 JSON 失败:', e.message);
   }
-});`
+});`,
     },
     {
       id: 'copy-selector',
@@ -298,7 +298,7 @@ navigator.clipboard.readText().then(text => {
   console.log('选择器:', selector);
   console.log('元素:', el);
   console.log('按 Ctrl+C 复制选择器');
-}, { once: false });`
+}, { once: false });`,
     },
     {
       id: 'monitor-console',
@@ -331,36 +331,37 @@ navigator.clipboard.readText().then(text => {
     Object.assign(console, originalConsole);
   };
   console.log('Console 监控已启动，使用 getConsoleLogs() 获取日志');
-})();`
-    }
+})();`,
+    },
   ],
 
   // 获取所有分类
   getCategories() {
-    const categories = new Set(this.presets.map(p => p.category));
-    return [...categories];
+    const categories = new Set(this.presets.map((p) => p.category))
+    return [...categories]
   },
 
   // 按分类获取模板
   getByCategory(category) {
-    return this.presets.filter(p => p.category === category);
+    return this.presets.filter((p) => p.category === category)
   },
 
   // 按 ID 获取模板
   getById(id) {
-    return this.presets.find(p => p.id === id);
+    return this.presets.find((p) => p.id === id)
   },
 
   // 搜索模板
   search(keyword) {
-    const kw = keyword.toLowerCase();
-    return this.presets.filter(p =>
-      p.name.toLowerCase().includes(kw) ||
-      p.description.toLowerCase().includes(kw) ||
-      p.category.toLowerCase().includes(kw)
-    );
-  }
-};
+    const kw = keyword.toLowerCase()
+    return this.presets.filter(
+      (p) =>
+        p.name.toLowerCase().includes(kw) ||
+        p.description.toLowerCase().includes(kw) ||
+        p.category.toLowerCase().includes(kw)
+    )
+  },
+}
 
 // 默认导出
-export default SnippetTemplates;
+export default SnippetTemplates

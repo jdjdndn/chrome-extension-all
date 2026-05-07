@@ -3,6 +3,7 @@
 ## 快速开始
 
 ### 1. 单次同步
+
 将所有源文件同步到 dist 目录（执行一次后退出）：
 
 ```bash
@@ -12,6 +13,7 @@ node scripts/watch-and-sync.js --once
 ```
 
 ### 2. 持续监控模式
+
 自动监控文件变化并同步到 dist 目录：
 
 ```bash
@@ -29,6 +31,7 @@ node scripts/watch-and-sync.js
 ## 文件监控范围
 
 ### 单个文件
+
 - manifest.json
 - background.js
 - content.js
@@ -39,6 +42,7 @@ node scripts/watch-and-sync.js
 - rules.json
 
 ### 目录
+
 - devtools/
 - content/
 - icons/
@@ -46,6 +50,7 @@ node scripts/watch-and-sync.js
 - src/
 
 ## 忽略的文件/目录
+
 - `.git/`
 - `node_modules/`
 - `dist/`

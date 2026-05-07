@@ -3,7 +3,7 @@
  * 用于站点脚本的关键词过滤功能
  */
 
-'use strict';
+'use strict'
 
 /**
  * 创建关键词过滤器
@@ -14,20 +14,16 @@
  * @returns {Object} 过滤器实例
  */
 export function createKeywordFilter(options = {}) {
-  const {
-    domain = '',
-    defaultKeywords = [],
-    caseSensitive = false
-  } = options;
+  const { domain = '', defaultKeywords = [], caseSensitive = false } = options
 
-  let keywords = [...defaultKeywords];
-  let userKeywords = [];
+  let keywords = [...defaultKeywords]
+  let userKeywords = []
 
   /**
    * 标准化关键词
    */
   function normalize(keyword) {
-    return caseSensitive ? keyword : keyword.toLowerCase();
+    return caseSensitive ? keyword : keyword.toLowerCase()
   }
 
   return {
@@ -37,9 +33,9 @@ export function createKeywordFilter(options = {}) {
      * @returns {boolean}
      */
     match(text) {
-      if (!text || keywords.length === 0) return false;
-      const normalizedText = normalize(text);
-      return keywords.some(keyword => normalizedText.includes(normalize(keyword)));
+      if (!text || keywords.length === 0) return false
+      const normalizedText = normalize(text)
+      return keywords.some((keyword) => normalizedText.includes(normalize(keyword)))
     },
 
     /**
@@ -48,9 +44,9 @@ export function createKeywordFilter(options = {}) {
      * @returns {string[]} 匹配的关键词列表
      */
     findMatches(text) {
-      if (!text || keywords.length === 0) return [];
-      const normalizedText = normalize(text);
-      return keywords.filter(keyword => normalizedText.includes(normalize(keyword)));
+      if (!text || keywords.length === 0) return []
+      const normalizedText = normalize(text)
+      return keywords.filter((keyword) => normalizedText.includes(normalize(keyword)))
     },
 
     /**
@@ -58,8 +54,8 @@ export function createKeywordFilter(options = {}) {
      * @param {string|string[]} newKeywords - 新关键词
      */
     add(newKeywords) {
-      const toAdd = Array.isArray(newKeywords) ? newKeywords : [newKeywords];
-      keywords = [...new Set([...keywords, ...toAdd])];
+      const toAdd = Array.isArray(newKeywords) ? newKeywords : [newKeywords]
+      keywords = [...new Set([...keywords, ...toAdd])]
     },
 
     /**
@@ -67,8 +63,8 @@ export function createKeywordFilter(options = {}) {
      * @param {string|string[]} toRemove - 要移除的关键词
      */
     remove(toRemove) {
-      const removeList = Array.isArray(toRemove) ? toRemove : [toRemove];
-      keywords = keywords.filter(k => !removeList.includes(k));
+      const removeList = Array.isArray(toRemove) ? toRemove : [toRemove]
+      keywords = keywords.filter((k) => !removeList.includes(k))
     },
 
     /**
@@ -76,16 +72,16 @@ export function createKeywordFilter(options = {}) {
      * @param {string[]} newUserKeywords - 用户关键词列表
      */
     setUserKeywords(newUserKeywords) {
-      userKeywords = [...newUserKeywords];
-      keywords = [...new Set([...defaultKeywords, ...userKeywords])];
+      userKeywords = [...newUserKeywords]
+      keywords = [...new Set([...defaultKeywords, ...userKeywords])]
     },
 
     /**
      * 重置为默认关键词
      */
     reset() {
-      userKeywords = [];
-      keywords = [...defaultKeywords];
+      userKeywords = []
+      keywords = [...defaultKeywords]
     },
 
     /**
@@ -93,7 +89,7 @@ export function createKeywordFilter(options = {}) {
      * @returns {string[]}
      */
     getKeywords() {
-      return [...keywords];
+      return [...keywords]
     },
 
     /**
@@ -101,7 +97,7 @@ export function createKeywordFilter(options = {}) {
      * @returns {string[]}
      */
     getUserKeywords() {
-      return [...userKeywords];
+      return [...userKeywords]
     },
 
     /**
@@ -109,13 +105,13 @@ export function createKeywordFilter(options = {}) {
      */
     async loadFromStorage() {
       try {
-        const storageKey = `${domain}Keywords`;
-        const result = await chrome.storage.local.get(storageKey);
+        const storageKey = `${domain}Keywords`
+        const result = await chrome.storage.local.get(storageKey)
         if (result[storageKey]) {
-          this.setUserKeywords(result[storageKey]);
+          this.setUserKeywords(result[storageKey])
         }
       } catch (error) {
-        console.warn(`[${domain}] 加载关键词失败:`, error.message);
+        console.warn(`[${domain}] 加载关键词失败:`, error.message)
       }
     },
 
@@ -124,10 +120,10 @@ export function createKeywordFilter(options = {}) {
      */
     async saveToStorage() {
       try {
-        const storageKey = `${domain}Keywords`;
-        await chrome.storage.local.set({ [storageKey]: userKeywords });
+        const storageKey = `${domain}Keywords`
+        await chrome.storage.local.set({ [storageKey]: userKeywords })
       } catch (error) {
-        console.warn(`[${domain}] 保存关键词失败:`, error.message);
+        console.warn(`[${domain}] 保存关键词失败:`, error.message)
       }
     },
 
@@ -139,20 +135,20 @@ export function createKeywordFilter(options = {}) {
         domain,
         defaultKeywords: [...defaultKeywords],
         userKeywords: [...userKeywords],
-        allKeywords: [...keywords]
-      };
-    }
-  };
+        allKeywords: [...keywords],
+      }
+    },
+  }
 }
 
 const KeywordFilter = {
-  create: createKeywordFilter
-};
+  create: createKeywordFilter,
+}
 
-export default KeywordFilter;
+export default KeywordFilter
 
 // 全局暴露
 if (typeof window !== 'undefined' && !window.KeywordFilter) {
-  window.KeywordFilter = KeywordFilter;
-  console.log('[KeywordFilter] 模块已加载');
+  window.KeywordFilter = KeywordFilter
+  console.log('[KeywordFilter] 模块已加载')
 }

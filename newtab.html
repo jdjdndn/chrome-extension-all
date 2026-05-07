@@ -1,1331 +1,1406 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>新标签页</title>
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    html, body {
-      overflow: hidden;
-      height: 100%;
-    }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 80px 20px 40px;
-    }
-
-    /* 设置图标按钮 */
-    .settings-btn {
-      position: fixed;
-      top: 20px;
-      left: 20px;
-      width: 44px;
-      height: 44px;
-      background: rgba(255, 255, 255, 0.2);
-      border: none;
-      border-radius: 12px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 20px;
-      transition: all 0.3s ease;
-      backdrop-filter: blur(10px);
-      z-index: 100;
-    }
-
-    .settings-btn:hover {
-      background: rgba(255, 255, 255, 0.3);
-      transform: rotate(45deg);
-    }
-
-    /* 设置抽屉 */
-    .settings-drawer {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 320px;
-      height: 100%;
-      background: rgba(255, 255, 255, 0.98);
-      backdrop-filter: blur(20px);
-      box-shadow: 5px 0 30px rgba(0, 0, 0, 0.2);
-      transform: translateX(-100%);
-      transition: transform 0.3s ease;
-      z-index: 200;
-      overflow-y: auto;
-    }
-
-    .settings-drawer.open {
-      transform: translateX(0);
-    }
-
-    .settings-drawer-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 20px;
-      border-bottom: 1px solid #e0e0e0;
-    }
-
-    .settings-drawer-title {
-      font-size: 18px;
-      font-weight: 600;
-      color: #333;
-    }
-
-    .settings-close-btn {
-      width: 32px;
-      height: 32px;
-      background: #f0f0f0;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 18px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.2s ease;
-    }
-
-    .settings-close-btn:hover {
-      background: #e0e0e0;
-    }
-
-    .settings-content {
-      padding: 20px;
-    }
-
-    .setting-item {
-      margin-bottom: 24px;
-    }
-
-    .setting-label {
-      display: block;
-      font-size: 14px;
-      font-weight: 500;
-      color: #333;
-      margin-bottom: 10px;
-    }
-
-    .setting-input {
-      width: 100%;
-      padding: 10px 14px;
-      font-size: 14px;
-      border: 1px solid #e0e0e0;
-      border-radius: 8px;
-      outline: none;
-      transition: all 0.2s ease;
-    }
-
-    .setting-input:focus {
-      border-color: #667eea;
-      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-    }
-
-    .setting-range {
-      width: 100%;
-      height: 6px;
-      border-radius: 3px;
-      background: #e0e0e0;
-      outline: none;
-      -webkit-appearance: none;
-    }
-
-    .setting-range::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      background: #667eea;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-
-    .setting-range::-webkit-slider-thumb:hover {
-      transform: scale(1.1);
-    }
-
-    .setting-range-value {
-      display: inline-block;
-      margin-left: 10px;
-      font-size: 14px;
-      color: #667eea;
-      font-weight: 600;
-      min-width: 30px;
-    }
-
-    /* 抽屉遮罩 */
-    .drawer-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.5);
-      opacity: 0;
-      visibility: hidden;
-      transition: all 0.3s ease;
-      z-index: 150;
-    }
-
-    .drawer-overlay.open {
-      opacity: 1;
-      visibility: visible;
-    }
-
-    .container {
-      max-width: 1200px;
-      width: 100%;
-      background: rgba(255, 255, 255, 0.95);
-      border-radius: 20px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-      padding: 40px;
-      margin-top: 20px;
-      display: flex;
-      flex-direction: column;
-      max-height: calc(100vh - 120px);
-    }
-
-    .header {
-      text-align: center;
-      margin-bottom: 30px;
-    }
-
-    .header h1 {
-      font-size: 28px;
-      color: #333;
-      margin-bottom: 8px;
-    }
-
-    .header p {
-      color: #666;
-      font-size: 14px;
-    }
-
-    .search-box {
-      margin-bottom: 30px;
-    }
-
-    .search-input {
-      width: 100%;
-      padding: 14px 20px;
-      font-size: 15px;
-      border: 2px solid #e0e0e0;
-      border-radius: 12px;
-      outline: none;
-      transition: all 0.3s ease;
-      background: #f8f9fa;
-    }
-
-    .search-input:focus {
-      border-color: #667eea;
-      background: #fff;
-      box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
-    }
-
-    .quick-links {
-      display: grid;
-      gap: 16px;
-      margin-bottom: 30px;
-    }
-
-    .quick-link {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 16px 12px;
-      background: #f8f9fa;
-      border-radius: 12px;
-      text-decoration: none;
-      color: #333;
-      transition: all 0.3s ease;
-      cursor: pointer;
-      min-height: 100px;
-    }
-
-    .quick-link:hover {
-      background: #667eea;
-      color: #fff;
-      transform: translateY(-4px);
-      box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
-    }
-
-    .quick-link-icon {
-      width: 44px;
-      height: 44px;
-      margin-bottom: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 22px;
-      background: #fff;
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    }
-
-    .quick-link:hover .quick-link-icon {
-      background: rgba(255, 255, 255, 0.2);
-      box-shadow: none;
-    }
-
-    .quick-link-title {
-      font-size: 12px;
-      font-weight: 500;
-      text-align: center;
-      line-height: 1.3;
-      word-break: break-word;
-    }
-
-    /* 历史记录区域 */
-    .history-section {
-      border-top: 1px solid #e0e0e0;
-      padding-top: 24px;
-      margin-bottom: 24px;
-    }
-
-    .history-title {
-      font-size: 16px;
-      color: #333;
-      margin-bottom: 16px;
-      font-weight: 600;
-    }
-
-    .history-container {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .history-domain {
-      background: #f8f9fa;
-      border-radius: 10px;
-      padding: 12px;
-    }
-
-    .history-domain-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 10px;
-      padding-bottom: 8px;
-      border-bottom: 1px solid #e0e0e0;
-    }
-
-    .history-domain-icon {
-      width: 20px;
-      height: 20px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #fff;
-      border-radius: 5px;
-      font-size: 12px;
-    }
-
-    .history-domain-name {
-      font-size: 13px;
-      font-weight: 600;
-      color: #333;
-      flex: 1;
-    }
-
-    .history-domain-count {
-      font-size: 11px;
-      color: #666;
-      background: #e0e0e0;
-      padding: 2px 6px;
-      border-radius: 8px;
-    }
-
-    .history-urls {
-      display: flex;
-      gap: 8px;
-      overflow-x: auto;
-      padding-bottom: 4px;
-    }
-
-    .history-urls::-webkit-scrollbar {
-      height: 4px;
-    }
-
-    .history-urls::-webkit-scrollbar-track {
-      background: transparent;
-    }
-
-    .history-urls::-webkit-scrollbar-thumb {
-      background: rgba(0, 0, 0, 0.2);
-      border-radius: 2px;
-    }
-
-    .history-url-item {
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 12px;
-      background: #fff;
-      border-radius: 6px;
-      text-decoration: none;
-      color: #333;
-      transition: all 0.2s ease;
-      max-width: 180px;
-    }
-
-    .history-url-item:hover {
-      background: #667eea;
-      color: #fff;
-      transform: translateY(-1px);
-    }
-
-    .history-url-icon {
-      width: 14px;
-      height: 14px;
-      font-size: 10px;
-    }
-
-    .history-url-title {
-      font-size: 11px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .history-empty {
-      text-align: center;
-      padding: 20px;
-      color: #999;
-      font-size: 13px;
-    }
-
-    /* Tab 导航 */
-    .tab-nav {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 24px;
-      padding: 4px;
-      background: #f0f0f0;
-      border-radius: 12px;
-      flex-shrink: 0;
-    }
-
-    .tab-btn {
-      flex: 1;
-      padding: 12px 20px;
-      border: none;
-      background: transparent;
-      border-radius: 10px;
-      font-size: 14px;
-      font-weight: 500;
-      color: #666;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-    }
-
-    .tab-btn:hover {
-      color: #333;
-      background: rgba(255, 255, 255, 0.5);
-    }
-
-    .tab-btn.active {
-      background: #fff;
-      color: #667eea;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    }
-
-    .tab-content {
-      display: none;
-      overflow-y: auto;
-      flex: 1;
-      min-height: 0;
-    }
-
-    .tab-content.active {
-      display: block;
-    }
-
-    /* Tab 内容滚动条 */
-    .tab-content::-webkit-scrollbar {
-      width: 6px;
-    }
-
-    .tab-content::-webkit-scrollbar-track {
-      background: transparent;
-    }
-
-    .tab-content::-webkit-scrollbar-thumb {
-      background: rgba(0, 0, 0, 0.2);
-      border-radius: 3px;
-    }
-
-    .tab-content::-webkit-scrollbar-thumb:hover {
-      background: rgba(0, 0, 0, 0.3);
-    }
-
-    .tools-section {
-      border-top: 1px solid #e0e0e0;
-      padding-top: 24px;
-    }
-
-    .tools-title {
-      font-size: 16px;
-      color: #333;
-      margin-bottom: 16px;
-      font-weight: 600;
-    }
-
-    .tools-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-      gap: 12px;
-    }
-
-    .tool-item {
-      display: flex;
-      align-items: center;
-      padding: 12px;
-      background: #f8f9fa;
-      border-radius: 10px;
-      text-decoration: none;
-      color: #333;
-      transition: all 0.3s ease;
-    }
-
-    .tool-item:hover {
-      background: #667eea;
-      color: #fff;
-      transform: translateX(4px);
-    }
-
-    .tool-icon {
-      width: 32px;
-      height: 32px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 16px;
-      background: #fff;
-      border-radius: 8px;
-      margin-right: 10px;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-      flex-shrink: 0;
-    }
-
-    .tool-item:hover .tool-icon {
-      background: rgba(255, 255, 255, 0.2);
-      box-shadow: none;
-    }
-
-    .tool-info {
-      flex: 1;
-      min-width: 0;
-    }
-
-    .tool-name {
-      font-size: 13px;
-      font-weight: 500;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .tool-desc {
-      font-size: 11px;
-      color: #666;
-      margin-top: 2px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .tool-item:hover .tool-desc {
-      color: rgba(255, 255, 255, 0.8);
-    }
-
-    .time-display {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      font-size: 24px;
-      font-weight: 300;
-      color: rgba(255, 255, 255, 0.9);
-      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-      text-align: right;
-    }
-
-    .date-display {
-      font-size: 14px;
-      color: rgba(255, 255, 255, 0.7);
-      margin-top: 5px;
-    }
-
-    .add-link-btn {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 16px 12px;
-      background: rgba(102, 126, 234, 0.08);
-      border: 2px dashed #667eea;
-      border-radius: 12px;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      min-height: 100px;
-    }
-
-    .add-link-btn:hover {
-      background: rgba(102, 126, 234, 0.15);
-      border-color: #5568d3;
-      transform: translateY(-2px);
-    }
-
-    .add-link-btn-icon {
-      font-size: 28px;
-      color: #667eea;
-    }
-
-    .add-link-btn-text {
-      font-size: 12px;
-      color: #667eea;
-      margin-top: 6px;
-      font-weight: 500;
-    }
-
-    /* 学习资源样式 */
-    .learn-section {
-      margin-bottom: 24px;
-    }
-
-    .learn-category {
-      background: #f8f9fa;
-      border-radius: 12px;
-      padding: 16px;
-      margin-bottom: 16px;
-    }
-
-    .learn-category-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 12px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid #e0e0e0;
-    }
-
-    .learn-category-title {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 15px;
-      font-weight: 600;
-      color: #333;
-    }
-
-    .learn-category-icon {
-      font-size: 18px;
-    }
-
-    .learn-category-actions {
-      display: flex;
-      gap: 8px;
-    }
-
-    .learn-category-btn {
-      padding: 6px 12px;
-      background: #667eea;
-      color: #fff;
-      border: none;
-      border-radius: 6px;
-      font-size: 12px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-
-    .learn-category-btn:hover {
-      background: #5568d3;
-      transform: translateY(-1px);
-    }
-
-    .learn-category-btn.delete {
-      background: #e74c3c;
-    }
-
-    .learn-category-btn.delete:hover {
-      background: #c0392b;
-    }
-
-    .learn-links-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: 10px;
-    }
-
-    .learn-link-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 12px;
-      background: #fff;
-      border-radius: 8px;
-      text-decoration: none;
-      color: #333;
-      transition: all 0.2s ease;
-      border: 1px solid #e0e0e0;
-    }
-
-    .learn-link-item:hover {
-      border-color: #667eea;
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
-    }
-
-    .learn-link-favicon {
-      width: 20px;
-      height: 20px;
-      flex-shrink: 0;
-    }
-
-    .learn-link-info {
-      flex: 1;
-      min-width: 0;
-    }
-
-    .learn-link-name {
-      font-size: 13px;
-      font-weight: 500;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .learn-link-url {
-      font-size: 11px;
-      color: #999;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .learn-link-delete {
-      padding: 4px 8px;
-      background: transparent;
-      border: none;
-      color: #999;
-      cursor: pointer;
-      border-radius: 4px;
-      transition: all 0.2s ease;
-      opacity: 0;
-    }
-
-    .learn-link-item:hover .learn-link-delete {
-      opacity: 1;
-    }
-
-    .learn-link-delete:hover {
-      background: #fee;
-      color: #e74c3c;
-    }
-
-    .add-category-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      padding: 16px;
-      background: rgba(102, 126, 234, 0.08);
-      border: 2px dashed #667eea;
-      border-radius: 12px;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      width: 100%;
-      color: #667eea;
-      font-size: 14px;
-      font-weight: 500;
-    }
-
-    .add-category-btn:hover {
-      background: rgba(102, 126, 234, 0.15);
-      border-color: #5568d3;
-    }
-
-    .learn-empty {
-      text-align: center;
-      padding: 40px 20px;
-      color: #999;
-    }
-
-    .learn-empty-icon {
-      font-size: 48px;
-      margin-bottom: 12px;
-    }
-
-    .learn-empty-text {
-      font-size: 14px;
-    }
-
-    /* 模态框 */
-    .modal-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.5);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 300;
-    }
-
-    .modal-overlay.open {
-      display: flex;
-    }
-
-    .modal {
-      background: #fff;
-      border-radius: 16px;
-      padding: 24px;
-      width: 90%;
-      max-width: 400px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-    }
-
-    .modal-title {
-      font-size: 18px;
-      font-weight: 600;
-      color: #333;
-      margin-bottom: 20px;
-    }
-
-    .modal-input {
-      width: 100%;
-      padding: 12px 14px;
-      font-size: 14px;
-      border: 1px solid #e0e0e0;
-      border-radius: 8px;
-      outline: none;
-      margin-bottom: 12px;
-      transition: all 0.2s ease;
-    }
-
-    .modal-input:focus {
-      border-color: #667eea;
-      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-    }
-
-    .modal-actions {
-      display: flex;
-      gap: 12px;
-      margin-top: 20px;
-    }
-
-    .modal-btn {
-      flex: 1;
-      padding: 12px;
-      border: none;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-
-    .modal-btn.cancel {
-      background: #f0f0f0;
-      color: #666;
-    }
-
-    .modal-btn.cancel:hover {
-      background: #e0e0e0;
-    }
-
-    .modal-btn.confirm {
-      background: #667eea;
-      color: #fff;
-    }
-
-    .modal-btn.confirm:hover {
-      background: #5568d3;
-    }
-
-    /* 统一搜索样式 */
-    .unified-search-box {
-      margin-bottom: 20px;
-    }
-
-    .unified-search-input {
-      margin-bottom: 12px;
-    }
-
-    .search-sources {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-
-    .search-source-item {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      font-size: 13px;
-      color: #666;
-      cursor: pointer;
-    }
-
-    .search-source-item input {
-      accent-color: #667eea;
-    }
-
-    .search-suggestions {
-      display: none;
-      background: #fff;
-      border: 1px solid #e0e0e0;
-      border-radius: 8px;
-      margin-bottom: 12px;
-      max-height: 200px;
-      overflow-y: auto;
-    }
-
-    .search-suggestions.show {
-      display: block;
-    }
-
-    .suggestion-item {
-      padding: 8px 12px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 13px;
-    }
-
-    .suggestion-item:hover {
-      background: #f5f5f5;
-    }
-
-    .suggestion-icon {
-      color: #999;
-    }
-
-    .suggestion-count {
-      margin-left: auto;
-      font-size: 11px;
-      color: #999;
-    }
-
-    .unified-results {
-      min-height: 200px;
-    }
-
-    .unified-results-empty {
-      text-align: center;
-      padding: 60px 20px;
-      color: #999;
-    }
-
-    .unified-result-section {
-      margin-bottom: 20px;
-    }
-
-    .unified-result-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 14px;
-      font-weight: 600;
-      color: #333;
-      margin-bottom: 12px;
-      padding-bottom: 8px;
-      border-bottom: 1px solid #e0e0e0;
-    }
-
-    .unified-result-count {
-      font-size: 11px;
-      color: #999;
-      background: #f0f0f0;
-      padding: 2px 8px;
-      border-radius: 10px;
-    }
-
-    .unified-result-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 12px;
-      background: #f8f9fa;
-      border-radius: 8px;
-      margin-bottom: 8px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-
-    .unified-result-item:hover {
-      background: #667eea;
-      color: #fff;
-      transform: translateX(4px);
-    }
-
-    .unified-result-icon {
-      width: 32px;
-      height: 32px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #fff;
-      border-radius: 6px;
-      font-size: 16px;
-      flex-shrink: 0;
-    }
-
-    .unified-result-item:hover .unified-result-icon {
-      background: rgba(255,255,255,0.2);
-    }
-
-    .unified-result-info {
-      flex: 1;
-      min-width: 0;
-    }
-
-    .unified-result-title {
-      font-size: 13px;
-      font-weight: 500;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .unified-result-meta {
-      font-size: 11px;
-      color: #999;
-      margin-top: 2px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .unified-result-item:hover .unified-result-meta {
-      color: rgba(255,255,255,0.7);
-    }
-
-    .unified-result-badge {
-      font-size: 10px;
-      padding: 2px 6px;
-      border-radius: 4px;
-      background: #e0e0e0;
-      color: #666;
-    }
-
-    .unified-result-item:hover .unified-result-badge {
-      background: rgba(255,255,255,0.2);
-      color: #fff;
-    }
-  </style>
-</head>
-<body>
-  <!-- 设置按钮 -->
-  <button class="settings-btn" id="settingsBtn" title="设置">⚙️</button>
-
-  <!-- 设置抽屉 -->
-  <div class="drawer-overlay" id="drawerOverlay"></div>
-  <div class="settings-drawer" id="settingsDrawer">
-    <div class="settings-drawer-header">
-      <span class="settings-drawer-title">⚙️ 设置</span>
-      <button class="settings-close-btn" id="settingsCloseBtn">✕</button>
-    </div>
-    <div class="settings-content">
-      <div class="setting-item">
-        <label class="setting-label">每行图标个数</label>
-        <div style="display: flex; align-items: center;">
-          <input type="range" class="setting-range" id="columnsRange" min="8" max="15" value="10">
-          <span class="setting-range-value" id="columnsValue">10</span>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>新标签页</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        overflow: hidden;
+        height: 100%;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 80px 20px 40px;
+      }
+
+      /* 设置图标按钮 */
+      .settings-btn {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        width: 44px;
+        height: 44px;
+        background: rgba(255, 255, 255, 0.2);
+        border: none;
+        border-radius: 12px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        transition: all 0.3s ease;
+        backdrop-filter: blur(10px);
+        z-index: 100;
+      }
+
+      .settings-btn:hover {
+        background: rgba(255, 255, 255, 0.3);
+        transform: rotate(45deg);
+      }
+
+      /* 设置抽屉 */
+      .settings-drawer {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 320px;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.98);
+        backdrop-filter: blur(20px);
+        box-shadow: 5px 0 30px rgba(0, 0, 0, 0.2);
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+        z-index: 200;
+        overflow-y: auto;
+      }
+
+      .settings-drawer.open {
+        transform: translateX(0);
+      }
+
+      .settings-drawer-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 20px;
+        border-bottom: 1px solid #e0e0e0;
+      }
+
+      .settings-drawer-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #333;
+      }
+
+      .settings-close-btn {
+        width: 32px;
+        height: 32px;
+        background: #f0f0f0;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+      }
+
+      .settings-close-btn:hover {
+        background: #e0e0e0;
+      }
+
+      .settings-content {
+        padding: 20px;
+      }
+
+      .setting-item {
+        margin-bottom: 24px;
+      }
+
+      .setting-label {
+        display: block;
+        font-size: 14px;
+        font-weight: 500;
+        color: #333;
+        margin-bottom: 10px;
+      }
+
+      .setting-input {
+        width: 100%;
+        padding: 10px 14px;
+        font-size: 14px;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        outline: none;
+        transition: all 0.2s ease;
+      }
+
+      .setting-input:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      }
+
+      .setting-range {
+        width: 100%;
+        height: 6px;
+        border-radius: 3px;
+        background: #e0e0e0;
+        outline: none;
+        -webkit-appearance: none;
+      }
+
+      .setting-range::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #667eea;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .setting-range::-webkit-slider-thumb:hover {
+        transform: scale(1.1);
+      }
+
+      .setting-range-value {
+        display: inline-block;
+        margin-left: 10px;
+        font-size: 14px;
+        color: #667eea;
+        font-weight: 600;
+        min-width: 30px;
+      }
+
+      /* 抽屉遮罩 */
+      .drawer-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.3s ease;
+        z-index: 150;
+      }
+
+      .drawer-overlay.open {
+        opacity: 1;
+        visibility: visible;
+      }
+
+      .container {
+        max-width: 1200px;
+        width: 100%;
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 20px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        padding: 40px;
+        margin-top: 20px;
+        display: flex;
+        flex-direction: column;
+        max-height: calc(100vh - 120px);
+      }
+
+      .header {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+
+      .header h1 {
+        font-size: 28px;
+        color: #333;
+        margin-bottom: 8px;
+      }
+
+      .header p {
+        color: #666;
+        font-size: 14px;
+      }
+
+      .search-box {
+        margin-bottom: 30px;
+      }
+
+      .search-input {
+        width: 100%;
+        padding: 14px 20px;
+        font-size: 15px;
+        border: 2px solid #e0e0e0;
+        border-radius: 12px;
+        outline: none;
+        transition: all 0.3s ease;
+        background: #f8f9fa;
+      }
+
+      .search-input:focus {
+        border-color: #667eea;
+        background: #fff;
+        box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+      }
+
+      .quick-links {
+        display: grid;
+        gap: 16px;
+        margin-bottom: 30px;
+      }
+
+      .quick-link {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 16px 12px;
+        background: #f8f9fa;
+        border-radius: 12px;
+        text-decoration: none;
+        color: #333;
+        transition: all 0.3s ease;
+        cursor: pointer;
+        min-height: 100px;
+      }
+
+      .quick-link:hover {
+        background: #667eea;
+        color: #fff;
+        transform: translateY(-4px);
+        box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+      }
+
+      .quick-link-icon {
+        width: 44px;
+        height: 44px;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      .quick-link:hover .quick-link-icon {
+        background: rgba(255, 255, 255, 0.2);
+        box-shadow: none;
+      }
+
+      .quick-link-title {
+        font-size: 12px;
+        font-weight: 500;
+        text-align: center;
+        line-height: 1.3;
+        word-break: break-word;
+      }
+
+      /* 历史记录区域 */
+      .history-section {
+        border-top: 1px solid #e0e0e0;
+        padding-top: 24px;
+        margin-bottom: 24px;
+      }
+
+      .history-title {
+        font-size: 16px;
+        color: #333;
+        margin-bottom: 16px;
+        font-weight: 600;
+      }
+
+      .history-container {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .history-domain {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 12px;
+      }
+
+      .history-domain-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 10px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #e0e0e0;
+      }
+
+      .history-domain-icon {
+        width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #fff;
+        border-radius: 5px;
+        font-size: 12px;
+      }
+
+      .history-domain-name {
+        font-size: 13px;
+        font-weight: 600;
+        color: #333;
+        flex: 1;
+      }
+
+      .history-domain-count {
+        font-size: 11px;
+        color: #666;
+        background: #e0e0e0;
+        padding: 2px 6px;
+        border-radius: 8px;
+      }
+
+      .history-urls {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        padding-bottom: 4px;
+      }
+
+      .history-urls::-webkit-scrollbar {
+        height: 4px;
+      }
+
+      .history-urls::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      .history-urls::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 2px;
+      }
+
+      .history-url-item {
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        background: #fff;
+        border-radius: 6px;
+        text-decoration: none;
+        color: #333;
+        transition: all 0.2s ease;
+        max-width: 180px;
+      }
+
+      .history-url-item:hover {
+        background: #667eea;
+        color: #fff;
+        transform: translateY(-1px);
+      }
+
+      .history-url-icon {
+        width: 14px;
+        height: 14px;
+        font-size: 10px;
+      }
+
+      .history-url-title {
+        font-size: 11px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .history-empty {
+        text-align: center;
+        padding: 20px;
+        color: #999;
+        font-size: 13px;
+      }
+
+      /* Tab 导航 */
+      .tab-nav {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 24px;
+        padding: 4px;
+        background: #f0f0f0;
+        border-radius: 12px;
+        flex-shrink: 0;
+      }
+
+      .tab-btn {
+        flex: 1;
+        padding: 12px 20px;
+        border: none;
+        background: transparent;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 500;
+        color: #666;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+
+      .tab-btn:hover {
+        color: #333;
+        background: rgba(255, 255, 255, 0.5);
+      }
+
+      .tab-btn.active {
+        background: #fff;
+        color: #667eea;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      .tab-content {
+        display: none;
+        overflow-y: auto;
+        flex: 1;
+        min-height: 0;
+      }
+
+      .tab-content.active {
+        display: block;
+      }
+
+      /* Tab 内容滚动条 */
+      .tab-content::-webkit-scrollbar {
+        width: 6px;
+      }
+
+      .tab-content::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      .tab-content::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 3px;
+      }
+
+      .tab-content::-webkit-scrollbar-thumb:hover {
+        background: rgba(0, 0, 0, 0.3);
+      }
+
+      .tools-section {
+        border-top: 1px solid #e0e0e0;
+        padding-top: 24px;
+      }
+
+      .tools-title {
+        font-size: 16px;
+        color: #333;
+        margin-bottom: 16px;
+        font-weight: 600;
+      }
+
+      .tools-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 12px;
+      }
+
+      .tool-item {
+        display: flex;
+        align-items: center;
+        padding: 12px;
+        background: #f8f9fa;
+        border-radius: 10px;
+        text-decoration: none;
+        color: #333;
+        transition: all 0.3s ease;
+      }
+
+      .tool-item:hover {
+        background: #667eea;
+        color: #fff;
+        transform: translateX(4px);
+      }
+
+      .tool-icon {
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        background: #fff;
+        border-radius: 8px;
+        margin-right: 10px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+        flex-shrink: 0;
+      }
+
+      .tool-item:hover .tool-icon {
+        background: rgba(255, 255, 255, 0.2);
+        box-shadow: none;
+      }
+
+      .tool-info {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .tool-name {
+        font-size: 13px;
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .tool-desc {
+        font-size: 11px;
+        color: #666;
+        margin-top: 2px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .tool-item:hover .tool-desc {
+        color: rgba(255, 255, 255, 0.8);
+      }
+
+      .time-display {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        font-size: 24px;
+        font-weight: 300;
+        color: rgba(255, 255, 255, 0.9);
+        text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        text-align: right;
+      }
+
+      .date-display {
+        font-size: 14px;
+        color: rgba(255, 255, 255, 0.7);
+        margin-top: 5px;
+      }
+
+      .add-link-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 16px 12px;
+        background: rgba(102, 126, 234, 0.08);
+        border: 2px dashed #667eea;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        min-height: 100px;
+      }
+
+      .add-link-btn:hover {
+        background: rgba(102, 126, 234, 0.15);
+        border-color: #5568d3;
+        transform: translateY(-2px);
+      }
+
+      .add-link-btn-icon {
+        font-size: 28px;
+        color: #667eea;
+      }
+
+      .add-link-btn-text {
+        font-size: 12px;
+        color: #667eea;
+        margin-top: 6px;
+        font-weight: 500;
+      }
+
+      /* 学习资源样式 */
+      .learn-section {
+        margin-bottom: 24px;
+      }
+
+      .learn-category {
+        background: #f8f9fa;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 16px;
+      }
+
+      .learn-category-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid #e0e0e0;
+      }
+
+      .learn-category-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 15px;
+        font-weight: 600;
+        color: #333;
+      }
+
+      .learn-category-icon {
+        font-size: 18px;
+      }
+
+      .learn-category-actions {
+        display: flex;
+        gap: 8px;
+      }
+
+      .learn-category-btn {
+        padding: 6px 12px;
+        background: #667eea;
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .learn-category-btn:hover {
+        background: #5568d3;
+        transform: translateY(-1px);
+      }
+
+      .learn-category-btn.delete {
+        background: #e74c3c;
+      }
+
+      .learn-category-btn.delete:hover {
+        background: #c0392b;
+      }
+
+      .learn-links-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 10px;
+      }
+
+      .learn-link-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        background: #fff;
+        border-radius: 8px;
+        text-decoration: none;
+        color: #333;
+        transition: all 0.2s ease;
+        border: 1px solid #e0e0e0;
+      }
+
+      .learn-link-item:hover {
+        border-color: #667eea;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+      }
+
+      .learn-link-favicon {
+        width: 20px;
+        height: 20px;
+        flex-shrink: 0;
+      }
+
+      .learn-link-info {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .learn-link-name {
+        font-size: 13px;
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .learn-link-url {
+        font-size: 11px;
+        color: #999;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .learn-link-delete {
+        padding: 4px 8px;
+        background: transparent;
+        border: none;
+        color: #999;
+        cursor: pointer;
+        border-radius: 4px;
+        transition: all 0.2s ease;
+        opacity: 0;
+      }
+
+      .learn-link-item:hover .learn-link-delete {
+        opacity: 1;
+      }
+
+      .learn-link-delete:hover {
+        background: #fee;
+        color: #e74c3c;
+      }
+
+      .add-category-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 16px;
+        background: rgba(102, 126, 234, 0.08);
+        border: 2px dashed #667eea;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        width: 100%;
+        color: #667eea;
+        font-size: 14px;
+        font-weight: 500;
+      }
+
+      .add-category-btn:hover {
+        background: rgba(102, 126, 234, 0.15);
+        border-color: #5568d3;
+      }
+
+      .learn-empty {
+        text-align: center;
+        padding: 40px 20px;
+        color: #999;
+      }
+
+      .learn-empty-icon {
+        font-size: 48px;
+        margin-bottom: 12px;
+      }
+
+      .learn-empty-text {
+        font-size: 14px;
+      }
+
+      /* 模态框 */
+      .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 300;
+      }
+
+      .modal-overlay.open {
+        display: flex;
+      }
+
+      .modal {
+        background: #fff;
+        border-radius: 16px;
+        padding: 24px;
+        width: 90%;
+        max-width: 400px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      }
+
+      .modal-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 20px;
+      }
+
+      .modal-input {
+        width: 100%;
+        padding: 12px 14px;
+        font-size: 14px;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        outline: none;
+        margin-bottom: 12px;
+        transition: all 0.2s ease;
+      }
+
+      .modal-input:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      }
+
+      .modal-actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 20px;
+      }
+
+      .modal-btn {
+        flex: 1;
+        padding: 12px;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .modal-btn.cancel {
+        background: #f0f0f0;
+        color: #666;
+      }
+
+      .modal-btn.cancel:hover {
+        background: #e0e0e0;
+      }
+
+      .modal-btn.confirm {
+        background: #667eea;
+        color: #fff;
+      }
+
+      .modal-btn.confirm:hover {
+        background: #5568d3;
+      }
+
+      /* 统一搜索样式 */
+      .unified-search-box {
+        margin-bottom: 20px;
+      }
+
+      .unified-search-input {
+        margin-bottom: 12px;
+      }
+
+      .search-sources {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .search-source-item {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 13px;
+        color: #666;
+        cursor: pointer;
+      }
+
+      .search-source-item input {
+        accent-color: #667eea;
+      }
+
+      .search-suggestions {
+        display: none;
+        background: #fff;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        margin-bottom: 12px;
+        max-height: 200px;
+        overflow-y: auto;
+      }
+
+      .search-suggestions.show {
+        display: block;
+      }
+
+      .suggestion-item {
+        padding: 8px 12px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+      }
+
+      .suggestion-item:hover {
+        background: #f5f5f5;
+      }
+
+      .suggestion-icon {
+        color: #999;
+      }
+
+      .suggestion-count {
+        margin-left: auto;
+        font-size: 11px;
+        color: #999;
+      }
+
+      .unified-results {
+        min-height: 200px;
+      }
+
+      .unified-results-empty {
+        text-align: center;
+        padding: 60px 20px;
+        color: #999;
+      }
+
+      .unified-result-section {
+        margin-bottom: 20px;
+      }
+
+      .unified-result-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 12px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #e0e0e0;
+      }
+
+      .unified-result-count {
+        font-size: 11px;
+        color: #999;
+        background: #f0f0f0;
+        padding: 2px 8px;
+        border-radius: 10px;
+      }
+
+      .unified-result-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        margin-bottom: 8px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .unified-result-item:hover {
+        background: #667eea;
+        color: #fff;
+        transform: translateX(4px);
+      }
+
+      .unified-result-icon {
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #fff;
+        border-radius: 6px;
+        font-size: 16px;
+        flex-shrink: 0;
+      }
+
+      .unified-result-item:hover .unified-result-icon {
+        background: rgba(255, 255, 255, 0.2);
+      }
+
+      .unified-result-info {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .unified-result-title {
+        font-size: 13px;
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .unified-result-meta {
+        font-size: 11px;
+        color: #999;
+        margin-top: 2px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .unified-result-item:hover .unified-result-meta {
+        color: rgba(255, 255, 255, 0.7);
+      }
+
+      .unified-result-badge {
+        font-size: 10px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        background: #e0e0e0;
+        color: #666;
+      }
+
+      .unified-result-item:hover .unified-result-badge {
+        background: rgba(255, 255, 255, 0.2);
+        color: #fff;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- 设置按钮 -->
+    <button class="settings-btn" id="settingsBtn" title="设置">⚙️</button>
+
+    <!-- 设置抽屉 -->
+    <div class="drawer-overlay" id="drawerOverlay"></div>
+    <div class="settings-drawer" id="settingsDrawer">
+      <div class="settings-drawer-header">
+        <span class="settings-drawer-title">⚙️ 设置</span>
+        <button class="settings-close-btn" id="settingsCloseBtn">✕</button>
+      </div>
+      <div class="settings-content">
+        <div class="setting-item">
+          <label class="setting-label">每行图标个数</label>
+          <div style="display: flex; align-items: center">
+            <input
+              type="range"
+              class="setting-range"
+              id="columnsRange"
+              min="8"
+              max="15"
+              value="10"
+            />
+            <span class="setting-range-value" id="columnsValue">10</span>
+          </div>
         </div>
-      </div>
-      <div class="setting-item">
-        <label class="setting-label">历史记录显示数量</label>
-        <div style="display: flex; align-items: center;">
-          <input type="range" class="setting-range" id="historyCountRange" min="3" max="20" value="8">
-          <span class="setting-range-value" id="historyCountValue">8</span>
+        <div class="setting-item">
+          <label class="setting-label">历史记录显示数量</label>
+          <div style="display: flex; align-items: center">
+            <input
+              type="range"
+              class="setting-range"
+              id="historyCountRange"
+              min="3"
+              max="20"
+              value="8"
+            />
+            <span class="setting-range-value" id="historyCountValue">8</span>
+          </div>
         </div>
-      </div>
-      <div class="setting-item">
-        <label class="setting-label">搜索引擎</label>
-        <select class="setting-input" id="searchEngineSelect">
-          <option value="baidu">百度</option>
-          <option value="google">Google</option>
-          <option value="bing">Bing</option>
-          <option value="duckduckgo">DuckDuckGo</option>
-          <option value="sogou">搜狗</option>
-        </select>
-      </div>
-    </div>
-  </div>
-
-  <div class="time-display" id="time">00:00</div>
-  <div class="date-display" id="date">星期一</div>
-
-  <!-- 天气显示 -->
-  <div id="weather-widget" style="text-align: center; margin: 10px 0; padding: 8px 16px; background: rgba(255,255,255,0.1); border-radius: 12px; display: inline-flex; align-items: center; gap: 8px;">
-    <span id="weather-icon" style="font-size: 24px;">🌤️</span>
-    <div>
-      <span id="weather-temp" style="font-size: 16px; font-weight: 600; color: #fff;">--°C</span>
-      <span id="weather-desc" style="font-size: 11px; color: rgba(255,255,255,0.7); margin-left: 8px;">加载中...</span>
-    </div>
-  </div>
-
-  <!-- 每日一言 -->
-  <div id="daily-quote" style="text-align: center; margin: 8px 0 20px 0; padding: 12px 20px; max-width: 600px; background: rgba(255,255,255,0.08); border-radius: 8px;">
-    <div id="quote-text" style="font-size: 14px; color: rgba(255,255,255,0.9); line-height: 1.5; margin-bottom: 4px;">加载中...</div>
-    <div id="quote-author" style="font-size: 11px; color: rgba(255,255,255,0.5);"></div>
-  </div>
-
-  <div class="container">
-    <div class="header">
-      <h1>👋 欢迎使用</h1>
-      <p>快速访问您的常用网站和工具</p>
-    </div>
-
-    <div class="search-box">
-      <input type="text" class="search-input" id="searchInput" placeholder="搜索或输入网址..." autofocus>
-    </div>
-
-    <!-- Tab 导航 -->
-    <div class="tab-nav">
-      <button class="tab-btn active" data-tab="home">
-        <span>🏠</span>
-        <span>主页</span>
-      </button>
-      <button class="tab-btn" data-tab="search">
-        <span>🔍</span>
-        <span>统一搜索</span>
-      </button>
-      <button class="tab-btn" data-tab="learn">
-        <span>📚</span>
-        <span>学习资源</span>
-      </button>
-    </div>
-
-    <!-- 统一搜索 Tab -->
-    <div class="tab-content" id="tab-search">
-      <div class="unified-search-box">
-        <input type="text" class="search-input unified-search-input" id="unifiedSearchInput" placeholder="搜索历史、书签、下载、标签页...">
-        <div class="search-sources">
-          <label class="search-source-item">
-            <input type="checkbox" checked data-source="history"> 历史
-          </label>
-          <label class="search-source-item">
-            <input type="checkbox" checked data-source="bookmarks"> 书签
-          </label>
-          <label class="search-source-item">
-            <input type="checkbox" checked data-source="downloads"> 下载
-          </label>
-          <label class="search-source-item">
-            <input type="checkbox" checked data-source="tabs"> 标签页
-          </label>
-        </div>
-      </div>
-      <div class="search-suggestions" id="searchSuggestions"></div>
-      <div class="unified-results" id="unifiedResults">
-        <div class="unified-results-empty">输入关键词开始搜索</div>
-      </div>
-    </div>
-
-    <!-- 主页 Tab -->
-    <div class="tab-content active" id="tab-home">
-      <div class="quick-links" id="quickLinks">
-        <!-- 快捷方式由 JS 动态生成 -->
-        <div class="add-link-btn" id="addLinkBtn">
-          <span class="add-link-btn-icon">+</span>
-          <span class="add-link-btn-text">添加</span>
-        </div>
-      </div>
-
-      <!-- 历史记录区域 -->
-      <div class="history-section" id="historySection">
-        <div class="history-title">🕐 最近访问</div>
-        <div class="history-container" id="historyContainer">
-          <div class="history-empty">加载中...</div>
-        </div>
-      </div>
-
-      <!-- 书签快捷访问 -->
-      <div class="history-section" id="bookmarksSection" style="margin-top: 20px;">
-        <div class="history-title">📌 常用书签</div>
-        <div class="history-container" id="bookmarksContainer">
-          <div class="history-empty">加载中...</div>
-        </div>
-      </div>
-
-      <div class="tools-section">
-        <div class="tools-title">🛠️ 实用工具</div>
-        <div class="tools-grid">
-        <a href="https://www.google.com/search?q=chrome+extensions" target="_blank" class="tool-item">
-          <div class="tool-icon">⚙️</div>
-          <div class="tool-info">
-            <div class="tool-name">扩展管理</div>
-            <div class="tool-desc">管理浏览器扩展</div>
-          </div>
-        </a>
-        <a href="https://www.speedtest.net/" target="_blank" class="tool-item">
-          <div class="tool-icon">📊</div>
-          <div class="tool-info">
-            <div class="tool-name">网速测试</div>
-            <div class="tool-desc">测试网络速度</div>
-          </div>
-        </a>
-        <a href="https://wttr.in/?lang=zh" target="_blank" class="tool-item">
-          <div class="tool-icon">🌤️</div>
-          <div class="tool-info">
-            <div class="tool-name">天气查询</div>
-            <div class="tool-desc">查看当前天气</div>
-          </div>
-        </a>
-        <a href="https://ipinfo.io/" target="_blank" class="tool-item">
-          <div class="tool-icon">🌍</div>
-          <div class="tool-info">
-            <div class="tool-name">IP查询</div>
-            <div class="tool-desc">查看本机IP信息</div>
-          </div>
-        </a>
-        <a href="https://translate.google.com/?sl=auto&tl=zh-CN" target="_blank" class="tool-item">
-          <div class="tool-icon">🌐</div>
-          <div class="tool-info">
-            <div class="tool-name">谷歌翻译</div>
-            <div class="tool-desc">在线翻译工具</div>
-          </div>
-        </a>
-        <a href="https://json.cn/" target="_blank" class="tool-item">
-          <div class="tool-icon">📝</div>
-          <div class="tool-info">
-            <div class="tool-name">JSON格式化</div>
-            <div class="tool-desc">在线JSON工具</div>
-          </div>
-        </a>
-        <a href="https://regex101.com/" target="_blank" class="tool-item">
-          <div class="tool-icon">🔍</div>
-          <div class="tool-info">
-            <div class="tool-name">正则测试</div>
-            <div class="tool-desc">正则表达式测试</div>
-          </div>
-        </a>
-        <a href="https://caniuse.com/" target="_blank" class="tool-item">
-          <div class="tool-icon">📱</div>
-          <div class="tool-info">
-            <div class="tool-name">浏览器兼容</div>
-            <div class="tool-desc">查询特性支持</div>
-          </div>
-        </a>
-        <a href="https://tinypng.com/" target="_blank" class="tool-item">
-          <div class="tool-icon">🖼️</div>
-          <div class="tool-info">
-            <div class="tool-name">图片压缩</div>
-            <div class="tool-desc">在线压缩图片</div>
-          </div>
-        </a>
-        <a href="https://www.photopea.com/" target="_blank" class="tool-item">
-          <div class="tool-icon">🎨</div>
-          <div class="tool-info">
-            <div class="tool-name">在线PS</div>
-            <div class="tool-desc">在线图片编辑</div>
-          </div>
-        </a>
-        <a href="https://www.figma.com/" target="_blank" class="tool-item">
-          <div class="tool-icon">✏️</div>
-          <div class="tool-info">
-            <div class="tool-name">Figma</div>
-            <div class="tool-desc">在线设计工具</div>
-          </div>
-        </a>
-        <a href="https://codepen.io/pen/" target="_blank" class="tool-item">
-          <div class="tool-icon">💻</div>
-          <div class="tool-info">
-            <div class="tool-name">CodePen</div>
-            <div class="tool-desc">在线代码编辑</div>
-          </div>
-        </a>
-        <a href="https://convertio.co/zh/" target="_blank" class="tool-item">
-          <div class="tool-icon">🔄</div>
-          <div class="tool-info">
-            <div class="tool-name">文件转换</div>
-            <div class="tool-desc">在线文件格式转换</div>
-          </div>
-        </a>
-        <a href="https://www.remove.bg/" target="_blank" class="tool-item">
-          <div class="tool-icon">✂️</div>
-          <div class="tool-info">
-            <div class="tool-name">抠图工具</div>
-            <div class="tool-desc">在线去除背景</div>
-          </div>
-        </a>
-        <a href="https://extract.pics/" target="_blank" class="tool-item">
-          <div class="tool-icon">🖼️</div>
-          <div class="tool-info">
-            <div class="tool-name">图片提取</div>
-            <div class="tool-desc">从网站提取图片</div>
-          </div>
-        </a>
-        <a href="https://squoosh.app/" target="_blank" class="tool-item">
-          <div class="tool-icon">🎨</div>
-          <div class="tool-info">
-            <div class="tool-name">图片优化</div>
-            <div class="tool-desc">Google图片压缩工具</div>
-          </div>
-        </a>
+        <div class="setting-item">
+          <label class="setting-label">搜索引擎</label>
+          <select class="setting-input" id="searchEngineSelect">
+            <option value="baidu">百度</option>
+            <option value="google">Google</option>
+            <option value="bing">Bing</option>
+            <option value="duckduckgo">DuckDuckGo</option>
+            <option value="sogou">搜狗</option>
+          </select>
         </div>
       </div>
     </div>
 
-    <!-- 学习资源 Tab -->
-    <div class="tab-content" id="tab-learn">
-      <div class="learn-section" id="learnSection">
-        <!-- 学习分类由 JS 动态生成 -->
+    <div class="time-display" id="time">00:00</div>
+    <div class="date-display" id="date">星期一</div>
+
+    <!-- 天气显示 -->
+    <div
+      id="weather-widget"
+      style="
+        text-align: center;
+        margin: 10px 0;
+        padding: 8px 16px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      "
+    >
+      <span id="weather-icon" style="font-size: 24px">🌤️</span>
+      <div>
+        <span id="weather-temp" style="font-size: 16px; font-weight: 600; color: #fff">--°C</span>
+        <span
+          id="weather-desc"
+          style="font-size: 11px; color: rgba(255, 255, 255, 0.7); margin-left: 8px"
+          >加载中...</span
+        >
       </div>
-      <div style="display: flex; gap: 12px; margin-top: 16px;">
-        <button class="add-category-btn" id="addCategoryBtn" style="flex: 1;">
-          <span>➕</span>
-          <span>添加新分类</span>
+    </div>
+
+    <!-- 每日一言 -->
+    <div
+      id="daily-quote"
+      style="
+        text-align: center;
+        margin: 8px 0 20px 0;
+        padding: 12px 20px;
+        max-width: 600px;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 8px;
+      "
+    >
+      <div
+        id="quote-text"
+        style="
+          font-size: 14px;
+          color: rgba(255, 255, 255, 0.9);
+          line-height: 1.5;
+          margin-bottom: 4px;
+        "
+      >
+        加载中...
+      </div>
+      <div id="quote-author" style="font-size: 11px; color: rgba(255, 255, 255, 0.5)"></div>
+    </div>
+
+    <div class="container">
+      <div class="header">
+        <h1>👋 欢迎使用</h1>
+        <p>快速访问您的常用网站和工具</p>
+      </div>
+
+      <div class="search-box">
+        <input
+          type="text"
+          class="search-input"
+          id="searchInput"
+          placeholder="搜索或输入网址..."
+          autofocus
+        />
+      </div>
+
+      <!-- Tab 导航 -->
+      <div class="tab-nav">
+        <button class="tab-btn active" data-tab="home">
+          <span>🏠</span>
+          <span>主页</span>
         </button>
-        <button class="add-category-btn" id="importBookmarkBtn" style="flex: 1; border-color: #52c41a; color: #52c41a;">
-          <span>📖</span>
-          <span>从书签导入</span>
+        <button class="tab-btn" data-tab="search">
+          <span>🔍</span>
+          <span>统一搜索</span>
+        </button>
+        <button class="tab-btn" data-tab="learn">
+          <span>📚</span>
+          <span>学习资源</span>
         </button>
       </div>
-    </div>
-  </div>
 
-  <!-- 模态框 -->
-  <div class="modal-overlay" id="modalOverlay">
-    <div class="modal">
-      <div class="modal-title" id="modalTitle">添加分类</div>
-      <input type="text" class="modal-input" id="modalInput1" placeholder="分类名称">
-      <input type="text" class="modal-input" id="modalInput2" placeholder="分类图标（emoji）">
-      <input type="text" class="modal-input" id="modalInput3" placeholder="">
-      <div class="modal-actions">
-        <button class="modal-btn cancel" id="modalCancel">取消</button>
-        <button class="modal-btn confirm" id="modalConfirm">确认</button>
+      <!-- 统一搜索 Tab -->
+      <div class="tab-content" id="tab-search">
+        <div class="unified-search-box">
+          <input
+            type="text"
+            class="search-input unified-search-input"
+            id="unifiedSearchInput"
+            placeholder="搜索历史、书签、下载、标签页..."
+          />
+          <div class="search-sources">
+            <label class="search-source-item">
+              <input type="checkbox" checked data-source="history" /> 历史
+            </label>
+            <label class="search-source-item">
+              <input type="checkbox" checked data-source="bookmarks" /> 书签
+            </label>
+            <label class="search-source-item">
+              <input type="checkbox" checked data-source="downloads" /> 下载
+            </label>
+            <label class="search-source-item">
+              <input type="checkbox" checked data-source="tabs" /> 标签页
+            </label>
+          </div>
+        </div>
+        <div class="search-suggestions" id="searchSuggestions"></div>
+        <div class="unified-results" id="unifiedResults">
+          <div class="unified-results-empty">输入关键词开始搜索</div>
+        </div>
+      </div>
+
+      <!-- 主页 Tab -->
+      <div class="tab-content active" id="tab-home">
+        <div class="quick-links" id="quickLinks">
+          <!-- 快捷方式由 JS 动态生成 -->
+          <div class="add-link-btn" id="addLinkBtn">
+            <span class="add-link-btn-icon">+</span>
+            <span class="add-link-btn-text">添加</span>
+          </div>
+        </div>
+
+        <!-- 历史记录区域 -->
+        <div class="history-section" id="historySection">
+          <div class="history-title">🕐 最近访问</div>
+          <div class="history-container" id="historyContainer">
+            <div class="history-empty">加载中...</div>
+          </div>
+        </div>
+
+        <!-- 书签快捷访问 -->
+        <div class="history-section" id="bookmarksSection" style="margin-top: 20px">
+          <div class="history-title">📌 常用书签</div>
+          <div class="history-container" id="bookmarksContainer">
+            <div class="history-empty">加载中...</div>
+          </div>
+        </div>
+
+        <div class="tools-section">
+          <div class="tools-title">🛠️ 实用工具</div>
+          <div class="tools-grid">
+            <a
+              href="https://www.google.com/search?q=chrome+extensions"
+              target="_blank"
+              class="tool-item"
+            >
+              <div class="tool-icon">⚙️</div>
+              <div class="tool-info">
+                <div class="tool-name">扩展管理</div>
+                <div class="tool-desc">管理浏览器扩展</div>
+              </div>
+            </a>
+            <a href="https://www.speedtest.net/" target="_blank" class="tool-item">
+              <div class="tool-icon">📊</div>
+              <div class="tool-info">
+                <div class="tool-name">网速测试</div>
+                <div class="tool-desc">测试网络速度</div>
+              </div>
+            </a>
+            <a href="https://wttr.in/?lang=zh" target="_blank" class="tool-item">
+              <div class="tool-icon">🌤️</div>
+              <div class="tool-info">
+                <div class="tool-name">天气查询</div>
+                <div class="tool-desc">查看当前天气</div>
+              </div>
+            </a>
+            <a href="https://ipinfo.io/" target="_blank" class="tool-item">
+              <div class="tool-icon">🌍</div>
+              <div class="tool-info">
+                <div class="tool-name">IP查询</div>
+                <div class="tool-desc">查看本机IP信息</div>
+              </div>
+            </a>
+            <a
+              href="https://translate.google.com/?sl=auto&tl=zh-CN"
+              target="_blank"
+              class="tool-item"
+            >
+              <div class="tool-icon">🌐</div>
+              <div class="tool-info">
+                <div class="tool-name">谷歌翻译</div>
+                <div class="tool-desc">在线翻译工具</div>
+              </div>
+            </a>
+            <a href="https://json.cn/" target="_blank" class="tool-item">
+              <div class="tool-icon">📝</div>
+              <div class="tool-info">
+                <div class="tool-name">JSON格式化</div>
+                <div class="tool-desc">在线JSON工具</div>
+              </div>
+            </a>
+            <a href="https://regex101.com/" target="_blank" class="tool-item">
+              <div class="tool-icon">🔍</div>
+              <div class="tool-info">
+                <div class="tool-name">正则测试</div>
+                <div class="tool-desc">正则表达式测试</div>
+              </div>
+            </a>
+            <a href="https://caniuse.com/" target="_blank" class="tool-item">
+              <div class="tool-icon">📱</div>
+              <div class="tool-info">
+                <div class="tool-name">浏览器兼容</div>
+                <div class="tool-desc">查询特性支持</div>
+              </div>
+            </a>
+            <a href="https://tinypng.com/" target="_blank" class="tool-item">
+              <div class="tool-icon">🖼️</div>
+              <div class="tool-info">
+                <div class="tool-name">图片压缩</div>
+                <div class="tool-desc">在线压缩图片</div>
+              </div>
+            </a>
+            <a href="https://www.photopea.com/" target="_blank" class="tool-item">
+              <div class="tool-icon">🎨</div>
+              <div class="tool-info">
+                <div class="tool-name">在线PS</div>
+                <div class="tool-desc">在线图片编辑</div>
+              </div>
+            </a>
+            <a href="https://www.figma.com/" target="_blank" class="tool-item">
+              <div class="tool-icon">✏️</div>
+              <div class="tool-info">
+                <div class="tool-name">Figma</div>
+                <div class="tool-desc">在线设计工具</div>
+              </div>
+            </a>
+            <a href="https://codepen.io/pen/" target="_blank" class="tool-item">
+              <div class="tool-icon">💻</div>
+              <div class="tool-info">
+                <div class="tool-name">CodePen</div>
+                <div class="tool-desc">在线代码编辑</div>
+              </div>
+            </a>
+            <a href="https://convertio.co/zh/" target="_blank" class="tool-item">
+              <div class="tool-icon">🔄</div>
+              <div class="tool-info">
+                <div class="tool-name">文件转换</div>
+                <div class="tool-desc">在线文件格式转换</div>
+              </div>
+            </a>
+            <a href="https://www.remove.bg/" target="_blank" class="tool-item">
+              <div class="tool-icon">✂️</div>
+              <div class="tool-info">
+                <div class="tool-name">抠图工具</div>
+                <div class="tool-desc">在线去除背景</div>
+              </div>
+            </a>
+            <a href="https://extract.pics/" target="_blank" class="tool-item">
+              <div class="tool-icon">🖼️</div>
+              <div class="tool-info">
+                <div class="tool-name">图片提取</div>
+                <div class="tool-desc">从网站提取图片</div>
+              </div>
+            </a>
+            <a href="https://squoosh.app/" target="_blank" class="tool-item">
+              <div class="tool-icon">🎨</div>
+              <div class="tool-info">
+                <div class="tool-name">图片优化</div>
+                <div class="tool-desc">Google图片压缩工具</div>
+              </div>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- 学习资源 Tab -->
+      <div class="tab-content" id="tab-learn">
+        <div class="learn-section" id="learnSection">
+          <!-- 学习分类由 JS 动态生成 -->
+        </div>
+        <div style="display: flex; gap: 12px; margin-top: 16px">
+          <button class="add-category-btn" id="addCategoryBtn" style="flex: 1">
+            <span>➕</span>
+            <span>添加新分类</span>
+          </button>
+          <button
+            class="add-category-btn"
+            id="importBookmarkBtn"
+            style="flex: 1; border-color: #52c41a; color: #52c41a"
+          >
+            <span>📖</span>
+            <span>从书签导入</span>
+          </button>
+        </div>
       </div>
     </div>
-  </div>
 
-  <script src="shared/downloads-search.js"></script>
-  <script src="shared/search-history.js"></script>
-  <script src="shared/tab-content-search.js"></script>
-  <script src="shared/unified-search.js"></script>
-  <script src="newtab.js"></script>
-</body>
+    <!-- 模态框 -->
+    <div class="modal-overlay" id="modalOverlay">
+      <div class="modal">
+        <div class="modal-title" id="modalTitle">添加分类</div>
+        <input type="text" class="modal-input" id="modalInput1" placeholder="分类名称" />
+        <input type="text" class="modal-input" id="modalInput2" placeholder="分类图标（emoji）" />
+        <input type="text" class="modal-input" id="modalInput3" placeholder="" />
+        <div class="modal-actions">
+          <button class="modal-btn cancel" id="modalCancel">取消</button>
+          <button class="modal-btn confirm" id="modalConfirm">确认</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="shared/downloads-search.js"></script>
+    <script src="shared/search-history.js"></script>
+    <script src="shared/tab-content-search.js"></script>
+    <script src="shared/unified-search.js"></script>
+    <script src="newtab.js"></script>
+  </body>
 </html>

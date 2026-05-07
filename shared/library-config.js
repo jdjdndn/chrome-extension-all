@@ -3,32 +3,32 @@
  * 包含知名库定义、CDN 模板、函数提取规则
  */
 
-(function () {
-  'use strict';
+;(function () {
+  'use strict'
 
   // ========== CDN 模板 ==========
   const CDN_TEMPLATES = {
     unpkg: {
       name: 'unpkg',
       template: 'https://unpkg.com/{name}@{version}/{path}',
-      defaultPath: 'dist/{name}.min.js'
+      defaultPath: 'dist/{name}.min.js',
     },
     jsdelivr: {
       name: 'jsDelivr',
       template: 'https://cdn.jsdelivr.net/npm/{name}@{version}/{path}',
-      defaultPath: 'dist/{name}.min.js'
+      defaultPath: 'dist/{name}.min.js',
     },
     cdnjs: {
       name: 'cdnjs',
       template: 'https://cdnjs.cloudflare.com/ajax/libs/{name}/{version}/{path}',
-      defaultPath: '{name}.min.js'
+      defaultPath: '{name}.min.js',
     },
     esm: {
       name: 'esm.run',
       template: 'https://esm.run/{name}@{version}',
-      isModule: true
-    }
-  };
+      isModule: true,
+    },
+  }
 
   // ========== 知名库预设 ==========
   const POPULAR_LIBRARIES = [
@@ -40,7 +40,7 @@
       cdn: 'jsdelivr',
       version: '1.6.0',
       path: 'dist/axios.min.js',
-      global: 'axios'
+      global: 'axios',
     },
     {
       id: 'jquery',
@@ -50,7 +50,7 @@
       cdn: 'jsdelivr',
       version: '3.7.1',
       path: 'dist/jquery.min.js',
-      global: '$'
+      global: '$',
     },
     {
       id: 'lodash',
@@ -60,7 +60,7 @@
       cdn: 'jsdelivr',
       version: '4.17.21',
       path: 'lodash.min.js',
-      global: '_'
+      global: '_',
     },
     {
       id: 'dayjs',
@@ -70,7 +70,7 @@
       cdn: 'jsdelivr',
       version: '1.11.10',
       path: 'dayjs.min.js',
-      global: 'dayjs'
+      global: 'dayjs',
     },
     {
       id: 'vue',
@@ -80,7 +80,7 @@
       cdn: 'unpkg',
       version: '3.4.0',
       path: 'dist/vue.global.prod.js',
-      global: 'Vue'
+      global: 'Vue',
     },
     {
       id: 'react',
@@ -90,7 +90,7 @@
       cdn: 'jsdelivr',
       version: '18.2.0',
       path: 'umd/react.production.min.js',
-      global: 'React'
+      global: 'React',
     },
     {
       id: 'immutable',
@@ -100,7 +100,7 @@
       cdn: 'jsdelivr',
       version: '4.3.0',
       path: 'immutable.min.js',
-      global: 'Immutable'
+      global: 'Immutable',
     },
     {
       id: 'moment',
@@ -110,7 +110,7 @@
       cdn: 'jsdelivr',
       version: '2.29.4',
       path: 'moment.min.js',
-      global: 'moment'
+      global: 'moment',
     },
     {
       id: 'uuid',
@@ -120,7 +120,7 @@
       cdn: 'jsdelivr',
       version: '9.0.0',
       path: 'dist/umd/uuid.min.js',
-      global: 'uuid'
+      global: 'uuid',
     },
     {
       id: 'qs',
@@ -130,7 +130,7 @@
       cdn: 'jsdelivr',
       version: '6.11.2',
       path: 'dist/qs.js',
-      global: 'qs'
+      global: 'qs',
     },
     {
       id: 'chart',
@@ -140,7 +140,7 @@
       cdn: 'jsdelivr',
       version: '4.4.0',
       path: 'dist/chart.umd.min.js',
-      global: 'Chart'
+      global: 'Chart',
     },
     {
       id: 'marked',
@@ -150,16 +150,17 @@
       cdn: 'jsdelivr',
       version: '11.1.0',
       path: 'marked.min.js',
-      global: 'marked'
-    }
-  ];
+      global: 'marked',
+    },
+  ]
 
   // ========== 函数提取规则 ==========
   const FUNCTION_PATTERNS = {
     // 普通函数: function name() {}
     namedFunction: /function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\([^)]*\)\s*\{/g,
     // 箭头函数: const name = () => {}
-    arrowFunction: /(?:const|let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(?:async\s*)?(?:\([^)]*\)|[^=])\s*=>/g,
+    arrowFunction:
+      /(?:const|let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(?:async\s*)?(?:\([^)]*\)|[^=])\s*=>/g,
     // 方法简写: const obj = { name() {} }
     methodShorthand: /([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\([^)]*\)\s*\{/g,
     // async 函数
@@ -167,8 +168,8 @@
     // export function
     exportFunction: /export\s+(?:async\s+)?function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)/g,
     // export const
-    exportConst: /export\s+(?:const|let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=/g
-  };
+    exportConst: /export\s+(?:const|let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=/g,
+  }
 
   // ========== 工具函数 ==========
 
@@ -176,197 +177,204 @@
    * 生成 CDN URL
    */
   function generateCDNUrl(lib) {
-    const cdn = CDN_TEMPLATES[lib.cdn] || CDN_TEMPLATES.jsdelivr;
+    const cdn = CDN_TEMPLATES[lib.cdn] || CDN_TEMPLATES.jsdelivr
     let url = cdn.template
       .replace('{name}', lib.id)
       .replace('{version}', lib.version)
-      .replace('{path}', lib.path || cdn.defaultPath);
+      .replace('{path}', lib.path || cdn.defaultPath)
 
-    return url;
+    return url
   }
 
   /**
    * 从代码中提取函数
    */
   function extractFunctions(code) {
-    const functions = new Map();
+    const functions = new Map()
 
     // 提取普通命名函数
-    let match;
-    const namedFuncRegex = /function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(([^)]*)\)/g;
+    let match
+    const namedFuncRegex = /function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(([^)]*)\)/g
     while ((match = namedFuncRegex.exec(code)) !== null) {
-      const name = match[1];
-      const params = match[2];
-      const funcCode = extractFunctionBody(code, match.index, '{');
+      const name = match[1]
+      const params = match[2]
+      const funcCode = extractFunctionBody(code, match.index, '{')
       if (funcCode) {
         functions.set(name, {
           name,
-          params: params.split(',').map(p => p.trim()).filter(Boolean),
+          params: params
+            .split(',')
+            .map((p) => p.trim())
+            .filter(Boolean),
           code: funcCode,
-          type: 'function'
-        });
+          type: 'function',
+        })
       }
     }
 
     // 提取箭头函数
-    const arrowFuncRegex = /(?:const|let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(?:async\s*)?(?:\(([^)]*)\)|([a-zA-Z_$][a-zA-Z0-9_$]*))\s*=>\s*/g;
+    const arrowFuncRegex =
+      /(?:const|let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(?:async\s*)?(?:\(([^)]*)\)|([a-zA-Z_$][a-zA-Z0-9_$]*))\s*=>\s*/g
     while ((match = arrowFuncRegex.exec(code)) !== null) {
-      const name = match[1];
-      const params = match[2] || match[3] || '';
-      const funcCode = extractArrowFunctionBody(code, match.index + match[0].length);
+      const name = match[1]
+      const params = match[2] || match[3] || ''
+      const funcCode = extractArrowFunctionBody(code, match.index + match[0].length)
       if (funcCode && !functions.has(name)) {
         functions.set(name, {
           name,
-          params: params.split(',').map(p => p.trim()).filter(Boolean),
+          params: params
+            .split(',')
+            .map((p) => p.trim())
+            .filter(Boolean),
           code: `const ${name} = ${match[0].trim()}${funcCode}`,
-          type: 'arrow'
-        });
+          type: 'arrow',
+        })
       }
     }
 
-    return Array.from(functions.values());
+    return Array.from(functions.values())
   }
 
   /**
    * 提取函数体（处理嵌套括号）
    */
   function extractFunctionBody(code, startIndex, openChar) {
-    const closeChar = openChar === '{' ? '}' : openChar === '(' ? ')' : ']';
-    let depth = 0;
-    let inString = false;
-    let stringChar = '';
-    let bodyStart = -1;
+    const closeChar = openChar === '{' ? '}' : openChar === '(' ? ')' : ']'
+    let depth = 0
+    let inString = false
+    let stringChar = ''
+    let bodyStart = -1
 
     for (let i = startIndex; i < code.length; i++) {
-      const char = code[i];
-      const prevChar = i > 0 ? code[i - 1] : '';
+      const char = code[i]
+      const prevChar = i > 0 ? code[i - 1] : ''
 
       // 处理字符串
       if ((char === '"' || char === "'" || char === '`') && prevChar !== '\\') {
         if (!inString) {
-          inString = true;
-          stringChar = char;
+          inString = true
+          stringChar = char
         } else if (char === stringChar) {
-          inString = false;
+          inString = false
         }
-        continue;
+        continue
       }
 
-      if (inString) continue;
+      if (inString) continue
 
       if (char === openChar) {
-        if (depth === 0) bodyStart = i;
-        depth++;
+        if (depth === 0) bodyStart = i
+        depth++
       } else if (char === closeChar) {
-        depth--;
+        depth--
         if (depth === 0 && bodyStart >= 0) {
-          return code.substring(bodyStart, i + 1);
+          return code.substring(bodyStart, i + 1)
         }
       }
     }
 
-    return null;
+    return null
   }
 
   /**
    * 提取箭头函数体
    */
   function extractArrowFunctionBody(code, startIndex) {
-    const firstChar = code[startIndex];
+    const firstChar = code[startIndex]
 
     // 块体: { ... }
     if (firstChar === '{') {
-      return extractFunctionBody(code, startIndex, '{');
+      return extractFunctionBody(code, startIndex, '{')
     }
 
     // 表达式体: 找到分号或换行
-    let end = startIndex;
-    let inString = false;
-    let stringChar = '';
-    let parenDepth = 0;
+    let end = startIndex
+    let inString = false
+    let stringChar = ''
+    let parenDepth = 0
 
     for (let i = startIndex; i < code.length; i++) {
-      const char = code[i];
-      const prevChar = i > 0 ? code[i - 1] : '';
+      const char = code[i]
+      const prevChar = i > 0 ? code[i - 1] : ''
 
       if ((char === '"' || char === "'" || char === '`') && prevChar !== '\\') {
         if (!inString) {
-          inString = true;
-          stringChar = char;
+          inString = true
+          stringChar = char
         } else if (char === stringChar) {
-          inString = false;
+          inString = false
         }
-        continue;
+        continue
       }
 
-      if (inString) continue;
+      if (inString) continue
 
-      if (char === '(') parenDepth++;
-      if (char === ')') parenDepth--;
+      if (char === '(') parenDepth++
+      if (char === ')') parenDepth--
 
       if (char === ';' && parenDepth === 0) {
-        return code.substring(startIndex, i);
+        return code.substring(startIndex, i)
       }
 
       if (char === '\n' && parenDepth === 0) {
-        return code.substring(startIndex, i);
+        return code.substring(startIndex, i)
       }
     }
 
-    return code.substring(startIndex);
+    return code.substring(startIndex)
   }
 
   /**
    * 生成注入脚本
    */
   function generateInjectionScript(functions) {
-    const script = functions.map(fn => fn.code).join('\n\n');
+    const script = functions.map((fn) => fn.code).join('\n\n')
     return `
 (function() {
   'use strict';
   ${script}
-  console.log('[DevTools Tools] 已注入 ${functions.length} 个函数:', ${JSON.stringify(functions.map(f => f.name))});
+  console.log('[DevTools Tools] 已注入 ${functions.length} 个函数:', ${JSON.stringify(functions.map((f) => f.name))});
 })();
-`;
+`
   }
 
   // ========== 缓存管理 ==========
-  const CACHE_KEY = 'devtools-loaded-libs';
-  const CUSTOM_LIBS_KEY = 'devtools-custom-libs';
+  const CACHE_KEY = 'devtools-loaded-libs'
+  const CUSTOM_LIBS_KEY = 'devtools-custom-libs'
 
   function getCache() {
     try {
-      const data = localStorage.getItem(CACHE_KEY);
-      return data ? JSON.parse(data) : [];
+      const data = localStorage.getItem(CACHE_KEY)
+      return data ? JSON.parse(data) : []
     } catch {
-      return [];
+      return []
     }
   }
 
   function saveCache(cache) {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+    localStorage.setItem(CACHE_KEY, JSON.stringify(cache))
   }
 
   function addToCache(lib) {
-    const cache = getCache();
-    const existing = cache.findIndex(l => l.id === lib.id && l.type === lib.type);
+    const cache = getCache()
+    const existing = cache.findIndex((l) => l.id === lib.id && l.type === lib.type)
     if (existing >= 0) {
-      cache[existing] = { ...lib, timestamp: Date.now() };
+      cache[existing] = { ...lib, timestamp: Date.now() }
     } else {
-      cache.push({ ...lib, timestamp: Date.now() });
+      cache.push({ ...lib, timestamp: Date.now() })
     }
-    saveCache(cache);
+    saveCache(cache)
   }
 
   function removeFromCache(id, type) {
-    const cache = getCache();
-    const filtered = cache.filter(l => !(l.id === id && l.type === type));
-    saveCache(filtered);
-    return filtered;
+    const cache = getCache()
+    const filtered = cache.filter((l) => !(l.id === id && l.type === type))
+    saveCache(filtered)
+    return filtered
   }
 
   function clearCache() {
-    localStorage.removeItem(CACHE_KEY);
+    localStorage.removeItem(CACHE_KEY)
   }
 
   // ========== 自定义库管理 ==========
@@ -376,10 +384,10 @@
    */
   function getCustomLibs() {
     try {
-      const data = localStorage.getItem(CUSTOM_LIBS_KEY);
-      return data ? JSON.parse(data) : [];
+      const data = localStorage.getItem(CUSTOM_LIBS_KEY)
+      return data ? JSON.parse(data) : []
     } catch {
-      return [];
+      return []
     }
   }
 
@@ -387,16 +395,16 @@
    * 保存自定义库列表
    */
   function saveCustomLibs(libs) {
-    localStorage.setItem(CUSTOM_LIBS_KEY, JSON.stringify(libs));
+    localStorage.setItem(CUSTOM_LIBS_KEY, JSON.stringify(libs))
   }
 
   /**
    * 添加到自定义库
    */
   function addToCustomLibs(lib) {
-    const customLibs = getCustomLibs();
+    const customLibs = getCustomLibs()
     // 检查是否已存在
-    if (!customLibs.some(l => l.id === lib.id)) {
+    if (!customLibs.some((l) => l.id === lib.id)) {
       customLibs.push({
         id: lib.id,
         name: lib.name,
@@ -408,29 +416,29 @@
         global: lib.global || lib.name,
         url: lib.url || '',
         type: lib.type || 'cdn',
-        isCustom: true
-      });
-      saveCustomLibs(customLibs);
+        isCustom: true,
+      })
+      saveCustomLibs(customLibs)
     }
-    return customLibs;
+    return customLibs
   }
 
   /**
    * 从自定义库中移除
    */
   function removeFromCustomLibs(id) {
-    const customLibs = getCustomLibs();
-    const filtered = customLibs.filter(l => l.id !== id);
-    saveCustomLibs(filtered);
-    return filtered;
+    const customLibs = getCustomLibs()
+    const filtered = customLibs.filter((l) => l.id !== id)
+    saveCustomLibs(filtered)
+    return filtered
   }
 
   /**
    * 获取所有库（预设 + 自定义）
    */
   function getAllLibraries() {
-    const customLibs = getCustomLibs();
-    return [...POPULAR_LIBRARIES, ...customLibs];
+    const customLibs = getCustomLibs()
+    return [...POPULAR_LIBRARIES, ...customLibs]
   }
 
   // ========== 导出 ==========
@@ -450,8 +458,8 @@
     saveCustomLibs,
     addToCustomLibs,
     removeFromCustomLibs,
-    getAllLibraries
-  };
+    getAllLibraries,
+  }
 
-  console.log('[LibraryConfig] 库配置已加载');
-})();
+  console.log('[LibraryConfig] 库配置已加载')
+})()

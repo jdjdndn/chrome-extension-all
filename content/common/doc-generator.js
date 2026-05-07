@@ -4,67 +4,67 @@
 // 支持拖拽移动面板位置
 // 支持 Tab 切换：页面大纲 / 收集链接 / GitHub 仓库
 
-'use strict';
+'use strict'
 
 if (window.DocGeneratorLoaded) {
-  console.log('[文档生成器] 已加载，跳过');
+  console.log('[文档生成器] 已加载，跳过')
 } else if (!window.getScriptSwitch || !window.getScriptSwitch('doc-generator')) {
-  console.log('[文档生成器] 已禁用');
+  console.log('[文档生成器] 已禁用')
 } else {
-  window.DocGeneratorLoaded = true;
+  window.DocGeneratorLoaded = true
 
-  const CONTAINER_ID = 'yc-doc-generator-container';
-  const TOOLBAR_ID = 'yc-doc-toolbar';
-  const PANEL_ID = 'yc-doc-panel';
-  const STORAGE_KEY = 'yc-doc-generator-position';
+  const CONTAINER_ID = 'yc-doc-generator-container'
+  const TOOLBAR_ID = 'yc-doc-toolbar'
+  const PANEL_ID = 'yc-doc-panel'
+  const STORAGE_KEY = 'yc-doc-generator-position'
 
   class DocGenerator {
     constructor() {
-      this.isVisible = true;
-      this.isMinimized = true;
-      this.collectedContent = [];
-      this.collectedLinks = [];  // 收集的链接
-      this.linkElements = [];    // 链接元素引用
-      this.githubRepos = [];     // GitHub 仓库链接
-      this.githubElements = [];  // GitHub 链接元素引用
-      this.outlineCount = 0;
-      this.linkCount = 0;
-      this.githubCount = 0;
-      this.currentTab = 'outline';  // 当前 Tab: 'outline' | 'links' | 'github'
-      this.isDragging = false;
-      this.dragStart = null;
-      this.panelStart = null;
-      this.init();
+      this.isVisible = true
+      this.isMinimized = true
+      this.collectedContent = []
+      this.collectedLinks = [] // 收集的链接
+      this.linkElements = [] // 链接元素引用
+      this.githubRepos = [] // GitHub 仓库链接
+      this.githubElements = [] // GitHub 链接元素引用
+      this.outlineCount = 0
+      this.linkCount = 0
+      this.githubCount = 0
+      this.currentTab = 'outline' // 当前 Tab: 'outline' | 'links' | 'github'
+      this.isDragging = false
+      this.dragStart = null
+      this.panelStart = null
+      this.init()
     }
 
     init() {
-      if (document.getElementById(CONTAINER_ID)) return;
-      this.createUI();
-      this.bindEvents();
-      this.registerToPositionManager();
-      console.log('[文档生成器] 初始化完成（支持 Tab 切换）');
+      if (document.getElementById(CONTAINER_ID)) return
+      this.createUI()
+      this.bindEvents()
+      this.registerToPositionManager()
+      console.log('[文档生成器] 初始化完成（支持 Tab 切换）')
     }
 
     // 注册到位置管理器
     registerToPositionManager() {
       if (window.PanelPositionManager) {
-        const toolbar = document.getElementById(TOOLBAR_ID);
-        const panel = document.getElementById(PANEL_ID);
+        const toolbar = document.getElementById(TOOLBAR_ID)
+        const panel = document.getElementById(PANEL_ID)
 
         window.PanelPositionManager.register({
           id: 'doc-generator',
           priority: 1, // 优先级高，排在上面
           iconEl: toolbar,
           panelEl: panel,
-          requiresHTags: true  // 显式声明需要 H 标签
-        });
+          requiresHTags: true, // 显式声明需要 H 标签
+        })
       }
     }
 
     createUI() {
       // 创建容器
-      const container = document.createElement('div');
-      container.id = CONTAINER_ID;
+      const container = document.createElement('div')
+      container.id = CONTAINER_ID
       container.innerHTML = `
         <div id="${TOOLBAR_ID}" class="yc-doc-toolbar">
           <button class="yc-doc-btn" data-action="generate" title="生成文档">
@@ -119,17 +119,17 @@ if (window.DocGeneratorLoaded) {
             <span class="yc-doc-count">0 项内容</span>
           </div>
         </div>
-      `;
+      `
 
-      document.body.appendChild(container);
-      this.injectStyles();
+      document.body.appendChild(container)
+      this.injectStyles()
     }
 
     injectStyles() {
-      if (document.getElementById('yc-doc-generator-styles')) return;
+      if (document.getElementById('yc-doc-generator-styles')) return
 
-      const style = document.createElement('style');
-      style.id = 'yc-doc-generator-styles';
+      const style = document.createElement('style')
+      style.id = 'yc-doc-generator-styles'
       style.textContent = `
         #${CONTAINER_ID} {
           position: fixed;
@@ -607,145 +607,149 @@ if (window.DocGeneratorLoaded) {
           from { opacity: 0; transform: translateX(-50%) translateY(20px); }
           to { opacity: 1; transform: translateX(-50%) translateY(0); }
         }
-      `;
-      document.head.appendChild(style);
+      `
+      document.head.appendChild(style)
     }
 
     bindEvents() {
-      const container = document.getElementById(CONTAINER_ID);
-      const panel = document.getElementById(PANEL_ID);
+      const container = document.getElementById(CONTAINER_ID)
+      const panel = document.getElementById(PANEL_ID)
 
       container.addEventListener('click', (e) => {
-        const btn = e.target.closest('[data-action]');
+        const btn = e.target.closest('[data-action]')
         if (btn) {
-          const action = btn.dataset.action;
+          const action = btn.dataset.action
           switch (action) {
             case 'generate':
-              this.generateDocument();
-              break;
+              this.generateDocument()
+              break
             case 'collect':
-              this.collectSelection();
-              break;
+              this.collectSelection()
+              break
             case 'toggle':
-              this.togglePanel();
-              break;
+              this.togglePanel()
+              break
             case 'close':
-              this.hide();
-              break;
+              this.hide()
+              break
             case 'copy':
-              this.copyContent();
-              break;
+              this.copyContent()
+              break
             case 'download':
-              this.downloadContent();
-              break;
+              this.downloadContent()
+              break
             case 'clear':
-              this.clearContent();
-              break;
+              this.clearContent()
+              break
           }
-          return;
+          return
         }
 
         // 处理 Tab 切换
-        const tab = e.target.closest('.yc-doc-tab');
+        const tab = e.target.closest('.yc-doc-tab')
         if (tab) {
-          this.switchTab(tab.dataset.tab);
-          return;
+          this.switchTab(tab.dataset.tab)
+          return
         }
 
         // 处理大纲项点击跳转
-        const outlineItem = e.target.closest('.yc-doc-outline-item');
+        const outlineItem = e.target.closest('.yc-doc-outline-item')
         if (outlineItem) {
           // 如果点击的是链接按钮，打开新标签页
-          const linkBtn = e.target.closest('.yc-doc-link-btn');
+          const linkBtn = e.target.closest('.yc-doc-link-btn')
           if (linkBtn) {
-            e.stopPropagation();
-            const link = linkBtn.dataset.link;
+            e.stopPropagation()
+            const link = linkBtn.dataset.link
             if (link) {
-              window.open(link, '_blank');
+              window.open(link, '_blank')
             }
-            return;
+            return
           }
 
-          const headingText = outlineItem.dataset.headingText;
+          const headingText = outlineItem.dataset.headingText
           if (headingText) {
-            this.scrollToHeading(headingText);
+            this.scrollToHeading(headingText)
           }
-          return;
+          return
         }
 
         // 处理定位按钮点击
-        const locateBtn = e.target.closest('.yc-doc-locate-btn');
+        const locateBtn = e.target.closest('.yc-doc-locate-btn')
         if (locateBtn) {
-          const index = parseInt(locateBtn.dataset.index, 10);
+          const index = parseInt(locateBtn.dataset.index, 10)
           // 根据父容器判断是哪种类型的定位
           if (locateBtn.closest('.yc-doc-content-github')) {
-            this.locateGithubElement(index);
+            this.locateGithubElement(index)
           } else {
-            this.locateLinkElement(index);
+            this.locateLinkElement(index)
           }
-          return;
+          return
         }
 
         // 处理 GitHub 下载按钮点击
-        const downloadBtn = e.target.closest('.yc-doc-download-btn');
+        const downloadBtn = e.target.closest('.yc-doc-download-btn')
         if (downloadBtn) {
-          const index = parseInt(downloadBtn.dataset.index, 10);
-          this.downloadGithubRepo(index);
-          return;
+          const index = parseInt(downloadBtn.dataset.index, 10)
+          this.downloadGithubRepo(index)
+          return
         }
-      });
+      })
 
       // 监听选择变化
       document.addEventListener('selectionchange', () => {
-        const selection = window.getSelection();
-        const collectBtn = container.querySelector('[data-action="collect"]');
+        const selection = window.getSelection()
+        const collectBtn = container.querySelector('[data-action="collect"]')
         if (collectBtn) {
           collectBtn.style.background = selection.toString().trim()
             ? 'rgba(40, 167, 69, 0.6)'
-            : 'rgba(255, 255, 255, 0.2)';
+            : 'rgba(255, 255, 255, 0.2)'
         }
-      });
+      })
 
       // 拖拽功能
-      this.bindDragEvents(panel);
+      this.bindDragEvents(panel)
 
       // 窗口大小变化时确保面板在可视范围内
       window.addEventListener('resize', () => {
-        this.ensurePanelInViewport();
-      });
+        this.ensurePanelInViewport()
+      })
 
       // 阻止面板内部滚动事件冒泡到外部
-      const panelBody = panel.querySelector('.yc-doc-panel-body');
+      const panelBody = panel.querySelector('.yc-doc-panel-body')
       if (panelBody) {
-        panelBody.addEventListener('wheel', (e) => {
-          e.stopPropagation();
-        }, { passive: true });
+        panelBody.addEventListener(
+          'wheel',
+          (e) => {
+            e.stopPropagation()
+          },
+          { passive: true }
+        )
       }
     }
 
     // 切换 Tab
     switchTab(tabName) {
-      this.currentTab = tabName;
+      this.currentTab = tabName
 
       // 更新 Tab 按钮状态
-      const tabs = document.querySelectorAll('.yc-doc-tab');
-      tabs.forEach(tab => {
-        tab.classList.toggle('active', tab.dataset.tab === tabName);
-      });
+      const tabs = document.querySelectorAll('.yc-doc-tab')
+      tabs.forEach((tab) => {
+        tab.classList.toggle('active', tab.dataset.tab === tabName)
+      })
 
       // 更新内容区域显示
-      const outlineContent = document.querySelector('.yc-doc-content-outline');
-      const linksContent = document.querySelector('.yc-doc-content-links');
-      const githubContent = document.querySelector('.yc-doc-content-github');
+      const outlineContent = document.querySelector('.yc-doc-content-outline')
+      const linksContent = document.querySelector('.yc-doc-content-links')
+      const githubContent = document.querySelector('.yc-doc-content-github')
 
       if (outlineContent && linksContent && githubContent) {
-        outlineContent.style.display = tabName === 'outline' ? 'block' : 'none';
-        linksContent.style.display = tabName === 'links' ? 'block' : 'none';
-        githubContent.style.display = tabName === 'github' ? 'block' : 'none';
+        outlineContent.style.display = tabName === 'outline' ? 'block' : 'none'
+        linksContent.style.display = tabName === 'links' ? 'block' : 'none'
+        githubContent.style.display = tabName === 'github' ? 'block' : 'none'
       }
 
       // 根据当前 tab 执行对应方法
-      this.executeTabAction(tabName);
+      this.executeTabAction(tabName)
     }
 
     // 根据 tab 名称执行对应的收集方法
@@ -754,226 +758,230 @@ if (window.DocGeneratorLoaded) {
         case 'outline':
           // 如果大纲内容为空，则生成文档
           if (this.outlineCount === 0) {
-            const title = this.getPageTitle();
-            const content = this.extractMainContent();
-            const docContent = this.formatDocument(title, content);
-            this.updateOutlinePanel(docContent);
+            const title = this.getPageTitle()
+            const content = this.extractMainContent()
+            const docContent = this.formatDocument(title, content)
+            this.updateOutlinePanel(docContent)
           }
-          break;
+          break
         case 'links':
           // 如果链接列表为空，则收集链接
           if (this.linkCount === 0) {
-            this.collectLinks();
+            this.collectLinks()
           }
-          break;
+          break
         case 'github':
           // 如果 GitHub 仓库列表为空，则收集 GitHub 仓库
           if (this.githubCount === 0) {
-            this.collectGithubRepos();
+            this.collectGithubRepos()
           }
-          break;
+          break
       }
     }
 
     // 绑定拖拽事件
     bindDragEvents(panel) {
-      const header = panel.querySelector('.yc-doc-panel-header');
+      const header = panel.querySelector('.yc-doc-panel-header')
 
       header.addEventListener('mousedown', (e) => {
         // 忽略按钮点击
-        if (e.target.closest('button')) return;
+        if (e.target.closest('button')) return
 
-        this.isDragging = true;
-        this.dragStart = { x: e.clientX, y: e.clientY };
+        this.isDragging = true
+        this.dragStart = { x: e.clientX, y: e.clientY }
 
-        const rect = panel.getBoundingClientRect();
+        const rect = panel.getBoundingClientRect()
         this.panelStart = {
           right: window.innerWidth - rect.right,
-          top: rect.top
-        };
+          top: rect.top,
+        }
 
-        panel.classList.add('yc-dragging');
+        panel.classList.add('yc-dragging')
 
         // 通知位置管理器拖拽开始
         if (window.PanelPositionManager) {
-          window.PanelPositionManager.notifyDragStart('doc-generator');
+          window.PanelPositionManager.notifyDragStart('doc-generator')
         }
 
-        e.preventDefault();
-      });
+        e.preventDefault()
+      })
 
       document.addEventListener('mousemove', (e) => {
-        if (!this.isDragging) return;
+        if (!this.isDragging) return
 
-        const dx = this.dragStart.x - e.clientX;
-        const dy = e.clientY - this.dragStart.y;
+        const dx = this.dragStart.x - e.clientX
+        const dy = e.clientY - this.dragStart.y
 
-        let newRight = this.panelStart.right + dx;
-        let newTop = this.panelStart.top + dy;
+        let newRight = this.panelStart.right + dx
+        let newTop = this.panelStart.top + dy
 
         // 获取面板尺寸
-        const panelWidth = panel.offsetWidth;
-        const panelHeight = panel.offsetHeight;
+        const panelWidth = panel.offsetWidth
+        const panelHeight = panel.offsetHeight
 
         // 使用位置管理器限制位置（屏幕边界 + 不遮挡 icon）
         if (window.PanelPositionManager) {
           const constrained = window.PanelPositionManager.constrainPanelPosition(
-            'doc-generator', newRight, newTop, panelWidth, panelHeight
-          );
-          newRight = constrained.right;
-          newTop = constrained.top;
+            'doc-generator',
+            newRight,
+            newTop,
+            panelWidth,
+            panelHeight
+          )
+          newRight = constrained.right
+          newTop = constrained.top
         } else {
           // 回退到简单边界限制
-          newRight = Math.max(20, Math.min(newRight, window.innerWidth - panelWidth - 20));
-          newTop = Math.max(20, Math.min(newTop, window.innerHeight - panelHeight - 20));
+          newRight = Math.max(20, Math.min(newRight, window.innerWidth - panelWidth - 20))
+          newTop = Math.max(20, Math.min(newTop, window.innerHeight - panelHeight - 20))
         }
 
-        panel.style.right = `${newRight}px`;
-        panel.style.top = `${newTop}px`;
-      });
+        panel.style.right = `${newRight}px`
+        panel.style.top = `${newTop}px`
+      })
 
       document.addEventListener('mouseup', () => {
         if (this.isDragging) {
-          this.isDragging = false;
-          panel.classList.remove('yc-dragging');
+          this.isDragging = false
+          panel.classList.remove('yc-dragging')
           // 通知位置管理器拖拽结束
           if (window.PanelPositionManager) {
-            const toolbar = document.getElementById(TOOLBAR_ID);
-            window.PanelPositionManager.notifyDragEnd('doc-generator', toolbar, panel);
+            const toolbar = document.getElementById(TOOLBAR_ID)
+            window.PanelPositionManager.notifyDragEnd('doc-generator', toolbar, panel)
           }
         }
-      });
+      })
     }
 
     // 确保面板在可视区域内
     ensurePanelInViewport() {
-      const panel = document.getElementById(PANEL_ID);
-      if (!panel || panel.classList.contains('yc-doc-hidden')) return;
+      const panel = document.getElementById(PANEL_ID)
+      if (!panel || panel.classList.contains('yc-doc-hidden')) return
 
-      const rect = panel.getBoundingClientRect();
-      const currentRight = parseInt(panel.style.right) || 70;
-      const currentTop = parseInt(panel.style.top) || 80;
+      const rect = panel.getBoundingClientRect()
+      const currentRight = parseInt(panel.style.right) || 70
+      const currentTop = parseInt(panel.style.top) || 80
 
-      let newRight = currentRight;
-      let newTop = currentTop;
+      let newRight = currentRight
+      let newTop = currentTop
 
       // 检查是否超出右边界
       if (rect.right > window.innerWidth) {
-        newRight = Math.max(0, window.innerWidth - rect.width - 10);
+        newRight = Math.max(0, window.innerWidth - rect.width - 10)
       }
 
       // 检查是否超出下边界
       if (rect.bottom > window.innerHeight) {
-        newTop = Math.max(0, window.innerHeight - rect.height - 10);
+        newTop = Math.max(0, window.innerHeight - rect.height - 10)
       }
 
       // 检查是否超出上边界
       if (rect.top < 0) {
-        newTop = 10;
+        newTop = 10
       }
 
       if (newRight !== currentRight || newTop !== currentTop) {
-        panel.style.right = `${newRight}px`;
-        panel.style.top = `${newTop}px`;
+        panel.style.right = `${newRight}px`
+        panel.style.top = `${newTop}px`
       }
     }
 
     scrollToHeading(text) {
       // 查找页面上匹配的标题元素
-      const headings = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
+      const headings = document.querySelectorAll('h1, h2, h3, h4, h5, h6')
       for (const h of headings) {
         if (h.textContent.trim() === text) {
-          h.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          h.scrollIntoView({ behavior: 'smooth', block: 'center' })
           // 高亮效果
-          h.style.transition = 'background-color 0.3s';
-          h.style.backgroundColor = '#fff3cd';
+          h.style.transition = 'background-color 0.3s'
+          h.style.backgroundColor = '#fff3cd'
           setTimeout(() => {
-            h.style.backgroundColor = '';
-          }, 2000);
-          this.showToast(`已跳转到: ${text}`);
-          return;
+            h.style.backgroundColor = ''
+          }, 2000)
+          this.showToast(`已跳转到: ${text}`)
+          return
         }
       }
-      this.showToast('未找到对应标题');
+      this.showToast('未找到对应标题')
     }
 
     // 定位链接元素
     locateLinkElement(index) {
-      const element = this.linkElements[index];
+      const element = this.linkElements[index]
       if (!element) {
-        this.showToast('链接元素已失效，请重新收集');
-        return;
+        this.showToast('链接元素已失效，请重新收集')
+        return
       }
 
       // 滚动到元素位置
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' })
 
       // 高亮效果
-      const originalOutline = element.style.outline;
-      const originalBg = element.style.backgroundColor;
-      element.style.transition = 'outline 0.3s, background-color 0.3s';
-      element.style.outline = '3px solid #1a73e8';
-      element.style.backgroundColor = '#e8f0fe';
+      const originalOutline = element.style.outline
+      const originalBg = element.style.backgroundColor
+      element.style.transition = 'outline 0.3s, background-color 0.3s'
+      element.style.outline = '3px solid #1a73e8'
+      element.style.backgroundColor = '#e8f0fe'
 
       setTimeout(() => {
-        element.style.outline = originalOutline;
-        element.style.backgroundColor = originalBg;
-      }, 2000);
+        element.style.outline = originalOutline
+        element.style.backgroundColor = originalBg
+      }, 2000)
 
-      this.showToast('已定位到链接元素');
+      this.showToast('已定位到链接元素')
     }
 
     show() {
-      const container = document.getElementById(CONTAINER_ID);
+      const container = document.getElementById(CONTAINER_ID)
       if (container) {
-        container.style.display = 'block';
-        this.isVisible = true;
+        container.style.display = 'block'
+        this.isVisible = true
       }
     }
 
     hide() {
       // 只隐藏面板，保留工具栏可见
-      const panel = document.getElementById(PANEL_ID);
+      const panel = document.getElementById(PANEL_ID)
       if (panel) {
-        panel.classList.add('yc-doc-hidden');
-        this.isMinimized = true;
+        panel.classList.add('yc-doc-hidden')
+        this.isMinimized = true
       }
     }
 
     togglePanel() {
-      const panel = document.getElementById(PANEL_ID);
+      const panel = document.getElementById(PANEL_ID)
       if (panel) {
-        const wasHidden = panel.classList.contains('yc-doc-hidden');
-        panel.classList.toggle('yc-doc-hidden');
-        this.isMinimized = panel.classList.contains('yc-doc-hidden');
+        const wasHidden = panel.classList.contains('yc-doc-hidden')
+        panel.classList.toggle('yc-doc-hidden')
+        this.isMinimized = panel.classList.contains('yc-doc-hidden')
 
         // 通知位置管理器
         if (window.PanelPositionManager) {
-          window.PanelPositionManager.handlePanelToggle('doc-generator', !this.isMinimized);
+          window.PanelPositionManager.handlePanelToggle('doc-generator', !this.isMinimized)
         }
 
         // 面板展开时，执行当前 tab 的方法
         if (wasHidden && !this.isMinimized) {
-          this.executeTabAction(this.currentTab);
+          this.executeTabAction(this.currentTab)
         }
       }
     }
 
     generateDocument() {
-      const title = this.getPageTitle();
-      const content = this.extractMainContent();
+      const title = this.getPageTitle()
+      const content = this.extractMainContent()
 
       // 生成大纲内容
-      const docContent = this.formatDocument(title, content);
-      this.updateOutlinePanel(docContent);
+      const docContent = this.formatDocument(title, content)
+      this.updateOutlinePanel(docContent)
 
       // 同时收集链接
-      this.collectLinks();
+      this.collectLinks()
 
       // 收集 GitHub 仓库链接
-      this.collectGithubRepos();
+      this.collectGithubRepos()
 
-      this.showToast('文档生成完成');
+      this.showToast('文档生成完成')
     }
 
     getPageTitle() {
@@ -985,534 +993,557 @@ if (window.DocGeneratorLoaded) {
         'article h1',
         '.post-title',
         '.article-title',
-        '.entry-title'
-      ];
+        '.entry-title',
+      ]
 
       for (const selector of selectors) {
-        const el = document.querySelector(selector);
+        const el = document.querySelector(selector)
         if (el && el.textContent.trim()) {
-          return el.textContent.trim();
+          return el.textContent.trim()
         }
       }
 
-      return document.title;
+      return document.title
     }
 
     extractMainContent() {
-      let sections = [];
+      let sections = []
 
       // 第一层：提取标准 h1-h6 标题
-      sections = this.extractStandardHeadings();
+      sections = this.extractStandardHeadings()
       if (sections.length > 0) {
-        return sections;
+        return sections
       }
 
       // 第二层：提取语义化替代标题（常见 class 名、role 属性、粗体大字）
-      sections = this.extractSemanticHeadings();
+      sections = this.extractSemanticHeadings()
       if (sections.length > 0) {
-        return sections;
+        return sections
       }
 
       // 第三层：基于段落结构智能分割
-      sections = this.extractParagraphStructure();
-      return sections;
+      sections = this.extractParagraphStructure()
+      return sections
     }
 
     // 第一层：提取标准 h1-h6 标题
     extractStandardHeadings() {
-      const sections = [];
-      const headings = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
+      const sections = []
+      const headings = document.querySelectorAll('h1, h2, h3, h4, h5, h6')
 
-      headings.forEach(h => {
-        const text = h.textContent.trim();
-        if (this.isHiddenElement(h)) return;
+      headings.forEach((h) => {
+        const text = h.textContent.trim()
+        if (this.isHiddenElement(h)) return
         if (text && text.length < 100) {
-          const link = this.findLink(h);
+          const link = this.findLink(h)
           sections.push({
             type: h.tagName.toLowerCase(),
             text: text,
-            link: link
-          });
+            link: link,
+          })
         }
-      });
+      })
 
-      return sections;
+      return sections
     }
 
     // 第二层：提取语义化替代标题
     extractSemanticHeadings() {
-      const sections = [];
-      const seenTexts = new Set();
+      const sections = []
+      const seenTexts = new Set()
 
       // 常见标题类名模式
       const titleClassPatterns = [
-        '[class*="title"]', '[class*="Title"]', '[class*="heading"]', '[class*="Heading"]',
-        '[class*="section"]', '[class*="Section"]', '[class*="chapter"]', '[class*="Chapter"]',
-        '[class*="-title"]', '[class*="-head"]', '[class*="caption"]', '[class*="Caption"]'
-      ];
+        '[class*="title"]',
+        '[class*="Title"]',
+        '[class*="heading"]',
+        '[class*="Heading"]',
+        '[class*="section"]',
+        '[class*="Section"]',
+        '[class*="chapter"]',
+        '[class*="Chapter"]',
+        '[class*="-title"]',
+        '[class*="-head"]',
+        '[class*="caption"]',
+        '[class*="Caption"]',
+      ]
 
       // role="heading" 元素
-      const roleHeadings = document.querySelectorAll('[role="heading"]');
-      roleHeadings.forEach(el => {
-        const text = el.textContent.trim();
-        if (this.isHiddenElement(el)) return;
+      const roleHeadings = document.querySelectorAll('[role="heading"]')
+      roleHeadings.forEach((el) => {
+        const text = el.textContent.trim()
+        if (this.isHiddenElement(el)) return
         if (text && text.length >= 2 && text.length < 100 && !seenTexts.has(text)) {
-          seenTexts.add(text);
-          const ariaLevel = el.getAttribute('aria-level') || '2';
+          seenTexts.add(text)
+          const ariaLevel = el.getAttribute('aria-level') || '2'
           sections.push({
             type: `h${ariaLevel}`,
             text: text,
-            link: this.findLink(el)
-          });
+            link: this.findLink(el),
+          })
         }
-      });
+      })
 
       // 常见标题类名元素
-      titleClassPatterns.forEach(pattern => {
-        const elements = document.querySelectorAll(pattern);
-        elements.forEach(el => {
-          const text = el.textContent.trim();
-          if (this.isHiddenElement(el)) return;
+      titleClassPatterns.forEach((pattern) => {
+        const elements = document.querySelectorAll(pattern)
+        elements.forEach((el) => {
+          const text = el.textContent.trim()
+          if (this.isHiddenElement(el)) return
           // 排除导航区域内的元素
-          if (this.isInNavigationArea(el)) return;
+          if (this.isInNavigationArea(el)) return
           if (text && text.length >= 2 && text.length < 100 && !seenTexts.has(text)) {
-            seenTexts.add(text);
+            seenTexts.add(text)
             sections.push({
               type: 'h2',
               text: text,
-              link: this.findLink(el)
-            });
+              link: this.findLink(el),
+            })
           }
-        });
-      });
+        })
+      })
 
       // 粗体大字段落（可能是小标题）
-      const boldElements = document.querySelectorAll('strong, b');
-      boldElements.forEach(el => {
-        const text = el.textContent.trim();
-        if (this.isHiddenElement(el)) return;
-        if (this.isInNavigationArea(el)) return;
+      const boldElements = document.querySelectorAll('strong, b')
+      boldElements.forEach((el) => {
+        const text = el.textContent.trim()
+        if (this.isHiddenElement(el)) return
+        if (this.isInNavigationArea(el)) return
 
         // 检查是否为独立行（可能是小标题）
-        const parent = el.parentElement;
+        const parent = el.parentElement
         if (parent && parent.tagName === 'P') {
-          const parentText = parent.textContent.trim();
+          const parentText = parent.textContent.trim()
           // 如果粗体文本占段落大部分内容，可能是标题
-          if (text.length >= 3 && text.length < 80 &&
-              parentText.length < 100 && !seenTexts.has(text)) {
-            seenTexts.add(text);
+          if (
+            text.length >= 3 &&
+            text.length < 80 &&
+            parentText.length < 100 &&
+            !seenTexts.has(text)
+          ) {
+            seenTexts.add(text)
             sections.push({
               type: 'h3',
               text: text,
-              link: this.findLink(el)
-            });
+              link: this.findLink(el),
+            })
           }
         }
-      });
+      })
 
       // 按文档顺序排序
       if (sections.length > 0) {
         sections.sort((a, b) => {
           // 简单按文本长度排序，短的更像标题
-          return a.text.length - b.text.length;
-        });
+          return a.text.length - b.text.length
+        })
       }
 
-      return sections;
+      return sections
     }
 
     // 第三层：基于段落结构智能分割
     extractParagraphStructure() {
-      const sections = [];
+      const sections = []
 
       // 查找主要内容区域
-      const mainContent = this.findMainContentArea();
-      if (!mainContent) return sections;
+      const mainContent = this.findMainContentArea()
+      if (!mainContent) return sections
 
       // 获取所有段落
-      const paragraphs = mainContent.querySelectorAll('p, div > br, article > div');
-      const validParagraphs = [];
+      const paragraphs = mainContent.querySelectorAll('p, div > br, article > div')
+      const validParagraphs = []
 
-      paragraphs.forEach(p => {
-        if (this.isHiddenElement(p)) return;
-        const text = p.textContent.trim();
+      paragraphs.forEach((p) => {
+        if (this.isHiddenElement(p)) return
+        const text = p.textContent.trim()
         // 有效段落：有一定长度，不是纯链接
         if (text.length >= 20 && text.length <= 500) {
-          validParagraphs.push({ element: p, text: text });
+          validParagraphs.push({ element: p, text: text })
         }
-      });
+      })
 
-      if (validParagraphs.length === 0) return sections;
+      if (validParagraphs.length === 0) return sections
 
       // 智能分割策略：每 5-8 个段落提取一个作为大纲项
-      const segmentSize = Math.max(5, Math.min(8, Math.floor(validParagraphs.length / 10) + 3));
-      const seenTexts = new Set();
+      const segmentSize = Math.max(5, Math.min(8, Math.floor(validParagraphs.length / 10) + 3))
+      const seenTexts = new Set()
 
       for (let i = 0; i < validParagraphs.length; i += segmentSize) {
-        const para = validParagraphs[i];
+        const para = validParagraphs[i]
         // 提取段落首句作为标题
-        let title = this.extractFirstSentence(para.text);
+        let title = this.extractFirstSentence(para.text)
         if (title && title.length >= 5 && title.length < 80 && !seenTexts.has(title)) {
-          seenTexts.add(title);
+          seenTexts.add(title)
           sections.push({
             type: 'h3',
             text: title,
-            link: null
-          });
+            link: null,
+          })
         }
       }
 
       // 如果仍然没有结果，至少提取第一个段落
       if (sections.length === 0 && validParagraphs.length > 0) {
-        const firstPara = validParagraphs[0];
-        const title = this.extractFirstSentence(firstPara.text);
+        const firstPara = validParagraphs[0]
+        const title = this.extractFirstSentence(firstPara.text)
         if (title) {
           sections.push({
             type: 'h2',
             text: title,
-            link: null
-          });
+            link: null,
+          })
         }
       }
 
-      return sections;
+      return sections
     }
 
     // 查找主要内容区域
     findMainContentArea() {
       // 优先级：article > main > [role="main"] > 常见内容 class
       const selectors = [
-        'article', 'main', '[role="main"]',
-        '[class*="content"]', '[class*="article"]', '[class*="post"]',
-        '[class*="entry"]', '[class*="body"]'
-      ];
+        'article',
+        'main',
+        '[role="main"]',
+        '[class*="content"]',
+        '[class*="article"]',
+        '[class*="post"]',
+        '[class*="entry"]',
+        '[class*="body"]',
+      ]
 
       for (const selector of selectors) {
-        const el = document.querySelector(selector);
+        const el = document.querySelector(selector)
         if (el && !this.isHiddenElement(el) && el.textContent.trim().length > 200) {
-          return el;
+          return el
         }
       }
 
       // 回退到 body
-      return document.body;
+      return document.body
     }
 
     // 提取首句作为标题
     extractFirstSentence(text) {
       // 移除多余空白
-      text = text.replace(/\s+/g, ' ').trim();
+      text = text.replace(/\s+/g, ' ').trim()
 
       // 查找句子结束符
-      const match = text.match(/^[^。！？.!?\n]{5,60}[。！？.!?]?/);
+      const match = text.match(/^[^。！？.!?\n]{5,60}[。！？.!?]?/)
       if (match) {
-        let sentence = match[0].trim();
+        let sentence = match[0].trim()
         // 移除末尾标点
-        sentence = sentence.replace(/[。！？.!?]$/, '');
-        return sentence.length >= 5 ? sentence : null;
+        sentence = sentence.replace(/[。！？.!?]$/, '')
+        return sentence.length >= 5 ? sentence : null
       }
 
       // 如果没有找到合适句子，截取前 50 字符
       if (text.length >= 5) {
-        return text.substring(0, Math.min(50, text.length)) + (text.length > 50 ? '...' : '');
+        return text.substring(0, Math.min(50, text.length)) + (text.length > 50 ? '...' : '')
       }
 
-      return null;
+      return null
     }
 
     // 检查元素是否在导航区域
     isInNavigationArea(el) {
-      let parent = el.parentElement;
+      let parent = el.parentElement
       while (parent && parent !== document.body) {
-        const tagName = parent.tagName.toLowerCase();
-        const role = parent.getAttribute('role');
-        const className = parent.className || '';
+        const tagName = parent.tagName.toLowerCase()
+        const role = parent.getAttribute('role')
+        const className = parent.className || ''
 
-        if (['nav', 'header', 'footer'].includes(tagName)) return true;
-        if (role === 'navigation' || role === 'menu') return true;
+        if (['nav', 'header', 'footer'].includes(tagName)) return true
+        if (role === 'navigation' || role === 'menu') return true
 
-        const navPatterns = /\b(nav|menu|sidebar|navigation|navbar|topbar|header-nav|footer-nav)\b/i;
-        if (navPatterns.test(className)) return true;
+        const navPatterns = /\b(nav|menu|sidebar|navigation|navbar|topbar|header-nav|footer-nav)\b/i
+        if (navPatterns.test(className)) return true
 
-        parent = parent.parentElement;
+        parent = parent.parentElement
       }
-      return false;
+      return false
     }
 
     // 检查元素是否隐藏
     isHiddenElement(el) {
-      if (!el) return true;
+      if (!el) return true
 
-      const style = window.getComputedStyle(el);
+      const style = window.getComputedStyle(el)
 
-      if (style.display === 'none') return true;
-      if (style.visibility === 'hidden') return true;
-      if (style.visibility === 'collapse') return true;
-      if (parseFloat(style.opacity) === 0) return true;
+      if (style.display === 'none') return true
+      if (style.visibility === 'hidden') return true
+      if (style.visibility === 'collapse') return true
+      if (parseFloat(style.opacity) === 0) return true
 
-      if (style.display === 'contents') return false;
+      if (style.display === 'contents') return false
 
-      if (this.isClippedHidden(style)) return true;
+      if (this.isClippedHidden(style)) return true
 
       if (el.offsetWidth <= 2 || el.offsetHeight <= 2) {
-        return true;
+        return true
       }
 
-      const rect = el.getBoundingClientRect();
+      const rect = el.getBoundingClientRect()
       if (rect.width <= 2 || rect.height <= 2) {
-        return true;
+        return true
       }
 
-      let parent = el.parentElement;
+      let parent = el.parentElement
       while (parent && parent !== document.body) {
-        const parentStyle = window.getComputedStyle(parent);
+        const parentStyle = window.getComputedStyle(parent)
 
         if (parentStyle.display === 'contents') {
-          parent = parent.parentElement;
-          continue;
+          parent = parent.parentElement
+          continue
         }
 
-        if (parentStyle.display === 'none' ||
-            parentStyle.visibility === 'hidden' ||
-            parseFloat(parentStyle.opacity) === 0) {
-          return true;
+        if (
+          parentStyle.display === 'none' ||
+          parentStyle.visibility === 'hidden' ||
+          parseFloat(parentStyle.opacity) === 0
+        ) {
+          return true
         }
 
         if (parent.offsetWidth <= 2 || parent.offsetHeight <= 2) {
-          return true;
+          return true
         }
 
         if (this.isClippedHidden(parentStyle)) {
-          return true;
+          return true
         }
 
-        parent = parent.parentElement;
+        parent = parent.parentElement
       }
 
-      return false;
+      return false
     }
 
     // 检测元素是否使用 clip 技术隐藏
     isClippedHidden(style) {
-      const clip = style.clip;
+      const clip = style.clip
       if (clip && clip !== 'auto') {
-        const clipMatch = clip.match(/rect\s*\(\s*(\d+)/i);
+        const clipMatch = clip.match(/rect\s*\(\s*(\d+)/i)
         if (clipMatch) {
-          const values = clip.match(/-?\d+/g);
-          if (values && values.every(v => parseInt(v) === 0)) {
-            return true;
+          const values = clip.match(/-?\d+/g)
+          if (values && values.every((v) => parseInt(v) === 0)) {
+            return true
           }
         }
       }
 
-      const clipPath = style.clipPath;
+      const clipPath = style.clipPath
       if (clipPath && clipPath !== 'none') {
-        if (clipPath.includes('inset(100%') ||
-            clipPath.includes('circle(0') ||
-            clipPath.includes('polygon(0')) {
-          return true;
+        if (
+          clipPath.includes('inset(100%') ||
+          clipPath.includes('circle(0') ||
+          clipPath.includes('polygon(0')
+        ) {
+          return true
         }
       }
 
-      return false;
+      return false
     }
 
     // 查找h标签自身或父元素的链接
     findLink(el) {
       if (el.tagName === 'A') {
-        return el.href;
+        return el.href
       }
 
-      let parent = el.parentElement;
+      let parent = el.parentElement
       while (parent && parent !== document.body) {
         if (parent.tagName === 'A' && parent.href) {
-          return parent.href;
+          return parent.href
         }
-        parent = parent.parentElement;
+        parent = parent.parentElement
       }
 
-      const innerLink = el.querySelector('a[href]');
+      const innerLink = el.querySelector('a[href]')
       if (innerLink && innerLink.href) {
-        return innerLink.href;
+        return innerLink.href
       }
 
-      return null;
+      return null
     }
 
     // ==================== 链接收集功能 ====================
 
     // 判断是否为导航链接（应排除）
     isNavigationLink(linkEl) {
-      const href = linkEl.getAttribute('href') || '';
+      const href = linkEl.getAttribute('href') || ''
 
       // 1. 排除锚点链接（用于 tab 切换或页内跳转）
-      if (href.startsWith('#')) return true;
+      if (href.startsWith('#')) return true
 
       // 2. 排除 JS 链接
-      if (href.startsWith('javascript:')) return true;
+      if (href.startsWith('javascript:')) return true
 
       // 3. 排除空链接
-      if (!href.trim() || href === '#') return true;
+      if (!href.trim() || href === '#') return true
 
       // 4. 检查是否在导航区域内
-      let parent = linkEl.parentElement;
+      let parent = linkEl.parentElement
       while (parent && parent !== document.body) {
-        const tagName = parent.tagName.toLowerCase();
-        const role = parent.getAttribute('role');
+        const tagName = parent.tagName.toLowerCase()
+        const role = parent.getAttribute('role')
 
         // 排除 nav、header、footer 区域
         if (['nav', 'header', 'footer'].includes(tagName)) {
-          return true;
+          return true
         }
 
         // 排除 role="navigation" 或 role="menu" 区域
         if (role === 'navigation' || role === 'menu') {
-          return true;
+          return true
         }
 
         // 排除常见的导航类名
-        const className = parent.className || '';
-        const navPatterns = /\b(nav|menu|sidebar|navigation|navbar|topbar|header-nav|footer-nav)\b/i;
+        const className = parent.className || ''
+        const navPatterns = /\b(nav|menu|sidebar|navigation|navbar|topbar|header-nav|footer-nav)\b/i
         if (navPatterns.test(className)) {
-          return true;
+          return true
         }
 
-        parent = parent.parentElement;
+        parent = parent.parentElement
       }
 
-      return false;
+      return false
     }
 
     // 收集页面链接
     // 解析重定向链接，提取真实URL
     unwrapRedirectUrl(url) {
       try {
-        const urlObj = new URL(url);
-        const params = urlObj.searchParams;
+        const urlObj = new URL(url)
+        const params = urlObj.searchParams
 
         // 常见的重定向参数名
-        const redirectParams = ['target', 'url', 'redirect', 'goto', 'link', 'dest', 'destination'];
+        const redirectParams = ['target', 'url', 'redirect', 'goto', 'link', 'dest', 'destination']
 
         for (const param of redirectParams) {
-          const target = params.get(param);
+          const target = params.get(param)
           if (target) {
             // 解码 URL 编码
-            const decoded = decodeURIComponent(target);
+            const decoded = decodeURIComponent(target)
             // 验证是否为有效 URL
             if (decoded.startsWith('http://') || decoded.startsWith('https://')) {
-              return decoded;
+              return decoded
             }
           }
         }
       } catch (e) {
         // URL 解析失败，返回原始 URL
       }
-      return url;
+      return url
     }
 
     collectLinks() {
-      const links = document.querySelectorAll('a[href]');
-      const seenUrls = new Set();
-      this.collectedLinks = [];
-      this.linkElements = []; // 保存链接元素引用
+      const links = document.querySelectorAll('a[href]')
+      const seenUrls = new Set()
+      this.collectedLinks = []
+      this.linkElements = [] // 保存链接元素引用
 
-      links.forEach(link => {
+      links.forEach((link) => {
         // 检查是否隐藏
-        if (this.isHiddenElement(link)) return;
+        if (this.isHiddenElement(link)) return
 
         // 检查是否为导航链接
-        if (this.isNavigationLink(link)) return;
+        if (this.isNavigationLink(link)) return
 
         // 解析重定向链接，获取真实 URL
-        const url = this.unwrapRedirectUrl(link.href);
-        const text = link.textContent.trim();
+        const url = this.unwrapRedirectUrl(link.href)
+        const text = link.textContent.trim()
 
         // 去重
-        if (seenUrls.has(url)) return;
-        seenUrls.add(url);
+        if (seenUrls.has(url)) return
+        seenUrls.add(url)
 
         // 过滤无效链接
-        if (!text || text.length < 1) return;
+        if (!text || text.length < 1) return
 
         this.collectedLinks.push({
           text: text.substring(0, 100), // 限制文本长度
-          url: url
-        });
-        this.linkElements.push(link); // 保存元素引用
-      });
+          url: url,
+        })
+        this.linkElements.push(link) // 保存元素引用
+      })
 
-      this.linkCount = this.collectedLinks.length;
-      this.updateLinksPanel();
-      this.updateStatus();
+      this.linkCount = this.collectedLinks.length
+      this.updateLinksPanel()
+      this.updateStatus()
 
-      console.log(`[文档生成器] 收集了 ${this.linkCount} 个链接`);
+      console.log(`[文档生成器] 收集了 ${this.linkCount} 个链接`)
     }
 
     // ==================== GitHub 仓库收集功能 ====================
 
     // 收集 GitHub 仓库链接
     collectGithubRepos() {
-      const links = document.querySelectorAll('a[href]');
-      const seenRepos = new Set();
-      this.githubRepos = [];
-      this.githubElements = [];
+      const links = document.querySelectorAll('a[href]')
+      const seenRepos = new Set()
+      this.githubRepos = []
+      this.githubElements = []
 
       // GitHub 仓库 URL 正则：匹配 owner/repo 格式
-      const githubRepoPattern = /^https?:\/\/github\.com\/([a-zA-Z0-9_-]+)\/([a-zA-Z0-9_.-]+)\/?$/;
+      const githubRepoPattern = /^https?:\/\/github\.com\/([a-zA-Z0-9_-]+)\/([a-zA-Z0-9_.-]+)\/?$/
       // 也匹配带 tree/blob 等的链接，但只提取仓库部分
-      const githubRepoPathPattern = /^https?:\/\/github\.com\/([a-zA-Z0-9_-]+)\/([a-zA-Z0-9_.-]+)(?:\/|$)/;
+      const githubRepoPathPattern =
+        /^https?:\/\/github\.com\/([a-zA-Z0-9_-]+)\/([a-zA-Z0-9_.-]+)(?:\/|$)/
 
-      links.forEach(link => {
+      links.forEach((link) => {
         // 检查是否隐藏
-        if (this.isHiddenElement(link)) return;
+        if (this.isHiddenElement(link)) return
 
-        const href = link.href;
-        const match = href.match(githubRepoPathPattern);
+        const href = link.href
+        const match = href.match(githubRepoPathPattern)
 
         if (match) {
-          const owner = match[1];
-          const repo = match[2];
+          const owner = match[1]
+          const repo = match[2]
 
           // 排除 GitHub 自己的特殊页面
           const excludePatterns = [
-            /^(features|pricing|security|about|blog|careers|press|shop|sponsors|topics|trending|collections|events|explore|settings|notifications|pulls|issues|marketplace|orgs|new|import|gist)$/i
-          ];
+            /^(features|pricing|security|about|blog|careers|press|shop|sponsors|topics|trending|collections|events|explore|settings|notifications|pulls|issues|marketplace|orgs|new|import|gist)$/i,
+          ]
 
-          if (excludePatterns.some(p => p.test(owner))) return;
+          if (excludePatterns.some((p) => p.test(owner))) return
 
           // 排除组织页面
-          if (href.match(/^https?:\/\/github\.com\/orgs\//)) return;
+          if (href.match(/^https?:\/\/github\.com\/orgs\//)) return
 
-          const repoKey = `${owner}/${repo}`;
+          const repoKey = `${owner}/${repo}`
 
           // 去重
-          if (seenRepos.has(repoKey)) return;
-          seenRepos.add(repoKey);
+          if (seenRepos.has(repoKey)) return
+          seenRepos.add(repoKey)
 
-          const text = link.textContent.trim() || repo;
+          const text = link.textContent.trim() || repo
 
           this.githubRepos.push({
             owner: owner,
             repo: repo,
             url: `https://github.com/${owner}/${repo}`,
             text: text.substring(0, 100),
-            originalUrl: href
-          });
-          this.githubElements.push(link);
+            originalUrl: href,
+          })
+          this.githubElements.push(link)
         }
-      });
+      })
 
-      this.githubCount = this.githubRepos.length;
-      this.updateGithubPanel();
-      this.updateStatus();
+      this.githubCount = this.githubRepos.length
+      this.updateGithubPanel()
+      this.updateStatus()
 
-      console.log(`[文档生成器] 收集了 ${this.githubCount} 个 GitHub 仓库`);
+      console.log(`[文档生成器] 收集了 ${this.githubCount} 个 GitHub 仓库`)
     }
 
     // 更新 GitHub 仓库面板内容
     updateGithubPanel() {
-      const githubContent = document.querySelector('.yc-doc-content-github');
-      if (!githubContent) return;
+      const githubContent = document.querySelector('.yc-doc-content-github')
+      if (!githubContent) return
 
       if (this.githubRepos.length === 0) {
         githubContent.innerHTML = `
@@ -1522,15 +1553,15 @@ if (window.DocGeneratorLoaded) {
             </svg>
             <p>当前页面没有发现 GitHub 仓库链接<br>访问包含 GitHub 链接的页面后点击"生成文档"</p>
           </div>
-        `;
-        return;
+        `
+        return
       }
 
-      let html = '<ul class="yc-doc-github-list">';
+      let html = '<ul class="yc-doc-github-list">'
       this.githubRepos.forEach((repo, index) => {
-        const escapedText = this.escapeHtml(repo.text);
-        const escapedUrl = this.escapeHtml(repo.url);
-        const displayText = repo.text || `${repo.owner}/${repo.repo}`;
+        const escapedText = this.escapeHtml(repo.text)
+        const escapedUrl = this.escapeHtml(repo.url)
+        const displayText = repo.text || `${repo.owner}/${repo.repo}`
 
         html += `
           <li class="yc-doc-github-item">
@@ -1565,59 +1596,59 @@ if (window.DocGeneratorLoaded) {
               </button>
             </div>
           </li>
-        `;
-      });
-      html += '</ul>';
+        `
+      })
+      html += '</ul>'
 
-      githubContent.innerHTML = html;
+      githubContent.innerHTML = html
     }
 
     // 定位 GitHub 链接元素
     locateGithubElement(index) {
-      const element = this.githubElements[index];
+      const element = this.githubElements[index]
       if (!element) {
-        this.showToast('链接元素已失效，请重新收集');
-        return;
+        this.showToast('链接元素已失效，请重新收集')
+        return
       }
 
       // 滚动到元素位置
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' })
 
       // 高亮效果
-      const originalOutline = element.style.outline;
-      const originalBg = element.style.backgroundColor;
-      element.style.transition = 'outline 0.3s, background-color 0.3s';
-      element.style.outline = '3px solid #1a73e8';
-      element.style.backgroundColor = '#e8f0fe';
+      const originalOutline = element.style.outline
+      const originalBg = element.style.backgroundColor
+      element.style.transition = 'outline 0.3s, background-color 0.3s'
+      element.style.outline = '3px solid #1a73e8'
+      element.style.backgroundColor = '#e8f0fe'
 
       setTimeout(() => {
-        element.style.outline = originalOutline;
-        element.style.backgroundColor = originalBg;
-      }, 2000);
+        element.style.outline = originalOutline
+        element.style.backgroundColor = originalBg
+      }, 2000)
 
-      this.showToast('已定位到链接元素');
+      this.showToast('已定位到链接元素')
     }
 
     // 下载 GitHub 仓库
     async downloadGithubRepo(index) {
-      const repo = this.githubRepos[index];
+      const repo = this.githubRepos[index]
       if (!repo) {
-        this.showToast('仓库信息已失效，请重新收集');
-        return;
+        this.showToast('仓库信息已失效，请重新收集')
+        return
       }
 
-      const downloadUrl = `https://github.com/${repo.owner}/${repo.repo}/archive/refs/heads/main.zip`;
-      const masterUrl = `https://github.com/${repo.owner}/${repo.repo}/archive/refs/heads/master.zip`;
+      const downloadUrl = `https://github.com/${repo.owner}/${repo.repo}/archive/refs/heads/main.zip`
+      const masterUrl = `https://github.com/${repo.owner}/${repo.repo}/archive/refs/heads/master.zip`
 
-      this.showToast(`正在下载 ${repo.owner}/${repo.repo}...`);
+      this.showToast(`正在下载 ${repo.owner}/${repo.repo}...`)
 
       // 尝试 main 分支
       try {
-        const response = await fetch(downloadUrl, { method: 'HEAD' });
+        const response = await fetch(downloadUrl, { method: 'HEAD' })
         if (response.ok) {
-          window.open(downloadUrl, '_blank');
-          this.showToast(`已开始下载 ${repo.repo} (main 分支)`);
-          return;
+          window.open(downloadUrl, '_blank')
+          this.showToast(`已开始下载 ${repo.repo} (main 分支)`)
+          return
         }
       } catch (e) {
         // 继续尝试 master
@@ -1625,25 +1656,28 @@ if (window.DocGeneratorLoaded) {
 
       // 尝试 master 分支
       try {
-        const response = await fetch(masterUrl, { method: 'HEAD' });
+        const response = await fetch(masterUrl, { method: 'HEAD' })
         if (response.ok) {
-          window.open(masterUrl, '_blank');
-          this.showToast(`已开始下载 ${repo.repo} (master 分支)`);
-          return;
+          window.open(masterUrl, '_blank')
+          this.showToast(`已开始下载 ${repo.repo} (master 分支)`)
+          return
         }
       } catch (e) {
         // 继续使用默认方式
       }
 
       // 直接打开下载页面
-      window.open(`https://github.com/${repo.owner}/${repo.repo}/archive/refs/heads/main.zip`, '_blank');
-      this.showToast(`已打开下载链接`);
+      window.open(
+        `https://github.com/${repo.owner}/${repo.repo}/archive/refs/heads/main.zip`,
+        '_blank'
+      )
+      this.showToast(`已打开下载链接`)
     }
 
     // 更新链接面板内容
     updateLinksPanel() {
-      const linksContent = document.querySelector('.yc-doc-content-links');
-      if (!linksContent) return;
+      const linksContent = document.querySelector('.yc-doc-content-links')
+      if (!linksContent) return
 
       if (this.collectedLinks.length === 0) {
         linksContent.innerHTML = `
@@ -1654,15 +1688,15 @@ if (window.DocGeneratorLoaded) {
             </svg>
             <p>点击"生成文档"自动收集页面链接<br>导航区域的链接会被自动排除</p>
           </div>
-        `;
-        return;
+        `
+        return
       }
 
-      let html = '<ul class="yc-doc-link-list">';
+      let html = '<ul class="yc-doc-link-list">'
       this.collectedLinks.forEach((link, index) => {
-        const escapedText = this.escapeHtml(link.text);
-        const escapedUrl = this.escapeHtml(link.url);
-        const displayText = link.text || link.url;
+        const escapedText = this.escapeHtml(link.text)
+        const escapedUrl = this.escapeHtml(link.url)
+        const displayText = link.text || link.url
 
         html += `
           <li class="yc-doc-link-item">
@@ -1680,49 +1714,49 @@ if (window.DocGeneratorLoaded) {
               </svg>
             </button>
           </li>
-        `;
-      });
-      html += '</ul>';
+        `
+      })
+      html += '</ul>'
 
-      linksContent.innerHTML = html;
+      linksContent.innerHTML = html
     }
 
     formatDocument(title, sections) {
-      let html = `<h1 title="${this.escapeHtml(title)}">${this.escapeHtml(title)}</h1>`;
+      let html = `<h1 title="${this.escapeHtml(title)}">${this.escapeHtml(title)}</h1>`
 
       // 页面展示时不显示来源，下载时再添加
 
       if (this.collectedContent.length > 0) {
-        html += '<h2>收集的内容</h2>';
+        html += '<h2>收集的内容</h2>'
         this.collectedContent.forEach((item, index) => {
-          html += `<blockquote>${this.escapeHtml(item)}</blockquote>`;
-        });
+          html += `<blockquote>${this.escapeHtml(item)}</blockquote>`
+        })
       }
 
       if (sections.length > 0) {
-        const filteredSections = sections.filter(s => {
-          if (s.text === title) return false;
-          const normalizedTitle = title.replace(/\s+/g, ' ').trim();
-          const normalizedText = s.text.replace(/\s+/g, ' ').trim();
-          if (normalizedTitle === normalizedText) return false;
-          return true;
-        });
+        const filteredSections = sections.filter((s) => {
+          if (s.text === title) return false
+          const normalizedTitle = title.replace(/\s+/g, ' ').trim()
+          const normalizedText = s.text.replace(/\s+/g, ' ').trim()
+          if (normalizedTitle === normalizedText) return false
+          return true
+        })
 
-        const seenTexts = new Set();
-        const uniqueSections = filteredSections.filter(s => {
-          if (seenTexts.has(s.text)) return false;
-          seenTexts.add(s.text);
-          return true;
-        });
+        const seenTexts = new Set()
+        const uniqueSections = filteredSections.filter((s) => {
+          if (seenTexts.has(s.text)) return false
+          seenTexts.add(s.text)
+          return true
+        })
 
         if (uniqueSections.length > 0) {
-          html += '<h2>页面大纲</h2>';
-          html += '<ul class="yc-doc-outline">';
+          html += '<h2>页面大纲</h2>'
+          html += '<ul class="yc-doc-outline">'
           uniqueSections.forEach((s, index) => {
-            const escapedText = this.escapeHtml(s.text);
+            const escapedText = this.escapeHtml(s.text)
             // 获取标题级别 (h1=1, h2=2, ...)
-            const level = parseInt(s.type.replace('h', '')) || 1;
-            const levelClass = `yc-doc-level-${level}`;
+            const level = parseInt(s.type.replace('h', '')) || 1
+            const levelClass = `yc-doc-level-${level}`
             if (s.link) {
               html += `<li class="yc-doc-outline-item yc-doc-has-link ${levelClass}" data-index="${index}" data-level="${level}" title="${escapedText}" data-heading-text="${escapedText}">
                 <span class="yc-doc-outline-text">${escapedText}</span>
@@ -1734,224 +1768,231 @@ if (window.DocGeneratorLoaded) {
                   </svg>
                   打开
                 </button>
-              </li>`;
+              </li>`
             } else {
-              html += `<li class="yc-doc-outline-item ${levelClass}" data-index="${index}" data-level="${level}" title="${escapedText}" data-heading-text="${escapedText}">${escapedText}</li>`;
+              html += `<li class="yc-doc-outline-item ${levelClass}" data-index="${index}" data-level="${level}" title="${escapedText}" data-heading-text="${escapedText}">${escapedText}</li>`
             }
-          });
-          html += '</ul>';
-          this.outlineSections = uniqueSections;
-          this.outlineCount = uniqueSections.length;
+          })
+          html += '</ul>'
+          this.outlineSections = uniqueSections
+          this.outlineCount = uniqueSections.length
         }
       }
 
-      return html;
+      return html
     }
 
     collectSelection() {
-      const selection = window.getSelection();
-      const text = selection.toString().trim();
+      const selection = window.getSelection()
+      const text = selection.toString().trim()
 
       if (!text) {
-        this.showToast('请先选择要收集的文本');
-        return;
+        this.showToast('请先选择要收集的文本')
+        return
       }
 
-      this.collectedContent.push(text);
-      this.updateStatus();
-      this.showToast(`已收集 ${text.length} 字`);
+      this.collectedContent.push(text)
+      this.updateStatus()
+      this.showToast(`已收集 ${text.length} 字`)
 
-      selection.removeAllRanges();
+      selection.removeAllRanges()
 
       if (!this.isMinimized) {
-        const title = this.getPageTitle();
-        const sections = this.extractMainContent();
-        const docContent = this.formatDocument(title, sections);
-        this.updateOutlinePanel(docContent);
+        const title = this.getPageTitle()
+        const sections = this.extractMainContent()
+        const docContent = this.formatDocument(title, sections)
+        this.updateOutlinePanel(docContent)
       }
     }
 
     updateOutlinePanel(html) {
-      const panel = document.getElementById(PANEL_ID);
+      const panel = document.getElementById(PANEL_ID)
       if (panel) {
-        panel.classList.remove('yc-doc-hidden');
-        this.isMinimized = false;
+        panel.classList.remove('yc-doc-hidden')
+        this.isMinimized = false
         // 通知位置管理器
         if (window.PanelPositionManager) {
-          window.PanelPositionManager.handlePanelToggle('doc-generator', true);
+          window.PanelPositionManager.handlePanelToggle('doc-generator', true)
         }
       }
 
-      const content = document.querySelector('.yc-doc-content-outline');
+      const content = document.querySelector('.yc-doc-content-outline')
       if (content) {
-        content.innerHTML = html;
+        content.innerHTML = html
       }
 
-      this.updateStatus();
+      this.updateStatus()
     }
 
     updateStatus() {
-      const count = document.querySelector('.yc-doc-count');
+      const count = document.querySelector('.yc-doc-count')
       if (count) {
-        const outlineNum = this.outlineCount || 0;
-        const linkNum = this.linkCount || 0;
-        const githubNum = this.githubCount || 0;
-        count.textContent = `大纲 ${outlineNum} | 链接 ${linkNum} | GitHub ${githubNum}`;
+        const outlineNum = this.outlineCount || 0
+        const linkNum = this.linkCount || 0
+        const githubNum = this.githubCount || 0
+        count.textContent = `大纲 ${outlineNum} | 链接 ${linkNum} | GitHub ${githubNum}`
       }
     }
 
     copyContent() {
       // 根据当前 Tab 复制对应内容
-      let textToCopy = '';
+      let textToCopy = ''
 
       if (this.currentTab === 'links') {
         // 复制链接列表
         if (this.collectedLinks.length === 0) {
-          this.showToast('没有可复制的链接');
-          return;
+          this.showToast('没有可复制的链接')
+          return
         }
-        textToCopy = this.collectedLinks.map(link => `${link.text}\n${link.url}`).join('\n\n');
+        textToCopy = this.collectedLinks.map((link) => `${link.text}\n${link.url}`).join('\n\n')
       } else if (this.currentTab === 'github') {
         // 复制 GitHub 仓库列表
         if (this.githubRepos.length === 0) {
-          this.showToast('没有可复制的 GitHub 仓库');
-          return;
+          this.showToast('没有可复制的 GitHub 仓库')
+          return
         }
-        textToCopy = this.githubRepos.map(repo => `${repo.owner}/${repo.repo}\n${repo.url}`).join('\n\n');
+        textToCopy = this.githubRepos
+          .map((repo) => `${repo.owner}/${repo.repo}\n${repo.url}`)
+          .join('\n\n')
       } else {
         // 复制大纲内容
-        const content = document.querySelector('.yc-doc-content-outline');
+        const content = document.querySelector('.yc-doc-content-outline')
         if (content) {
-          textToCopy = content.innerText;
+          textToCopy = content.innerText
         }
       }
 
       if (textToCopy) {
-        navigator.clipboard.writeText(textToCopy)
+        navigator.clipboard
+          .writeText(textToCopy)
           .then(() => this.showToast('已复制到剪贴板'))
-          .catch(() => this.showToast('复制失败'));
+          .catch(() => this.showToast('复制失败'))
       }
     }
 
     downloadContent() {
-      const title = this.getPageTitle();
-      const filename = `${title.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_')}.md`;
+      const title = this.getPageTitle()
+      const filename = `${title.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_')}.md`
 
-      let markdown = '';
+      let markdown = ''
 
       // 添加来源和生成时间
-      const sourceUrl = window.location.href;
-      const timestamp = new Date().toLocaleString('zh-CN');
-      markdown += `> 来源: ${sourceUrl}\n> 生成时间: ${timestamp}\n\n`;
+      const sourceUrl = window.location.href
+      const timestamp = new Date().toLocaleString('zh-CN')
+      markdown += `> 来源: ${sourceUrl}\n> 生成时间: ${timestamp}\n\n`
 
       // 添加标题
-      markdown += `# ${title}\n\n`;
+      markdown += `# ${title}\n\n`
 
       // 添加大纲内容
-      const outlineContent = document.querySelector('.yc-doc-content-outline');
+      const outlineContent = document.querySelector('.yc-doc-content-outline')
       if (outlineContent && outlineContent.innerHTML.trim()) {
-        const clone = outlineContent.cloneNode(true);
+        const clone = outlineContent.cloneNode(true)
 
         // 处理大纲项中的链接
-        const outlineItems = clone.querySelectorAll('.yc-doc-outline-item');
-        outlineItems.forEach(item => {
-          const linkBtn = item.querySelector('.yc-doc-link-btn');
-          const textSpan = item.querySelector('.yc-doc-outline-text');
+        const outlineItems = clone.querySelectorAll('.yc-doc-outline-item')
+        outlineItems.forEach((item) => {
+          const linkBtn = item.querySelector('.yc-doc-link-btn')
+          const textSpan = item.querySelector('.yc-doc-outline-text')
 
           if (linkBtn && textSpan) {
-            const link = linkBtn.dataset.link;
-            const text = textSpan.textContent;
+            const link = linkBtn.dataset.link
+            const text = textSpan.textContent
             if (link) {
-              textSpan.textContent = `[${text}](${link})`;
+              textSpan.textContent = `[${text}](${link})`
             }
-            linkBtn.remove();
+            linkBtn.remove()
           }
-        });
+        })
 
-        markdown += '## 页面大纲\n\n';
-        markdown += this.htmlToMarkdown(clone.innerHTML);
-        markdown += '\n';
+        markdown += '## 页面大纲\n\n'
+        markdown += this.htmlToMarkdown(clone.innerHTML)
+        markdown += '\n'
       }
 
       // 添加链接内容
       if (this.collectedLinks.length > 0) {
-        markdown += '## 收集的链接\n\n';
+        markdown += '## 收集的链接\n\n'
         this.collectedLinks.forEach((link, index) => {
-          markdown += `${index + 1}. [${link.text}](${link.url})\n`;
-        });
-        markdown += '\n';
+          markdown += `${index + 1}. [${link.text}](${link.url})\n`
+        })
+        markdown += '\n'
       }
 
       // 添加 GitHub 仓库内容
       if (this.githubRepos.length > 0) {
-        markdown += '## GitHub 仓库\n\n';
+        markdown += '## GitHub 仓库\n\n'
         this.githubRepos.forEach((repo, index) => {
-          markdown += `${index + 1}. [${repo.owner}/${repo.repo}](${repo.url}) - ${repo.text}\n`;
-        });
-        markdown += '\n';
+          markdown += `${index + 1}. [${repo.owner}/${repo.repo}](${repo.url}) - ${repo.text}\n`
+        })
+        markdown += '\n'
       }
 
-      const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(url);
+      const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      a.click()
+      URL.revokeObjectURL(url)
 
-      this.showToast('文件已下载');
+      this.showToast('文件已下载')
     }
 
     htmlToMarkdown(html) {
-      let md = html;
+      let md = html
 
-      md = md.replace(/<li[^>]*class="[^"]*yc-doc-outline-item[^"]*"[^>]*>(.*?)<\/li>/gi, '- $1\n');
-      md = md.replace(/<h1[^>]*>(.*?)<\/h1>/gi, '# $1\n\n');
-      md = md.replace(/<h2[^>]*>(.*?)<\/h2>/gi, '## $1\n\n');
-      md = md.replace(/<h3[^>]*>(.*?)<\/h3>/gi, '### $1\n\n');
-      md = md.replace(/<h4[^>]*>(.*?)<\/h4>/gi, '#### $1\n\n');
+      md = md.replace(/<li[^>]*class="[^"]*yc-doc-outline-item[^"]*"[^>]*>(.*?)<\/li>/gi, '- $1\n')
+      md = md.replace(/<h1[^>]*>(.*?)<\/h1>/gi, '# $1\n\n')
+      md = md.replace(/<h2[^>]*>(.*?)<\/h2>/gi, '## $1\n\n')
+      md = md.replace(/<h3[^>]*>(.*?)<\/h3>/gi, '### $1\n\n')
+      md = md.replace(/<h4[^>]*>(.*?)<\/h4>/gi, '#### $1\n\n')
 
       md = md.replace(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/gi, (match, content) => {
-        const cleanContent = content.replace(/<[^>]+>/g, '').trim();
-        return `> ${cleanContent}\n\n`;
-      });
+        const cleanContent = content.replace(/<[^>]+>/g, '').trim()
+        return `> ${cleanContent}\n\n`
+      })
 
-      md = md.replace(/<p[^>]*>([\s\S]*?)<\/p>/gi, '$1\n\n');
-      md = md.replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, '- $1\n');
-      md = md.replace(/<ul[^>]*>([\s\S]*?)<\/ul>/gi, '$1\n');
-      md = md.replace(/<ol[^>]*>([\s\S]*?)<\/ol>/gi, '$1\n');
-      md = md.replace(/<code[^>]*>([\s\S]*?)<\/code>/gi, '`$1`');
-      md = md.replace(/<pre[^>]*>([\s\S]*?)<\/pre>/gi, '```\n$1\n```\n\n');
-      md = md.replace(/<a[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi, '[$2]($1)');
-      md = md.replace(/<small[^>]*>([\s\S]*?)<\/small>/gi, '$1');
-      md = md.replace(/<span[^>]*>([\s\S]*?)<\/span>/gi, '$1');
-      md = md.replace(/<[^>]+>/g, '');
-      md = md.replace(/&nbsp;/g, ' ');
-      md = md.replace(/&lt;/g, '<');
-      md = md.replace(/&gt;/g, '>');
-      md = md.replace(/&amp;/g, '&');
-      md = md.replace(/&quot;/g, '"');
-      md = md.replace(/\n{3,}/g, '\n\n');
-      md = md.split('\n').map(line => line.trim()).join('\n');
+      md = md.replace(/<p[^>]*>([\s\S]*?)<\/p>/gi, '$1\n\n')
+      md = md.replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, '- $1\n')
+      md = md.replace(/<ul[^>]*>([\s\S]*?)<\/ul>/gi, '$1\n')
+      md = md.replace(/<ol[^>]*>([\s\S]*?)<\/ol>/gi, '$1\n')
+      md = md.replace(/<code[^>]*>([\s\S]*?)<\/code>/gi, '`$1`')
+      md = md.replace(/<pre[^>]*>([\s\S]*?)<\/pre>/gi, '```\n$1\n```\n\n')
+      md = md.replace(/<a[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi, '[$2]($1)')
+      md = md.replace(/<small[^>]*>([\s\S]*?)<\/small>/gi, '$1')
+      md = md.replace(/<span[^>]*>([\s\S]*?)<\/span>/gi, '$1')
+      md = md.replace(/<[^>]+>/g, '')
+      md = md.replace(/&nbsp;/g, ' ')
+      md = md.replace(/&lt;/g, '<')
+      md = md.replace(/&gt;/g, '>')
+      md = md.replace(/&amp;/g, '&')
+      md = md.replace(/&quot;/g, '"')
+      md = md.replace(/\n{3,}/g, '\n\n')
+      md = md
+        .split('\n')
+        .map((line) => line.trim())
+        .join('\n')
 
-      return md.trim();
+      return md.trim()
     }
 
     clearContent() {
-      this.collectedContent = [];
-      this.collectedLinks = [];
-      this.githubRepos = [];
-      this.githubElements = [];
-      this.outlineCount = 0;
-      this.linkCount = 0;
-      this.githubCount = 0;
+      this.collectedContent = []
+      this.collectedLinks = []
+      this.githubRepos = []
+      this.githubElements = []
+      this.outlineCount = 0
+      this.linkCount = 0
+      this.githubCount = 0
 
-      const outlineContent = document.querySelector('.yc-doc-content-outline');
+      const outlineContent = document.querySelector('.yc-doc-content-outline')
       if (outlineContent) {
-        outlineContent.innerHTML = '<p style="color: #999;">点击"生成文档"或选择文本后点击"收集"</p>';
+        outlineContent.innerHTML =
+          '<p style="color: #999;">点击"生成文档"或选择文本后点击"收集"</p>'
       }
 
-      const linksContent = document.querySelector('.yc-doc-content-links');
+      const linksContent = document.querySelector('.yc-doc-content-links')
       if (linksContent) {
         linksContent.innerHTML = `
           <div class="yc-doc-empty-hint">
@@ -1961,10 +2002,10 @@ if (window.DocGeneratorLoaded) {
             </svg>
             <p>点击"生成文档"自动收集页面链接<br>导航区域的链接会被自动排除</p>
           </div>
-        `;
+        `
       }
 
-      const githubContent = document.querySelector('.yc-doc-content-github');
+      const githubContent = document.querySelector('.yc-doc-content-github')
       if (githubContent) {
         githubContent.innerHTML = `
           <div class="yc-doc-empty-hint">
@@ -1973,38 +2014,38 @@ if (window.DocGeneratorLoaded) {
             </svg>
             <p>当前页面没有发现 GitHub 仓库链接<br>访问包含 GitHub 链接的页面后点击"生成文档"</p>
           </div>
-        `;
+        `
       }
 
-      this.updateStatus();
-      this.showToast('已清空');
+      this.updateStatus()
+      this.showToast('已清空')
     }
 
     showToast(message) {
-      const existing = document.querySelector('.yc-doc-toast');
-      if (existing) existing.remove();
+      const existing = document.querySelector('.yc-doc-toast')
+      if (existing) existing.remove()
 
-      const toast = document.createElement('div');
-      toast.className = 'yc-doc-toast';
-      toast.textContent = message;
-      document.body.appendChild(toast);
+      const toast = document.createElement('div')
+      toast.className = 'yc-doc-toast'
+      toast.textContent = message
+      document.body.appendChild(toast)
 
-      setTimeout(() => toast.remove(), 2000);
+      setTimeout(() => toast.remove(), 2000)
     }
 
     escapeHtml(text) {
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
+      const div = document.createElement('div')
+      div.textContent = text
+      return div.innerHTML
     }
   }
 
   // 初始化
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
-      window.docGenerator = new DocGenerator();
-    });
+      window.docGenerator = new DocGenerator()
+    })
   } else {
-    window.docGenerator = new DocGenerator();
+    window.docGenerator = new DocGenerator()
   }
 }

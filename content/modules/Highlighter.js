@@ -2,21 +2,21 @@
  * 高亮管理模块
  * 负责元素高亮显示和管理
  */
-(function() {
-  'use strict';
+;(function () {
+  'use strict'
 
   class Highlighter {
     constructor() {
-      this.overlays = new Map(); // pickerUid -> overlay element
-      this.container = null;
-      this.style = null;
-      this._init();
+      this.overlays = new Map() // pickerUid -> overlay element
+      this.container = null
+      this.style = null
+      this._init()
     }
 
     _init() {
       // 创建容器
-      this.container = document.createElement('div');
-      this.container.id = 'ep-highlighter-container';
+      this.container = document.createElement('div')
+      this.container.id = 'ep-highlighter-container'
       this.container.style.cssText = `
         position: fixed;
         top: 0;
@@ -25,12 +25,12 @@
         height: 100%;
         pointer-events: none;
         z-index: 2147483644;
-      `;
-      document.body.appendChild(this.container);
+      `
+      document.body.appendChild(this.container)
 
       // 添加样式
-      this.style = document.createElement('style');
-      this.style.id = 'ep-highlighter-styles';
+      this.style = document.createElement('style')
+      this.style.id = 'ep-highlighter-styles'
       this.style.textContent = `
         .ep-highlight-overlay {
           position: absolute;
@@ -84,22 +84,22 @@
           0%, 100% { opacity: 1; }
           50% { opacity: 0.7; }
         }
-      `;
-      document.head.appendChild(this.style);
+      `
+      document.head.appendChild(this.style)
     }
 
     /**
      * 显示悬停高亮
      */
     showHover(element) {
-      this._removeHover();
+      this._removeHover()
 
-      if (!element) return;
+      if (!element) return
 
-      const rect = element.getBoundingClientRect();
-      const overlay = this._createOverlay(rect, 'hover');
-      this.container.appendChild(overlay);
-      this._hoverOverlay = overlay;
+      const rect = element.getBoundingClientRect()
+      const overlay = this._createOverlay(rect, 'hover')
+      this.container.appendChild(overlay)
+      this._hoverOverlay = overlay
     }
 
     /**
@@ -107,8 +107,8 @@
      */
     hideHover() {
       if (this._hoverOverlay) {
-        this._hoverOverlay.remove();
-        this._hoverOverlay = null;
+        this._hoverOverlay.remove()
+        this._hoverOverlay = null
       }
     }
 
@@ -116,30 +116,30 @@
      * 添加选中高亮
      */
     addSelected(element, pickerUid, index) {
-      if (this.overlays.has(pickerUid)) return;
+      if (this.overlays.has(pickerUid)) return
 
-      const rect = element.getBoundingClientRect();
-      const overlay = this._createOverlay(rect, 'selected');
-      const label = document.createElement('div');
-      label.className = 'ep-highlight-label';
-      label.textContent = index;
-      overlay.appendChild(label);
+      const rect = element.getBoundingClientRect()
+      const overlay = this._createOverlay(rect, 'selected')
+      const label = document.createElement('div')
+      label.className = 'ep-highlight-label'
+      label.textContent = index
+      overlay.appendChild(label)
 
-      this.container.appendChild(overlay);
-      this.overlays.set(pickerUid, overlay);
+      this.container.appendChild(overlay)
+      this.overlays.set(pickerUid, overlay)
 
       // 监听元素位置变化
-      this._observeElement(element, pickerUid);
+      this._observeElement(element, pickerUid)
     }
 
     /**
      * 移除选中高亮
      */
     removeSelected(pickerUid) {
-      const overlay = this.overlays.get(pickerUid);
+      const overlay = this.overlays.get(pickerUid)
       if (overlay) {
-        overlay.remove();
-        this.overlays.delete(pickerUid);
+        overlay.remove()
+        this.overlays.delete(pickerUid)
       }
     }
 
@@ -147,13 +147,13 @@
      * 更新高亮位置
      */
     updatePosition(pickerUid, element) {
-      const overlay = this.overlays.get(pickerUid);
+      const overlay = this.overlays.get(pickerUid)
       if (overlay && element) {
-        const rect = element.getBoundingClientRect();
-        overlay.style.left = rect.left + 'px';
-        overlay.style.top = rect.top + 'px';
-        overlay.style.width = rect.width + 'px';
-        overlay.style.height = rect.height + 'px';
+        const rect = element.getBoundingClientRect()
+        overlay.style.left = rect.left + 'px'
+        overlay.style.top = rect.top + 'px'
+        overlay.style.width = rect.width + 'px'
+        overlay.style.height = rect.height + 'px'
       }
     }
 
@@ -161,23 +161,23 @@
      * 清除所有选中高亮
      */
     clearAll() {
-      this.overlays.forEach(overlay => overlay.remove());
-      this.overlays.clear();
+      this.overlays.forEach((overlay) => overlay.remove())
+      this.overlays.clear()
     }
 
     /**
      * 显示预览高亮
      */
     showPreview(elements) {
-      this.clearPreview();
+      this.clearPreview()
 
       elements.forEach((element, index) => {
-        const rect = element.getBoundingClientRect();
-        const overlay = this._createOverlay(rect, 'preview');
-        this.container.appendChild(overlay);
-        if (!this._previews) this._previews = [];
-        this._previews.push(overlay);
-      });
+        const rect = element.getBoundingClientRect()
+        const overlay = this._createOverlay(rect, 'preview')
+        this.container.appendChild(overlay)
+        if (!this._previews) this._previews = []
+        this._previews.push(overlay)
+      })
     }
 
     /**
@@ -185,8 +185,8 @@
      */
     clearPreview() {
       if (this._previews) {
-        this._previews.forEach(o => o.remove());
-        this._previews = [];
+        this._previews.forEach((o) => o.remove())
+        this._previews = []
       }
     }
 
@@ -194,15 +194,15 @@
      * 创建高亮覆盖层
      */
     _createOverlay(rect, type) {
-      const overlay = document.createElement('div');
-      overlay.className = `ep-highlight-overlay ${type}`;
+      const overlay = document.createElement('div')
+      overlay.className = `ep-highlight-overlay ${type}`
       overlay.style.cssText = `
         left: ${rect.left}px;
         top: ${rect.top}px;
         width: ${rect.width}px;
         height: ${rect.height}px;
-      `;
-      return overlay;
+      `
+      return overlay
     }
 
     /**
@@ -212,9 +212,9 @@
       // 使用 ResizeObserver 监听大小变化
       if (window.ResizeObserver) {
         const observer = new ResizeObserver(() => {
-          this.updatePosition(pickerUid, element);
-        });
-        observer.observe(element);
+          this.updatePosition(pickerUid, element)
+        })
+        observer.observe(element)
       }
     }
 
@@ -222,14 +222,14 @@
      * 销毁
      */
     destroy() {
-      this.clearAll();
-      this.clearPreview();
-      this.hideHover();
-      if (this.container) this.container.remove();
-      if (this.style) this.style.remove();
+      this.clearAll()
+      this.clearPreview()
+      this.hideHover()
+      if (this.container) this.container.remove()
+      if (this.style) this.style.remove()
     }
   }
 
   // 导出
-  window.Highlighter = Highlighter;
-})();
+  window.Highlighter = Highlighter
+})()

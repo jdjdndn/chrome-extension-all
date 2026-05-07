@@ -3,24 +3,22 @@
  * 统一管理所有域名的脚本加载配置
  */
 
-(function () {
-  'use strict';
+;(function () {
+  'use strict'
 
   // 域名匹配工具
   function matchDomain(pattern, hostname) {
-    if (pattern === '*') return true;
+    if (pattern === '*') return true
     if (pattern.startsWith('*://')) {
       // *://*.example.com/* -> 匹配 example.com 及其子域名
-      const domain = pattern.replace('*://*.', '').replace('*://', '').replace('/*', '');
-      return hostname === domain || hostname.endsWith('.' + domain);
+      const domain = pattern.replace('*://*.', '').replace('*://', '').replace('/*', '')
+      return hostname === domain || hostname.endsWith('.' + domain)
     }
-    return hostname === pattern || hostname.endsWith('.' + pattern);
+    return hostname === pattern || hostname.endsWith('.' + pattern)
   }
 
   // 通用脚本配置（所有页面加载 - 已打包为单个 bundle）
-  const COMMON_SCRIPTS = [
-    'content/common-bundle.js'
-  ];
+  const COMMON_SCRIPTS = ['content/common-bundle.js']
 
   // 域名特定脚本配置（所有站点已打包为自包含 bundle）
   const DOMAIN_SCRIPTS = [
@@ -75,18 +73,18 @@
     {
       patterns: ['*://*.youtube.com/*'],
       scripts: ['content/bundled/youtube.bundle.js'],
-      runAt: 'document_start'
+      runAt: 'document_start',
     },
     {
       patterns: ['*://github.com/*', '*://*.github.com/*'],
       scripts: ['content/bundled/github.bundle.js'],
-      runAt: 'document_start'
+      runAt: 'document_start',
     },
     {
       patterns: ['*://modelscope.cn/models*', '*://*.modelscope.cn/models*'],
       scripts: ['content/bundled/modelscope.bundle.js'],
-    }
-  ];
+    },
+  ]
 
   /**
    * 获取当前域名需要加载的脚本配置
@@ -99,29 +97,29 @@
       domainScripts: [],
       runAtStart: [],
       eventbusIntegration: false,
-      eventbusScript: 'content/eventbus-integration.js'
-    };
+      eventbusScript: 'content/eventbus-integration.js',
+    }
 
     // 查找匹配的域名配置
     for (const config of DOMAIN_SCRIPTS) {
-      const matched = config.patterns.some(pattern => matchDomain(pattern, hostname));
+      const matched = config.patterns.some((pattern) => matchDomain(pattern, hostname))
       if (matched) {
         // 分离 document_start 和默认脚本
         if (config.runAt === 'document_start') {
-          result.runAtStart.push(...config.scripts);
+          result.runAtStart.push(...config.scripts)
         } else {
-          result.domainScripts.push(...config.scripts);
+          result.domainScripts.push(...config.scripts)
         }
         if (config.eventbusIntegration) {
-          result.eventbusIntegration = true;
+          result.eventbusIntegration = true
         }
         if (config.eventbusScript) {
-          result.eventbusScript = config.eventbusScript;
+          result.eventbusScript = config.eventbusScript
         }
       }
     }
 
-    return result;
+    return result
   }
 
   // 导出配置
@@ -129,8 +127,8 @@
     getScriptConfig,
     COMMON_SCRIPTS,
     DOMAIN_SCRIPTS,
-    matchDomain
-  };
+    matchDomain,
+  }
 
-  console.log('[DomainConfig] 域名配置模块已加载');
-})();
+  console.log('[DomainConfig] 域名配置模块已加载')
+})()

@@ -43,21 +43,25 @@
 setTimeout(async () => {
   // 注册消息处理器
   EventBus.on('GET_DATA', async (data, source) => {
-    console.log('[Background] 收到数据请求:', data, '来自:', source);
-    return { status: 'ok', data: { /* ... */ } };
-  });
+    console.log('[Background] 收到数据请求:', data, '来自:', source)
+    return {
+      status: 'ok',
+      data: {
+        /* ... */
+      },
+    }
+  })
 
   // 监听事件
   EventBus.subscribe('USER_ACTION', (data, source) => {
-    console.log('[Background] 用户操作:', data, '来自:', source);
+    console.log('[Background] 用户操作:', data, '来自:', source)
     // 处理用户操作...
-  });
+  })
 
   // 向其他组件发送消息
-  const response = await EventBus.request('CONTENT_GET_INFO', { url: '...' });
-  console.log('[Background] Content 响应:', response);
-
-}, 1000);
+  const response = await EventBus.request('CONTENT_GET_INFO', { url: '...' })
+  console.log('[Background] Content 响应:', response)
+}, 1000)
 
 // ============================================
 // 3. Content Script (content.js)
@@ -68,22 +72,22 @@ setTimeout(async () => {
 
 // 监听来自 background/popup 的消息
 EventBus.on('UPDATE_CONFIG', (config) => {
-  console.log('[Content] 配置更新:', config);
+  console.log('[Content] 配置更新:', config)
   // 更新配置...
-});
+})
 
 // 向 background 发送请求
 async function getData() {
   try {
-    const result = await EventBus.request('GET_DATA', { query: '...' });
-    console.log('[Content] 收到数据:', result);
+    const result = await EventBus.request('GET_DATA', { query: '...' })
+    console.log('[Content] 收到数据:', result)
   } catch (error) {
-    console.error('[Content] 请求失败:', error);
+    console.error('[Content] 请求失败:', error)
   }
 }
 
 // 向 DevTools 发送消息（如果已连接）
-EventBus.publish('TO_DEVTOOLS', { action: 'log', message: 'Hello DevTools' });
+EventBus.publish('TO_DEVTOOLS', { action: 'log', message: 'Hello DevTools' })
 
 // ============================================
 // 4. Popup (popup.html / popup.js)
@@ -107,18 +111,18 @@ EventBus.publish('TO_DEVTOOLS', { action: 'log', message: 'Hello DevTools' });
 // 等待就绪
 setTimeout(async () => {
   // 向 content script 发送消息
-  const response = await EventBus.request('CONTENT_GET_INFO', {});
-  console.log('[Popup] Content 响应:', response);
+  const response = await EventBus.request('CONTENT_GET_INFO', {})
+  console.log('[Popup] Content 响应:', response)
 
   // 广播消息到所有组件
-  await EventBus.publish('GLOBAL_EVENT', { message: 'Hello everyone!' });
+  await EventBus.publish('GLOBAL_EVENT', { message: 'Hello everyone!' })
 
   // 订阅事件
   EventBus.subscribe('CONTENT_UPDATE', (data) => {
-    console.log('[Popup] Content 更新:', data);
-    updateUI(data);
-  });
-}, 100);
+    console.log('[Popup] Content 更新:', data)
+    updateUI(data)
+  })
+}, 100)
 
 // ============================================
 // 5. DevTools (devtools.js / devtools-panel.js)
@@ -142,19 +146,19 @@ setTimeout(async () => {
 // 创建 DevTools 面板
 chrome.devtools.panels.create('MyPanel', 'icon.png', 'panel.html', (panel) => {
   // 面板创建完成
-});
+})
 
 // 在 panel.js 中：
 
 // 监听 content script 的消息
 EventBus.subscribe('TO_DEVTOOLS', (data) => {
-  console.log('[DevTools] 收到消息:', data);
+  console.log('[DevTools] 收到消息:', data)
   // 在 DevTools 面板中显示...
-});
+})
 
 // 向 content script 发送命令
 async function inspectElement(selector) {
-  await EventBus.send('CONTENT_INSPECT', { selector }, { target: 'content' });
+  await EventBus.send('CONTENT_INSPECT', { selector }, { target: 'content' })
 }
 
 // ============================================
@@ -166,14 +170,14 @@ async function inspectElement(selector) {
 // 获取所有组件状态
 async function getAllStates() {
   // 广播请求状态
-  await EventBus.publish('REQUEST_STATE');
+  await EventBus.publish('REQUEST_STATE')
 
   // 等待响应
-  await new Promise(r => setTimeout(r, 1000));
+  await new Promise((r) => setTimeout(r, 1000))
 
   // 向 background 请求汇总状态
-  const states = await EventBus.request('GET_ALL_STATES', {});
-  console.log('[Options] 所有组件状态:', states);
+  const states = await EventBus.request('GET_ALL_STATES', {})
+  console.log('[Options] 所有组件状态:', states)
 }
 
 // ============================================
@@ -208,27 +212,27 @@ async function getAllStates() {
 // ============================================
 
 // 8.1 广播消息（一对多）
-await EventBus.publish('THEME_CHANGED', { theme: 'dark' });
+await EventBus.publish('THEME_CHANGED', { theme: 'dark' })
 // 所有订阅了 THEME_CHANGED 的组件都会收到
 
 // 8.2 定向发送（发送到特定组件）
-await EventBus.send('PRIVATE_MESSAGE', data, { target: 'background' });
+await EventBus.send('PRIVATE_MESSAGE', data, { target: 'background' })
 
 // 8.3 超时控制
 const result = await EventBus.request('SLOW_OPERATION', data, {
-  timeout: 10000  // 10秒超时
-});
+  timeout: 10000, // 10秒超时
+})
 
 // 8.4 订阅并自动取消
 const unsubscribe = EventBus.subscribe('LOG_EVENT', (data) => {
-  console.log(data);
-});
+  console.log(data)
+})
 // 稍后取消订阅
-unsubscribe();
+unsubscribe()
 
 // 8.5 获取系统状态
-const state = await EventBus.request('GET_STATE', {});
-console.log(state);
+const state = await EventBus.request('GET_STATE', {})
+console.log(state)
 // 输出:
 // {
 //   env: 'popup',
@@ -244,13 +248,13 @@ console.log(state);
 
 // 使用 try-catch 处理请求错误
 try {
-  const result = await EventBus.request('RISKY_OPERATION', data);
-  console.log('成功:', result);
+  const result = await EventBus.request('RISKY_OPERATION', data)
+  console.log('成功:', result)
 } catch (error) {
   if (error.message === 'Message timeout') {
-    console.error('操作超时，可能目标组件未就绪');
+    console.error('操作超时，可能目标组件未就绪')
   } else {
-    console.error('操作失败:', error);
+    console.error('操作失败:', error)
   }
 }
 
@@ -259,15 +263,15 @@ try {
 // ============================================
 
 // 开启详细日志
-localStorage.setItem('eventbus_debug', 'true');
+localStorage.setItem('eventbus_debug', 'true')
 
 // 在控制台查看所有消息
 EventBus.subscribe('*', (data, source) => {
-  console.log('[Debug] 所有消息:', data, 'from:', source);
-});
+  console.log('[Debug] 所有消息:', data, 'from:', source)
+})
 
 // 查看当前状态
-console.log(EventBus.getState());
+console.log(EventBus.getState())
 
 // ============================================
 // 11. 与现有代码集成

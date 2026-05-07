@@ -16,13 +16,6 @@
     "ignoreDeprecations": "6.0",
     "types": ["chrome"]
   },
-  "include": [
-    "content/utils/**/*.ts",
-    "content/base/**/*.ts",
-    "content/core/**/*.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist"
-  ]
+  "include": ["content/utils/**/*.ts", "content/base/**/*.ts", "content/core/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
 }

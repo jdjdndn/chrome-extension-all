@@ -13,7 +13,7 @@
 
 ### 实现
 
-在_initCompressorWorkers中添加预热逻辑，创建Worker后立即发送一个微型测试任务。
+在\_initCompressorWorkers中添加预热逻辑，创建Worker后立即发送一个微型测试任务。
 
 ---
 

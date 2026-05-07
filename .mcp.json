@@ -4,8 +4,10 @@
       "command": "npx",
       "args": [
         "chrome-devtools-mcp@latest",
-        "--browserUrl", "http://127.0.0.1:9222",
-        "--executablePath", "C:\\Program Files\\Google\\Chrome Dev\\Application\\chrome.exe"
+        "--browserUrl",
+        "http://127.0.0.1:9222",
+        "--executablePath",
+        "C:\\Program Files\\Google\\Chrome Dev\\Application\\chrome.exe"
       ]
     }
   }

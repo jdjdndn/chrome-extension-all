@@ -36,16 +36,16 @@
 
 #### API 改进
 
-| 方法 | 说明 |
-|------|------|
-| `once(type, callback)` | 新增：一次性订阅 |
-| `off(type, callback?)` | 新增：取消订阅 |
-| `clear()` | 新增：清理资源 |
-| `setDebugMode(enabled)` | 新增：设置调试模式 |
-| `getStats()` | 新增：获取统计信息 |
-| `getHistory(filter)` | 新增：获取消息历史 |
+| 方法                           | 说明               |
+| ------------------------------ | ------------------ |
+| `once(type, callback)`         | 新增：一次性订阅   |
+| `off(type, callback?)`         | 新增：取消订阅     |
+| `clear()`                      | 新增：清理资源     |
+| `setDebugMode(enabled)`        | 新增：设置调试模式 |
+| `getStats()`                   | 新增：获取统计信息 |
+| `getHistory(filter)`           | 新增：获取消息历史 |
 | `onConnectionChange(callback)` | 新增：监听连接变化 |
-| `removeHandler(type)` | 新增：移除处理器 |
+| `removeHandler(type)`          | 新增：移除处理器   |
 
 #### 性能优化
 
@@ -66,31 +66,31 @@
 
 ```javascript
 // 这些代码在 V2 中仍然可用
-EventBus.request('TYPE', data);
-EventBus.publish('TYPE', data);
-EventBus.subscribe('TYPE', callback);
-EventBus.on('TYPE', handler);
+EventBus.request('TYPE', data)
+EventBus.publish('TYPE', data)
+EventBus.subscribe('TYPE', callback)
+EventBus.on('TYPE', handler)
 ```
 
 #### 可选的新功能
 
 ```javascript
 // 使用 once 代替手动取消
-EventBus.once('READY', init);
+EventBus.once('READY', init)
 
 // 使用 off 更灵活地取消订阅
-EventBus.off('TYPE', specificCallback);
-EventBus.off('TYPE'); // 取消所有
+EventBus.off('TYPE', specificCallback)
+EventBus.off('TYPE') // 取消所有
 
 // 使用 clear 清理资源
-EventBus.clear();
+EventBus.clear()
 
 // 使用调试模式
-EventBus.setDebugMode(true);
+EventBus.setDebugMode(true)
 
 // 使用追踪功能
-const stats = EventBus.getStats();
-const history = EventBus.getHistory({ limit: 10 });
+const stats = EventBus.getStats()
+const history = EventBus.getHistory({ limit: 10 })
 ```
 
 ### 文档更新
@@ -104,11 +104,11 @@ const history = EventBus.getHistory({ limit: 10 });
 新增测试命令：
 
 ```javascript
-EventBusTestV2.runAllTests();           // 运行所有测试
-EventBusTestV2.showStatusPanel();       // 显示状态面板
-EventBusTestV2.showRecentMessages(10);  // 显示最近消息
-EventBusTestV2.enableDebugMode();       // 启用调试
-EventBusTestV2.disableDebugMode();      // 禁用调试
+EventBusTestV2.runAllTests() // 运行所有测试
+EventBusTestV2.showStatusPanel() // 显示状态面板
+EventBusTestV2.showRecentMessages(10) // 显示最近消息
+EventBusTestV2.enableDebugMode() // 启用调试
+EventBusTestV2.disableDebugMode() // 禁用调试
 ```
 
 ### 已修复的问题
@@ -165,11 +165,11 @@ EventBusTestV2.disableDebugMode();      // 禁用调试
 直接使用 EventBus V2：
 
 ```javascript
-import './event-bus.js';
+import './event-bus.js'
 
 // 使用所有新功能
-EventBus.once('READY', init);
-const stats = EventBus.getStats();
+EventBus.once('READY', init)
+const stats = EventBus.getStats()
 ```
 
 ### 对于现有项目
