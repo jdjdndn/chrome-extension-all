@@ -1568,6 +1568,73 @@
     }
   }
 
+  // ========== 延迟加载观察器 ==========
+  let _lazyLoadObserver = null;
+
+  /**
+   * 设置延迟加载观察器
+   */
+  function _setupLazyLoadObserver() {
+    if (_lazyLoadObserver) return;
+    if (typeof IntersectionObserver === 'undefined') return;
+
+    const nearbyThreshold = state.config.positionAwareLoading?.nearbyThreshold || 1;
+    const rootMargin = `${nearbyThreshold * 100}% 0px ${nearbyThreshold * 100}% 0px`;
+
+    _lazyLoadObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const el = entry.target;
+          const type = el.tagName.toLowerCase();
+
+          // 触发加载
+          if (el.dataset.lazySrc) {
+            el.src = el.dataset.lazySrc;
+            delete el.dataset.lazySrc;
+          }
+
+          // 图片触发压缩
+          if (type === 'img' && !el.complete && el.src) {
+            enqueueCompress(el, el.src);
+          }
+
+          _lazyLoadObserver.unobserve(el);
+        }
+      });
+    }, {
+      rootMargin: rootMargin
+    });
+
+    addLog('info', 'loader', 'init', { feature: 'lazyLoadObserver', threshold: nearbyThreshold });
+  }
+
+  /**
+   * 将元素加入延迟加载观察
+   * @param {Element} element - DOM元素
+   */
+  function _observeLazyLoad(element) {
+    if (!_lazyLoadObserver) return;
+    _lazyLoadObserver.observe(element);
+  }
+
+  /**
+   * 销毁延迟加载观察器
+   */
+  function _destroyLazyLoadObserver() {
+    if (_lazyLoadObserver) {
+      _lazyLoadObserver.disconnect();
+      _lazyLoadObserver = null;
+    }
+  }
+
+  /**
+   * 初始化位置感知加载
+   */
+  function _initPositionAwareLoading() {
+    if (!state.config.positionAwareLoading?.enabled) return;
+    _setupLazyLoadObserver();
+  }
+
   // 获取图片压缩优先级（基于位置）
   function _getCompressPriority(img) {
     // 已加载跳过
