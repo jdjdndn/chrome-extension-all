@@ -1543,6 +1543,31 @@
     return { zone: 'far', priority: 100, distance: distanceToViewport };
   }
 
+  /**
+   * 检查资源是否已加载
+   * @param {Element} element - DOM元素
+   * @param {string} type - 资源类型
+   * @returns {boolean}
+   */
+  function _isResourceLoaded(element, type) {
+    switch (type) {
+      case 'image':
+        return element.complete && element.naturalHeight > 0;
+      case 'iframe':
+        if (element.dataset.loaded === 'true') return true;
+        // 跨域iframe访问contentDocument会抛出安全错误
+        try {
+          return element.contentDocument !== null;
+        } catch {
+          return false;
+        }
+      case 'script':
+        return element.dataset.loaded === 'true';
+      default:
+        return false;
+    }
+  }
+
   // 获取图片压缩优先级：可视区域 > 小图 > 大图
   function _getCompressPriority(img) {
     try {
