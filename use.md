@@ -35,3 +35,11 @@ rm -rf "C:\Users\26673\AppData\Local\Google\Chrome Dev\User Data\DevToolsActiveP
     "DISABLE_AUTOUPDATER": "1",
     "ENABLE_TOOL_SEARCH": "true"
   }, -->
+
+使用方式：
+
+- npm run dev - 启动开发模式（热重载 + Vite watch）
+- npm run format - 格式化代码
+- npm run lint - ESLint检查
+- npm run typecheck - TypeScript类型检查
+- git commit - 自动执行格式化 + 检查

@@ -20,6 +20,8 @@
     "prefer-const": "warn",
     "prefer-arrow-callback": "warn",
     "eqeqeq": "warn",
-    "curly": "warn"
+    "curly": "warn",
+    "no-case-declarations": "warn",
+    "no-empty": "warn"
   }
 }
