@@ -3763,6 +3763,9 @@
     // 初始化压缩Worker
     _initCompressorWorkers();
 
+    // 初始化位置感知加载
+    _initPositionAwareLoading();
+
     // 初始化网络变化监听
     _initNetworkChangeListener();
 
