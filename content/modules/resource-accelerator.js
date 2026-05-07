@@ -1621,7 +1621,9 @@
     if (typeof IntersectionObserver === 'undefined') return;
 
     const nearbyThreshold = state.config.positionAwareLoading?.nearbyThreshold || 1;
-    const rootMargin = `${nearbyThreshold * 100}% 0px ${nearbyThreshold * 100}% 0px`;
+    // 限制最大阈值为 2 屏（200%），避免预加载过多资源
+    const cappedThreshold = Math.min(nearbyThreshold, 2);
+    const rootMargin = `${cappedThreshold * 100}% 0px ${cappedThreshold * 100}% 0px`;
 
     _lazyLoadObserver = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
