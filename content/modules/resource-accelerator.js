@@ -271,6 +271,12 @@
         },
       },
     },
+    // 位置感知加载
+    positionAwareLoading: {
+      enabled: true,
+      nearbyThreshold: 1,      // 触发加载的距离阈值（屏数），默认1屏
+      processLoaded: false,    // 已加载资源是否重新处理
+    },
   };
 
   // ========== 日志系统 ==========
