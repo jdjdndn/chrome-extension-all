@@ -138,7 +138,13 @@ function _isResourceLoaded(element, type) {
     case 'image':
       return element.complete && element.naturalHeight > 0;
     case 'iframe':
-      return element.dataset.loaded === 'true' || element.contentDocument !== null;
+      if (element.dataset.loaded === 'true') return true;
+      // 跨域iframe访问contentDocument会抛出安全错误
+      try {
+        return element.contentDocument !== null;
+      } catch {
+        return false; // 跨域iframe无法判断，返回false
+      }
     case 'script':
       return element.dataset.loaded === 'true';
     default:
@@ -379,10 +385,10 @@ function _processImage(img) {
 
 | 风险 | 影响 | 缓解 |
 |------|------|------|
-| 清空src导致布局跳动 | 用户体验差 | 保留占位符或使用placeholder |
+| 清空src导致布局跳动 | 用户体验差 | 使用透明1x1像素占位图或CSS aspect-ratio保持布局 |
 | IntersectionObserver不支持 | 功能失效 | 检测支持性，降级为原生lazy |
 | 滚动频繁触发 | 性能问题 | rootMargin已设置阈值，只触发一次 |
-| 跨域iframe检测失败 | 误判未加载 | 使用dataset标记加载状态 |
+| 跨域iframe检测失败 | 误判未加载 | 使用dataset标记加载状态，try-catch保护 |
 
 ---
 
@@ -394,9 +400,12 @@ function _processImage(img) {
 | 图片在视口下方0.5屏 | fetchPriority='auto', loading='lazy' |
 | 图片在视口下方2屏 | fetchPriority='low', loading='lazy', 加入observer |
 | 滚动到far图片位置 | 图片开始加载 |
+| 快速滚动经过far区域 | 图片不加载，直到滚动停止在范围内 |
+| 向上滚动到far图片位置 | 图片开始加载（双向滚动支持） |
 | 已加载图片 | 跳过处理 |
 | 关键JS脚本 | 不受影响，正常加载 |
 | 非关键JS在far区域 | src被清空，等待滚动触发 |
+| 跨域iframe加载检测 | try-catch保护，使用dataset判断 |
 | nearbyThreshold=2 | 视口上下2屏内都算nearby |
 
 ---
