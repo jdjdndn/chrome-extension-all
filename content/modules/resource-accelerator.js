@@ -2541,15 +2541,44 @@
     }
 
     applyPriorityToResource(element, url, type) {
-      const priority = this.getResourcePriority(url, type);
+      // 已加载资源跳过
+      if (_isResourceLoaded(element, type)) return;
 
-      if (element.fetchPriority) {
-        element.fetchPriority = priority <= 1 ? 'high' : priority >= 3 ? 'low' : 'auto';
+      // 图片和iframe使用位置优先级
+      if (type === 'image' || type === 'iframe') {
+        const { zone } = _getResourcePositionPriority(element);
+
+        if (zone === 'inViewport') {
+          if ('fetchPriority' in element) element.fetchPriority = 'high';
+          if ('loading' in element) element.loading = 'eager';
+        } else if (zone === 'nearby') {
+          if ('fetchPriority' in element) element.fetchPriority = 'auto';
+          if ('loading' in element) element.loading = 'lazy';
+        } else {
+          // far - 设置lazy，等待滚动触发
+          if ('fetchPriority' in element) element.fetchPriority = 'low';
+          if ('loading' in element) element.loading = 'lazy';
+        }
+        return;
       }
 
-      if (element.loading) {
-        element.loading = priority <= 1 ? 'eager' : 'lazy';
+      // 脚本：关键JS正常加载，非关键按位置
+      if (type === 'script') {
+        const isCritical = element.type === 'module' || element.closest('head');
+        if (isCritical) return; // 关键JS不干预
+
+        const { zone } = _getResourcePositionPriority(element);
+        if (zone === 'far') {
+          // 非关键JS在far区域延迟加载
+          if (!element.dataset.src) {
+            element.dataset.src = element.src;
+            element.src = '';
+          }
+        }
+        return;
       }
+
+      // CSS 不处理
     }
 
     applyToExistingElements() {
