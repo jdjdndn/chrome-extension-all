@@ -38,8 +38,10 @@ rm -rf "C:\Users\26673\AppData\Local\Google\Chrome Dev\User Data\DevToolsActiveP
 
 使用方式：
 
-- npm run dev - 启动开发模式（热重载 + Vite watch）
-- npm run format - 格式化代码
-- npm run lint - ESLint检查
-- npm run typecheck - TypeScript类型检查
-- git commit - 自动执行格式化 + 检查
+npm run dev # 开发模式（热重载 + Vite watch）
+npm run build # 生产构建
+npm run format # 格式化代码
+npm run lint # ESLint检查
+npm run lint:fix # ESLint自动修复
+npm run typecheck # TypeScript类型检查
+git commit # 自动执行格式化 + 检查

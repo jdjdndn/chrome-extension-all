@@ -9,7 +9,7 @@
  * 6. 智能调度 - 优先级队列、动态批量处理、CDN探测优先级
  */
 
-;(function () {
+(function () {
   'use strict'
 
   const LOG_PREFIX = '[ResourceAccelerator]'
@@ -328,7 +328,7 @@
    * 调度错误日志持久化（防抖）
    */
   function _scheduleErrorLogPersist() {
-    if (_logPersistTimer) return
+    if (_logPersistTimer) {return}
     _logPersistTimer = setTimeout(async () => {
       _logPersistTimer = null
       try {
@@ -468,7 +468,7 @@
   }
 
   function _persistStats() {
-    if (_statsTimer) return
+    if (_statsTimer) {return}
     _statsTimer = setTimeout(async () => {
       _statsTimer = null
       try {
@@ -540,7 +540,7 @@
   let _networkChangeListener = null
 
   function _initNetworkChangeListener() {
-    if (!navigator.connection) return
+    if (!navigator.connection) {return}
 
     _networkChangeListener = () => {
       const oldQuality = state._lastNetworkQuality
@@ -567,7 +567,7 @@
    * @returns {'fast'|'medium'|'slow'}
    */
   function detectNetworkQuality() {
-    if (!navigator.connection) return state._lastNetworkQuality || 'medium'
+    if (!navigator.connection) {return state._lastNetworkQuality || 'medium'}
 
     const effectiveType = navigator.connection.effectiveType
     const downlink = navigator.connection.downlink
@@ -594,19 +594,19 @@
    * @returns {'high'|'medium'|'low'}
    */
   function detectDeviceTier() {
-    if (_cachedDeviceTier) return _cachedDeviceTier
+    if (_cachedDeviceTier) {return _cachedDeviceTier}
 
     let tier = 'medium'
     // 优先使用 deviceMemory API
     if (navigator.deviceMemory) {
-      if (navigator.deviceMemory >= 8) tier = 'high'
-      else if (navigator.deviceMemory >= 4) tier = 'medium'
-      else tier = 'low'
+      if (navigator.deviceMemory >= 8) {tier = 'high'}
+      else if (navigator.deviceMemory >= 4) {tier = 'medium'}
+      else {tier = 'low'}
     } else if (navigator.hardwareConcurrency) {
       // 回退：根据硬件并发数判断
-      if (navigator.hardwareConcurrency >= 8) tier = 'high'
-      else if (navigator.hardwareConcurrency >= 4) tier = 'medium'
-      else tier = 'low'
+      if (navigator.hardwareConcurrency >= 8) {tier = 'high'}
+      else if (navigator.hardwareConcurrency >= 4) {tier = 'medium'}
+      else {tier = 'low'}
     }
 
     _cachedDeviceTier = tier
@@ -689,8 +689,8 @@
   }
 
   function isExcluded(url) {
-    if (!url || typeof url !== 'string') return true
-    if (/^chrome-extension:|^moz-extension:|^about:|^data:|^javascript:/i.test(url)) return true
+    if (!url || typeof url !== 'string') {return true}
+    if (/^chrome-extension:|^moz-extension:|^about:|^data:|^javascript:/i.test(url)) {return true}
     return (state.config.excludeUrls || []).some((pattern) => {
       try {
         return new RegExp(pattern.replace(/\*/g, '.*'), 'i').test(url)
@@ -701,7 +701,7 @@
   }
 
   function isCDNUrl(url) {
-    if (!window.CDNMappings?.CDN_SOURCES) return false
+    if (!window.CDNMappings?.CDN_SOURCES) {return false}
     return window.CDNMappings.CDN_SOURCES.some((cdn) => {
       try {
         return url.includes(new URL(cdn.baseUrl).hostname)
@@ -721,8 +721,8 @@
       const urlObj = new URL(url)
       const pageBase = getBaseDomain(location.hostname)
       const scriptBase = getBaseDomain(urlObj.hostname)
-      if (pageBase === scriptBase) return false
-      if (isCDNUrl(url)) return false
+      if (pageBase === scriptBase) {return false}
+      if (isCDNUrl(url)) {return false}
       return true
     } catch {
       return false
@@ -736,11 +736,11 @@
 
     // 精确匹配优先
     const exact = rules.find((r) => r.domain === hostname)
-    if (exact) return exact
+    if (exact) {return exact}
 
     // 通配符匹配 (*.domain.com)
     const wildcard = rules.find((r) => {
-      if (!r.domain.startsWith('*')) return false
+      if (!r.domain.startsWith('*')) {return false}
       const suffix = r.domain.slice(1)
       return hostname.endsWith(suffix)
     })
@@ -752,10 +752,10 @@
     const site = getSiteConfig(location.hostname)
 
     // 站点级别完全禁用
-    if (site && site.enabled === false) return false
+    if (site && site.enabled === false) {return false}
 
     // 站点级别功能开关
-    if (site && feature in site) return site[feature]
+    if (site && feature in site) {return site[feature]}
 
     // 回退到全局配置
     return state.config[feature]
@@ -809,8 +809,8 @@
 
       if (matches) {
         // 检查 type 是否匹配
-        if (rule.type === 'include' && !context.isInclude) continue
-        if (rule.type === 'exclude' && context.isInclude) continue
+        if (rule.type === 'include' && !context.isInclude) {continue}
+        if (rule.type === 'exclude' && context.isInclude) {continue}
 
         return { matched: true, action: rule.action, rule }
       }
@@ -867,7 +867,7 @@
   }
 
   function supportsWebP() {
-    if (state._supportsWebP !== undefined) return state._supportsWebP
+    if (state._supportsWebP !== undefined) {return state._supportsWebP}
     try {
       const canvas = document.createElement('canvas')
       canvas.width = 1
@@ -886,7 +886,7 @@
   ]
 
   function getSupportedImageFormat() {
-    if (state._imageFormat) return state._imageFormat
+    if (state._imageFormat) {return state._imageFormat}
     const canvas = document.createElement('canvas')
     canvas.width = 1
     canvas.height = 1
@@ -909,16 +909,16 @@
   }
 
   function getWeightPriority(weight) {
-    if (!weight || weight === 'unknown') return 99
+    if (!weight || weight === 'unknown') {return 99}
     const w = parseInt(weight)
-    if (w === 400 || weight === 'normal') return 0
-    if (w === 700 || weight === 'bold') return 1
+    if (w === 400 || weight === 'normal') {return 0}
+    if (w === 700 || weight === 'bold') {return 1}
     return 2
   }
 
   function parseFontWeight(url) {
     const queryMatch = url.match(/wght[@=](\d+)/i)
-    if (queryMatch) return queryMatch[1]
+    if (queryMatch) {return queryMatch[1]}
     const nameMatch = url.match(/-(Regular|Bold|Light|Medium|SemiBold|ExtraBold|Thin|Black)/i)
     if (nameMatch) {
       const map = {
@@ -940,7 +940,7 @@
 
   function matchDeferralRule(url) {
     const deferral = state.config.thirdPartyDeferral
-    if (!deferral?.enabled) return null
+    if (!deferral?.enabled) {return null}
 
     // 1. User-defined rules (regex match, highest priority)
     for (const rule of deferral.userRules || []) {
@@ -970,7 +970,7 @@
   }
 
   function deferScript(script, strategy) {
-    if (state.cspRestricted) return
+    if (state.cspRestricted) {return}
 
     const src = script.src
     script.removeAttribute('src')
@@ -979,7 +979,7 @@
     script.dataset._raDeferralTime = Date.now()
 
     const loadFn = () => {
-      if (script.dataset._raLoaded) return
+      if (script.dataset._raLoaded) {return}
       script.src = script.dataset._deferredSrc
       script.dataset._raLoaded = 'true'
       console.log(`${LOG_PREFIX} 第三方脚本延迟加载完成: ${src.substring(0, 60)}...`)
@@ -999,7 +999,7 @@
     const origOnload = script.onload
     script.onload = () => {
       clearTimeout(forceLoadTimer)
-      if (origOnload) origOnload.call(script)
+      if (origOnload) {origOnload.call(script)}
     }
 
     switch (strategy) {
@@ -1028,10 +1028,10 @@
   // ========== 核心拦截：脚本处理 ==========
 
   async function processScript(script) {
-    if (state.cspRestricted) return
-    if (!isSiteEnabled('jsReplace')) return
+    if (state.cspRestricted) {return}
+    if (!isSiteEnabled('jsReplace')) {return}
     const url = script.src
-    if (!url || script.dataset._raProcessed) return
+    if (!url || script.dataset._raProcessed) {return}
 
     script.dataset._raProcessed = '1'
 
@@ -1074,7 +1074,7 @@
             strategy: deferralRule.strategy,
             timestamp: Date.now(),
           })
-          if (state.recentReplacements.length > 50) state.recentReplacements.shift()
+          if (state.recentReplacements.length > 50) {state.recentReplacements.shift()}
           _persistStats()
           addLog('info', 'deferral', 'defer', {
             url,
@@ -1126,7 +1126,7 @@
       state.recentReplacements.shift()
     }
     _persistStats()
-    if (state.config.dedupEnabled) state.dedupSet.add(originalSrc)
+    if (state.config.dedupEnabled) {state.dedupSet.add(originalSrc)}
 
     addLog('info', 'script', 'replace', {
       url: originalSrc,
@@ -1149,10 +1149,10 @@
   // ========== 核心拦截：样式/字体处理 ==========
 
   function processLink(link) {
-    if (state.cspRestricted) return
-    if (!isSiteEnabled('fontReplace') && !isSiteEnabled('cssReplace')) return
+    if (state.cspRestricted) {return}
+    if (!isSiteEnabled('fontReplace') && !isSiteEnabled('cssReplace')) {return}
     const url = link.href
-    if (!url || link.dataset._raProcessed) return
+    if (!url || link.dataset._raProcessed) {return}
 
     link.dataset._raProcessed = '1'
 
@@ -1244,7 +1244,7 @@
       state.recentReplacements.shift()
     }
     _persistStats()
-    if (state.config.dedupEnabled) state.dedupSet.add(originalHref)
+    if (state.config.dedupEnabled) {state.dedupSet.add(originalHref)}
 
     addLog('info', fontMatch ? 'style' : 'style', 'replace', {
       url: originalHref,
@@ -1275,11 +1275,11 @@
       }
     }
 
-    if (!isSiteEnabled('imageLazyLoad')) return
+    if (!isSiteEnabled('imageLazyLoad')) {return}
     if (img.dataset._raProcessed || !img.src || img.dataset.src || img.src.startsWith('data:'))
-      return
-    if (img.loading === 'eager' || img.hasAttribute('data-no-lazy')) return
-    if (img.complete && img.naturalWidth > 0) return
+      {return}
+    if (img.loading === 'eager' || img.hasAttribute('data-no-lazy')) {return}
+    if (img.complete && img.naturalWidth > 0) {return}
 
     // 高级过滤检查
     const filterResult = matchAdvancedFilter(img.src)
@@ -1302,7 +1302,7 @@
         // 使用透明占位图保持布局
         img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
       }
-      if ('fetchPriority' in img) img.fetchPriority = 'low'
+      if ('fetchPriority' in img) {img.fetchPriority = 'low'}
       img.loading = 'lazy'
       img.dataset._raLazyLoad = '1'
       _observeLazyLoad(img)
@@ -1324,7 +1324,7 @@
     // 可视区图片：立即加载，不延迟
     if (viewportState.inViewport && viewportState.visible) {
       img.loading = 'eager'
-      if ('fetchPriority' in img) img.fetchPriority = viewportState.priority
+      if ('fetchPriority' in img) {img.fetchPriority = viewportState.priority}
 
       if (_priorityOptimizer) {
         _priorityOptimizer.applyPriorityToResource(img, img.src, 'image')
@@ -1355,7 +1355,7 @@
 
     // 非可视区或不可见图片：懒加载处理
     img.loading = 'lazy'
-    if ('fetchPriority' in img) img.fetchPriority = 'low'
+    if ('fetchPriority' in img) {img.fetchPriority = 'low'}
     img.dataset._raLazyLoad = '1'
 
     if (_priorityOptimizer) {
@@ -1394,17 +1394,17 @@
 
   // ========== 第三方iframe懒加载 ==========
   function processIframeLazyLoad() {
-    if (!isSiteEnabled('iframeLazyLoad')) return
+    if (!isSiteEnabled('iframeLazyLoad')) {return}
     const config = state.config.iframeLazyLoad
 
     const iframes = document.querySelectorAll('iframe[src]')
     iframes.forEach((iframe) => {
       try {
         const url = new URL(iframe.src, location.href)
-        if (url.hostname === location.hostname) return
-        if (config.excludePatterns?.some((p) => url.hostname.includes(p))) return
-        if (iframe.dataset._raIframeProcessed) return
-        if (_isResourceLoaded(iframe, 'iframe')) return
+        if (url.hostname === location.hostname) {return}
+        if (config.excludePatterns?.some((p) => url.hostname.includes(p))) {return}
+        if (iframe.dataset._raIframeProcessed) {return}
+        if (_isResourceLoaded(iframe, 'iframe')) {return}
 
         iframe.dataset._raIframeProcessed = '1'
 
@@ -1413,14 +1413,14 @@
 
         if (zone === 'inViewport') {
           // 视口内：正常加载
-          if ('fetchPriority' in iframe) iframe.fetchPriority = 'high'
+          if ('fetchPriority' in iframe) {iframe.fetchPriority = 'high'}
           return
         }
 
         // nearby 和 far 区域：延迟加载
         iframe.dataset.lazySrc = iframe.src
         iframe.loading = 'lazy'
-        if ('fetchPriority' in iframe) iframe.fetchPriority = zone === 'nearby' ? 'auto' : 'low'
+        if ('fetchPriority' in iframe) {iframe.fetchPriority = zone === 'nearby' ? 'auto' : 'low'}
 
         // far 区域：使用 data-src 模式，保留 src 占位
         if (zone === 'far') {
@@ -1444,7 +1444,7 @@
 
   // ========== 全站DNS prefetch ==========
   function _addGlobalDnsPrefetch() {
-    if (!isSiteEnabled('dnsPrefetch')) return
+    if (!isSiteEnabled('dnsPrefetch')) {return}
     const config = state.config.dnsPrefetch
     const maxDomains = config.maxDomains || 15
     const origins = new Set()
@@ -1452,7 +1452,7 @@
 
     document.querySelectorAll('script[src], link[href], img[src], iframe[src]').forEach((el) => {
       const url = el.src || el.href
-      if (!url) return
+      if (!url) {return}
       try {
         const origin = new URL(url, location.href).origin
         if (origin !== location.origin) {
@@ -1463,9 +1463,9 @@
 
     let count = 0
     origins.forEach((origin) => {
-      if (count >= maxDomains) return
-      if (head.querySelector(`link[rel="preconnect"][href="${origin}"]`)) return
-      if (head.querySelector(`link[rel="dns-prefetch"][href="${origin}"]`)) return
+      if (count >= maxDomains) {return}
+      if (head.querySelector(`link[rel="preconnect"][href="${origin}"]`)) {return}
+      if (head.querySelector(`link[rel="dns-prefetch"][href="${origin}"]`)) {return}
 
       const link = document.createElement('link')
       link.rel = 'dns-prefetch'
@@ -1482,17 +1482,17 @@
    * @param {HTMLImageElement} img - 图片元素
    */
   async function processSVG(img) {
-    if (state.cspRestricted) return
-    if (!isSiteEnabled('svgOptimize')) return
+    if (state.cspRestricted) {return}
+    if (!isSiteEnabled('svgOptimize')) {return}
 
     const url = img.src
-    if (!url || img.dataset._raSvgProcessed) return
+    if (!url || img.dataset._raSvgProcessed) {return}
 
     // 已经是 data URI，跳过
-    if (url.startsWith('data:')) return
+    if (url.startsWith('data:')) {return}
 
     // 判断是否为 SVG
-    if (!/\.svg(\?|#|$)/i.test(url) && !/\/svg\+xml/i.test(url)) return
+    if (!/\.svg(\?|#|$)/i.test(url) && !/\/svg\+xml/i.test(url)) {return}
 
     img.dataset._raSvgProcessed = '1'
 
@@ -1508,7 +1508,7 @@
     // 缓存命中
     if (state._svgCache.has(url)) {
       const cached = state._svgCache.get(url)
-      if (cached) img.src = cached
+      if (cached) {img.src = cached}
       return
     }
 
@@ -1527,7 +1527,7 @@
 
     try {
       const response = await fetch(url)
-      if (!response.ok) return
+      if (!response.ok) {return}
       const text = await response.text()
       const originalSize = new Blob([text]).size
 
@@ -1673,7 +1673,7 @@
       case 'image':
         return element.complete && element.naturalHeight > 0
       case 'iframe':
-        if (element.dataset.loaded === 'true') return true
+        if (element.dataset.loaded === 'true') {return true}
         // 跨域iframe访问contentDocument会抛出安全错误
         try {
           return element.contentDocument !== null
@@ -1694,8 +1694,8 @@
    * 设置延迟加载观察器
    */
   function _setupLazyLoadObserver() {
-    if (_lazyLoadObserver) return
-    if (typeof IntersectionObserver === 'undefined') return
+    if (_lazyLoadObserver) {return}
+    if (typeof IntersectionObserver === 'undefined') {return}
 
     const nearbyThreshold = state.config.positionAwareLoading?.nearbyThreshold || 1
     // 限制最大阈值为 2 屏（200%），避免预加载过多资源
@@ -1737,7 +1737,7 @@
    * @param {Element} element - DOM元素
    */
   function _observeLazyLoad(element) {
-    if (!_lazyLoadObserver) return
+    if (!_lazyLoadObserver) {return}
     _lazyLoadObserver.observe(element)
   }
 
@@ -1755,19 +1755,19 @@
    * 初始化位置感知加载
    */
   function _initPositionAwareLoading() {
-    if (!state.config.positionAwareLoading?.enabled) return
+    if (!state.config.positionAwareLoading?.enabled) {return}
     _setupLazyLoadObserver()
   }
 
   // 获取图片压缩优先级（基于位置）
   function _getCompressPriority(img) {
     // 已加载跳过
-    if (_isResourceLoaded(img, 'image')) return 999
+    if (_isResourceLoaded(img, 'image')) {return 999}
 
     const { zone, priority } = _getResourcePositionPriority(img)
 
     // far 区域不压缩
-    if (zone === 'far') return 999
+    if (zone === 'far') {return 999}
 
     // inViewport 和 nearby 使用位置优先级
     // 小图在同级别内微调 -1
@@ -1987,7 +1987,7 @@
       const img = new Image()
       img.crossOrigin = 'anonymous'
       img.onload = () => {
-        if (checkAborted()) return
+        if (checkAborted()) {return}
         // 使用实际大小（如果获取到）；否则用像素估算降级
         const bytes = actualSize || img.naturalWidth * img.naturalHeight * 4
         if (bytes < state.config.imageMinSize) {
@@ -2066,10 +2066,10 @@
   // ========== Preload 提示 ==========
 
   function addPreloadHint(cdnUrl, type, fontInfo) {
-    if (state.stats.preloadHints >= state.config.maxPreloadHints) return
+    if (state.stats.preloadHints >= state.config.maxPreloadHints) {return}
 
     if (type === 'font') {
-      if (state._fontPreloadedUrls.has(cdnUrl)) return
+      if (state._fontPreloadedUrls.has(cdnUrl)) {return}
 
       const weight = fontInfo?.weight || parseFontWeight(cdnUrl)
       state._fontCandidates.push({
@@ -2089,12 +2089,12 @@
   }
 
   function _insertPreloadLink(cdnUrl, type) {
-    if (!cdnUrl || typeof cdnUrl !== 'string' || !cdnUrl.startsWith('http')) return
+    if (!cdnUrl || typeof cdnUrl !== 'string' || !cdnUrl.startsWith('http')) {return}
     const head = document.head || document.documentElement
     if (head.querySelector(`link[rel="preload"]`)) {
       const links = head.querySelectorAll('link[rel="preload"]')
       for (const l of links) {
-        if (l.getAttribute('href') === cdnUrl) return
+        if (l.getAttribute('href') === cdnUrl) {return}
       }
     }
     const link = document.createElement('link')
@@ -2208,9 +2208,9 @@
   Element.prototype.appendChild = function (node) {
     const result = _appendChild.call(this, node)
     if (node.tagName) {
-      if (node.tagName === 'SCRIPT' && node.src) processScript(node)
-      else if (node.tagName === 'LINK' && node.rel === 'stylesheet') processLink(node)
-      else if (node.tagName === 'IMG') processImage(node)
+      if (node.tagName === 'SCRIPT' && node.src) {processScript(node)}
+      else if (node.tagName === 'LINK' && node.rel === 'stylesheet') {processLink(node)}
+      else if (node.tagName === 'IMG') {processImage(node)}
     }
     return result
   }
@@ -2219,9 +2219,9 @@
   Element.prototype.insertBefore = function (node, ref) {
     const result = _insertBefore.call(this, node, ref)
     if (node.tagName) {
-      if (node.tagName === 'SCRIPT' && node.src) processScript(node)
-      else if (node.tagName === 'LINK' && node.rel === 'stylesheet') processLink(node)
-      else if (node.tagName === 'IMG') processImage(node)
+      if (node.tagName === 'SCRIPT' && node.src) {processScript(node)}
+      else if (node.tagName === 'LINK' && node.rel === 'stylesheet') {processLink(node)}
+      else if (node.tagName === 'IMG') {processImage(node)}
     }
     return result
   }
@@ -2237,16 +2237,16 @@
   // 根据页面负载动态调整批量大小
   function _getBatchSize() {
     const pending = state._mutationBatch.length
-    if (pending > BATCH_THRESHOLDS.HIGH) return BATCH_SIZES.HIGH // 高负载：大批次
-    if (pending > BATCH_THRESHOLDS.MEDIUM) return BATCH_SIZES.MEDIUM // 中负载：中批次
+    if (pending > BATCH_THRESHOLDS.HIGH) {return BATCH_SIZES.HIGH} // 高负载：大批次
+    if (pending > BATCH_THRESHOLDS.MEDIUM) {return BATCH_SIZES.MEDIUM} // 中负载：中批次
     return BATCH_SIZES.LOW // 低负载：小批次
   }
 
   // 根据页面负载动态调整批量处理间隔
   function _getBatchInterval() {
     const pending = state._mutationBatch.length
-    if (pending > INTERVAL_THRESHOLDS.HIGH) return BATCH_INTERVALS.HIGH // 高负载：更快处理
-    if (pending > INTERVAL_THRESHOLDS.MEDIUM) return BATCH_INTERVALS.MEDIUM // 中负载：正常
+    if (pending > INTERVAL_THRESHOLDS.HIGH) {return BATCH_INTERVALS.HIGH} // 高负载：更快处理
+    if (pending > INTERVAL_THRESHOLDS.MEDIUM) {return BATCH_INTERVALS.MEDIUM} // 中负载：正常
     return BATCH_INTERVALS.LOW // 低负载：节省资源
   }
 
@@ -2260,7 +2260,7 @@
     // 批量处理：收集所有需要处理的节点
     for (const mutation of mutations) {
       for (const node of mutation.addedNodes) {
-        if (!node.tagName) continue
+        if (!node.tagName) {continue}
         state._mutationBatch.push(node)
       }
     }
@@ -2276,7 +2276,7 @@
   })
 
   function _processBatch() {
-    if (state._isProcessingBatch || state._mutationBatch.length === 0) return
+    if (state._isProcessingBatch || state._mutationBatch.length === 0) {return}
 
     state._isProcessingBatch = true
     // 使用动态批量大小
@@ -2284,11 +2284,11 @@
     const batch = state._mutationBatch.splice(0, batchSize)
 
     batch.forEach((node) => {
-      if (!node.tagName) return
-      if (node.tagName === 'SCRIPT' && node.src) processScript(node)
-      else if (node.tagName === 'LINK' && node.rel === 'stylesheet') processLink(node)
-      else if (node.tagName === 'IMG') processImage(node)
-      else if (node.tagName === 'IFRAME') processIframeLazyLoad()
+      if (!node.tagName) {return}
+      if (node.tagName === 'SCRIPT' && node.src) {processScript(node)}
+      else if (node.tagName === 'LINK' && node.rel === 'stylesheet') {processLink(node)}
+      else if (node.tagName === 'IMG') {processImage(node)}
+      else if (node.tagName === 'IFRAME') {processIframeLazyLoad()}
 
       if (node.querySelectorAll) {
         node.querySelectorAll('script[src]').forEach(processScript)
@@ -2310,11 +2310,11 @@
   function _processMutations(mutations) {
     for (const mutation of mutations) {
       for (const node of mutation.addedNodes) {
-        if (!node.tagName) continue
-        if (node.tagName === 'SCRIPT' && node.src) processScript(node)
-        else if (node.tagName === 'LINK' && node.rel === 'stylesheet') processLink(node)
-        else if (node.tagName === 'IMG') processImage(node)
-        else if (node.tagName === 'IFRAME') processIframeLazyLoad()
+        if (!node.tagName) {continue}
+        if (node.tagName === 'SCRIPT' && node.src) {processScript(node)}
+        else if (node.tagName === 'LINK' && node.rel === 'stylesheet') {processLink(node)}
+        else if (node.tagName === 'IMG') {processImage(node)}
+        else if (node.tagName === 'IFRAME') {processIframeLazyLoad()}
 
         if (node.querySelectorAll) {
           node.querySelectorAll('script[src]').forEach(processScript)
@@ -2339,7 +2339,7 @@
     },
 
     detect() {
-      if (!navigator.connection) return
+      if (!navigator.connection) {return}
 
       const effectiveType = navigator.connection.effectiveType
       const downlink = navigator.connection.downlink
@@ -2356,7 +2356,7 @@
     },
 
     listen() {
-      if (!navigator.connection) return
+      if (!navigator.connection) {return}
 
       this._handleNetworkChange = () => {
         const oldQuality = this.quality
@@ -2397,7 +2397,7 @@
     }
 
     init() {
-      if (!this.config.enabled || !this.sampled) return
+      if (!this.config.enabled || !this.sampled) {return}
 
       this.initCoreWebVitals()
       this.initResourceTiming()
@@ -2472,7 +2472,7 @@
     }
 
     initResourceTiming() {
-      if (!this.config.metrics.resourceTiming) return
+      if (!this.config.metrics.resourceTiming) {return}
 
       try {
         const resourceObserver = new PerformanceObserver((entryList) => {
@@ -2511,15 +2511,15 @@
     }
 
     getResourceType(url) {
-      if (url.endsWith('.js')) return 'script'
-      if (url.endsWith('.css')) return 'style'
-      if (url.match(/\.(png|jpg|jpeg|gif|webp|svg)$/)) return 'image'
-      if (url.match(/\.(woff|woff2|ttf|otf)$/)) return 'font'
+      if (url.endsWith('.js')) {return 'script'}
+      if (url.endsWith('.css')) {return 'style'}
+      if (url.match(/\.(png|jpg|jpeg|gif|webp|svg)$/)) {return 'image'}
+      if (url.match(/\.(woff|woff2|ttf|otf)$/)) {return 'font'}
       return 'other'
     }
 
     initMemoryMonitoring() {
-      if (!this.config.metrics.memoryUsage) return
+      if (!this.config.metrics.memoryUsage) {return}
 
       this._memoryTimer = setInterval(() => {
         if (performance.memory) {
@@ -2539,7 +2539,7 @@
     }
 
     async reportMetrics() {
-      if (Object.keys(this.metrics).length === 0) return
+      if (Object.keys(this.metrics).length === 0) {return}
 
       const report = {
         timestamp: Date.now(),
@@ -2623,8 +2623,8 @@
     destroy() {
       this.observers.forEach((observer) => observer.disconnect())
       this.observers = []
-      if (this._reportTimer) clearInterval(this._reportTimer)
-      if (this._memoryTimer) clearInterval(this._memoryTimer)
+      if (this._reportTimer) {clearInterval(this._reportTimer)}
+      if (this._memoryTimer) {clearInterval(this._memoryTimer)}
     }
   }
 
@@ -2639,7 +2639,7 @@
     }
 
     init() {
-      if (!this.config.enabled) return
+      if (!this.config.enabled) {return}
 
       this.detectNetworkQuality()
       this.detectPageType()
@@ -2651,13 +2651,13 @@
     }
 
     detectNetworkQuality() {
-      if (!this.config.networkAware.enabled) return
+      if (!this.config.networkAware.enabled) {return}
       // 使用共享函数，统一网络质量检测
       this.networkQuality = detectNetworkQuality()
     }
 
     detectPageType() {
-      if (!this.config.pageTypeAware.enabled) return
+      if (!this.config.pageTypeAware.enabled) {return}
 
       const url = location.href
       const hostname = location.hostname
@@ -2722,7 +2722,7 @@
     }
 
     listenNetworkChanges() {
-      if (!navigator.connection) return
+      if (!navigator.connection) {return}
 
       this._handleNetworkChange = () => {
         this.detectNetworkQuality()
@@ -2761,22 +2761,22 @@
 
     applyPriorityToResource(element, url, type) {
       // 已加载资源跳过
-      if (_isResourceLoaded(element, type)) return
+      if (_isResourceLoaded(element, type)) {return}
 
       // 图片和iframe使用位置优先级
       if (type === 'image' || type === 'iframe') {
         const { zone } = _getResourcePositionPriority(element)
 
         if (zone === 'inViewport') {
-          if ('fetchPriority' in element) element.fetchPriority = 'high'
-          if ('loading' in element) element.loading = 'eager'
+          if ('fetchPriority' in element) {element.fetchPriority = 'high'}
+          if ('loading' in element) {element.loading = 'eager'}
         } else if (zone === 'nearby') {
-          if ('fetchPriority' in element) element.fetchPriority = 'auto'
-          if ('loading' in element) element.loading = 'lazy'
+          if ('fetchPriority' in element) {element.fetchPriority = 'auto'}
+          if ('loading' in element) {element.loading = 'lazy'}
         } else {
           // far - 设置lazy，等待滚动触发
-          if ('fetchPriority' in element) element.fetchPriority = 'low'
-          if ('loading' in element) element.loading = 'lazy'
+          if ('fetchPriority' in element) {element.fetchPriority = 'low'}
+          if ('loading' in element) {element.loading = 'lazy'}
         }
         return
       }
@@ -2784,7 +2784,7 @@
       // 脚本：关键JS正常加载，非关键按位置
       if (type === 'script') {
         const isCritical = element.type === 'module' || element.closest('head')
-        if (isCritical) return // 关键JS不干预
+        if (isCritical) {return} // 关键JS不干预
 
         const { zone } = _getResourcePositionPriority(element)
         if (zone === 'far') {
@@ -2801,26 +2801,26 @@
     }
 
     applyToExistingElements() {
-      if (!this.config.scanExisting?.enabled) return
+      if (!this.config.scanExisting?.enabled) {return}
 
       const viewportHeight = window.innerHeight
       let count = 0
       const max = this.config.scanExisting.maxElements || 50
 
       document.querySelectorAll('script[src]').forEach((script) => {
-        if (count >= max) return
+        if (count >= max) {return}
         this.applyPriorityToResource(script, script.src, 'script')
         count++
       })
 
       document.querySelectorAll('link[rel="stylesheet"]').forEach((link) => {
-        if (count >= max) return
+        if (count >= max) {return}
         this.applyPriorityToResource(link, link.href, 'style')
         count++
       })
 
       document.querySelectorAll('img[src]').forEach((img) => {
-        if (count >= max) return
+        if (count >= max) {return}
         const rect = img.getBoundingClientRect()
         const isInViewport = rect.top < viewportHeight
         this.applyPriorityToResource(img, img.src, 'image')
@@ -2861,7 +2861,7 @@
     }
 
     async init() {
-      if (!this.config.enabled) return
+      if (!this.config.enabled) {return}
 
       this.initMemoryMonitoring()
       this.initCache()
@@ -2872,7 +2872,7 @@
     }
 
     initMemoryMonitoring() {
-      if (!this.config.monitoring.enabled) return
+      if (!this.config.monitoring.enabled) {return}
 
       this._checkTimer = setInterval(() => {
         this.checkMemoryPressure()
@@ -2880,7 +2880,7 @@
     }
 
     checkMemoryPressure() {
-      if (!performance.memory) return
+      if (!performance.memory) {return}
 
       const usedMB = performance.memory.usedJSHeapSize / 1024 / 1024
 
@@ -2897,7 +2897,7 @@
 
     applyPressureResponse(pressure) {
       const strategy = this.config.pressureResponse.strategies[pressure]
-      if (!strategy) return
+      if (!strategy) {return}
 
       if (strategy.disableImageCompress && typeof state !== 'undefined') {
         state.config.imageCompress = false
@@ -2945,7 +2945,7 @@
     }
 
     async prewarmCache() {
-      if (!this.config.caching.prewarm?.enabled) return
+      if (!this.config.caching.prewarm?.enabled) {return}
 
       const types = this.config.caching.prewarm.types || []
       const resources = document.querySelectorAll('link[rel="stylesheet"], script[src], style')
@@ -2982,7 +2982,7 @@
     }
 
     isCacheEntryValid(entry) {
-      if (!entry || !entry.timestamp) return false
+      if (!entry || !entry.timestamp) {return false}
       const now = Date.now()
       return now - entry.timestamp < this.config.caching.ttl
     }
@@ -3028,7 +3028,7 @@
       }
 
       for (const [key, value] of entries) {
-        if (evictedSize >= targetSize) break
+        if (evictedSize >= targetSize) {break}
         const size = this.estimateSize(value)
         this.cache.delete(key)
         evictedSize += size
@@ -3037,7 +3037,7 @@
     }
 
     async getFromCache(key) {
-      if (!this.config.caching.enabled) return null
+      if (!this.config.caching.enabled) {return null}
 
       const entry = this.cache.get(key)
       if (!entry) {
@@ -3058,7 +3058,7 @@
     }
 
     async setCache(key, value) {
-      if (!this.config.caching.enabled) return
+      if (!this.config.caching.enabled) {return}
 
       const currentSize = this.getCacheSize()
       const entrySize = this.estimateSize(value)
@@ -3078,7 +3078,7 @@
     }
 
     scheduleSaveCacheData() {
-      if (this._saveTimer) return
+      if (this._saveTimer) {return}
       this._saveTimer = setTimeout(() => {
         this._saveTimer = null
         this.saveCacheData()
@@ -3101,8 +3101,8 @@
     }
 
     destroy() {
-      if (this._checkTimer) clearInterval(this._checkTimer)
-      if (this._saveTimer) clearTimeout(this._saveTimer)
+      if (this._checkTimer) {clearInterval(this._checkTimer)}
+      if (this._saveTimer) {clearTimeout(this._saveTimer)}
       this.saveCacheData()
     }
   }
@@ -3110,7 +3110,7 @@
   let _perfMonitor = null
 
   function _initPerfMonitor() {
-    if (!state.config.perfMonitor?.enabled) return
+    if (!state.config.perfMonitor?.enabled) {return}
     _perfMonitor = new PerformanceMonitor(state.config.perfMonitor)
     _perfMonitor.init()
   }
@@ -3118,7 +3118,7 @@
   let _priorityOptimizer = null
 
   function _initPriorityOptimizer() {
-    if (!state.config.priorityOptimizer?.enabled) return
+    if (!state.config.priorityOptimizer?.enabled) {return}
     _priorityOptimizer = new PriorityOptimizer(state.config.priorityOptimizer)
     _priorityOptimizer.init()
   }
@@ -3126,7 +3126,7 @@
   let _memoryOptimizer = null
 
   function _initMemoryOptimizer() {
-    if (!state.config.memoryOptimizer?.enabled) return
+    if (!state.config.memoryOptimizer?.enabled) {return}
     _memoryOptimizer = new MemoryOptimizer(state.config.memoryOptimizer)
     _memoryOptimizer.init()
   }
@@ -3135,9 +3135,9 @@
   let _lqipStyleInjected = false
 
   function _injectLqipCSS() {
-    if (_lqipStyleInjected) return
+    if (_lqipStyleInjected) {return}
     const config = state.config.lqip
-    if (!config?.enabled) return
+    if (!config?.enabled) {return}
 
     const style = document.createElement('style')
     style.textContent = `
@@ -3161,9 +3161,9 @@
   let _contentVisibilityInjected = false
 
   function _injectContentVisibilityCSS() {
-    if (_contentVisibilityInjected) return
+    if (_contentVisibilityInjected) {return}
     const config = state.config.contentVisibility
-    if (!config?.enabled) return
+    if (!config?.enabled) {return}
 
     const includeSelector = config.selectors.join(', ')
     const excludeSelector = config.excludeSelectors.map((s) => `:not(${s})`).join('')
@@ -3181,7 +3181,7 @@
   }
 
   function _triggerLqipTransition(img) {
-    if (!img.dataset.lqip) return
+    if (!img.dataset.lqip) {return}
     if (img.complete) {
       img.dataset.lqipLoaded = '1'
     } else {
@@ -3203,10 +3203,87 @@
   }
 
   // ========== Worker 压缩管理 ==========
+  // Image Compressor Worker 代码（Blob URL 模式，兼容 Manifest V3，支持跨域和优先级）
+  const _imageCompressorWorkerCode = `
+self.onmessage = async function (e) {
+  const { id, src, quality, maxWidth, maxHeight, priority, isCors } = e.data
+
+  try {
+    let blob
+
+    // 跨域处理
+    if (isCors) {
+      const response = await fetch(src, { mode: 'cors', credentials: 'omit' })
+      if (!response.ok) {
+        throw new Error('cors_fetch_failed: ' + response.status)
+      }
+      blob = await response.blob()
+    } else {
+      const response = await fetch(src)
+      if (!response.ok) {
+        throw new Error('fetch failed: ' + response.status)
+      }
+      blob = await response.blob()
+    }
+
+    // 创建 ImageBitmap
+    const imageBitmap = await createImageBitmap(blob)
+
+    // 计算目标尺寸
+    let width = imageBitmap.width
+    let height = imageBitmap.height
+    if (maxWidth > 0 && (width > maxWidth || height > maxHeight)) {
+      const ratio = Math.min(maxWidth / width, maxHeight / height)
+      width = Math.floor(width * ratio)
+      height = Math.floor(height * ratio)
+    }
+
+    // 使用 OffscreenCanvas 压缩
+    const canvas = new OffscreenCanvas(width, height)
+    const ctx = canvas.getContext('2d')
+    ctx.drawImage(imageBitmap, 0, 0, width, height)
+
+    // 导出为 Blob (优先 webp，不支持时回退 jpeg)
+    let compressedBlob
+    try {
+      compressedBlob = await canvas.convertToBlob({
+        type: 'image/webp',
+        quality: quality,
+      })
+    } catch {
+      compressedBlob = await canvas.convertToBlob({
+        type: 'image/jpeg',
+        quality: quality,
+      })
+    }
+
+    // 返回结果
+    const reader = new FileReader()
+    reader.onload = () => {
+      self.postMessage({
+        id,
+        success: true,
+        dataUrl: reader.result,
+        originalSize: blob.size,
+        compressedSize: compressedBlob.size,
+        priority,
+      })
+    }
+    reader.onerror = () => {
+      self.postMessage({ id, success: false, error: 'FileReader error', priority })
+    }
+    reader.readAsDataURL(compressedBlob)
+  } catch (error) {
+    self.postMessage({ id, success: false, error: error.message, priority })
+  }
+}
+`
+
   let _compressorWorkers = []
   let _workerTaskId = 0
-  let _workerPendingTasks = new Map()
-  let _workerLoadIndex = 0 // 轮询索引
+  const _workerPendingTasks = new Map()
+  let _workerLoadIndex = 0
+  const _workerTaskQueue = [] // 优先级任务队列
 
   // 根据设备性能获取最优Worker数量
   function _getOptimalWorkerCount() {
@@ -3220,7 +3297,12 @@
   // 创建单个Worker（支持健康检查重建）
   function _createWorker(index) {
     try {
-      const worker = new Worker(chrome.runtime.getURL('content/workers/image-compressor.worker.js'))
+      // 使用 Blob URL 创建 Worker（Manifest V3 兼容）
+      const blob = new Blob([_imageCompressorWorkerCode], { type: 'application/javascript' })
+      const url = URL.createObjectURL(blob)
+      const worker = new Worker(url)
+      URL.revokeObjectURL(url) // 立即释放，Worker 已加载
+
       worker.onmessage = _handleWorkerMessage
       worker.onerror = (e) => {
         console.error(`${LOG_PREFIX} Worker#${index}错误:`, e.message)
@@ -3241,13 +3323,13 @@
   }
 
   function _initCompressorWorkers() {
-    if (!state.config.workerCompress?.enabled) return
-    if (typeof Worker === 'undefined') return
+    if (!state.config.workerCompress?.enabled) {return}
+    if (typeof Worker === 'undefined') {return}
 
     const maxWorkers = _getOptimalWorkerCount()
     for (let i = 0; i < maxWorkers; i++) {
       const worker = _createWorker(i)
-      if (worker) _compressorWorkers.push(worker)
+      if (worker) {_compressorWorkers.push(worker)}
     }
 
     if (_compressorWorkers.length > 0) {
@@ -3256,6 +3338,8 @@
       )
       // 预热：发送微型测试任务激活Worker
       _warmupWorkers()
+      // 启动动态伸缩监控
+      _startWorkerPoolMonitor()
     }
   }
 
@@ -3272,7 +3356,7 @@
   function _handleWorkerMessage(e) {
     const { id, success, dataUrl, error, originalSize, compressedSize } = e.data
     const task = _workerPendingTasks.get(id)
-    if (!task) return
+    if (!task) {return}
 
     _workerPendingTasks.delete(id)
 
@@ -3291,43 +3375,115 @@
 
   // 轮询分配Worker
   function _getAvailableWorker() {
-    if (_compressorWorkers.length === 0) return null
+    if (_compressorWorkers.length === 0) {return null}
     const worker = _compressorWorkers[_workerLoadIndex % _compressorWorkers.length]
     _workerLoadIndex++
     return worker
   }
 
-  async function _compressViaWorker(src, quality, maxWidth, maxHeight) {
+  // 检测跨域图片
+  function _isCorsUrl(url) {
+    if (!url || url.startsWith('data:')) {return false}
+    try {
+      const urlObj = new URL(url, location.href)
+      return urlObj.origin !== location.origin
+    } catch {
+      return true
+    }
+  }
+
+  // 优先级队列处理
+  function _processWorkerQueue() {
+    if (_workerTaskQueue.length === 0) {return}
+    const worker = _getAvailableWorker()
+    if (!worker) {return}
+
+    // 按优先级排序（高优先级先处理）
+    _workerTaskQueue.sort((a, b) => b.priority - a.priority)
+    const task = _workerTaskQueue.shift()
+    if (!task) {return}
+
+    const { id, src, quality, maxWidth, maxHeight, priority, isCors, resolve, reject } = task
+    const timeout = state.config.workerCompress?.timeout || 5000
+    const startTime = Date.now()
+
+    const timer = setTimeout(() => {
+      _workerPendingTasks.delete(id)
+      state.stats.workerCompressFallback = (state.stats.workerCompressFallback || 0) + 1
+      reject(new Error('Worker timeout'))
+    }, timeout)
+
+    _workerPendingTasks.set(id, {
+      startTime,
+      priority,
+      resolve: (result) => {
+        clearTimeout(timer)
+        resolve(result)
+        // 处理下一个队列任务
+        setTimeout(_processWorkerQueue, 0)
+      },
+      reject: (err) => {
+        clearTimeout(timer)
+        reject(err)
+        setTimeout(_processWorkerQueue, 0)
+      },
+    })
+
+    worker.postMessage({ id, src, quality, maxWidth, maxHeight, priority, isCors })
+  }
+
+  async function _compressViaWorker(src, quality, maxWidth, maxHeight, priority = 0) {
     return new Promise((resolve, reject) => {
       const worker = _getAvailableWorker()
+      const isCors = _isCorsUrl(src)
+
       if (!worker) {
         reject(new Error('No available worker'))
         return
       }
 
-      const id = ++_workerTaskId
-      const timeout = state.config.workerCompress?.timeout || 5000
-      const startTime = Date.now()
+      // 高优先级直接处理，低优先级进队列
+      if (priority >= 5 || _workerTaskQueue.length === 0) {
+        const id = ++_workerTaskId
+        const timeout = state.config.workerCompress?.timeout || 5000
+        const startTime = Date.now()
 
-      const timer = setTimeout(() => {
-        _workerPendingTasks.delete(id)
-        state.stats.workerCompressFallback = (state.stats.workerCompressFallback || 0) + 1
-        reject(new Error('Worker timeout'))
-      }, timeout)
+        const timer = setTimeout(() => {
+          _workerPendingTasks.delete(id)
+          state.stats.workerCompressFallback = (state.stats.workerCompressFallback || 0) + 1
+          reject(new Error('Worker timeout'))
+        }, timeout)
 
-      _workerPendingTasks.set(id, {
-        startTime,
-        resolve: (result) => {
-          clearTimeout(timer)
-          resolve(result)
-        },
-        reject: (err) => {
-          clearTimeout(timer)
-          reject(err)
-        },
-      })
+        _workerPendingTasks.set(id, {
+          startTime,
+          priority,
+          resolve: (result) => {
+            clearTimeout(timer)
+            resolve(result)
+          },
+          reject: (err) => {
+            clearTimeout(timer)
+            reject(err)
+          },
+        })
 
-      worker.postMessage({ id, src, quality, maxWidth, maxHeight })
+        worker.postMessage({ id, src, quality, maxWidth, maxHeight, priority, isCors })
+      } else {
+        // 加入队列
+        _workerTaskQueue.push({
+          id: ++_workerTaskId,
+          src,
+          quality,
+          maxWidth,
+          maxHeight,
+          priority,
+          isCors,
+          resolve,
+          reject,
+        })
+        // 触发队列处理
+        setTimeout(_processWorkerQueue, 0)
+      }
     })
   }
 
@@ -3335,6 +3491,130 @@
     _compressorWorkers.forEach((w) => w.terminate())
     _compressorWorkers = []
     _workerPendingTasks.clear()
+    // 停止动态伸缩监控
+    if (_workerPoolMonitor) {
+      clearInterval(_workerPoolMonitor)
+      _workerPoolMonitor = null
+    }
+  }
+
+  // ========== 主线程降级压缩 ==========
+  async function _compressOnMainThread(src, quality, maxWidth, maxHeight, actualSize = null) {
+    return new Promise((resolve) => {
+      if (state._isNavigating) {
+        resolve(null)
+        return
+      }
+
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      img.onload = () => {
+        if (state._isNavigating) {
+          resolve(null)
+          return
+        }
+
+        const bytes = actualSize || img.naturalWidth * img.naturalHeight * 4
+        if (bytes < state.config.imageMinSize) {
+          state._compressCache.set(src, { skip: true })
+          resolve(null)
+          return
+        }
+
+        try {
+          let { naturalWidth: w, naturalHeight: h } = img
+          if (maxWidth > 0 && (w > maxWidth || h > maxHeight)) {
+            const scale = maxWidth / Math.max(w, h)
+            w = Math.round(w * scale)
+            h = Math.round(h * scale)
+          }
+
+          const canvas = document.createElement('canvas')
+          canvas.width = w
+          canvas.height = h
+          const ctx = canvas.getContext('2d')
+          ctx.drawImage(img, 0, 0, w, h)
+
+          const format = getSupportedImageFormat()
+          canvas.toBlob(
+            (blob) => {
+              if (state._isNavigating) {
+                resolve(null)
+                return
+              }
+              if (blob && blob.size < bytes) {
+                state.stats.mainThreadCompress = (state.stats.mainThreadCompress || 0) + 1
+                const blobUrl = URL.createObjectURL(blob)
+                resolve({ dataUrl: blobUrl, originalSize: bytes, compressedSize: blob.size })
+              } else {
+                resolve(null)
+              }
+            },
+            format.mime,
+            quality
+          )
+        } catch {
+          resolve(null)
+        }
+      }
+      img.onerror = () => resolve(null)
+      img.src = src
+    })
+  }
+
+  // ========== Worker 池动态伸缩 ==========
+  let _workerPoolMonitor = null
+  const WORKER_POOL_CONFIG = {
+    minWorkers: 1,
+    maxWorkers: 4,
+    scaleUpThreshold: 3, // 连续积压任务数触发扩容
+    scaleDownThreshold: 5000, // 空闲时间(ms)触发缩容
+    monitorInterval: 2000, // 监控间隔
+  }
+
+  function _startWorkerPoolMonitor() {
+    if (_workerPoolMonitor) {return}
+
+    let consecutiveBacklog = 0
+    let lastActiveTime = Date.now()
+
+    _workerPoolMonitor = setInterval(() => {
+      const pendingCount = _workerPendingTasks.size
+      const workerCount = _compressorWorkers.length
+
+      // 更新活跃时间
+      if (pendingCount > 0) {
+        lastActiveTime = Date.now()
+      }
+
+      // 扩容逻辑：积压任务持续增加
+      if (pendingCount >= WORKER_POOL_CONFIG.scaleUpThreshold) {
+        consecutiveBacklog++
+        if (consecutiveBacklog >= 2 && workerCount < WORKER_POOL_CONFIG.maxWorkers) {
+          const newWorker = _createWorker(workerCount)
+          if (newWorker) {
+            _compressorWorkers.push(newWorker)
+            console.log(`${LOG_PREFIX} Worker池扩容至 ${_compressorWorkers.length} 个`)
+          }
+          consecutiveBacklog = 0
+        }
+      } else {
+        consecutiveBacklog = 0
+      }
+
+      // 缩容逻辑：长时间空闲
+      const idleTime = Date.now() - lastActiveTime
+      if (
+        idleTime > WORKER_POOL_CONFIG.scaleDownThreshold &&
+        workerCount > WORKER_POOL_CONFIG.minWorkers
+      ) {
+        const removed = _compressorWorkers.pop()
+        if (removed) {
+          removed.terminate()
+          console.log(`${LOG_PREFIX} Worker池缩容至 ${_compressorWorkers.length} 个`)
+        }
+      }
+    }, WORKER_POOL_CONFIG.monitorInterval)
   }
 
   // ========== 自适应压缩 ==========
@@ -3347,7 +3627,7 @@
     }
 
     init() {
-      if (!this.config.enabled) return
+      if (!this.config.enabled) {return}
 
       // 独立检测网络质量，不依赖 PriorityOptimizer
       this.detectNetworkQuality()
@@ -3357,13 +3637,13 @@
     }
 
     detectNetworkQuality() {
-      if (!this.config.networkAdaptive.enabled) return
+      if (!this.config.networkAdaptive.enabled) {return}
       // 使用共享函数，统一网络质量检测
       this.networkQuality = detectNetworkQuality()
     }
 
     listenNetworkChanges() {
-      if (!navigator.connection) return
+      if (!navigator.connection) {return}
 
       this._handleNetworkChange = () => {
         this.detectNetworkQuality()
@@ -3373,7 +3653,7 @@
     }
 
     detectImageType(url, element) {
-      if (!this.config.typeDetection.enabled) return 'photo'
+      if (!this.config.typeDetection.enabled) {return 'photo'}
 
       const cacheKey = url
       if (this.typeCache.has(cacheKey)) {
@@ -3411,7 +3691,7 @@
 
       let quality = baseParams.quality
       let maxWidth = baseParams.maxWidth
-      let deviceTier = detectDeviceTier() // 设备等级检测
+      const deviceTier = detectDeviceTier() // 设备等级检测
 
       // 网络感知调整
       if (this.config.networkAdaptive.enabled) {
@@ -3469,7 +3749,7 @@
   let _adaptiveCompressor = null
 
   function _initAdaptiveCompressor() {
-    if (!state.config.adaptiveCompress?.enabled) return
+    if (!state.config.adaptiveCompress?.enabled) {return}
     _adaptiveCompressor = new AdaptiveCompressor(state.config.adaptiveCompress)
     _adaptiveCompressor.init()
   }
@@ -3492,7 +3772,7 @@
     }
 
     init() {
-      if (!this.config.enabled) return
+      if (!this.config.enabled) {return}
 
       this.analyzePageStructure()
       this.preloadCriticalResources() // 新增
@@ -3504,7 +3784,7 @@
     }
 
     analyzePageStructure() {
-      if (!this.config.pageStructure.enabled) return
+      if (!this.config.pageStructure.enabled) {return}
 
       const url = location.href
       for (const [type, rules] of Object.entries(this.config.pageStructure.contentTypes)) {
@@ -3551,7 +3831,7 @@
     }
 
     preloadCriticalResources() {
-      if (!this.criticalResources || this.criticalResources.length === 0) return
+      if (!this.criticalResources || this.criticalResources.length === 0) {return}
       this.criticalResources
         .filter((r) => r.type === 'image' && r.priority === 0)
         .slice(0, this.config.priorityScheduling.maxPreloads || 6)
@@ -3559,7 +3839,7 @@
     }
 
     initScrollListener() {
-      if (!this.config.intentPrediction.enabled) return
+      if (!this.config.intentPrediction.enabled) {return}
 
       this._scrollTimer = null
       this._scrollHandler = () => {
@@ -3594,14 +3874,14 @@
     }
 
     initMouseListener() {
-      if (!this.config.intentPrediction.mouseMovement.enabled) return
+      if (!this.config.intentPrediction.mouseMovement.enabled) {return}
 
       this._mouseHandler = (e) => {
         const target = e.target.closest('a[href], img[src]')
-        if (!target) return
+        if (!target) {return}
 
         const url = target.href || target.src
-        if (!url) return
+        if (!url) {return}
 
         clearTimeout(this._mouseTimeout)
         this._mouseTimeout = setTimeout(() => {
@@ -3612,7 +3892,7 @@
     }
 
     initDwellTimeTracker() {
-      if (!this.config.intentPrediction.enabled) return
+      if (!this.config.intentPrediction.enabled) {return}
 
       this._dwellTimer = setInterval(() => {
         this.dwellTime = Date.now() - this.pageLoadTime
@@ -3661,7 +3941,7 @@
     }
 
     _executePreload(url, reason) {
-      if (this._preloadUrls.has(url)) return // 去重
+      if (this._preloadUrls.has(url)) {return} // 去重
       this._preloadUrls.add(url)
       this.activePreloads++
       const isCritical = reason === 'aboveFold' || reason === 'hover' || reason === 'scroll-predict'
@@ -3682,7 +3962,7 @@
 
       let _done = false
       const finish = () => {
-        if (_done) return
+        if (_done) {return}
         _done = true
         this.activePreloads--
         this.processQueue()
@@ -3710,7 +3990,7 @@
       let preloaded = 0
 
       for (const img of images) {
-        if (preloaded >= count) break
+        if (preloaded >= count) {break}
 
         const rect = img.getBoundingClientRect()
         if (rect.top > viewportHeight && rect.top < viewportHeight + 500) {
@@ -3725,12 +4005,12 @@
 
     preloadCurrentContentDetails() {
       const article = document.querySelector('article, .article, .post-content, .entry-content')
-      if (!article) return
+      if (!article) {return}
 
       let count = 0
       const images = article.querySelectorAll('img[data-src], img[src]')
       images.forEach((img) => {
-        if (count >= 10) return
+        if (count >= 10) {return}
         const url = img.dataset.src || img.src
         if (url && !url.startsWith('data:')) {
           this.schedulePreload(url, 'content-detail', 2)
@@ -3740,7 +4020,7 @@
 
       const links = article.querySelectorAll('a[href]')
       links.forEach((link) => {
-        if (count >= 10) return
+        if (count >= 10) {return}
         if (link.hostname === location.hostname) {
           this.schedulePreload(link.href, 'related-link', 3)
           count++
@@ -3764,7 +4044,7 @@
       relatedSections.forEach((section) => {
         const links = section.querySelectorAll('a[href]')
         links.forEach((link) => {
-          if (count >= 10) return
+          if (count >= 10) {return}
           if (link.hostname === location.hostname) {
             this.schedulePreload(link.href, 'related-content', 2)
             count++
@@ -3798,7 +4078,7 @@
   let _smartPreloadV2 = null
 
   function _initSmartPreloadV2() {
-    if (!state.config.smartPreloadV2?.enabled) return
+    if (!state.config.smartPreloadV2?.enabled) {return}
     _smartPreloadV2 = new SmartPreloadV2(state.config.smartPreloadV2)
     _smartPreloadV2.init()
   }
@@ -3855,7 +4135,7 @@
 
   // 获取 URL 对应的 CDN 信息
   function _getCDNInfo(url) {
-    if (!window.CDNMappings?.CDN_SOURCES) return null
+    if (!window.CDNMappings?.CDN_SOURCES) {return null}
 
     for (const cdn of window.CDNMappings.CDN_SOURCES) {
       try {
@@ -3871,7 +4151,7 @@
   }
 
   function init() {
-    if (state.initialized) return
+    if (state.initialized) {return}
     state.initialized = true
 
     // 0. LCP 指标收集（需要尽早启动观察）
@@ -3993,16 +4273,16 @@
       'click',
       (e) => {
         const img = e.target.closest('img[data-_raLazyLoad="1"]')
-        if (!img) return
+        if (!img) {return}
 
         const originalSrc = img.dataset.src
-        if (!originalSrc || img.dataset.lazyLoaded === 'true') return
+        if (!originalSrc || img.dataset.lazyLoaded === 'true') {return}
 
         // 立即加载原图
         img.src = originalSrc
         img.dataset.lazyLoaded = 'true'
         img.loading = 'eager'
-        if ('fetchPriority' in img) img.fetchPriority = 'high'
+        if ('fetchPriority' in img) {img.fetchPriority = 'high'}
 
         // 触发 LQIP 过渡
         _triggerLqipTransition(img)
@@ -4022,7 +4302,7 @@
 
       // 配置迁移：自动升级旧版本配置
       if (window.ConfigMigrator && userConfig.version !== DEFAULT_CONFIG.version) {
-        const migrationResult = await ConfigMigrator.migrate(userConfig)
+        const migrationResult = await window.ConfigMigrator.migrate(userConfig)
         if (migrationResult?.config) {
           userConfig = migrationResult.config
           console.log(
@@ -4069,19 +4349,19 @@
   }
 
   function _addCDNPreconnect() {
-    if (!window.CDNMappings?.CDN_SOURCES) return
+    if (!window.CDNMappings?.CDN_SOURCES) {return}
     const head = document.head || document.documentElement
     const priorityCDNs = ['bootcdn', 'staticfile', 'jsdelivr']
 
     window.CDNMappings.CDN_SOURCES.forEach((cdn) => {
-      if (cdn._disabled) return
+      if (cdn._disabled) {return}
       try {
         const origin = new URL(cdn.baseUrl).origin
-        if (document.querySelector(`link[rel="dns-prefetch"][href="${origin}"]`)) return
+        if (document.querySelector(`link[rel="dns-prefetch"][href="${origin}"]`)) {return}
         const link = _createElement('link')
         link.rel = priorityCDNs.includes(cdn.id) ? 'preconnect' : 'dns-prefetch'
         link.href = origin
-        if (link.rel === 'preconnect') link.crossOrigin = 'anonymous'
+        if (link.rel === 'preconnect') {link.crossOrigin = 'anonymous'}
         head.insertBefore(link, head.firstChild)
       } catch (error) {
         console.warn('[_addCDNPreconnect] 添加CDN预连接失败:', error)
@@ -4094,7 +4374,7 @@
   function _initMessageListener() {
     chrome.runtime?.onMessage?.addListener((message, sender, sendResponse) => {
       if (message.type === 'RESOURCE_ACCELERATOR_GET_STATS') {
-        sendResponse({ success: true, data: getStats() })
+        sendResponse({ success: true, data: state.stats })
         return true
       }
       if (message.type === 'RESOURCE_ACCELERATOR_GET_CDN_HEALTH') {
@@ -4152,7 +4432,7 @@
   function collectPerformanceMetrics() {
     try {
       const navEntries = performance.getEntriesByType('navigation')
-      if (!navEntries.length) return null
+      if (!navEntries.length) {return null}
       const nav = navEntries[0]
 
       const resEntries = performance.getEntriesByType('resource')
@@ -4235,7 +4515,7 @@
   const PERFORMANCE_BASELINE_KEY = 'resourceAcceleratorPerformanceBaseline'
 
   function savePerformanceBaseline() {
-    if (!state.performance) return null
+    if (!state.performance) {return null}
 
     const baseline = {
       ttfb: state.performance.ttfb,
@@ -4322,7 +4602,7 @@
 
   // 保存当日统计数据
   function saveDailyStats() {
-    if (!state.performance) return
+    if (!state.performance) {return}
 
     const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD
     const dailyData = {
