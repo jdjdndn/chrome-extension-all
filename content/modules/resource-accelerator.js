@@ -4269,6 +4269,7 @@
       _memoryOptimizer?.destroy?.();
       _adaptiveCompressor?.destroy();
       _smartPreloadV2?.destroy();
+      _destroyLazyLoadObserver();
       _terminateCompressorWorkers();
       // 清理网络变化监听
       if (_networkChangeListener && navigator.connection) {
