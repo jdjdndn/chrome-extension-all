@@ -4,7 +4,7 @@
  * 仅在开发模式下使用
  */
 
-(function() {
+;(function () {
   // 检查是否在扩展环境中
   if (typeof chrome === 'undefined' || !chrome.alarms) {
     return

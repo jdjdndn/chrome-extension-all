@@ -7,7 +7,11 @@
 if (typeof self !== 'undefined' && typeof self.importScripts === 'function') {
   self.importScripts('event-bus-v4.6.js')
   // 热重载支持（开发模式下通过Vite复制到dist）
-  try { self.importScripts('hot-reload-background.js'); } catch (e) { /* 生产环境忽略 */ }
+  try {
+    self.importScripts('hot-reload-background.js')
+  } catch (e) {
+    /* 生产环境忽略 */
+  }
 }
 
 // ========== Port 连接管理 ==========

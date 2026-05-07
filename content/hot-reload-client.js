@@ -4,7 +4,7 @@
  * 仅在开发模式下使用
  */
 
-(function() {
+;(function () {
   const HOT_RELOAD_URL = 'ws://localhost:8765'
   const RECONNECT_DELAY = 1000
   const MAX_RECONNECT_DELAY = 30000
@@ -54,10 +54,7 @@
     }
 
     // 指数退避重连
-    const delay = Math.min(
-      RECONNECT_DELAY * Math.pow(2, reconnectAttempts),
-      MAX_RECONNECT_DELAY
-    )
+    const delay = Math.min(RECONNECT_DELAY * Math.pow(2, reconnectAttempts), MAX_RECONNECT_DELAY)
     reconnectAttempts++
 
     reconnectTimeout = setTimeout(() => {

@@ -1,6 +1,14 @@
 import { defineConfig } from 'vite'
 import { resolve } from 'path'
-import { existsSync, copyFileSync, mkdirSync, readdirSync, unlinkSync, writeFileSync, readFileSync } from 'fs'
+import {
+  existsSync,
+  copyFileSync,
+  mkdirSync,
+  readdirSync,
+  unlinkSync,
+  writeFileSync,
+  readFileSync,
+} from 'fs'
 import { build as esbuildBuild } from 'esbuild'
 
 // ========== Content script bundles (from build-site-bundles.js) ==========
@@ -214,9 +222,9 @@ function chromeExtensionPlugin() {
 
           // 为content_scripts添加热重载客户端
           if (manifest.content_scripts) {
-            manifest.content_scripts = manifest.content_scripts.map(cs => ({
+            manifest.content_scripts = manifest.content_scripts.map((cs) => ({
               ...cs,
-              js: ['content/hot-reload-client.js', ...(cs.js || [])]
+              js: ['content/hot-reload-client.js', ...(cs.js || [])],
             }))
           }
 

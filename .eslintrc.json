@@ -6,7 +6,9 @@
   },
   "extends": ["eslint:recommended"],
   "globals": {
-    "chrome": "readonly"
+    "chrome": "readonly",
+    "EventBus": "readonly",
+    "clients": "readonly"
   },
   "parserOptions": {
     "ecmaVersion": 2020,

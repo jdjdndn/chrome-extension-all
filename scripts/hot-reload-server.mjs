@@ -48,7 +48,8 @@ const server = createServer((req, res) => {
     // 通知所有WebSocket客户端
     const message = JSON.stringify({ type: 'reload', timestamp: buildTimestamp })
     wsClients.forEach((client) => {
-      if (client.readyState === 1) { // WebSocket.OPEN
+      if (client.readyState === 1) {
+        // WebSocket.OPEN
         client.send(message)
       }
     })

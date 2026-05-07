@@ -3,3 +3,4 @@ coverage/
 *.bundle.js
 *.min.js
 content/bundled/
+vite.config.js
