@@ -4,7 +4,7 @@
   "description": "Chrome 扩展 - 减少资源使用",
   "private": true,
   "scripts": {
-    "dev": "vite build --watch",
+    "dev": "node scripts/dev.js",
     "watch": "vite build --watch",
     "build": "vite build",
     "sync": "node scripts/watch-and-sync.js --once",
