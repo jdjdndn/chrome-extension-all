@@ -390,7 +390,7 @@
     config: { ...DEFAULT_CONFIG },
     cspRestricted: false,
     initialized: false,
-    stats: { jsReplaced: 0, jsErrors: 0, fontsReplaced: 0, fontErrors: 0, cssReplaced: 0, cssErrors: 0, imagesLazy: 0, imagesCompressed: 0, imagesCompressBytesSaved: 0, svgOptimized: 0, svgInlined: 0, svgBytesSaved: 0, videosLazy: 0, preloadHints: 0, cdnLoadMs: 0, cdnLoadCount: 0, thirdPartyDeferred: 0, thirdPartyBlocked: 0 },
+    stats: { jsReplaced: 0, jsErrors: 0, fontsReplaced: 0, fontErrors: 0, cssReplaced: 0, cssErrors: 0, imagesLazy: 0, imagesCompressed: 0, imagesCompressBytesSaved: 0, svgOptimized: 0, svgInlined: 0, svgBytesSaved: 0, videosLazy: 0, preloadHints: 0, cdnLoadMs: 0, cdnLoadCount: 0, thirdPartyDeferred: 0, thirdPartyBlocked: 0, workerCompressSuccess: 0, workerCompressFallback: 0, workerCompressTotalMs: 0 },
     // 图片压缩
     compressQueue: [],
     compressingCount: 0,
@@ -485,24 +485,31 @@
     return quality;
   }
 
+  // 设备性能缓存
+  let _cachedDeviceTier = null;
+
   /**
    * 检测设备性能等级
    * @returns {'high'|'medium'|'low'}
    */
   function detectDeviceTier() {
+    if (_cachedDeviceTier) return _cachedDeviceTier;
+
+    let tier = 'medium';
     // 优先使用 deviceMemory API
     if (navigator.deviceMemory) {
-      if (navigator.deviceMemory >= 8) return 'high';
-      if (navigator.deviceMemory >= 4) return 'medium';
-      return 'low';
+      if (navigator.deviceMemory >= 8) tier = 'high';
+      else if (navigator.deviceMemory >= 4) tier = 'medium';
+      else tier = 'low';
+    } else if (navigator.hardwareConcurrency) {
+      // 回退：根据硬件并发数判断
+      if (navigator.hardwareConcurrency >= 8) tier = 'high';
+      else if (navigator.hardwareConcurrency >= 4) tier = 'medium';
+      else tier = 'low';
     }
-    // 回退：根据硬件并发数判断
-    if (navigator.hardwareConcurrency) {
-      if (navigator.hardwareConcurrency >= 8) return 'high';
-      if (navigator.hardwareConcurrency >= 4) return 'medium';
-      return 'low';
-    }
-    return 'medium'; // 默认中端
+
+    _cachedDeviceTier = tier;
+    return tier;
   }
 
   /**
@@ -1641,10 +1648,20 @@
           state._compressCache.set(url, { skip: true });
           return null;
         }
-        addLog('debug', 'image', 'worker_fallback', { url, error: e.message });
+        // 识别跨域错误
+        const isCorsError = e.message?.includes('fetch') ||
+                           e.message?.includes('CORS') ||
+                           e.message?.includes('Failed to fetch');
+        addLog('debug', 'image', 'worker_fallback', {
+          url,
+          error: e.message,
+          isCorsError,
+          reason: isCorsError ? 'cors_fallback' : 'worker_error'
+        });
       }
     }
 
+    // 主线程压缩（回退或首选）
     return new Promise(resolve => {
       // 跳转检查函数
       const checkAborted = () => {
@@ -2816,12 +2833,22 @@
   let _compressorWorkers = [];
   let _workerTaskId = 0;
   let _workerPendingTasks = new Map();
+  let _workerLoadIndex = 0;  // 轮询索引
+
+  // 根据设备性能获取最优Worker数量
+  function _getOptimalWorkerCount() {
+    const tier = detectDeviceTier();
+    const configMax = state.config.workerCompress?.maxWorkers || 2;
+    // 高端设备4个，中端2个，低端1个
+    const optimal = tier === 'high' ? 4 : tier === 'medium' ? 2 : 1;
+    return Math.min(optimal, configMax);
+  }
 
   function _initCompressorWorkers() {
     if (!state.config.workerCompress?.enabled) return;
     if (typeof Worker === 'undefined') return;
 
-    const maxWorkers = state.config.workerCompress.maxWorkers || 2;
+    const maxWorkers = _getOptimalWorkerCount();
     for (let i = 0; i < maxWorkers; i++) {
       try {
         const worker = new Worker(chrome.runtime.getURL('content/workers/image-compressor.worker.js'));
@@ -2836,7 +2863,7 @@
     }
 
     if (_compressorWorkers.length > 0) {
-      console.log(`${LOG_PREFIX} 已初始化 ${_compressorWorkers.length} 个压缩Worker`);
+      console.log(`${LOG_PREFIX} 已初始化 ${_compressorWorkers.length} 个压缩Worker (设备等级: ${detectDeviceTier()})`);
     }
   }
 
@@ -2847,15 +2874,25 @@
 
     _workerPendingTasks.delete(id);
 
+    // 记录耗时
+    const duration = Date.now() - task.startTime;
+    state.stats.workerCompressTotalMs = (state.stats.workerCompressTotalMs || 0) + duration;
+
     if (success) {
-      task.resolve({ dataUrl, originalSize, compressedSize });
+      state.stats.workerCompressSuccess = (state.stats.workerCompressSuccess || 0) + 1;
+      task.resolve({ dataUrl, originalSize, compressedSize, duration });
     } else {
+      state.stats.workerCompressFallback = (state.stats.workerCompressFallback || 0) + 1;
       task.reject(new Error(error));
     }
   }
 
+  // 轮询分配Worker
   function _getAvailableWorker() {
-    return _compressorWorkers[0] || null;
+    if (_compressorWorkers.length === 0) return null;
+    const worker = _compressorWorkers[_workerLoadIndex % _compressorWorkers.length];
+    _workerLoadIndex++;
+    return worker;
   }
 
   async function _compressViaWorker(src, quality, maxWidth, maxHeight) {
@@ -2868,13 +2905,25 @@
 
       const id = ++_workerTaskId;
       const timeout = state.config.workerCompress?.timeout || 5000;
+      const startTime = Date.now();
 
       const timer = setTimeout(() => {
         _workerPendingTasks.delete(id);
+        state.stats.workerCompressFallback = (state.stats.workerCompressFallback || 0) + 1;
         reject(new Error('Worker timeout'));
       }, timeout);
 
       _workerPendingTasks.set(id, {
+        startTime,
+        resolve: (result) => {
+          clearTimeout(timer);
+          resolve(result);
+        },
+        reject: (err) => {
+          clearTimeout(timer);
+          reject(err);
+        },
+      });
         resolve: (result) => {
           clearTimeout(timer);
           resolve(result);
