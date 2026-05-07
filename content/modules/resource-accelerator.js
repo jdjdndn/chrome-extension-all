@@ -1220,6 +1220,28 @@
 
     img.dataset._raProcessed = '1';
 
+    // 位置感知加载：检测图片位置
+    const positionState = _getResourcePositionPriority(img);
+
+    // far 区域加入延迟加载观察，不立即处理
+    if (positionState.zone === 'far') {
+      if (img.src && !img.dataset.lazySrc) {
+        img.dataset.lazySrc = img.src;
+        // 使用透明占位图保持布局
+        img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+      }
+      if ('fetchPriority' in img) img.fetchPriority = 'low';
+      img.loading = 'lazy';
+      img.dataset._raLazyLoad = '1';
+      _observeLazyLoad(img);
+      addLog('info', 'image', 'far_delayed', {
+        url: img.dataset.lazySrc,
+        distance: Math.round(positionState.distance),
+        zone: positionState.zone
+      });
+      return;
+    }
+
     // 增强的可视区检测
     const viewportState = detectViewportState(img, {
       topThreshold: 0.5,
