@@ -241,7 +241,7 @@ function _setupLazyLoadObserver() {
   if (typeof IntersectionObserver === 'undefined') return;
 
   const nearbyThreshold = state.config.positionAwareLoading?.nearbyThreshold || 1;
-  const rootMargin = `${nearbyThreshold * 100}% 0px`;
+  const rootMargin = `${nearbyThreshold * 100}% 0px ${nearbyThreshold * 100}% 0px`;
 
   _lazyLoadObserver = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
@@ -264,7 +264,7 @@ function _setupLazyLoadObserver() {
       }
     });
   }, {
-    rootMargin: rootMargin // 视口上下各N屏
+    rootMargin: rootMargin // 上 右 下 左，视口上下各N屏
   });
 }
 
