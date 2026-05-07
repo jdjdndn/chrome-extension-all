@@ -1324,7 +1324,6 @@
   function processIframeLazyLoad() {
     if (!isSiteEnabled('iframeLazyLoad')) return;
     const config = state.config.iframeLazyLoad;
-    const threshold = config.threshold || 200;
 
     const iframes = document.querySelectorAll('iframe[src]');
     iframes.forEach(iframe => {
@@ -1333,25 +1332,32 @@
         if (url.hostname === location.hostname) return;
         if (config.excludePatterns?.some(p => url.hostname.includes(p))) return;
         if (iframe.dataset._raIframeProcessed) return;
+        if (_isResourceLoaded(iframe, 'iframe')) return;
 
         iframe.dataset._raIframeProcessed = '1';
-        iframe.dataset.src = iframe.src;
+
+        // 使用位置优先级判断
+        const { zone } = _getResourcePositionPriority(iframe);
+
+        if (zone === 'inViewport') {
+          // 视口内：正常加载
+          if ('fetchPriority' in iframe) iframe.fetchPriority = 'high';
+          return;
+        }
+
+        // nearby 和 far 区域：延迟加载
+        iframe.dataset.lazySrc = iframe.src;
         iframe.removeAttribute('src');
         iframe.loading = 'lazy';
+        if ('fetchPriority' in iframe) iframe.fetchPriority = zone === 'nearby' ? 'auto' : 'low';
 
-        const observer = new IntersectionObserver((entries) => {
-          entries.forEach(entry => {
-            if (entry.isIntersecting) {
-              const el = entry.target;
-              if (el.dataset.src) {
-                el.src = el.dataset.src;
-                delete el.dataset.src;
-              }
-              observer.unobserve(el);
-            }
-          });
-        }, { rootMargin: `0px 0px ${threshold}px 0px` });
-        observer.observe(iframe);
+        // 使用统一的延迟加载观察器
+        _observeLazyLoad(iframe);
+
+        addLog('info', 'iframe', 'lazy', {
+          url: iframe.dataset.lazySrc,
+          zone: zone
+        });
       } catch {
         // URL 解析失败，跳过
       }
