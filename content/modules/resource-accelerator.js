@@ -1568,22 +1568,22 @@
     }
   }
 
-  // 获取图片压缩优先级：可视区域 > 小图 > 大图
+  // 获取图片压缩优先级（基于位置）
   function _getCompressPriority(img) {
-    try {
-      const rect = img.getBoundingClientRect();
-      // 可视区域最高优先级
-      if (rect.top < window.innerHeight && rect.bottom > 0) {
-        return COMPRESS_PRIORITY.IN_VIEW;
-      }
-    } catch (error) {
-      console.warn('[_getCompressPriority] 获取图片边界失败:', error);
-    }
+    // 已加载跳过
+    if (_isResourceLoaded(img, 'image')) return 999;
 
-    // 根据图片大小判断优先级
+    const { zone, priority } = _getResourcePositionPriority(img);
+
+    // far 区域不压缩
+    if (zone === 'far') return 999;
+
+    // inViewport 和 nearby 使用位置优先级
+    // 小图在同级别内微调 -1
     const size = (img.naturalWidth || 0) * (img.naturalHeight || 0);
-    if (size < SMALL_IMAGE_PIXEL_THRESHOLD) return COMPRESS_PRIORITY.SMALL;  // 小图次之
-    return COMPRESS_PRIORITY.LARGE;  // 大图最低
+    const sizeBonus = size < 100000 ? -1 : 0;
+
+    return Math.max(0, priority + sizeBonus);
   }
 
   function enqueueCompress(img, src) {
