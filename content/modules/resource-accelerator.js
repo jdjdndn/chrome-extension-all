@@ -1502,6 +1502,47 @@
   const COMPRESS_PRIORITY = { IN_VIEW: 0, SMALL: 1, LARGE: 2 };
   const SMALL_IMAGE_PIXEL_THRESHOLD = 100000;
 
+  /**
+   * 获取资源位置优先级
+   * @param {Element} element - DOM元素
+   * @returns {{ zone: 'inViewport'|'nearby'|'far', priority: number, distance: number }}
+   */
+  function _getResourcePositionPriority(element) {
+    if (!element || !element.isConnected) {
+      return { zone: 'far', priority: 999, distance: Infinity };
+    }
+
+    const rect = element.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+
+    // 计算元素距离视口的距离
+    const distanceToViewport = rect.top < 0
+      ? -rect.top  // 视口上方，取绝对值
+      : rect.top > viewportHeight
+        ? rect.top - viewportHeight  // 视口下方
+        : 0;  // 在视口内
+
+    // 获取配置的距离阈值（屏数）
+    const nearbyThreshold = (state.config.positionAwareLoading?.nearbyThreshold || 1) * viewportHeight;
+
+    // 判断区域
+    if (distanceToViewport === 0) {
+      return { zone: 'inViewport', priority: 0, distance: 0 };
+    }
+
+    if (distanceToViewport <= nearbyThreshold) {
+      // nearby 区域：优先级 10-19，距离越近优先级越高
+      return {
+        zone: 'nearby',
+        priority: 10 + Math.floor(distanceToViewport / viewportHeight * 10),
+        distance: distanceToViewport
+      };
+    }
+
+    // far 区域
+    return { zone: 'far', priority: 100, distance: distanceToViewport };
+  }
+
   // 获取图片压缩优先级：可视区域 > 小图 > 大图
   function _getCompressPriority(img) {
     try {
