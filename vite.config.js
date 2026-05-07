@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite'
 import { resolve } from 'path'
-import { existsSync, copyFileSync, mkdirSync, readdirSync, unlinkSync, writeFileSync } from 'fs'
+import { existsSync, copyFileSync, mkdirSync, readdirSync, unlinkSync, writeFileSync, readFileSync } from 'fs'
 import { build as esbuildBuild } from 'esbuild'
 
 // ========== Content script bundles (from build-site-bundles.js) ==========
@@ -92,6 +92,17 @@ const FILE_MAPPINGS = [
 
 const STATIC_DIRS = ['icons', 'devtools', 'shared', 'src']
 const SKIP_CONTENT_DIRS = ['entries', 'utils']
+
+// ========== Hot Reload Notification ==========
+async function notifyHotReloadServer() {
+  const HOT_RELOAD_URL = process.env.HOT_RELOAD_URL || 'http://localhost:8765'
+  try {
+    await fetch(`${HOT_RELOAD_URL}/reload`, { method: 'POST' })
+    console.log('[HotReload] 已通知热重载服务器')
+  } catch (err) {
+    // 服务器可能未启动，静默失败
+  }
+}
 
 // ========== Helpers ==========
 function copyDir(src, dest, skipDirs = []) {
@@ -193,12 +204,56 @@ function chromeExtensionPlugin() {
       const dist = resolve('dist')
       copyAllToDist(dist)
       await buildContentScripts(dist)
+
+      // 开发模式：处理manifest.json添加热重载支持
+      if (process.env.NODE_ENV !== 'production') {
+        const manifestPath = resolve(dist, 'manifest.json')
+        if (existsSync(manifestPath)) {
+          const manifestContent = readFileSync(manifestPath, 'utf-8')
+          const manifest = JSON.parse(manifestContent)
+
+          // 为content_scripts添加热重载客户端
+          if (manifest.content_scripts) {
+            manifest.content_scripts = manifest.content_scripts.map(cs => ({
+              ...cs,
+              js: ['content/hot-reload-client.js', ...(cs.js || [])]
+            }))
+          }
+
+          // 复制热重载后台脚本到dist
+          const hotReloadBg = resolve('hot-reload-background.js')
+          if (existsSync(hotReloadBg)) {
+            copyFileSync(hotReloadBg, resolve(dist, 'hot-reload-background.js'))
+          }
+
+          // 复制热重载客户端到dist
+          const hotReloadClient = resolve('content/hot-reload-client.js')
+          const distClientDir = resolve(dist, 'content')
+          if (!existsSync(distClientDir)) {
+            mkdirSync(distClientDir, { recursive: true })
+          }
+          if (existsSync(hotReloadClient)) {
+            copyFileSync(hotReloadClient, resolve(distClientDir, 'hot-reload-client.js'))
+          }
+
+          // 写回manifest
+          writeFileSync(manifestPath, JSON.stringify(manifest, null, 2))
+          console.log('[HotReload] manifest.json已更新，添加热重载支持')
+        }
+      }
     },
 
     writeBundle() {
       // Remove the dummy output file
       const dummy = resolve('dist/dummy.js')
       if (existsSync(dummy)) unlinkSync(dummy)
+    },
+
+    async closeBundle() {
+      // 构建完成后通知热重载服务器（开发模式）
+      if (process.env.NODE_ENV !== 'production') {
+        await notifyHotReloadServer()
+      }
     },
   }
 }
