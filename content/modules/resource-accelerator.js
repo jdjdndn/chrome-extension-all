@@ -402,6 +402,8 @@
     _isProcessingBatch: false,
     // 压缩结果缓存（同一页面会话内避免重复压缩）
     _compressCache: new Map(),
+    _compressCacheSize: 0,  // 缓存大小追踪（字节）
+    _compressCacheMaxSize: 50 * 1024 * 1024,  // 最大50MB
     // SVG 优化缓存
     _svgCache: new Map(),
     // 去重集合
@@ -457,6 +459,49 @@
         console.warn('[persistStats] 持久化统计失败:', error);
       }
     }, 2000);
+  }
+
+  // ========== 压缩缓存内存管理 ==========
+  function _addToCompressCache(url, result) {
+    const size = result ? result.length * 2 : 0; // dataUrl大小估算（UTF-16编码）
+
+    // 检查是否需要清理
+    while (state._compressCacheSize + size > state._compressCacheMaxSize && state._compressCache.size > 0) {
+      // 删除最旧的缓存项（Map保持插入顺序）
+      const oldest = state._compressCache.keys().next().value;
+      const oldEntry = state._compressCache.get(oldest);
+      const oldSize = oldEntry?.result?.length * 2 || 0;
+      state._compressCache.delete(oldest);
+      state._compressCacheSize -= oldSize;
+      state.stats.cacheEvictions = (state.stats.cacheEvictions || 0) + 1;
+    }
+
+    state._compressCache.set(url, result ? { skip: false, result } : { skip: true });
+    state._compressCacheSize += size;
+  }
+
+  // ========== 网络变化动态调整 ==========
+  let _networkChangeListener = null;
+
+  function _initNetworkChangeListener() {
+    if (!navigator.connection) return;
+
+    _networkChangeListener = () => {
+      const oldQuality = state._lastNetworkQuality;
+      const newQuality = detectNetworkQuality();
+
+      if (oldQuality !== newQuality) {
+        console.log(`${LOG_PREFIX} 网络质量变化: ${oldQuality} -> ${newQuality}`);
+        state._lastNetworkQuality = newQuality;
+
+        // 通知AdaptiveCompressor更新
+        if (_adaptiveCompressor) {
+          _adaptiveCompressor.networkQuality = newQuality;
+        }
+      }
+    };
+
+    navigator.connection.addEventListener('change', _networkChangeListener);
   }
 
   // ========== 工具方法（同步）==========
@@ -1632,7 +1677,7 @@
             state.stats.imagesCompressed++;
             state.stats.imagesCompressBytesSaved += (originalSize - result.compressedSize);
             _persistStats();
-            state._compressCache.set(url, { skip: false, result: result.dataUrl });
+            _addToCompressCache(url, result.dataUrl);
             addLog('info', 'image', 'worker_compress', {
               url,
               originalSize,
@@ -1721,7 +1766,7 @@
               state.stats.imagesCompressBytesSaved += (bytes - blob.size);
               _persistStats();
               const blobUrl = URL.createObjectURL(blob);
-              state._compressCache.set(url, { skip: false, result: blobUrl });
+              _addToCompressCache(url, blobUrl);
               resolve(blobUrl);
             } else {
               state._compressCache.set(url, { skip: true });
@@ -2844,27 +2889,53 @@
     return Math.min(optimal, configMax);
   }
 
+  // 创建单个Worker（支持健康检查重建）
+  function _createWorker(index) {
+    try {
+      const worker = new Worker(chrome.runtime.getURL('content/workers/image-compressor.worker.js'));
+      worker.onmessage = _handleWorkerMessage;
+      worker.onerror = (e) => {
+        console.error(`${LOG_PREFIX} Worker#${index}错误:`, e.message);
+        // 健康检查：自动重建崩溃的Worker
+        state.stats.workerCrashCount = (state.stats.workerCrashCount || 0) + 1;
+        setTimeout(() => {
+          if (_compressorWorkers[index] === worker) {
+            _compressorWorkers[index] = _createWorker(index);
+            console.log(`${LOG_PREFIX} Worker#${index}已重建`);
+          }
+        }, 100);
+      };
+      return worker;
+    } catch (e) {
+      console.warn(`${LOG_PREFIX} Worker创建失败:`, e);
+      return null;
+    }
+  }
+
   function _initCompressorWorkers() {
     if (!state.config.workerCompress?.enabled) return;
     if (typeof Worker === 'undefined') return;
 
     const maxWorkers = _getOptimalWorkerCount();
     for (let i = 0; i < maxWorkers; i++) {
-      try {
-        const worker = new Worker(chrome.runtime.getURL('content/workers/image-compressor.worker.js'));
-        worker.onmessage = _handleWorkerMessage;
-        worker.onerror = (e) => {
-          console.error(`${LOG_PREFIX} Worker错误:`, e.message);
-        };
-        _compressorWorkers.push(worker);
-      } catch (e) {
-        console.warn(`${LOG_PREFIX} Worker初始化失败:`, e);
-      }
+      const worker = _createWorker(i);
+      if (worker) _compressorWorkers.push(worker);
     }
 
     if (_compressorWorkers.length > 0) {
       console.log(`${LOG_PREFIX} 已初始化 ${_compressorWorkers.length} 个压缩Worker (设备等级: ${detectDeviceTier()})`);
+      // 预热：发送微型测试任务激活Worker
+      _warmupWorkers();
     }
+  }
+
+  // Worker预热
+  function _warmupWorkers() {
+    const testPng = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+    _compressorWorkers.forEach((worker, i) => {
+      const id = `warmup-${i}`;
+      worker.postMessage({ id, src: testPng, quality: 0.1, maxWidth: 1, maxHeight: 1 });
+    });
   }
 
   function _handleWorkerMessage(e) {
@@ -2915,15 +2986,6 @@
 
       _workerPendingTasks.set(id, {
         startTime,
-        resolve: (result) => {
-          clearTimeout(timer);
-          resolve(result);
-        },
-        reject: (err) => {
-          clearTimeout(timer);
-          reject(err);
-        },
-      });
         resolve: (result) => {
           clearTimeout(timer);
           resolve(result);
@@ -3505,6 +3567,9 @@
     // 初始化压缩Worker
     _initCompressorWorkers();
 
+    // 初始化网络变化监听
+    _initNetworkChangeListener();
+
     // 4. CDN健康探测（异步，不阻塞）- 优先探测页面使用的 CDN
     if (window.CDNMappings?.probeAllCDNs) {
       const pageCDNs = _getCDNPriorities();
@@ -4006,7 +4071,12 @@
       _adaptiveCompressor?.destroy();
       _smartPreloadV2?.destroy();
       _terminateCompressorWorkers();
+      // 清理网络变化监听
+      if (_networkChangeListener && navigator.connection) {
+        navigator.connection.removeEventListener('change', _networkChangeListener);
+      }
       state.compressQueue = [];
+      state._compressCacheSize = 0;
       state.recentReplacements = [];
       state.dedupSet.clear();
       state._compressCache.clear();
