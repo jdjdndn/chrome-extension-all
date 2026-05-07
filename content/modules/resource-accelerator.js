@@ -1347,9 +1347,15 @@
 
         // nearby 和 far 区域：延迟加载
         iframe.dataset.lazySrc = iframe.src;
-        iframe.removeAttribute('src');
         iframe.loading = 'lazy';
         if ('fetchPriority' in iframe) iframe.fetchPriority = zone === 'nearby' ? 'auto' : 'low';
+
+        // far 区域：使用 data-src 模式，保留 src 占位
+        if (zone === 'far') {
+          // 设置透明占位，保留 iframe 结构
+          iframe.src = 'about:blank';
+        }
+        // nearby 区域：保留原 src，依赖浏览器原生 lazy loading
 
         // 使用统一的延迟加载观察器
         _observeLazyLoad(iframe);
