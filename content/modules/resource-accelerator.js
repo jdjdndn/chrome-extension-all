@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 资源加速器主模块 (v8)
  * 核心优化：
  * 1. 同步启动 - 不等待配置加载
@@ -1530,6 +1530,10 @@
   const COMPRESS_PRIORITY = { IN_VIEW: 0, SMALL: 1, LARGE: 2 };
   const SMALL_IMAGE_PIXEL_THRESHOLD = 100000;
 
+  // 位置优先级缓存（避免滚动时频繁调用 getBoundingClientRect）
+  const _positionPriorityCache = new WeakMap();
+  const _POSITION_CACHE_TTL = 100; // 100ms 缓存有效期
+
   /**
    * 获取资源位置优先级
    * @param {Element} element - DOM元素
@@ -1538,6 +1542,12 @@
   function _getResourcePositionPriority(element) {
     if (!element || !element.isConnected) {
       return { zone: 'far', priority: 999, distance: Infinity };
+    }
+
+    // 检查缓存
+    const cached = _positionPriorityCache.get(element);
+    if (cached && (performance.now() - cached.time < _POSITION_CACHE_TTL)) {
+      return cached.result;
     }
 
     const rect = element.getBoundingClientRect();
@@ -1554,21 +1564,25 @@
     const nearbyThreshold = (state.config.positionAwareLoading?.nearbyThreshold || 1) * viewportHeight;
 
     // 判断区域
+    let result;
     if (distanceToViewport === 0) {
-      return { zone: 'inViewport', priority: 0, distance: 0 };
-    }
-
-    if (distanceToViewport <= nearbyThreshold) {
+      result = { zone: 'inViewport', priority: 0, distance: 0 };
+    } else if (distanceToViewport <= nearbyThreshold) {
       // nearby 区域：优先级 10-19，距离越近优先级越高
-      return {
+      result = {
         zone: 'nearby',
         priority: 10 + Math.floor(distanceToViewport / viewportHeight * 10),
         distance: distanceToViewport
       };
+    } else {
+      // far 区域
+      result = { zone: 'far', priority: 100, distance: distanceToViewport };
     }
 
-    // far 区域
-    return { zone: 'far', priority: 100, distance: distanceToViewport };
+    // 更新缓存
+    _positionPriorityCache.set(element, { result, time: performance.now() });
+
+    return result;
   }
 
   /**
