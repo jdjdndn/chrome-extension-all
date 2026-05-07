@@ -1,0 +1,5 @@
+dist/
+coverage/
+*.bundle.js
+*.min.js
+content/bundled/
