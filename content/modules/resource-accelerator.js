@@ -61,6 +61,13 @@
       enabled: true,
       maxDomains: 15,
     },
+    // Worker压缩
+    workerCompress: {
+      enabled: true,       // 启用Worker压缩
+      maxWorkers: 2,       // 最大Worker数
+      timeout: 5000,       // 超时时间(ms)
+      fallbackToMain: true, // Worker失败时回退主线程
+    },
     // 第三方脚本延迟加载
     thirdPartyDeferral: {
       enabled: true,
@@ -1597,6 +1604,47 @@
       return null;
     }
 
+    // 获取压缩参数
+    let quality = state.config.imageQuality || 0.8;
+    let maxWidth = state.config.imageMaxDimension || 2048;
+    if (_adaptiveCompressor) {
+      const params = _adaptiveCompressor.getCompressParams(url, null, actualSize);
+      quality = params.quality;
+      maxWidth = params.maxWidth;
+    }
+    const maxHeight = maxWidth;
+
+    // 尝试 Worker 压缩
+    if (state.config.workerCompress?.enabled && _compressorWorkers.length > 0) {
+      try {
+        const result = await _compressViaWorker(url, quality, maxWidth, maxHeight);
+        if (result.dataUrl) {
+          const originalSize = result.originalSize;
+          const compressionRatio = result.compressedSize / originalSize;
+          if (compressionRatio < 0.95) {
+            state.stats.imagesCompressed++;
+            state.stats.imagesCompressBytesSaved += (originalSize - result.compressedSize);
+            _persistStats();
+            state._compressCache.set(url, { skip: false, result: result.dataUrl });
+            addLog('info', 'image', 'worker_compress', {
+              url,
+              originalSize,
+              compressedSize: result.compressedSize,
+              ratio: compressionRatio.toFixed(2),
+            });
+            return result.dataUrl;
+          }
+        }
+      } catch (e) {
+        if (!state.config.workerCompress?.fallbackToMain) {
+          addLog('warn', 'image', 'worker_failed_no_fallback', { url, error: e.message });
+          state._compressCache.set(url, { skip: true });
+          return null;
+        }
+        addLog('debug', 'image', 'worker_fallback', { url, error: e.message });
+      }
+    }
+
     return new Promise(resolve => {
       // 跳转检查函数
       const checkAborted = () => {
@@ -2764,6 +2812,89 @@
     }
   }
 
+  // ========== Worker 压缩管理 ==========
+  let _compressorWorkers = [];
+  let _workerTaskId = 0;
+  let _workerPendingTasks = new Map();
+
+  function _initCompressorWorkers() {
+    if (!state.config.workerCompress?.enabled) return;
+    if (typeof Worker === 'undefined') return;
+
+    const maxWorkers = state.config.workerCompress.maxWorkers || 2;
+    for (let i = 0; i < maxWorkers; i++) {
+      try {
+        const worker = new Worker(chrome.runtime.getURL('content/workers/image-compressor.worker.js'));
+        worker.onmessage = _handleWorkerMessage;
+        worker.onerror = (e) => {
+          console.error(`${LOG_PREFIX} Worker错误:`, e.message);
+        };
+        _compressorWorkers.push(worker);
+      } catch (e) {
+        console.warn(`${LOG_PREFIX} Worker初始化失败:`, e);
+      }
+    }
+
+    if (_compressorWorkers.length > 0) {
+      console.log(`${LOG_PREFIX} 已初始化 ${_compressorWorkers.length} 个压缩Worker`);
+    }
+  }
+
+  function _handleWorkerMessage(e) {
+    const { id, success, dataUrl, error, originalSize, compressedSize } = e.data;
+    const task = _workerPendingTasks.get(id);
+    if (!task) return;
+
+    _workerPendingTasks.delete(id);
+
+    if (success) {
+      task.resolve({ dataUrl, originalSize, compressedSize });
+    } else {
+      task.reject(new Error(error));
+    }
+  }
+
+  function _getAvailableWorker() {
+    return _compressorWorkers[0] || null;
+  }
+
+  async function _compressViaWorker(src, quality, maxWidth, maxHeight) {
+    return new Promise((resolve, reject) => {
+      const worker = _getAvailableWorker();
+      if (!worker) {
+        reject(new Error('No available worker'));
+        return;
+      }
+
+      const id = ++_workerTaskId;
+      const timeout = state.config.workerCompress?.timeout || 5000;
+
+      const timer = setTimeout(() => {
+        _workerPendingTasks.delete(id);
+        reject(new Error('Worker timeout'));
+      }, timeout);
+
+      _workerPendingTasks.set(id, {
+        resolve: (result) => {
+          clearTimeout(timer);
+          resolve(result);
+        },
+        reject: (err) => {
+          clearTimeout(timer);
+          reject(err);
+        },
+      });
+
+      worker.postMessage({ id, src, quality, maxWidth, maxHeight });
+    });
+  }
+
+  function _terminateCompressorWorkers() {
+    _compressorWorkers.forEach(w => w.terminate());
+    _compressorWorkers = [];
+    _workerPendingTasks.clear();
+  }
+
   // ========== 自适应压缩 ==========
   class AdaptiveCompressor {
     constructor(config) {
@@ -3322,6 +3453,9 @@
     // 全站DNS prefetch
     _addGlobalDnsPrefetch();
 
+    // 初始化压缩Worker
+    _initCompressorWorkers();
+
     // 4. CDN健康探测（异步，不阻塞）- 优先探测页面使用的 CDN
     if (window.CDNMappings?.probeAllCDNs) {
       const pageCDNs = _getCDNPriorities();
@@ -3822,6 +3956,7 @@
       _memoryOptimizer?.destroy?.();
       _adaptiveCompressor?.destroy();
       _smartPreloadV2?.destroy();
+      _terminateCompressorWorkers();
       state.compressQueue = [];
       state.recentReplacements = [];
       state.dedupSet.clear();
