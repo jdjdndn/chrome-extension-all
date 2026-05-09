@@ -292,7 +292,12 @@
       cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr'],
     },
     swiper: {
-      patterns: [/swiper(?:\.bundle)?(?:\.min)?\.js/i, /swiper\/([\d.]+)\/swiper/i],
+      // 更精确的模式：避免匹配 swiper2、swiper3 等
+      patterns: [
+        /swiper(?:\.bundle)?(?:\.min)?\.js$/i, // 必须以 .js 结尾
+        /swiper\/([\d.]+)\/swiper/i,
+        /swiper-bundle(?:\.min)?\.js$/i,
+      ],
       versionPatterns: [/swiper[\/@](\d+\.\d+\.\d+)/i],
       package: 'swiper',
       file: 'swiper-bundle.min.js',

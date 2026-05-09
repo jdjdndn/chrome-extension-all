@@ -196,7 +196,7 @@ async function getCurrentTabDomain() {
 }
 
 // Extension state
-let extensionState = {
+const extensionState = {
   initialized: false,
   isDebugMode: false,
   lastUpdate: null,
@@ -216,7 +216,9 @@ Object.defineProperties(extensionState, {
   blockedDomains: {
     get: async function () {
       const domain = await getCurrentTabDomain()
-      if (!domain) return []
+      if (!domain) {
+        return []
+      }
       return _domainBlockedData.blockedDomains[domain] || []
     },
     set: async function (value) {
@@ -232,7 +234,9 @@ Object.defineProperties(extensionState, {
   blockedResponseDomains: {
     get: async function () {
       const domain = await getCurrentTabDomain()
-      if (!domain) return []
+      if (!domain) {
+        return []
+      }
       return _domainBlockedData.blockedResponseDomains[domain] || []
     },
     set: async function (value) {
@@ -265,7 +269,9 @@ async function persistDomainBlockedData() {
 
 // Get blocked domains for a specific domain (synchronous helper)
 function getBlockedDomainsForDomain(domain) {
-  if (!domain) return []
+  if (!domain) {
+    return []
+  }
   // First try exact match
   if (_domainBlockedData.blockedDomains[domain]) {
     return _domainBlockedData.blockedDomains[domain]
@@ -281,7 +287,9 @@ function getBlockedDomainsForDomain(domain) {
 
 // Get blocked response domains for a specific domain (synchronous helper)
 function getBlockedResponseDomainsForDomain(domain) {
-  if (!domain) return []
+  if (!domain) {
+    return []
+  }
   // First try exact match
   if (_domainBlockedData.blockedResponseDomains[domain]) {
     return _domainBlockedData.blockedResponseDomains[domain]
@@ -325,15 +333,17 @@ function getAllBlockedResponseDomains() {
 
 // Initialize extension
 async function initialize() {
-  if (extensionState.initialized) return
+  if (extensionState.initialized) {
+    return
+  }
 
   console.log('Initializing extension...')
   extensionState.initialized = true
 
-  // 初始化 EventBus V5
+  // 初始化 EventBus
   if (typeof EventBus !== 'undefined') {
     await EventBus.init()
-    console.log('[Background] EventBus V5 已初始化')
+    console.log('[Background] EventBus 已初始化')
 
     // 配置 EventBus
     EventBus.configure({
@@ -469,6 +479,23 @@ function registerEventBusHandlers() {
     return { success: true, selectors: [] }
   })
 
+  // 动态添加CDN域名到白名单
+  EventBus.on('ADD_CDN_DOMAINS', async (data) => {
+    if (data.domains && Array.isArray(data.domains)) {
+      CDNRegistry.addDomains(data.domains)
+      // 重新生成白名单规则
+      await updateCDNAllowlistRules()
+      console.log('[Background] 已添加CDN域名到白名单:', data.domains)
+      return { success: true, count: data.domains.length }
+    }
+    return { success: false, error: 'Missing or invalid domains array' }
+  })
+
+  // 获取CDN域名列表
+  EventBus.on('GET_CDN_DOMAINS', () => {
+    return { success: true, domains: CDNRegistry.getAllDomains() }
+  })
+
   EventBus.on('GET_CURRENT_HIDE_SELECTORS', () => {
     return { success: true, selectors: [] }
   })
@@ -562,7 +589,9 @@ function registerMessageTemplates() {
 
 // Ensure settings are loaded before accessing
 async function ensureSettingsLoaded() {
-  if (_settingsLoaded) return
+  if (_settingsLoaded) {
+    return
+  }
   if (_settingsLoadPromise) {
     await _settingsLoadPromise
   }
@@ -614,6 +643,8 @@ async function loadSettings() {
     await updateNetworkRules()
     // Update response blocking rules
     await updateResponseBlockingRules()
+    // CDN 白名单规则（必须在拦截规则之前注册）
+    await updateCDNAllowlistRules()
     // CDN 资源重定向规则
     await updateCDNRedirectRules()
   } catch (error) {
@@ -645,7 +676,9 @@ function setupEventListeners() {
 
   // 监听窗口焦点变化：提前感知即将激活的 tab
   chrome.windows.onFocusChanged.addListener(async (windowId) => {
-    if (windowId === chrome.windows.WINDOW_ID_NONE) return
+    if (windowId === chrome.windows.WINDOW_ID_NONE) {
+      return
+    }
     try {
       const [tab] = await chrome.tabs.query({ active: true, windowId })
       if (tab && tab.id) {
@@ -716,7 +749,9 @@ async function handleTabUpdate(tabId, tab) {
   if (extensionState.isDebugMode) {
     console.log('Tab updated:', tabId, tab.title)
   }
-  if (!tab.active) return
+  if (!tab.active) {
+    return
+  }
 
   // 排除 Chrome Web Store 等受保护页面
   const protectedPatterns = ['chrome.google.com/webstore', 'chromewebstore.google.com']
@@ -783,7 +818,9 @@ async function handleTabUpdate(tabId, tab) {
 // Add blocked domain for current active tab's domain
 async function addBlockedDomain(domain) {
   const currentDomain = await getCurrentTabDomain()
-  if (!currentDomain) return false
+  if (!currentDomain) {
+    return false
+  }
 
   if (!_domainBlockedData.blockedDomains[currentDomain]) {
     _domainBlockedData.blockedDomains[currentDomain] = []
@@ -801,7 +838,9 @@ async function addBlockedDomain(domain) {
 // Remove blocked domain for current active tab's domain
 async function removeBlockedDomain(domain) {
   const currentDomain = await getCurrentTabDomain()
-  if (!currentDomain) return false
+  if (!currentDomain) {
+    return false
+  }
 
   if (_domainBlockedData.blockedDomains[currentDomain]) {
     const index = _domainBlockedData.blockedDomains[currentDomain].indexOf(domain)
@@ -818,7 +857,9 @@ async function removeBlockedDomain(domain) {
 // Add blocked response domain for current active tab's domain
 async function addBlockedResponseDomain(domain) {
   const currentDomain = await getCurrentTabDomain()
-  if (!currentDomain) return false
+  if (!currentDomain) {
+    return false
+  }
 
   if (!_domainBlockedData.blockedResponseDomains[currentDomain]) {
     _domainBlockedData.blockedResponseDomains[currentDomain] = []
@@ -839,7 +880,9 @@ async function addBlockedResponseDomain(domain) {
 // Remove blocked response domain for current active tab's domain
 async function removeBlockedResponseDomain(domain) {
   const currentDomain = await getCurrentTabDomain()
-  if (!currentDomain) return false
+  if (!currentDomain) {
+    return false
+  }
 
   if (_domainBlockedData.blockedResponseDomains[currentDomain]) {
     const index = _domainBlockedData.blockedResponseDomains[currentDomain].indexOf(domain)
@@ -1704,6 +1747,38 @@ async function handleMessage(message, sender, sendResponse) {
         }
         break
 
+      case 'FETCH_CORS_IMAGE':
+        // 代理跨域图片请求（扩展有跨域权限）
+        try {
+          const response = await fetch(message.url, {
+            method: 'GET',
+            credentials: 'omit',
+          })
+          if (!response.ok) {
+            sendResponse({ success: false, error: `HTTP ${response.status}` })
+            return
+          }
+          const blob = await response.blob()
+          // 转为 base64 data URL
+          const reader = new FileReader()
+          reader.onloadend = () => {
+            sendResponse({
+              success: true,
+              dataUrl: reader.result,
+              contentType: blob.type,
+              size: blob.size,
+            })
+          }
+          reader.onerror = () => {
+            sendResponse({ success: false, error: 'FileReader error' })
+          }
+          reader.readAsDataURL(blob)
+        } catch (error) {
+          console.error('[CORS代理] 图片获取失败:', error.message)
+          sendResponse({ success: false, error: error.message })
+        }
+        return true // 保持消息通道开放（FileReader 是异步的）
+
       // ========== 元素拾取器消息处理 ==========
       case 'PICKER_MESSAGE_RELAY':
         // 转发元素拾取器消息到 DevTools 面板
@@ -1779,7 +1854,9 @@ async function handleMessage(message, sender, sendResponse) {
           await chrome.scripting.executeScript({
             target: { tabId: targetTabId },
             func: () => {
-              if (window._pickerMessageListenerSet) return
+              if (window._pickerMessageListenerSet) {
+                return
+              }
               document.addEventListener('element-picker-message', (event) => {
                 const message = event.detail
                 if (message) {
@@ -2235,6 +2312,9 @@ async function updateNetworkRules() {
 
     // Then add new rules if there are any
     if (allBlockedDomains.length > 0) {
+      // 获取CDN域名列表用于排除
+      const cdnDomains = CDNRegistry.getAllDomains()
+
       const rules = allBlockedDomains.map((domain, index) => ({
         id: 1000 + index,
         priority: 1,
@@ -2242,6 +2322,8 @@ async function updateNetworkRules() {
         condition: {
           urlFilter: `||${domain}`,
           resourceTypes: ['xmlhttprequest', 'script', 'image', 'sub_frame'],
+          // 排除CDN域名，避免拦截资源重定向
+          excludedRequestDomains: cdnDomains,
         },
       }))
 
@@ -2304,6 +2386,9 @@ async function updateResponseBlockingRules() {
 
     // Add new response blocking rules if any domains are blocked
     if (allBlockedResponseDomains.length > 0) {
+      // 获取CDN域名列表用于排除
+      const cdnDomains = CDNRegistry.getAllDomains()
+
       const newRules = allBlockedResponseDomains.map((domain, index) => ({
         id: 2000 + index,
         priority: 2,
@@ -2311,6 +2396,8 @@ async function updateResponseBlockingRules() {
         condition: {
           urlFilter: `||${domain}`,
           resourceTypes: ['xmlhttprequest', 'script', 'image', 'sub_frame', 'main_frame'],
+          // 排除CDN域名，避免拦截资源重定向
+          excludedRequestDomains: cdnDomains,
         },
       }))
 
@@ -2331,7 +2418,7 @@ async function updateResponseBlockingRules() {
 // 使用 declarativeNetRequest 在网络层拦截，消除DOM层时序竞争
 // 仅用于字体/CSS（CSP style-src通常宽松），JS保持DOM层安全替换
 
-// 国内快速CDN/镜像 — 已是目标源, 不需要重定向
+// 国内快速CDN/镜像 — 已是目标源, 不需要重定向，广告拦截也不应拦截
 const CDN_REDIRECT_DOMAINS = [
   'cdn.bootcdn.net',
   'cdn.baomitu.com',
@@ -2342,6 +2429,129 @@ const CDN_REDIRECT_DOMAINS = [
   'gstatic.font.im',
   'fonts.loli.net',
 ]
+
+// CDN 白名单规则ID范围 (ID 900-999)
+const CDN_ALLOWLIST_RULE_IDS_START = 900
+
+/**
+ * CDN域名统一管理器
+ * 自动从重定向规则提取域名，实现广告拦截与CDN重定向联动
+ */
+const CDNRegistry = {
+  // 基础CDN域名（目标CDN，已在CDN_REDIRECT_DOMAINS中）
+  _baseDomains: CDN_REDIRECT_DOMAINS,
+
+  // 从重定向规则中提取的域名
+  _extractedDomains: new Set(),
+
+  // 动态添加的域名
+  _dynamicDomains: new Set(),
+
+  /**
+   * 从URL中提取域名
+   */
+  _extractDomain(url) {
+    try {
+      return new URL(url).hostname
+    } catch {
+      // 从regex中提取域名
+      const match = url.match(/https?:\/\/(?:www\.)?([a-z0-9.-]+)/i)
+      return match ? match[1] : null
+    }
+  },
+
+  /**
+   * 从CDN重定向规则中提取所有域名（源和目标）
+   */
+  extractFromRules(rules) {
+    const domains = new Set()
+
+    for (const rule of rules) {
+      // 从regex提取源域名
+      const sourceMatch = rule.regex.match(/\^https:\/\/(?:www\.)?([a-z0-9.-]+)/i)
+      if (sourceMatch) {
+        domains.add(sourceMatch[1])
+      }
+
+      // 从substitution提取目标域名
+      const targetMatch = rule.sub.match(/https:\/\/(?:www\.)?([a-z0-9.-]+)/i)
+      if (targetMatch) {
+        domains.add(targetMatch[1])
+      }
+    }
+
+    this._extractedDomains = domains
+    return domains
+  },
+
+  /**
+   * 动态添加CDN域名（供外部调用）
+   */
+  addDomain(domain) {
+    this._dynamicDomains.add(domain)
+  },
+
+  /**
+   * 批量添加CDN域名
+   */
+  addDomains(domains) {
+    domains.forEach((d) => this._dynamicDomains.add(d))
+  },
+
+  /**
+   * 获取所有需要白名单的CDN域名
+   */
+  getAllDomains() {
+    return [...new Set([...this._baseDomains, ...this._extractedDomains, ...this._dynamicDomains])]
+  },
+
+  /**
+   * 检查URL是否匹配CDN域名
+   */
+  isCDNUrl(url) {
+    const hostname = this._extractDomain(url)
+    if (!hostname) return false
+    return this.getAllDomains().some(
+      (domain) => hostname === domain || hostname.endsWith('.' + domain)
+    )
+  },
+}
+
+// 更新 CDN 白名单规则（明确允许CDN请求，优先级高于拦截规则）
+async function updateCDNAllowlistRules() {
+  try {
+    const existingRules = await chrome.declarativeNetRequest.getDynamicRules()
+    const oldIds = existingRules
+      .filter((rule) => rule.id >= 900 && rule.id < 1000)
+      .map((rule) => rule.id)
+
+    if (oldIds.length > 0) {
+      await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: oldIds })
+    }
+
+    // 从CDN重定向规则中提取域名
+    CDNRegistry.extractFromRules(CDN_REDIRECT_RULES)
+
+    // 获取所有CDN域名
+    const allCDNDomains = CDNRegistry.getAllDomains()
+
+    // 为每个CDN域名创建allow规则
+    const rules = allCDNDomains.map((domain, index) => ({
+      id: 900 + index,
+      priority: 100, // 高优先级
+      action: { type: 'allow' },
+      condition: {
+        urlFilter: `||${domain}`,
+        resourceTypes: ['main_frame', 'sub_frame', 'stylesheet', 'script', 'image', 'font', 'xmlhttprequest', 'media', 'other'],
+      },
+    }))
+
+    await chrome.declarativeNetRequest.updateDynamicRules({ addRules: rules })
+    console.log('[Background] CDN 白名单规则已注册:', rules.length, '条，域名:', allCDNDomains.join(', '))
+  } catch (error) {
+    console.error('[Background] CDN 白名单规则注册失败:', error)
+  }
+}
 
 // DNR CDN重定向规则 (ID 3000-3099)
 // 策略: 通用域名替换(高覆盖) + 具体路径变换(精准映射)
@@ -2518,13 +2728,13 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === 'addToNewtab') {
     // 获取要添加的 URL
-    let url = info.linkUrl || tab.url
+    const url = info.linkUrl || tab.url
 
     // 获取页面标题
-    let title = tab.title
+    const title = tab.title
 
     // 获取 favicon
-    let favicon = tab.favIconUrl || ''
+    const favicon = tab.favIconUrl || ''
 
     // 保存到 storage
     saveToNewtab(url, title, favicon, tab.id)
@@ -2550,7 +2760,7 @@ function saveToNewtab(url, title, favicon, tabId) {
     }
 
     // 获取域名作为图标
-    let icon = getDomainIcon(url)
+    const icon = getDomainIcon(url)
 
     // 添加新链接
     links.unshift({
@@ -2732,3 +2942,26 @@ if (chrome.declarativeNetRequest?.onRuleMatchedDebug) {
 
 // 初始化统计数据
 loadStatsData()
+
+// 加载DNR规则（必须先于 background-csp-bypass.js）
+if (typeof self !== 'undefined' && typeof self.importScripts === 'function') {
+  try {
+    self.importScripts('background-dnr-rules-auto.js')
+    console.log('[Background] DNR rules loaded')
+  } catch (e) {
+    console.error('[Background] Failed to load background-dnr-rules-auto.js:', e)
+  }
+}
+
+// 加载CSP绕过支持
+if (typeof self !== 'undefined' && typeof self.importScripts === 'function') {
+  try {
+    self.importScripts('background-csp-bypass.js')
+  } catch (e) {
+    console.error('[Background] Failed to load background-csp-bypass.js:', e)
+  }
+}
+
+// 暴露CDNRegistry到全局，供其他模块使用
+self.CDNRegistry = CDNRegistry
+console.log('[Background] CDNRegistry 已暴露到全局')

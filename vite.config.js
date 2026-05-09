@@ -10,6 +10,23 @@ import {
   readFileSync,
 } from 'fs'
 import { build as esbuildBuild } from 'esbuild'
+import { execSync } from 'child_process'
+
+// ========== Environment Variables Auto-Injection ==========
+// 支持从命令行参数或环境变量注入配置
+// 用法: HOT_RELOAD=true npm run build
+// 或者在 .env 文件中设置: HOT_RELOAD=true
+
+const ENV_CONFIG = {
+  // 热重载开关（开发模式自动启用）
+  HOT_RELOAD: process.env.HOT_RELOAD === 'true' || process.env.NODE_ENV === 'development',
+
+  // 其他可配置项
+  DEBUG: process.env.DEBUG === 'true',
+  ANALYZE: process.env.ANALYZE === 'true',
+}
+
+console.log('[Build] Environment config:', ENV_CONFIG)
 
 // ========== Content script bundles (from build-site-bundles.js) ==========
 const CONTENT_BUNDLES = [
@@ -76,22 +93,53 @@ const CONTENT_BUNDLES = [
   },
 ]
 
-// ========== File sync config (from watch-and-sync.js) ==========
-const STATIC_FILES = [
-  'manifest.json',
-  'background.js',
-  'content.js',
-  'inject.js',
-  'popup.html',
-  'popup.js',
-  'newtab.html',
-  'newtab.js',
-  'styles.css',
-  'rules.json',
-  'welcome.html',
-  'event-bus-v4.6.js',
-  'eventbus-test.js',
-]
+// ========== File sync config (自动扫描) ==========
+
+// 需要排除的根目录文件（配置文件、测试文件等）
+const EXCLUDED_FILES = new Set([
+  'vite.config.js',
+  'vitest.config.js',
+  'package.json',
+  'package-lock.json',
+  'tsconfig.json',
+  'jsconfig.json',
+  '.eslintrc.js',
+  '.eslintrc.json',
+  '.prettierrc',
+  '.prettierrc.js',
+  '.gitignore',
+  'README.md',
+  'LICENSE',
+  'CHANGELOG.md',
+  '.env',
+  '.env.example',
+  '.editorconfig',
+  '.mcp.json',
+  'sw.js', // Service Worker 单独处理
+])
+
+// 自动扫描根目录的静态文件
+function scanStaticFiles() {
+  const extensions = ['.js', '.html', '.css', '.json']
+  const files = []
+
+  const entries = readdirSync('.', { withFileTypes: true })
+  for (const entry of entries) {
+    if (entry.isDirectory()) continue
+    if (EXCLUDED_FILES.has(entry.name)) continue
+
+    const ext = entry.name.substring(entry.name.lastIndexOf('.'))
+    if (extensions.includes(ext)) {
+      files.push(entry.name)
+    }
+  }
+
+  console.log('[Build] 自动扫描到静态文件:', files.length, '个')
+  return files
+}
+
+// 初始扫描（用于首次构建）
+let STATIC_FILES = scanStaticFiles()
 
 const FILE_MAPPINGS = [
   { src: 'eventbus-devtools.html', dest: 'devtools/eventbus-devtools.html' },
@@ -196,6 +244,9 @@ function chromeExtensionPlugin() {
     },
 
     buildStart() {
+      // watch 模式下重新扫描静态文件
+      STATIC_FILES = scanStaticFiles()
+
       for (const f of STATIC_FILES) {
         if (existsSync(f)) this.addWatchFile(resolve(f))
       }
@@ -206,6 +257,16 @@ function chromeExtensionPlugin() {
         addWatchFilesRecursive(d, this)
       }
       addWatchFilesRecursive('content', this)
+
+      // 监视根目录本身，以便检测新增的静态文件
+      this.addWatchFile(resolve('.'))
+
+      // 验证 Worker 资源声明
+      try {
+        execSync('node scripts/verify-worker-resources.js', { stdio: 'inherit' })
+      } catch {
+        console.warn('[Build] Worker 资源验证失败，请检查 manifest.json')
+      }
     },
 
     async generateBundle() {
@@ -213,8 +274,8 @@ function chromeExtensionPlugin() {
       copyAllToDist(dist)
       await buildContentScripts(dist)
 
-      // 开发模式：处理manifest.json添加热重载支持
-      if (process.env.NODE_ENV !== 'production') {
+      // 热重载支持（根据环境变量自动注入）
+      if (ENV_CONFIG.HOT_RELOAD) {
         const manifestPath = resolve(dist, 'manifest.json')
         if (existsSync(manifestPath)) {
           const manifestContent = readFileSync(manifestPath, 'utf-8')
@@ -234,14 +295,19 @@ function chromeExtensionPlugin() {
             copyFileSync(hotReloadBg, resolve(dist, 'hot-reload-background.js'))
           }
 
-          // 复制热重载客户端到dist
+          // 复制热重载客户端到dist，并注入开发环境标记
           const hotReloadClient = resolve('content/hot-reload-client.js')
           const distClientDir = resolve(dist, 'content')
           if (!existsSync(distClientDir)) {
             mkdirSync(distClientDir, { recursive: true })
           }
           if (existsSync(hotReloadClient)) {
-            copyFileSync(hotReloadClient, resolve(distClientDir, 'hot-reload-client.js'))
+            // 读取源文件
+            let clientCode = readFileSync(hotReloadClient, 'utf-8')
+            // 注入开发环境标记
+            clientCode = 'const __HOT_RELOAD__ = true;\n' + clientCode
+            // 写入到 dist
+            writeFileSync(resolve(distClientDir, 'hot-reload-client.js'), clientCode)
           }
 
           // 写回manifest
@@ -258,8 +324,8 @@ function chromeExtensionPlugin() {
     },
 
     async closeBundle() {
-      // 构建完成后通知热重载服务器（开发模式）
-      if (process.env.NODE_ENV !== 'production') {
+      // 构建完成后通知热重载服务器
+      if (ENV_CONFIG.HOT_RELOAD) {
         await notifyHotReloadServer()
       }
     },

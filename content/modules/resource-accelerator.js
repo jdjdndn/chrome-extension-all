@@ -1,12 +1,12 @@
 ﻿/**
- * 资源加速器主模块 (v8)
- * 核心优化：
- * 1. 同步启动 - 不等待配置加载
- * 2. API拦截 - 拦截 createElement/appendChild 等原生方法
- * 3. 即时处理 - 在元素创建时就拦截，而非等待 DOM 插入
- * 4. 图片压缩 - Canvas重绘导出WebP/JPEG
- * 5. CDN健康探测 - 启动时探测CDN可用性
- * 6. 智能调度 - 优先级队列、动态批量处理、CDN探测优先级
+ * ��Դ��������ģ�� (v8)
+ * �����Ż���
+ * 1. ͬ����� - ���ȴ����ü���
+ * 2. API���� - ���� createElement/appendChild ��ԭ������
+ * 3. ��ʱ���� - ��Ԫ�ش���ʱ�����أ����ǵȴ� DOM ����
+ * 4. ͼƬѹ�� - Canvas�ػ浼��WebP/JPEG
+ * 5. CDN����̽�� - ���ʱ̽��CDN������
+ * 6. ���ܵ��� - ���ȼ����С���̬���������CDN̽�����ȼ�
  */
 
 (function () {
@@ -17,7 +17,7 @@
   const STATS_KEY = 'resourceAcceleratorStats'
 
   const DEFAULT_CONFIG = {
-    version: '2.0.0', // 配置版本号，用于迁移
+    version: '2.0.0', // ���ð汾�ţ�����Ǩ��
     enabled: true,
     jsReplace: true,
     fontReplace: true,
@@ -30,45 +30,45 @@
     lazyLoadThreshold: 200,
     excludeDomains: [],
     excludeUrls: [],
-    // 性能优化配置
-    maxPreloadHints: 10, // 最大preload提示数
-    maxCompressQueueSize: 50, // 最大队列长度
-    mutationBatchInterval: 50, // mutation批量处理间隔(ms)
-    enableBatchProcessing: true, // 启用批量处理
-    dedupEnabled: true, // 资源去重
-    imageMaxDimension: 2048, // 最大输出尺寸，0=不限制
-    // 渐进式图片占位
+    // �����Ż�����
+    maxPreloadHints: 10, // ���preload��ʾ��
+    maxCompressQueueSize: 50, // �����г���
+    mutationBatchInterval: 50, // mutation����������(ms)
+    enableBatchProcessing: true, // ������������
+    dedupEnabled: true, // ��Դȥ��
+    imageMaxDimension: 2048, // �������ߴ磬0=������
+    // ����ʽͼƬռλ
     lqip: {
       enabled: true,
       blurRadius: 8,
       transitionDuration: 300,
       placeholderColor: '#f0f0f0',
     },
-    // content-visibility 渲染优化
+    // content-visibility ��Ⱦ�Ż�
     contentVisibility: {
       enabled: true,
       selectors: ['article', 'section', 'aside', '.sidebar', '.footer', '.comments'],
       excludeSelectors: ['nav', 'header', '.above-fold'],
     },
-    // 第三方iframe懒加载
+    // ������iframe������
     iframeLazyLoad: {
       enabled: true,
       threshold: 200,
       excludePatterns: [],
     },
-    // 全站DNS prefetch
+    // ȫվDNS prefetch
     dnsPrefetch: {
       enabled: true,
       maxDomains: 15,
     },
-    // Worker压缩
+    // Workerѹ��
     workerCompress: {
-      enabled: true, // 启用Worker压缩
-      maxWorkers: 2, // 最大Worker数
-      timeout: 5000, // 超时时间(ms)
-      fallbackToMain: true, // Worker失败时回退主线程
+      enabled: true, // ����Workerѹ��
+      maxWorkers: 2, // ���Worker��
+      timeout: 5000, // ��ʱʱ��(ms)
+      fallbackToMain: true, // Workerʧ��ʱ�������߳�
     },
-    // 第三方脚本延迟加载
+    // �������ű��ӳټ���
     thirdPartyDeferral: {
       enabled: true,
       strategy: 'idle', // idle | defer | block | pass
@@ -84,25 +84,25 @@
       userRules: [], // User-defined rules [{ pattern: string, strategy: string }]
       maxDeferralMs: 10000,
     },
-    // 站点级配置
+    // վ�㼶����
     siteConfig: {
-      enabled: true, // 全局开关
-      rules: [], // 站点规则列表 [{ domain: string, enabled: boolean, ...featureFlags }]
+      enabled: true, // ȫ�ֿ���
+      rules: [], // վ������б� [{ domain: string, enabled: boolean, ...featureFlags }]
     },
-    // 高级过滤规则
+    // �߼����˹���
     advancedFilter: {
       enabled: false,
       rules: [], // [{ type: 'exclude'|'include', match: 'extension'|'path'|'domain'|'query'|'regex', value: string, action: 'skipAll'|'skipCompress'|'skipReplace'|'forceReplace', description: string }]
     },
-    // SVG 优化
+    // SVG �Ż�
     svgOptimize: {
       enabled: true,
-      maxInlineSize: 10240, // 10KB 以下内联为 data URI
+      maxInlineSize: 10240, // 10KB ��������Ϊ data URI
       removeComments: true,
       removeMetadata: true,
       minify: true,
     },
-    // 自适应压缩
+    // ����Ӧѹ��
     adaptiveCompress: {
       enabled: true,
       typeDetection: {
@@ -139,7 +139,7 @@
         largeImageThreshold: 500000,
       },
     },
-    // 智能预加载 v2
+    // ����Ԥ���� v2
     smartPreloadV2: {
       enabled: true,
       pageStructure: {
@@ -182,10 +182,10 @@
         maxConcurrent: 3,
         priorityQueue: true,
         abortOnNavigate: true,
-        maxPreloads: 6, // 新增：最大preload元素数
+        maxPreloads: 6, // ���������preloadԪ����
       },
     },
-    // 性能监控
+    // ���ܼ��
     perfMonitor: {
       enabled: true,
       metrics: {
@@ -205,7 +205,7 @@
       storageKey: 'resourceAcceleratorPerfData',
       maxEntries: 1000,
     },
-    // 优先级优化
+    // ���ȼ��Ż�
     priorityOptimizer: {
       enabled: true,
       networkAware: {
@@ -234,7 +234,7 @@
         maxElements: 50,
       },
     },
-    // 内存优化
+    // �ڴ��Ż�
     memoryOptimizer: {
       enabled: true,
       monitoring: {
@@ -248,7 +248,7 @@
       caching: {
         enabled: true,
         maxSize: 50 * 1024 * 1024, // 50MB
-        ttl: 7 * 24 * 60 * 60 * 1000, // 7天
+        ttl: 7 * 24 * 60 * 60 * 1000, // 7��
         evictionPolicy: 'lru', // lru | lfu | fifo
         prewarm: {
           enabled: true,
@@ -271,15 +271,15 @@
         },
       },
     },
-    // 位置感知加载
+    // λ�ø�֪����
     positionAwareLoading: {
       enabled: true,
-      nearbyThreshold: 1, // 触发加载的距离阈值（屏数），默认1屏
-      processLoaded: false, // 已加载资源是否重新处理
+      nearbyThreshold: 1, // �������صľ�����ֵ����������Ĭ��1��
+      processLoaded: false, // �Ѽ�����Դ�Ƿ����´���
     },
   }
 
-  // ========== 日志系统 ==========
+  // ========== ��־ϵͳ ==========
   const MAX_LOG_SIZE = 200
   const LOG_ERROR_PERSIST_KEY = 'resourceAcceleratorErrorLogs'
   const MAX_PERSISTED_ERROR_LOGS = 50
@@ -287,11 +287,11 @@
   let _logPersistTimer = null
 
   /**
-   * 添加日志记录
-   * @param {'info'|'warn'|'error'} level - 日志级别
-   * @param {'script'|'style'|'image'|'svg'|'cdn'|'deferral'|'system'} module - 模块
-   * @param {'replace'|'compress'|'lazy'|'defer'|'skip'|'block'|'error'|'init'|'probe'} action - 操作
-   * @param {object} details - 详情
+   * �����־��¼
+   * @param {'info'|'warn'|'error'} level - ��־����
+   * @param {'script'|'style'|'image'|'svg'|'cdn'|'deferral'|'system'} module - ģ��
+   * @param {'replace'|'compress'|'lazy'|'defer'|'skip'|'block'|'error'|'init'|'probe'} action - ����
+   * @param {object} details - ����
    */
   function addLog(level, module, action, details = {}) {
     const logEntry = {
@@ -313,19 +313,19 @@
 
     _logBuffer.push(logEntry)
 
-    // 保持环形缓冲区大小
+    // ���ֻ��λ�������С
     if (_logBuffer.length > MAX_LOG_SIZE) {
       _logBuffer.shift()
     }
 
-    // error 级别日志持久化到 storage
+    // error ������־�־û��� storage
     if (level === 'error') {
       _scheduleErrorLogPersist()
     }
   }
 
   /**
-   * 调度错误日志持久化（防抖）
+   * ���ȴ�����־�־û���������
    */
   function _scheduleErrorLogPersist() {
     if (_logPersistTimer) {return}
@@ -337,48 +337,48 @@
           .slice(-MAX_PERSISTED_ERROR_LOGS)
         await chrome.storage.local.set({ [LOG_ERROR_PERSIST_KEY]: errorLogs })
       } catch (e) {
-        console.error(`${LOG_PREFIX} 持久化错误日志失败:`, e)
+        console.error(`${LOG_PREFIX} �־û�������־ʧ��:`, e)
       }
     }, 1000)
   }
 
   /**
-   * 从 storage 恢复错误日志
+   * �� storage �ָ�������־
    */
   async function _restoreErrorLogs() {
     try {
       const result = await chrome.storage.local.get(LOG_ERROR_PERSIST_KEY)
       const storedLogs = result[LOG_ERROR_PERSIST_KEY]
       if (Array.isArray(storedLogs) && storedLogs.length > 0) {
-        // 将历史错误日志添加到缓冲区开头，确保最新的日志在后面
+        // ����ʷ������־��ӵ���������ͷ��ȷ�����µ���־�ں���
         const historicalLogs = storedLogs.filter(
           (l) => l.timestamp && l.level === 'error' && l.module && l.action
         )
         _logBuffer = [...historicalLogs, ..._logBuffer].slice(-MAX_LOG_SIZE)
-        console.log(`${LOG_PREFIX} 已恢复 ${historicalLogs.length} 条历史错误日志`)
+        console.log(`${LOG_PREFIX} �ѻָ� ${historicalLogs.length} ����ʷ������־`)
       }
     } catch (e) {
-      console.error(`${LOG_PREFIX} 恢复历史错误日志失败:`, e)
+      console.error(`${LOG_PREFIX} �ָ���ʷ������־ʧ��:`, e)
     }
   }
 
   /**
-   * 获取日志缓冲区
+   * ��ȡ��־������
    */
   function getLogs(filter = {}) {
     let logs = [..._logBuffer]
 
-    // 按级别筛选
+    // ������ɸѡ
     if (filter.level && filter.level !== 'all') {
       logs = logs.filter((l) => l.level === filter.level)
     }
 
-    // 按模块筛选
+    // ��ģ��ɸѡ
     if (filter.module && filter.module !== 'all') {
       logs = logs.filter((l) => l.module === filter.module)
     }
 
-    // 按时间范围筛选
+    // ��ʱ�䷶Χɸѡ
     if (filter.since) {
       logs = logs.filter((l) => l.timestamp >= filter.since)
     }
@@ -387,13 +387,13 @@
   }
 
   /**
-   * 清空日志缓冲区
+   * �����־������
    */
   function clearLogs() {
     _logBuffer = []
   }
 
-  // ========== 全局状态（同步初始化）==========
+  // ========== ȫ��״̬��ͬ����ʼ����==========
   const state = {
     config: { ...DEFAULT_CONFIG },
     cspRestricted: false,
@@ -421,39 +421,49 @@
       workerCompressFallback: 0,
       workerCompressTotalMs: 0,
     },
-    // 图片压缩
+    // ͼƬѹ��
     compressQueue: [],
     compressingCount: 0,
     _supportsWebP: undefined,
     _imageFormat: null,
-    // 批量处理
+    // ��������
     _mutationBatch: [],
     _mutationTimer: null,
     _isProcessingBatch: false,
-    // 压缩结果缓存（同一页面会话内避免重复压缩）
+    // ѹ��������棨ͬһҳ��Ự�ڱ����ظ�ѹ����
     _compressCache: new Map(),
-    _compressCacheSize: 0, // 缓存大小追踪（字节）
-    _compressCacheMaxSize: 50 * 1024 * 1024, // 最大50MB
-    // SVG 优化缓存
+    _compressCacheSize: 0, // �����С׷�٣��ֽڣ�
+    _compressCacheMaxSize: 50 * 1024 * 1024, // ���50MB
+    // SVG �Ż�����
     _svgCache: new Map(),
-    // 去重集合
+    // ȥ�ؼ���
     dedupSet: new Set(),
-    // 最近50条替换记录
+    // ���50���滻��¼
     recentReplacements: [],
-    // 第三方脚本延迟队列
+    // �������ű��ӳٶ���
     _deferredScripts: [],
-    // 字体预加载候选队列（weight-based priority）
+    // ����Ԥ���غ�ѡ���У�weight-based priority��
     _fontCandidates: [],
     _fontPreloadedUrls: new Set(),
-    // LCP 指标
+    // LCP ָ��
     lcp: null,
-    // 性能指标
+    // ����ָ��
     performance: null,
-    // 页面跳转状态
+    // ҳ����ת״̬
     _isNavigating: false,
+    // ��������� throttle
+    _recheckThrottleTimer: null,
+    // ��ʽ�仯�۲���
+    _styleChangeObserver: null,
+    // ͼƬ���Լ�����
+    _imageRetryCount: new Map(),
   }
 
-  // ========== 统计持久化（防抖 + 增量）==========
+  // ͼƬ��������
+  const IMAGE_RETRY_MAX = 3
+  const IMAGE_RETRY_DELAY_MS = 500
+
+  // ========== ͳ�Ƴ־û������� + ������==========
 
   let _statsTimer = null
   const _lastPersisted = {
@@ -474,7 +484,7 @@
       try {
         const result = await chrome.storage.local.get(STATS_KEY)
         const stored = result[STATS_KEY] || {}
-        // 只写入自上次持久化以来的增量
+        // ֻд�����ϴγ־û�����������
         const delta = {
           totalJsReplaced:
             (stored.totalJsReplaced || 0) + (state.stats.jsReplaced - _lastPersisted.jsReplaced),
@@ -499,7 +509,7 @@
             (state.stats.svgOptimized - _lastPersisted.svgOptimized),
         }
         await chrome.storage.local.set({ [STATS_KEY]: delta })
-        // 更新快照
+        // ���¿���
         _lastPersisted.jsReplaced = state.stats.jsReplaced
         _lastPersisted.fontsReplaced = state.stats.fontsReplaced
         _lastPersisted.cssReplaced = state.stats.cssReplaced || 0
@@ -509,7 +519,7 @@
         _lastPersisted.svgOptimized = state.stats.svgOptimized
         _lastPersisted.svgBytesSaved = state.stats.svgBytesSaved
       } catch (error) {
-        console.warn('[persistStats] 持久化统计失败:', error)
+        console.warn('[persistStats] �־û�ͳ��ʧ��:', error)
       }
     }, 2000)
   }
@@ -518,25 +528,65 @@
   function _addToCompressCache(url, result) {
     const size = result ? result.length * 2 : 0 // dataUrl大小估算（UTF-16编码）
 
-    // 检查是否需要清理
+    // 加权LRU淘汰策略
     while (
       state._compressCacheSize + size > state._compressCacheMaxSize &&
       state._compressCache.size > 0
     ) {
-      // 删除最旧的缓存项（Map保持插入顺序）
-      const oldest = state._compressCache.keys().next().value
-      const oldEntry = state._compressCache.get(oldest)
-      const oldSize = oldEntry?.result?.length * 2 || 0
-      state._compressCache.delete(oldest)
-      state._compressCacheSize -= oldSize
+      // 计算每个缓存项的权重分数（越低越应该淘汰）
+      // 权重 = 访问频率 * 0.6 + 新近度 * 0.4
+      const now = Date.now()
+      let minScore = Infinity
+      let evictKey = null
+      let evictSize = 0
+
+      for (const [key, entry] of state._compressCache.entries()) {
+        if (!entry || entry.skip) continue
+
+        const accessCount = entry.accessCount || 1
+        const age = now - (entry.lastAccess || entry.timestamp || now)
+        const ageScore = Math.max(0, 1 - age / 3600000) // 1小时内归一化
+        const freqScore = Math.min(1, accessCount / 10) // 10次访问归一化
+
+        // 加权分数：访问频率权重0.6，新近度权重0.4
+        const score = freqScore * 0.6 + ageScore * 0.4
+
+        // 大文件额外惩罚
+        const entrySize = entry.result?.length * 2 || 0
+        const sizePenalty = entrySize > 500000 ? 0.3 : 0
+
+        if (score - sizePenalty < minScore) {
+          minScore = score - sizePenalty
+          evictKey = key
+          evictSize = entrySize
+        }
+      }
+
+      // 如果没找到合适的，使用FIFO作为后备
+      if (!evictKey) {
+        evictKey = state._compressCache.keys().next().value
+        const oldEntry = state._compressCache.get(evictKey)
+        evictSize = oldEntry?.result?.length * 2 || 0
+      }
+
+      state._compressCache.delete(evictKey)
+      state._compressCacheSize -= evictSize
       state.stats.cacheEvictions = (state.stats.cacheEvictions || 0) + 1
+      addLog('debug', 'cache', 'evict', { key: evictKey, size: evictSize, score: minScore })
     }
 
-    state._compressCache.set(url, result ? { skip: false, result } : { skip: true })
+    // 添加新缓存项，包含访问统计
+    state._compressCache.set(url, {
+      skip: false,
+      result,
+      timestamp: Date.now(),
+      lastAccess: Date.now(),
+      accessCount: 1,
+    })
     state._compressCacheSize += size
   }
 
-  // ========== 网络变化动态调整 ==========
+  // ========== ����仯��̬���� ==========
   let _networkChangeListener = null
 
   function _initNetworkChangeListener() {
@@ -547,10 +597,10 @@
       const newQuality = detectNetworkQuality()
 
       if (oldQuality !== newQuality) {
-        console.log(`${LOG_PREFIX} 网络质量变化: ${oldQuality} -> ${newQuality}`)
+        console.log(`${LOG_PREFIX} ���������仯: ${oldQuality} -> ${newQuality}`)
         state._lastNetworkQuality = newQuality
 
-        // 通知AdaptiveCompressor更新
+        // ֪ͨAdaptiveCompressor����
         if (_adaptiveCompressor) {
           _adaptiveCompressor.networkQuality = newQuality
         }
@@ -560,10 +610,10 @@
     navigator.connection.addEventListener('change', _networkChangeListener)
   }
 
-  // ========== 工具方法（同步）==========
+  // ========== ���߷�����ͬ����==========
 
   /**
-   * 检测网络质量（共享函数）
+   * ����������������������
    * @returns {'fast'|'medium'|'slow'}
    */
   function detectNetworkQuality() {
@@ -581,29 +631,29 @@
       quality = 'slow'
     }
 
-    // 更新全局状态
+    // ����ȫ��״̬
     state._lastNetworkQuality = quality
     return quality
   }
 
-  // 设备性能缓存
+  // �豸���ܻ���
   let _cachedDeviceTier = null
 
   /**
-   * 检测设备性能等级
+   * ����豸���ܵȼ�
    * @returns {'high'|'medium'|'low'}
    */
   function detectDeviceTier() {
     if (_cachedDeviceTier) {return _cachedDeviceTier}
 
     let tier = 'medium'
-    // 优先使用 deviceMemory API
+    // ����ʹ�� deviceMemory API
     if (navigator.deviceMemory) {
       if (navigator.deviceMemory >= 8) {tier = 'high'}
       else if (navigator.deviceMemory >= 4) {tier = 'medium'}
       else {tier = 'low'}
     } else if (navigator.hardwareConcurrency) {
-      // 回退：根据硬件并发数判断
+      // ���ˣ�����Ӳ���������ж�
       if (navigator.hardwareConcurrency >= 8) {tier = 'high'}
       else if (navigator.hardwareConcurrency >= 4) {tier = 'medium'}
       else {tier = 'low'}
@@ -614,24 +664,24 @@
   }
 
   /**
-   * 增强的可视区检测
-   * @param {Element} element - 要检测的元素
-   * @param {Object} options - 配置选项
+   * ��ǿ�Ŀ��������
+   * @param {Element} element - Ҫ����Ԫ��
+   * @param {Object} options - ����ѡ��
    * @returns {{inViewport: boolean, aboveFold: boolean, visible: boolean, priority: 'high'|'auto'|'low'}}
    */
   function detectViewportState(element, options = {}) {
     const {
-      topThreshold = 0.5, // 首屏顶部区域比例
-      bottomBuffer = 100, // 底部缓冲区
-      minVisibleArea = 0.1, // 最小可见面积比例
+      topThreshold = 0.5, // ���������������
+      bottomBuffer = 100, // �ײ�������
+      minVisibleArea = 0.1, // ��С�ɼ��������
     } = options
 
-    // 基础检查：元素是否存在
+    // ������飺Ԫ���Ƿ����
     if (!element || !element.isConnected) {
       return { inViewport: false, aboveFold: false, visible: false, priority: 'low' }
     }
 
-    // 检查元素可见性
+    // ���Ԫ�ؿɼ���
     const style = window.getComputedStyle(element)
     const isVisible =
       style.display !== 'none' && style.visibility !== 'hidden' && parseFloat(style.opacity) > 0
@@ -640,19 +690,19 @@
       return { inViewport: false, aboveFold: false, visible: false, priority: 'low' }
     }
 
-    // 获取元素边界
+    // ��ȡԪ�ر߽�
     const rect = element.getBoundingClientRect()
     const viewportWidth = window.innerWidth
     const viewportHeight = window.innerHeight
 
-    // 检查元素尺寸
+    // ���Ԫ�سߴ�
     const elementArea = rect.width * rect.height
     if (elementArea < 10) {
-      // 小于10像素的元素
+      // С��10���ص�Ԫ��
       return { inViewport: false, aboveFold: false, visible: true, priority: 'low' }
     }
 
-    // 检查是否在可视区内（考虑水平和垂直）
+    // ����Ƿ��ڿ������ڣ�����ˮƽ�ʹ�ֱ��
     const inViewportX = rect.right > 0 && rect.left < viewportWidth
     const inViewportY = rect.bottom > 0 && rect.top < viewportHeight + bottomBuffer
     const inViewport = inViewportX && inViewportY
@@ -661,27 +711,27 @@
       return { inViewport: false, aboveFold: false, visible: true, priority: 'low' }
     }
 
-    // 计算可见面积比例
+    // ����ɼ��������
     const visibleWidth = Math.min(rect.right, viewportWidth) - Math.max(rect.left, 0)
     const visibleHeight = Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0)
     const visibleArea = visibleWidth * visibleHeight
     const visibleRatio = visibleArea / elementArea
 
-    // 可见面积太小
+    // �ɼ����̫С
     if (visibleRatio < minVisibleArea) {
       return { inViewport: true, aboveFold: false, visible: true, priority: 'low' }
     }
 
-    // 检查是否在首屏顶部
+    // ����Ƿ�����������
     const aboveFold = rect.top < viewportHeight * topThreshold
 
-    // 确定优先级
+    // ȷ�����ȼ�
     let priority = 'auto'
     if (aboveFold && rect.top < viewportHeight * 0.3) {
-      // 首屏前30%区域，高优先级
+      // ����ǰ30%���򣬸����ȼ�
       priority = 'high'
     } else if (rect.top > viewportHeight) {
-      // 完全在可视区下方
+      // ��ȫ�ڿ������·�
       priority = 'low'
     }
 
@@ -729,16 +779,16 @@
     }
   }
 
-  // ========== 站点级配置 ==========
+  // ========== վ�㼶���� ==========
 
   function getSiteConfig(hostname) {
     const rules = state.config.siteConfig?.rules || []
 
-    // 精确匹配优先
+    // ��ȷƥ������
     const exact = rules.find((r) => r.domain === hostname)
     if (exact) {return exact}
 
-    // 通配符匹配 (*.domain.com)
+    // ͨ���ƥ�� (*.domain.com)
     const wildcard = rules.find((r) => {
       if (!r.domain.startsWith('*')) {return false}
       const suffix = r.domain.slice(1)
@@ -751,17 +801,17 @@
   function isSiteEnabled(feature) {
     const site = getSiteConfig(location.hostname)
 
-    // 站点级别完全禁用
+    // վ�㼶����ȫ����
     if (site && site.enabled === false) {return false}
 
-    // 站点级别功能开关
+    // վ�㼶���ܿ���
     if (site && feature in site) {return site[feature]}
 
-    // 回退到全局配置
+    // ���˵�ȫ������
     return state.config[feature]
   }
 
-  // ========== 高级过滤规则 ==========
+  // ========== �߼����˹��� ==========
 
   function matchAdvancedFilter(url, context = {}) {
     const filter = state.config.advancedFilter
@@ -808,7 +858,7 @@
       }
 
       if (matches) {
-        // 检查 type 是否匹配
+        // ��� type �Ƿ�ƥ��
         if (rule.type === 'include' && !context.isInclude) {continue}
         if (rule.type === 'exclude' && context.isInclude) {continue}
 
@@ -819,21 +869,21 @@
     return { matched: false, action: null }
   }
 
-  // ========== 精准图片压缩 ==========
+  // ========== ��׼ͼƬѹ�� ==========
 
   const _headSizeCache = new Map() // URL -> { size: number, timestamp: number }
-  const HEAD_CACHE_TTL = 30000 // 30秒缓存
+  const HEAD_CACHE_TTL = 30000 // 30�뻺��
   let _headRequestCount = 0
   const MAX_HEAD_CONCURRENT = 5
 
   async function getImageActualSize(url) {
-    // 检查缓存
+    // ��黺��
     const cached = _headSizeCache.get(url)
     if (cached && Date.now() - cached.timestamp < HEAD_CACHE_TTL) {
       return cached.size
     }
 
-    // 并发限制
+    // ��������
     if (_headRequestCount >= MAX_HEAD_CONCURRENT) {
       return null
     }
@@ -841,7 +891,7 @@
     _headRequestCount++
     try {
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 3000) // 3秒超时
+      const timeoutId = setTimeout(() => controller.abort(), 3000) // 3�볬ʱ
 
       const response = await fetch(url, {
         method: 'HEAD',
@@ -858,7 +908,7 @@
         return size
       }
     } catch {
-      // CORS 限制或其他错误，降级到估算
+      // CORS ���ƻ��������󣬽���������
     } finally {
       _headRequestCount--
     }
@@ -901,7 +951,7 @@
           return fmt
         }
       } catch (error) {
-        console.warn('[detectImageFormat] 检测图片格式失败:', error)
+        console.warn('[detectImageFormat] ���ͼƬ��ʽʧ��:', error)
       }
     }
     state._imageFormat = IMAGE_FORMAT_PRIORITY[2]
@@ -936,7 +986,7 @@
     return null
   }
 
-  // ========== 第三方脚本延迟加载 ==========
+  // ========== �������ű��ӳټ��� ==========
 
   function matchDeferralRule(url) {
     const deferral = state.config.thirdPartyDeferral
@@ -949,7 +999,7 @@
           return { pattern: rule.pattern, strategy: rule.strategy, name: rule.pattern }
         }
       } catch (error) {
-        console.warn('[getThirdPartyDeferral] 正则表达式匹配失败:', error)
+        console.warn('[getThirdPartyDeferral] ������ʽƥ��ʧ��:', error)
       }
     }
 
@@ -982,20 +1032,20 @@
       if (script.dataset._raLoaded) {return}
       script.src = script.dataset._deferredSrc
       script.dataset._raLoaded = 'true'
-      console.log(`${LOG_PREFIX} 第三方脚本延迟加载完成: ${src.substring(0, 60)}...`)
+      console.log(`${LOG_PREFIX} �������ű��ӳټ������: ${src.substring(0, 60)}...`)
     }
 
     const maxMs = state.config.thirdPartyDeferral.maxDeferralMs
 
-    // 最大延迟时间兜底
+    // ����ӳ�ʱ�䶵��
     const forceLoadTimer = setTimeout(() => {
       if (!script.dataset._raLoaded) {
-        console.log(`${LOG_PREFIX} 第三方脚本超过最大延迟，强制加载: ${src.substring(0, 60)}...`)
+        console.log(`${LOG_PREFIX} �������ű���������ӳ٣�ǿ�Ƽ���: ${src.substring(0, 60)}...`)
         loadFn()
       }
     }, maxMs)
 
-    // 加载成功后清除定时器
+    // ���سɹ��������ʱ��
     const origOnload = script.onload
     script.onload = () => {
       clearTimeout(forceLoadTimer)
@@ -1020,12 +1070,12 @@
       case 'block':
         clearTimeout(forceLoadTimer)
         state.stats.thirdPartyBlocked++
-        console.log(`${LOG_PREFIX} 第三方脚本已阻止: ${src.substring(0, 60)}...`)
+        console.log(`${LOG_PREFIX} �������ű�����ֹ: ${src.substring(0, 60)}...`)
         break
     }
   }
 
-  // ========== 核心拦截：脚本处理 ==========
+  // ========== �������أ��ű����� ==========
 
   async function processScript(script) {
     if (state.cspRestricted) {return}
@@ -1040,7 +1090,7 @@
       return
     }
 
-    // 高级过滤检查
+    // �߼����˼��
     const filterResult = matchAdvancedFilter(url)
     if (filterResult.matched) {
       if (filterResult.action === 'skipAll' || filterResult.action === 'skipReplace') {
@@ -1049,7 +1099,7 @@
       }
     }
 
-    // 去重检查：同一原始URL不重复替换
+    // ȥ�ؼ�飺ͬһԭʼURL���ظ��滻
     if (state.config.dedupEnabled && state.dedupSet.has(url)) {
       addLog('info', 'script', 'skip', { url, reason: 'deduplicated' })
       return
@@ -1057,10 +1107,10 @@
 
     const startTime = performance.now()
 
-    // 使用异步匹配（支持 jsDelivr API 动态查询）
+    // ʹ���첽ƥ�䣨֧�� jsDelivr API ��̬��ѯ��
     const match = await window.CDNMappings?.matchJSLibraryAsync?.(url)
 
-    // CDN 无法替换 → 尝试第三方延迟
+    // CDN �޷��滻 �� ���Ե������ӳ�
     if (!match) {
       if (state.config.thirdPartyDeferral?.enabled && state.config.jsReplace) {
         const deferralRule = matchDeferralRule(url)
@@ -1142,11 +1192,11 @@
     }
 
     console.log(
-      `${LOG_PREFIX} JS: ${match.name} → ${match.cdnName}${match.isDynamic ? ' (dynamic)' : ''}`
+      `${LOG_PREFIX} JS: ${match.name} �� ${match.cdnName}${match.isDynamic ? ' (dynamic)' : ''}`
     )
   }
 
-  // ========== 核心拦截：样式/字体处理 ==========
+  // ========== �������أ���ʽ/���崦�� ==========
 
   function processLink(link) {
     if (state.cspRestricted) {return}
@@ -1161,7 +1211,7 @@
       return
     }
 
-    // 高级过滤检查
+    // �߼����˼��
     const filterResult = matchAdvancedFilter(url)
     if (filterResult.matched) {
       if (filterResult.action === 'skipAll' || filterResult.action === 'skipReplace') {
@@ -1170,7 +1220,7 @@
       }
     }
 
-    // 去重检查：同一原始URL不重复替换
+    // ȥ�ؼ�飺ͬһԭʼURL���ظ��滻
     if (state.config.dedupEnabled && state.dedupSet.has(url)) {
       addLog('info', 'style', 'skip', { url, reason: 'deduplicated' })
       return
@@ -1178,11 +1228,11 @@
 
     const startTime = performance.now()
 
-    // 先尝试字体匹配，再尝试CSS匹配
+    // �ȳ�������ƥ�䣬�ٳ���CSSƥ��
     const fontMatch = window.CDNMappings?.matchFont(url)
     const cssMatch = !fontMatch ? window.CDNMappings?.matchCSS(url) : null
 
-    // 检查各自的开关
+    // �����ԵĿ���
     if (fontMatch && !state.config.fontReplace) {
       addLog('info', 'style', 'skip', { url, reason: 'font_replace_disabled' })
       return
@@ -1259,13 +1309,13 @@
       _priorityOptimizer.applyPriorityToResource(link, url, 'style')
     }
 
-    console.log(`${LOG_PREFIX} ${fontMatch ? 'Font' : 'CSS'}: ${match.name} → ${match.cdnName}`)
+    console.log(`${LOG_PREFIX} ${fontMatch ? 'Font' : 'CSS'}: ${match.name} �� ${match.cdnName}`)
   }
 
-  // ========== 核心拦截：图片懒加载 ==========
+  // ========== �������أ�ͼƬ������ ==========
 
   function processImage(img) {
-    // SVG 优化：与图片懒加载独立，优先处理
+    // SVG �Ż�����ͼƬ�����ض��������ȴ���
     if (img.src && !img.dataset._raSvgProcessed && !img.dataset._raProcessed) {
       if (/\.svg(\?|#|$)/i.test(img.src) || /\/svg\+xml/i.test(img.src)) {
         if (isSiteEnabled('svgOptimize') && !state.cspRestricted) {
@@ -1281,7 +1331,7 @@
     if (img.loading === 'eager' || img.hasAttribute('data-no-lazy')) {return}
     if (img.complete && img.naturalWidth > 0) {return}
 
-    // 高级过滤检查
+    // �߼����˼��
     const filterResult = matchAdvancedFilter(img.src)
     if (filterResult.matched) {
       if (filterResult.action === 'skipAll' || filterResult.action === 'skipReplace') {
@@ -1292,14 +1342,14 @@
 
     img.dataset._raProcessed = '1'
 
-    // 位置感知加载：检测图片位置
+    // λ�ø�֪���أ����ͼƬλ��
     const positionState = _getResourcePositionPriority(img)
 
-    // far 区域加入延迟加载观察，不立即处理
+    // far ��������ӳټ��ع۲죬����������
     if (positionState.zone === 'far') {
       if (img.src && !img.dataset.lazySrc) {
         img.dataset.lazySrc = img.src
-        // 使用透明占位图保持布局
+        // ʹ��͸��ռλͼ���ֲ���
         img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
       }
       if ('fetchPriority' in img) {img.fetchPriority = 'low'}
@@ -1314,14 +1364,14 @@
       return
     }
 
-    // 增强的可视区检测
+    // ��ǿ�Ŀ��������
     const viewportState = detectViewportState(img, {
       topThreshold: 0.5,
       bottomBuffer: 100,
       minVisibleArea: 0.1,
     })
 
-    // 可视区图片：立即加载，不延迟
+    // ������ͼƬ���������أ����ӳ�
     if (viewportState.inViewport && viewportState.visible) {
       img.loading = 'eager'
       if ('fetchPriority' in img) {img.fetchPriority = viewportState.priority}
@@ -1330,7 +1380,7 @@
         _priorityOptimizer.applyPriorityToResource(img, img.src, 'image')
       }
 
-      // 可视区图片：后台压缩，前台立即显示原图
+      // ������ͼƬ����̨ѹ����ǰ̨������ʾԭͼ
       if (state.config.imageCompress) {
         img.dataset.src = img.src
         addLog('info', 'image', 'viewport', {
@@ -1340,7 +1390,7 @@
           visibleRatio: viewportState.visibleRatio?.toFixed(2),
         })
 
-        // 后台压缩（低优先级）
+        // ��̨ѹ���������ȼ���
         if (state.compressQueue.length < 3) {
           compressImage(img.src).then((compressed) => {
             if (compressed && !state._isNavigating) {
@@ -1353,7 +1403,7 @@
       return
     }
 
-    // 非可视区或不可见图片：懒加载处理
+    // �ǿ������򲻿ɼ�ͼƬ�������ش���
     img.loading = 'lazy'
     if ('fetchPriority' in img) {img.fetchPriority = 'low'}
     img.dataset._raLazyLoad = '1'
@@ -1365,18 +1415,18 @@
     const originalSrc = img.src
     img.dataset.src = originalSrc
 
-    // LQIP：设置渐进式占位
+    // LQIP�����ý���ʽռλ
     if (state.config.lqip?.enabled) {
       img.dataset.lqip = '1'
       img.style.backgroundColor = state.config.lqip.placeholderColor || '#f0f0f0'
       img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
     }
 
-    // 图片压缩：预压缩后直接加载
+    // ͼƬѹ����Ԥѹ����ֱ�Ӽ���
     if (state.config.imageCompress) {
       enqueueCompress(img, originalSrc)
     } else {
-      // 非压缩路径：如果 LQIP 启用，触发过渡；否则仅懒加载
+      // ��ѹ��·������� LQIP ���ã��������ɣ������������
       if (state.config.lqip?.enabled) {
         _triggerLqipTransition(img)
       } else {
@@ -1392,7 +1442,7 @@
     }
   }
 
-  // ========== 第三方iframe懒加载 ==========
+  // ========== ������iframe������ ==========
   function processIframeLazyLoad() {
     if (!isSiteEnabled('iframeLazyLoad')) {return}
     const config = state.config.iframeLazyLoad
@@ -1408,28 +1458,28 @@
 
         iframe.dataset._raIframeProcessed = '1'
 
-        // 使用位置优先级判断
+        // ʹ��λ�����ȼ��ж�
         const { zone } = _getResourcePositionPriority(iframe)
 
         if (zone === 'inViewport') {
-          // 视口内：正常加载
+          // �ӿ��ڣ���������
           if ('fetchPriority' in iframe) {iframe.fetchPriority = 'high'}
           return
         }
 
-        // nearby 和 far 区域：延迟加载
+        // nearby �� far �����ӳټ���
         iframe.dataset.lazySrc = iframe.src
         iframe.loading = 'lazy'
         if ('fetchPriority' in iframe) {iframe.fetchPriority = zone === 'nearby' ? 'auto' : 'low'}
 
-        // far 区域：使用 data-src 模式，保留 src 占位
+        // far ����ʹ�� data-src ģʽ������ src ռλ
         if (zone === 'far') {
-          // 设置透明占位，保留 iframe 结构
+          // ����͸��ռλ������ iframe �ṹ
           iframe.src = 'about:blank'
         }
-        // nearby 区域：保留原 src，依赖浏览器原生 lazy loading
+        // nearby ���򣺱���ԭ src�����������ԭ�� lazy loading
 
-        // 使用统一的延迟加载观察器
+        // ʹ��ͳһ���ӳټ��ع۲���
         _observeLazyLoad(iframe)
 
         addLog('info', 'iframe', 'lazy', {
@@ -1437,12 +1487,12 @@
           zone: zone,
         })
       } catch {
-        // URL 解析失败，跳过
+        // URL ����ʧ�ܣ�����
       }
     })
   }
 
-  // ========== 全站DNS prefetch ==========
+  // ========== ȫվDNS prefetch ==========
   function _addGlobalDnsPrefetch() {
     if (!isSiteEnabled('dnsPrefetch')) {return}
     const config = state.config.dnsPrefetch
@@ -1475,11 +1525,11 @@
     })
   }
 
-  // ========== 核心拦截：SVG 优化 ==========
+  // ========== �������أ�SVG �Ż� ==========
 
   /**
-   * 处理 SVG 图片：优化内容并内联小 SVG
-   * @param {HTMLImageElement} img - 图片元素
+   * ���� SVG ͼƬ���Ż����ݲ�����С SVG
+   * @param {HTMLImageElement} img - ͼƬԪ��
    */
   async function processSVG(img) {
     if (state.cspRestricted) {return}
@@ -1488,15 +1538,15 @@
     const url = img.src
     if (!url || img.dataset._raSvgProcessed) {return}
 
-    // 已经是 data URI，跳过
+    // �Ѿ��� data URI������
     if (url.startsWith('data:')) {return}
 
-    // 判断是否为 SVG
+    // �ж��Ƿ�Ϊ SVG
     if (!/\.svg(\?|#|$)/i.test(url) && !/\/svg\+xml/i.test(url)) {return}
 
     img.dataset._raSvgProcessed = '1'
 
-    // 高级过滤检查
+    // �߼����˼��
     const filterResult = matchAdvancedFilter(url)
     if (filterResult.matched) {
       if (filterResult.action === 'skipAll' || filterResult.action === 'skipReplace') {
@@ -1505,14 +1555,14 @@
       }
     }
 
-    // 缓存命中
+    // ��������
     if (state._svgCache.has(url)) {
       const cached = state._svgCache.get(url)
       if (cached) {img.src = cached}
       return
     }
 
-    // 域名排除
+    // �����ų�
     try {
       const urlObj = new URL(url, location.href)
       if (state.config.excludeDomains.some((d) => urlObj.hostname.includes(d))) {
@@ -1534,26 +1584,26 @@
       const config = state.config.svgOptimize
       let optimized = text
 
-      // 移除注释
+      // �Ƴ�ע��
       if (config.removeComments) {
         optimized = optimized.replace(/<!--[\s\S]*?-->/g, '')
       }
 
-      // 移除元数据（Inkscape / sodipodi 等编辑器生成的非必要元素）
+      // �Ƴ�Ԫ���ݣ�Inkscape / sodipodi �ȱ༭�����ɵķǱ�ҪԪ�أ�
       if (config.removeMetadata) {
         optimized = optimized.replace(/<metadata[\s\S]*?<\/metadata>/gi, '')
         optimized = optimized.replace(/<sodipodi:[\s\S]*?\/>/gi, '')
         optimized = optimized.replace(/<inkscape:[\s\S]*?\/>/gi, '')
       }
 
-      // 压缩空白
+      // ѹ���հ�
       if (config.minify) {
         optimized = optimized.replace(/\s+/g, ' ').replace(/>\s+</g, '><').trim()
       }
 
       const optimizedSize = new Blob([optimized]).size
 
-      // 小 SVG：内联为 data URI
+      // С SVG������Ϊ data URI
       if (optimizedSize <= config.maxInlineSize) {
         const dataUri = `data:image/svg+xml,${encodeURIComponent(optimized)}`
         img.src = dataUri
@@ -1574,7 +1624,7 @@
         return
       }
 
-      // 大 SVG：优化后替换（需有 5% 以上收益）
+      // �� SVG���Ż����滻������ 5% �������棩
       if (optimizedSize < originalSize * 0.95) {
         const blob = new Blob([optimized], { type: 'image/svg+xml' })
         const blobUrl = URL.createObjectURL(blob)
@@ -1593,25 +1643,25 @@
           duration: Math.round(performance.now() - startTime),
         })
       }
-      // 优化收益不足，保持原图
+      // �Ż����治�㣬����ԭͼ
     } catch (error) {
       addLog('error', 'svg', 'error', { url, reason: 'svg_optimize_failed' })
     }
   }
 
-  // ========== 图片压缩 ==========
+  // ========== ͼƬѹ�� ==========
 
-  // 图片压缩优先级与阈值常量
+  // ͼƬѹ�����ȼ�����ֵ����
   const COMPRESS_PRIORITY = { IN_VIEW: 0, SMALL: 1, LARGE: 2 }
   const SMALL_IMAGE_PIXEL_THRESHOLD = 100000
 
-  // 位置优先级缓存（避免滚动时频繁调用 getBoundingClientRect）
+  // λ�����ȼ����棨�������ʱƵ������ getBoundingClientRect��
   const _positionPriorityCache = new WeakMap()
-  const _POSITION_CACHE_TTL = 100 // 100ms 缓存有效期
+  const _POSITION_CACHE_TTL = 100 // 100ms ������Ч��
 
   /**
-   * 获取资源位置优先级
-   * @param {Element} element - DOM元素
+   * ��ȡ��Դλ�����ȼ�
+   * @param {Element} element - DOMԪ��
    * @returns {{ zone: 'inViewport'|'nearby'|'far', priority: number, distance: number }}
    */
   function _getResourcePositionPriority(element) {
@@ -1619,7 +1669,7 @@
       return { zone: 'far', priority: 999, distance: Infinity }
     }
 
-    // 检查缓存
+    // ��黺��
     const cached = _positionPriorityCache.get(element)
     if (cached && performance.now() - cached.time < _POSITION_CACHE_TTL) {
       return cached.result
@@ -1628,44 +1678,44 @@
     const rect = element.getBoundingClientRect()
     const viewportHeight = window.innerHeight
 
-    // 计算元素距离视口的距离
+    // ����Ԫ�ؾ����ӿڵľ���
     const distanceToViewport =
       rect.top < 0
-        ? -rect.top // 视口上方，取绝对值
+        ? -rect.top // �ӿ��Ϸ���ȡ����ֵ
         : rect.top > viewportHeight
-          ? rect.top - viewportHeight // 视口下方
-          : 0 // 在视口内
+          ? rect.top - viewportHeight // �ӿ��·�
+          : 0 // ���ӿ���
 
-    // 获取配置的距离阈值（屏数）
+    // ��ȡ���õľ�����ֵ��������
     const nearbyThreshold =
       (state.config.positionAwareLoading?.nearbyThreshold || 1) * viewportHeight
 
-    // 判断区域
+    // �ж�����
     let result
     if (distanceToViewport === 0) {
       result = { zone: 'inViewport', priority: 0, distance: 0 }
     } else if (distanceToViewport <= nearbyThreshold) {
-      // nearby 区域：优先级 10-19，距离越近优先级越高
+      // nearby �������ȼ� 10-19������Խ�����ȼ�Խ��
       result = {
         zone: 'nearby',
         priority: 10 + Math.floor((distanceToViewport / viewportHeight) * 10),
         distance: distanceToViewport,
       }
     } else {
-      // far 区域
+      // far ����
       result = { zone: 'far', priority: 100, distance: distanceToViewport }
     }
 
-    // 更新缓存
+    // ���»���
     _positionPriorityCache.set(element, { result, time: performance.now() })
 
     return result
   }
 
   /**
-   * 检查资源是否已加载
-   * @param {Element} element - DOM元素
-   * @param {string} type - 资源类型
+   * �����Դ�Ƿ��Ѽ���
+   * @param {Element} element - DOMԪ��
+   * @param {string} type - ��Դ����
    * @returns {boolean}
    */
   function _isResourceLoaded(element, type) {
@@ -1674,7 +1724,7 @@
         return element.complete && element.naturalHeight > 0
       case 'iframe':
         if (element.dataset.loaded === 'true') {return true}
-        // 跨域iframe访问contentDocument会抛出安全错误
+        // ����iframe����contentDocument���׳���ȫ����
         try {
           return element.contentDocument !== null
         } catch {
@@ -1687,18 +1737,18 @@
     }
   }
 
-  // ========== 延迟加载观察器 ==========
+  // ========== �ӳټ��ع۲��� ==========
   let _lazyLoadObserver = null
 
   /**
-   * 设置延迟加载观察器
+   * �����ӳټ��ع۲���
    */
   function _setupLazyLoadObserver() {
     if (_lazyLoadObserver) {return}
     if (typeof IntersectionObserver === 'undefined') {return}
 
     const nearbyThreshold = state.config.positionAwareLoading?.nearbyThreshold || 1
-    // 限制最大阈值为 2 屏（200%），避免预加载过多资源
+    // ���������ֵΪ 2 ����200%��������Ԥ���ع�����Դ
     const cappedThreshold = Math.min(nearbyThreshold, 2)
     const rootMargin = `${cappedThreshold * 100}% 0px ${cappedThreshold * 100}% 0px`
 
@@ -1709,13 +1759,13 @@
             const el = entry.target
             const type = el.tagName.toLowerCase()
 
-            // 触发加载
+            // ��������
             if (el.dataset.lazySrc) {
               el.src = el.dataset.lazySrc
               delete el.dataset.lazySrc
             }
 
-            // 图片触发压缩
+            // ͼƬ����ѹ��
             if (type === 'img' && !el.complete && el.src) {
               enqueueCompress(el, el.src)
             }
@@ -1733,8 +1783,8 @@
   }
 
   /**
-   * 将元素加入延迟加载观察
-   * @param {Element} element - DOM元素
+   * ��Ԫ�ؼ����ӳټ��ع۲�
+   * @param {Element} element - DOMԪ��
    */
   function _observeLazyLoad(element) {
     if (!_lazyLoadObserver) {return}
@@ -1742,7 +1792,7 @@
   }
 
   /**
-   * 销毁延迟加载观察器
+   * �����ӳټ��ع۲���
    */
   function _destroyLazyLoadObserver() {
     if (_lazyLoadObserver) {
@@ -1752,25 +1802,213 @@
   }
 
   /**
-   * 初始化位置感知加载
+   * ��ʼ��λ�ø�֪����
    */
   function _initPositionAwareLoading() {
     if (!state.config.positionAwareLoading?.enabled) {return}
     _setupLazyLoadObserver()
   }
 
-  // 获取图片压缩优先级（基于位置）
+  // Throttle ������
+  const RECHECK_THROTTLE_MS = 100
+
+  /**
+   * ���¼����������ӳټ��ص�ͼƬ��throttled��
+   * ���� tab �л���display �仯�ȳ���
+   */
+  function _recheckVisibleLazyImages() {
+    // throttle����ֹƵ������
+    if (state._recheckThrottleTimer) {return}
+    state._recheckThrottleTimer = setTimeout(() => {
+      state._recheckThrottleTimer = null
+      _doRecheckVisibleLazyImages()
+    }, RECHECK_THROTTLE_MS)
+  }
+
+  /**
+   * ִ�п�����ͼƬ���
+   */
+  function _doRecheckVisibleLazyImages() {
+    const lazyImages = document.querySelectorAll('img[data-lazySrc]:not([data-lazyLoaded="true"])')
+
+    lazyImages.forEach((img) => {
+      // ���Ԫ���Ƿ�ɼ�
+      const style = window.getComputedStyle(img)
+      if (style.display === 'none' || style.visibility === 'hidden') {return}
+
+      // ����Ƿ��ڿ�����
+      const rect = img.getBoundingClientRect()
+      const viewportHeight = window.innerHeight
+      const viewportWidth = window.innerWidth
+
+      const inViewport =
+        rect.bottom > 0 &&
+        rect.top < viewportHeight &&
+        rect.right > 0 &&
+        rect.left < viewportWidth
+
+      if (inViewport && img.dataset.lazySrc) {
+        const originalSrc = img.dataset.lazySrc
+        delete img.dataset.lazySrc
+
+        // ��������
+        img.src = originalSrc
+        // ���ô�������
+        _setupImageErrorRetry(img, originalSrc)
+        img.dataset.lazyLoaded = 'true'
+        img.loading = 'eager'
+        if ('fetchPriority' in img) {img.fetchPriority = 'high'}
+
+        // �������ѹ��������ѹ������
+        if (state.config.imageCompress && !img.dataset.compressed) {
+          enqueueCompress(img, originalSrc)
+        }
+
+        addLog('info', 'image', 'viewport_reload', {
+          url: originalSrc,
+          reason: 'tab_switch_or_display_change',
+        })
+      }
+    })
+  }
+
+  /**
+   * DOM ׼���ú��ʼ���Ĺ���
+   * ͳһ������Ҫ document.body ���ڵĳ�ʼ���߼�
+   */
+  function _initAfterDOMReady() {
+    if (state._domReadyInitialized) {return}
+
+    const runInit = () => {
+      state._domReadyInitialized = true
+      _setupStyleChangeObserver()
+    }
+
+    if (document.body) {
+      runInit()
+    } else {
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', runInit, { once: true })
+      } else {
+        // readyState �� interactive �� complete���� body �Բ����ڣ����ټ���
+        const docObserver = new MutationObserver(() => {
+          if (document.body) {
+            docObserver.disconnect()
+            runInit()
+          }
+        })
+        docObserver.observe(document.documentElement, { childList: true, subtree: true })
+      }
+    }
+  }
+
+  /**
+   * ������ʽ�仯�۲���
+   * ���� display/visibility/hidden ���Ա仯������������ͼƬ���¼��
+   * ע�⣺�˺���Ӧͨ�� _initAfterDOMReady ���ã�ȷ�� document.body �Ѵ���
+   */
+  function _setupStyleChangeObserver() {
+    if (state._styleChangeObserver) {return}
+    if (typeof MutationObserver === 'undefined') {return}
+    // �����Լ�飺��� body �����ڣ���¼����
+    if (!document.body) {
+      console.warn(`${LOG_PREFIX} _setupStyleChangeObserver called before document.body is ready`)
+      return
+    }
+
+    state._styleChangeObserver = new MutationObserver((mutations) => {
+      let shouldRecheck = false
+
+      for (const mutation of mutations) {
+        // ����Ƿ�����ʽ�����Ա仯
+        if (mutation.type === 'attributes') {
+          const attr = mutation.attributeName
+          if (attr === 'style' || attr === 'hidden' || attr === 'class') {
+            shouldRecheck = true
+            break
+          }
+        }
+      }
+
+      if (shouldRecheck) {
+        _recheckVisibleLazyImages()
+      }
+    })
+
+    // �۲� body ������Ԫ�ص����Ա仯
+    state._styleChangeObserver.observe(document.body, {
+      attributes: true,
+      attributeFilter: ['style', 'hidden', 'class'],
+      subtree: true,
+      childList: false,
+    })
+
+    addLog('info', 'loader', 'init', { feature: 'styleChangeObserver' })
+  }
+
+  /**
+   * ������ʽ�仯�۲���
+   */
+  function _destroyStyleChangeObserver() {
+    if (state._styleChangeObserver) {
+      state._styleChangeObserver.disconnect()
+      state._styleChangeObserver = null
+    }
+  }
+
+  /**
+   * ����ͼƬ���ش�������
+   * @param {HTMLImageElement} img - ͼƬԪ��
+   * @param {string} src - ԭʼURL
+   */
+  function _setupImageErrorRetry(img, src) {
+    if (!src || src.startsWith('data:')) {return}
+
+    img.onerror = () => {
+      const retryCount = state._imageRetryCount.get(src) || 0
+
+      if (retryCount < IMAGE_RETRY_MAX) {
+        state._imageRetryCount.set(src, retryCount + 1)
+
+        addLog('warn', 'image', 'retry', {
+          url: src,
+          reason: 'load_failed',
+          attempt: retryCount + 1,
+          maxAttempts: IMAGE_RETRY_MAX,
+        })
+
+        // �ӳ�����
+        setTimeout(() => {
+          if (img.isConnected && !img.complete) {
+            // ���ʱ�����ֹ����
+            const separator = src.includes('?') ? '&' : '?'
+            img.src = `${src}${separator}_retry=${Date.now()}`
+          }
+        }, IMAGE_RETRY_DELAY_MS * (retryCount + 1))
+      } else {
+        addLog('error', 'image', 'error', {
+          url: src,
+          reason: 'max_retry_exceeded',
+          attempts: retryCount,
+        })
+        // �������Լ���
+        state._imageRetryCount.delete(src)
+      }
+    }
+  }
+
+  // ��ȡͼƬѹ�����ȼ�������λ�ã�
   function _getCompressPriority(img) {
-    // 已加载跳过
+    // �Ѽ�������
     if (_isResourceLoaded(img, 'image')) {return 999}
 
     const { zone, priority } = _getResourcePositionPriority(img)
 
-    // far 区域不压缩
+    // far ����ѹ��
     if (zone === 'far') {return 999}
 
-    // inViewport 和 nearby 使用位置优先级
-    // 小图在同级别内微调 -1
+    // inViewport �� nearby ʹ��λ�����ȼ�
+    // Сͼ��ͬ������΢�� -1
     const size = (img.naturalWidth || 0) * (img.naturalHeight || 0)
     const sizeBonus = size < 100000 ? -1 : 0
 
@@ -1778,9 +2016,9 @@
   }
 
   function enqueueCompress(img, src) {
-    // 限制队列大小，避免内存溢出
+    // ���ƶ��д�С�������ڴ����
     if (state.compressQueue.length >= state.config.maxCompressQueueSize) {
-      // 队列满时直接加载原图
+      // ������ʱֱ�Ӽ���ԭͼ
       img.src = src
       img.dataset.lazyLoading = 'false'
       img.dataset.lazyLoaded = 'true'
@@ -1788,11 +2026,11 @@
       return
     }
 
-    // 计算优先级并插入到队列的合适位置
+    // �������ȼ������뵽���еĺ���λ��
     const priority = _getCompressPriority(img)
     let insertIndex = state.compressQueue.length
 
-    // 找到第一个优先级比当前低（数值更大）的位置
+    // �ҵ���һ�����ȼ��ȵ�ǰ�ͣ���ֵ���󣩵�λ��
     for (let i = 0; i < state.compressQueue.length; i++) {
       if (state.compressQueue[i].priority < priority) {
         insertIndex = i
@@ -1805,7 +2043,7 @@
   }
 
   async function processCompressQueue() {
-    // 页面跳转时停止处理
+    // ҳ����תʱֹͣ����
     if (state._isNavigating) {
       state.compressQueue = []
       return
@@ -1815,13 +2053,13 @@
       state.compressingCount < state.config.imageMaxConcurrency &&
       state.compressQueue.length > 0
     ) {
-      // 页面跳转时停止处理
+      // ҳ����תʱֹͣ����
       if (state._isNavigating) {
         state.compressQueue = []
         return
       }
 
-      // 按优先级取任务：总是取第一个（最高优先级）
+      // �����ȼ�ȡ��������ȡ��һ����������ȼ���
       const task = state.compressQueue.shift()
       state.compressingCount++
       const startTime = performance.now()
@@ -1829,7 +2067,7 @@
         const compressed = await compressImage(task.src)
         const duration = Math.round(performance.now() - startTime)
         if (compressed) {
-          // 压缩成功，直接加载压缩版本
+          // ѹ���ɹ���ֱ�Ӽ���ѹ���汾
           task.img.src = compressed
           task.img.dataset.lazyLoading = 'false'
           task.img.dataset.lazyLoaded = 'true'
@@ -1841,7 +2079,7 @@
             duration,
           })
         } else {
-          // 压缩失败或不值得压缩，回退到原图
+          // ѹ��ʧ�ܻ�ֵ��ѹ�������˵�ԭͼ
           task.img.src = task.src
           task.img.dataset.lazyLoading = 'false'
           task.img.dataset.lazyLoaded = 'true'
@@ -1853,7 +2091,7 @@
           })
         }
       } catch {
-        // 异常时回退到原图
+        // �쳣ʱ���˵�ԭͼ
         task.img.src = task.src
         task.img.dataset.lazyLoading = 'false'
         task.img.dataset.lazyLoaded = 'true'
@@ -1874,7 +2112,7 @@
       return null
     }
 
-    // 高级过滤检查
+    // �߼����˼��
     const filterResult = matchAdvancedFilter(url)
     if (filterResult.matched) {
       if (filterResult.action === 'skipAll' || filterResult.action === 'skipCompress') {
@@ -1883,13 +2121,13 @@
       }
     }
 
-    // 检查缓存
+    // ��黺��
     if (state._compressCache.has(url)) {
       const cached = state._compressCache.get(url)
       return cached.skip ? null : cached.result
     }
 
-    // 检查域名排除
+    // ��������ų�
     try {
       const urlObj = new URL(url, location.href)
       if (state.config.excludeDomains.some((d) => urlObj.hostname.includes(d))) {
@@ -1902,27 +2140,27 @@
       return null
     }
 
-    // 非图片类型不压缩
+    // ��ͼƬ���Ͳ�ѹ��
     if (/\.(webp|svg|gif|avif)$/i.test(url)) {
       state._compressCache.set(url, { skip: true })
       addLog('info', 'image', 'skip', { url, reason: 'unsupported_format' })
       return null
     }
 
-    // 页面跳转时跳过压缩
+    // ҳ����תʱ����ѹ��
     if (state._isNavigating || false) {
       return null
     }
 
-    // 优先获取实际文件大小
+    // ���Ȼ�ȡʵ���ļ���С
     const actualSize = await getImageActualSize(url)
 
-    // 再次检查跳转状态
+    // �ٴμ����ת״̬
     if (state._isNavigating) {
       return null
     }
 
-    // 获取压缩参数
+    // ��ȡѹ������
     let quality = state.config.imageQuality || 0.8
     let maxWidth = state.config.imageMaxDimension || 2048
     if (_adaptiveCompressor) {
@@ -1932,7 +2170,7 @@
     }
     const maxHeight = maxWidth
 
-    // 尝试 Worker 压缩
+    // ���� Worker ѹ��
     if (state.config.workerCompress?.enabled && _compressorWorkers.length > 0) {
       try {
         const result = await _compressViaWorker(url, quality, maxWidth, maxHeight)
@@ -1959,7 +2197,7 @@
           state._compressCache.set(url, { skip: true })
           return null
         }
-        // 识别跨域错误
+        // ʶ��������
         const isCorsError =
           e.message?.includes('fetch') ||
           e.message?.includes('CORS') ||
@@ -1973,9 +2211,9 @@
       }
     }
 
-    // 主线程压缩（回退或首选）
+    // ���߳�ѹ�������˻���ѡ��
     return new Promise((resolve) => {
-      // 跳转检查函数
+      // ��ת��麯��
       const checkAborted = () => {
         if (state._isNavigating) {
           resolve(null)
@@ -1988,7 +2226,7 @@
       img.crossOrigin = 'anonymous'
       img.onload = () => {
         if (checkAborted()) {return}
-        // 使用实际大小（如果获取到）；否则用像素估算降级
+        // ʹ��ʵ�ʴ�С�������ȡ���������������ع��㽵��
         const bytes = actualSize || img.naturalWidth * img.naturalHeight * 4
         if (bytes < state.config.imageMinSize) {
           state._compressCache.set(url, { skip: true })
@@ -2024,7 +2262,7 @@
 
           canvas.toBlob(
             (blob) => {
-              // 跳转时放弃结果
+              // ��תʱ�������
               if (state._isNavigating) {
                 resolve(null)
                 return
@@ -2054,7 +2292,7 @@
         addLog('error', 'image', 'error', { url, reason: 'load_failed' })
         resolve(null)
       }
-      // 设置 src 前再次检查
+      // ���� src ǰ�ٴμ��
       if (state._isNavigating) {
         resolve(null)
         return
@@ -2063,7 +2301,7 @@
     })
   }
 
-  // ========== Preload 提示 ==========
+  // ========== Preload ��ʾ ==========
 
   function addPreloadHint(cdnUrl, type, fontInfo) {
     if (state.stats.preloadHints >= state.config.maxPreloadHints) {return}
@@ -2103,7 +2341,7 @@
     if (type === 'js') {
       link.as = 'script'
     } else if (type === 'font') {
-      // Google Fonts 等 replaceHost 返回的是 CSS 样式表 URL，不是字体文件
+      // Google Fonts �� replaceHost ���ص��� CSS ��ʽ�� URL�����������ļ�
       if (/\/css[2]?(?:\?|$)/i.test(cdnUrl)) {
         link.as = 'style'
       } else {
@@ -2126,19 +2364,19 @@
     }
   }
 
-  // ========== API 拦截（核心优化）==========
+  // ========== API ���أ������Ż���==========
 
   const _createElement = document.createElement.bind(document)
   const _appendChild = Element.prototype.appendChild
   const _insertBefore = Element.prototype.insertBefore
 
-  // 拦截 createElement
+  // ���� createElement
   document.createElement = function (tagName, options) {
     const el = _createElement(tagName, options)
     const tag = el.tagName
 
     if (tag === 'SCRIPT') {
-      // 拦截 src 属性设置
+      // ���� src ��������
       const desc =
         Object.getOwnPropertyDescriptor(el, 'src') ||
         Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype, 'src')
@@ -2158,7 +2396,7 @@
         })
       }
     } else if (tag === 'LINK') {
-      // 拦截 href 属性设置
+      // ���� href ��������
       const desc =
         Object.getOwnPropertyDescriptor(el, 'href') ||
         Object.getOwnPropertyDescriptor(HTMLLinkElement.prototype, 'href')
@@ -2180,7 +2418,7 @@
         })
       }
     } else if (tag === 'IMG') {
-      // 拦截 src 属性设置
+      // ���� src ��������
       const desc =
         Object.getOwnPropertyDescriptor(el, 'src') ||
         Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src')
@@ -2204,7 +2442,7 @@
     return el
   }
 
-  // 拦截 appendChild
+  // ���� appendChild
   Element.prototype.appendChild = function (node) {
     const result = _appendChild.call(this, node)
     if (node.tagName) {
@@ -2215,7 +2453,7 @@
     return result
   }
 
-  // 拦截 insertBefore
+  // ���� insertBefore
   Element.prototype.insertBefore = function (node, ref) {
     const result = _insertBefore.call(this, node, ref)
     if (node.tagName) {
@@ -2226,38 +2464,38 @@
     return result
   }
 
-  // ========== MutationObserver（兜底）==========
+  // ========== MutationObserver�����ף�==========
 
-  // 批量处理阈值与参数常量
+  // ����������ֵ���������
   const BATCH_THRESHOLDS = { HIGH: 500, MEDIUM: 100 }
   const BATCH_SIZES = { HIGH: 200, MEDIUM: 100, LOW: 50 }
   const INTERVAL_THRESHOLDS = { HIGH: 200, MEDIUM: 50 }
   const BATCH_INTERVALS = { HIGH: 30, MEDIUM: 50, LOW: 100 }
 
-  // 根据页面负载动态调整批量大小
+  // ����ҳ�渺�ض�̬����������С
   function _getBatchSize() {
     const pending = state._mutationBatch.length
-    if (pending > BATCH_THRESHOLDS.HIGH) {return BATCH_SIZES.HIGH} // 高负载：大批次
-    if (pending > BATCH_THRESHOLDS.MEDIUM) {return BATCH_SIZES.MEDIUM} // 中负载：中批次
-    return BATCH_SIZES.LOW // 低负载：小批次
+    if (pending > BATCH_THRESHOLDS.HIGH) {return BATCH_SIZES.HIGH} // �߸��أ�������
+    if (pending > BATCH_THRESHOLDS.MEDIUM) {return BATCH_SIZES.MEDIUM} // �и��أ�������
+    return BATCH_SIZES.LOW // �͸��أ�С����
   }
 
-  // 根据页面负载动态调整批量处理间隔
+  // ����ҳ�渺�ض�̬��������������
   function _getBatchInterval() {
     const pending = state._mutationBatch.length
-    if (pending > INTERVAL_THRESHOLDS.HIGH) {return BATCH_INTERVALS.HIGH} // 高负载：更快处理
-    if (pending > INTERVAL_THRESHOLDS.MEDIUM) {return BATCH_INTERVALS.MEDIUM} // 中负载：正常
-    return BATCH_INTERVALS.LOW // 低负载：节省资源
+    if (pending > INTERVAL_THRESHOLDS.HIGH) {return BATCH_INTERVALS.HIGH} // �߸��أ����촦��
+    if (pending > INTERVAL_THRESHOLDS.MEDIUM) {return BATCH_INTERVALS.MEDIUM} // �и��أ�����
+    return BATCH_INTERVALS.LOW // �͸��أ���ʡ��Դ
   }
 
   const _observer = new MutationObserver((mutations) => {
     if (!state.config.enableBatchProcessing) {
-      // 不启用批量处理时，直接处理
+      // ��������������ʱ��ֱ�Ӵ���
       _processMutations(mutations)
       return
     }
 
-    // 批量处理：收集所有需要处理的节点
+    // ����������ռ�������Ҫ����Ľڵ�
     for (const mutation of mutations) {
       for (const node of mutation.addedNodes) {
         if (!node.tagName) {continue}
@@ -2265,7 +2503,7 @@
       }
     }
 
-    // 设置定时器，使用动态间隔
+    // ���ö�ʱ����ʹ�ö�̬���
     if (!state._mutationTimer) {
       const interval = _getBatchInterval()
       state._mutationTimer = setTimeout(() => {
@@ -2279,7 +2517,7 @@
     if (state._isProcessingBatch || state._mutationBatch.length === 0) {return}
 
     state._isProcessingBatch = true
-    // 使用动态批量大小
+    // ʹ�ö�̬������С
     const batchSize = _getBatchSize()
     const batch = state._mutationBatch.splice(0, batchSize)
 
@@ -2300,7 +2538,7 @@
 
     state._isProcessingBatch = false
 
-    // 如果还有剩余节点，使用动态间隔继续处理
+    // �������ʣ��ڵ㣬ʹ�ö�̬����������
     if (state._mutationBatch.length > 0) {
       const interval = _getBatchInterval()
       setTimeout(_processBatch, interval)
@@ -2326,8 +2564,8 @@
     }
   }
 
-  // ========== 共享网络状态模块 ==========
-  // 单例模式：避免 PriorityOptimizer 和 AdaptiveCompressor 重复检测
+  // ========== ��������״̬ģ�� ==========
+  // ����ģʽ������ PriorityOptimizer �� AdaptiveCompressor �ظ����
   const NetworkState = {
     quality: 'medium',
     _listeners: new Set(),
@@ -2386,7 +2624,7 @@
     },
   }
 
-  // ========== 性能监控 ==========
+  // ========== ���ܼ�� ==========
   class PerformanceMonitor {
     constructor(config) {
       this.config = config
@@ -2404,11 +2642,11 @@
       this.initMemoryMonitoring()
       this.startReporting()
 
-      console.log(`${LOG_PREFIX} [PerfMonitor] 初始化完成`)
+      console.log(`${LOG_PREFIX} [PerfMonitor] ��ʼ�����`)
     }
 
     initCoreWebVitals() {
-      // LCP 已在 init() 中通过 state.lcp 收集，此处不再重复创建 observer
+      // LCP ���� init() ��ͨ�� state.lcp �ռ����˴������ظ����� observer
 
       try {
         if (this.config.metrics.fid && typeof PerformanceObserver !== 'undefined') {
@@ -2424,7 +2662,7 @@
           this.observers.push(fidObserver)
         }
       } catch (e) {
-        console.warn(`${LOG_PREFIX} [PerfMonitor] 指标收集失败:`, e)
+        console.warn(`${LOG_PREFIX} [PerfMonitor] ָ���ռ�ʧ��:`, e)
       }
 
       try {
@@ -2443,7 +2681,7 @@
           this.observers.push(clsObserver)
         }
       } catch (e) {
-        console.warn(`${LOG_PREFIX} [PerfMonitor] 指标收集失败:`, e)
+        console.warn(`${LOG_PREFIX} [PerfMonitor] ָ���ռ�ʧ��:`, e)
       }
 
       try {
@@ -2460,7 +2698,7 @@
           this.observers.push(fcpObserver)
         }
       } catch (e) {
-        console.warn(`${LOG_PREFIX} [PerfMonitor] 指标收集失败:`, e)
+        console.warn(`${LOG_PREFIX} [PerfMonitor] ָ���ռ�ʧ��:`, e)
       }
 
       if (this.config.metrics.ttfb) {
@@ -2484,7 +2722,7 @@
         resourceObserver.observe({ type: 'resource', buffered: true })
         this.observers.push(resourceObserver)
       } catch (e) {
-        console.warn(`${LOG_PREFIX} [PerfMonitor] 指标收集失败:`, e)
+        console.warn(`${LOG_PREFIX} [PerfMonitor] ָ���ռ�ʧ��:`, e)
       }
     }
 
@@ -2580,7 +2818,7 @@
 
         await chrome.storage.local.set({ [this.config.storageKey]: metrics })
       } catch (e) {
-        console.warn(`${LOG_PREFIX} [PerfMonitor] 保存指标失败:`, e)
+        console.warn(`${LOG_PREFIX} [PerfMonitor] ����ָ��ʧ��:`, e)
       }
     }
 
@@ -2591,8 +2829,8 @@
         suggestions.push({
           type: 'lcp',
           severity: 'high',
-          message: 'LCP 时间过长，建议优化关键资源加载',
-          actions: ['启用关键资源优先加载', '优化图片加载', '减少渲染阻塞资源'],
+          message: 'LCP ʱ������������Ż��ؼ���Դ����',
+          actions: ['���ùؼ���Դ���ȼ���', '�Ż�ͼƬ����', '������Ⱦ������Դ'],
         })
       }
 
@@ -2600,8 +2838,8 @@
         suggestions.push({
           type: 'cls',
           severity: 'medium',
-          message: '布局偏移过大，建议稳定页面布局',
-          actions: ['为图片设置尺寸', '避免动态插入内容', '使用 CSS containment'],
+          message: '����ƫ�ƹ��󣬽����ȶ�ҳ�沼��',
+          actions: ['ΪͼƬ���óߴ�', '���⶯̬��������', 'ʹ�� CSS containment'],
         })
       }
 
@@ -2611,8 +2849,8 @@
           suggestions.push({
             type: 'resource',
             severity: 'medium',
-            message: `发现 ${slowResources.length} 个慢加载资源`,
-            actions: ['启用 CDN 加速', '优化资源大小', '使用懒加载'],
+            message: `���� ${slowResources.length} ����������Դ`,
+            actions: ['���� CDN ����', '�Ż���Դ��С', 'ʹ��������'],
           })
         }
       }
@@ -2628,7 +2866,7 @@
     }
   }
 
-  // ========== 优先级优化 ==========
+  // ========== ���ȼ��Ż� ==========
   class PriorityOptimizer {
     constructor(config) {
       this.config = config
@@ -2647,12 +2885,12 @@
       this.applyToExistingElements()
       this.listenNetworkChanges()
 
-      console.log(`${LOG_PREFIX} [PriorityOptimizer] 初始化完成`)
+      console.log(`${LOG_PREFIX} [PriorityOptimizer] ��ʼ�����`)
     }
 
     detectNetworkQuality() {
       if (!this.config.networkAware.enabled) {return}
-      // 使用共享函数，统一网络质量检测
+      // ʹ�ù��������ͳһ�����������
       this.networkQuality = detectNetworkQuality()
     }
 
@@ -2760,10 +2998,10 @@
     }
 
     applyPriorityToResource(element, url, type) {
-      // 已加载资源跳过
+      // �Ѽ�����Դ����
       if (_isResourceLoaded(element, type)) {return}
 
-      // 图片和iframe使用位置优先级
+      // ͼƬ��iframeʹ��λ�����ȼ�
       if (type === 'image' || type === 'iframe') {
         const { zone } = _getResourcePositionPriority(element)
 
@@ -2774,21 +3012,21 @@
           if ('fetchPriority' in element) {element.fetchPriority = 'auto'}
           if ('loading' in element) {element.loading = 'lazy'}
         } else {
-          // far - 设置lazy，等待滚动触发
+          // far - ����lazy���ȴ���������
           if ('fetchPriority' in element) {element.fetchPriority = 'low'}
           if ('loading' in element) {element.loading = 'lazy'}
         }
         return
       }
 
-      // 脚本：关键JS正常加载，非关键按位置
+      // �ű����ؼ�JS�������أ��ǹؼ���λ��
       if (type === 'script') {
         const isCritical = element.type === 'module' || element.closest('head')
-        if (isCritical) {return} // 关键JS不干预
+        if (isCritical) {return} // �ؼ�JS����Ԥ
 
         const { zone } = _getResourcePositionPriority(element)
         if (zone === 'far') {
-          // 非关键JS在far区域延迟加载
+          // �ǹؼ�JS��far�����ӳټ���
           if (!element.dataset.src) {
             element.dataset.src = element.src
             element.src = ''
@@ -2797,7 +3035,7 @@
         return
       }
 
-      // CSS 不处理
+      // CSS ������
     }
 
     applyToExistingElements() {
@@ -2830,7 +3068,7 @@
         count++
       })
 
-      console.log(`${LOG_PREFIX} [PriorityOptimizer] 扫描已有资源: ${count} 个`)
+      console.log(`${LOG_PREFIX} [PriorityOptimizer] ɨ��������Դ: ${count} ��`)
     }
 
     getPriorityInfo() {
@@ -2842,14 +3080,14 @@
     }
 
     destroy() {
-      // 移除网络变化监听器
+      // �Ƴ�����仯������
       if (navigator.connection) {
         navigator.connection.removeEventListener('change', this._handleNetworkChange)
       }
     }
   }
 
-  // ========== 内存优化 ==========
+  // ========== �ڴ��Ż� ==========
   class MemoryOptimizer {
     constructor(config) {
       this.config = config
@@ -2868,7 +3106,7 @@
       await this.loadCacheData()
       await this.prewarmCache()
 
-      console.log(`${LOG_PREFIX} [MemoryOptimizer] 初始化完成`)
+      console.log(`${LOG_PREFIX} [MemoryOptimizer] ��ʼ�����`)
     }
 
     initMemoryMonitoring() {
@@ -2940,7 +3178,7 @@
           }
         }
       } catch (e) {
-        console.warn(`${LOG_PREFIX} [MemoryOptimizer] 加载缓存数据失败:`, e)
+        console.warn(`${LOG_PREFIX} [MemoryOptimizer] ���ػ�������ʧ��:`, e)
       }
     }
 
@@ -2978,7 +3216,7 @@
         }
       }
 
-      console.log(`${LOG_PREFIX} [MemoryOptimizer] 缓存预热完成，当前缓存 ${this.cache.size} 项`)
+      console.log(`${LOG_PREFIX} [MemoryOptimizer] ����Ԥ����ɣ���ǰ���� ${this.cache.size} ��`)
     }
 
     isCacheEntryValid(entry) {
@@ -2992,7 +3230,7 @@
         const cacheData = Object.fromEntries(this.cache)
         await chrome.storage.local.set({ resourceAcceleratorCacheData: cacheData })
       } catch (e) {
-        console.warn(`${LOG_PREFIX} [MemoryOptimizer] 保存缓存数据失败:`, e)
+        console.warn(`${LOG_PREFIX} [MemoryOptimizer] ���滺������ʧ��:`, e)
       }
     }
 
@@ -3131,7 +3369,7 @@
     _memoryOptimizer.init()
   }
 
-  // ========== LQIP 渐进式占位 ==========
+  // ========== LQIP ����ʽռλ ==========
   let _lqipStyleInjected = false
 
   function _injectLqipCSS() {
@@ -3157,7 +3395,7 @@
     _lqipStyleInjected = true
   }
 
-  // ========== content-visibility 渲染优化 ==========
+  // ========== content-visibility ��Ⱦ�Ż� ==========
   let _contentVisibilityInjected = false
 
   function _injectContentVisibilityCSS() {
@@ -3202,122 +3440,63 @@
     }
   }
 
-  // ========== Worker 压缩管理 ==========
-  // Image Compressor Worker 代码（Blob URL 模式，兼容 Manifest V3，支持跨域和优先级）
-  const _imageCompressorWorkerCode = `
-self.onmessage = async function (e) {
-  const { id, src, quality, maxWidth, maxHeight, priority, isCors } = e.data
-
-  try {
-    let blob
-
-    // 跨域处理
-    if (isCors) {
-      const response = await fetch(src, { mode: 'cors', credentials: 'omit' })
-      if (!response.ok) {
-        throw new Error('cors_fetch_failed: ' + response.status)
-      }
-      blob = await response.blob()
-    } else {
-      const response = await fetch(src)
-      if (!response.ok) {
-        throw new Error('fetch failed: ' + response.status)
-      }
-      blob = await response.blob()
-    }
-
-    // 创建 ImageBitmap
-    const imageBitmap = await createImageBitmap(blob)
-
-    // 计算目标尺寸
-    let width = imageBitmap.width
-    let height = imageBitmap.height
-    if (maxWidth > 0 && (width > maxWidth || height > maxHeight)) {
-      const ratio = Math.min(maxWidth / width, maxHeight / height)
-      width = Math.floor(width * ratio)
-      height = Math.floor(height * ratio)
-    }
-
-    // 使用 OffscreenCanvas 压缩
-    const canvas = new OffscreenCanvas(width, height)
-    const ctx = canvas.getContext('2d')
-    ctx.drawImage(imageBitmap, 0, 0, width, height)
-
-    // 导出为 Blob (优先 webp，不支持时回退 jpeg)
-    let compressedBlob
-    try {
-      compressedBlob = await canvas.convertToBlob({
-        type: 'image/webp',
-        quality: quality,
-      })
-    } catch {
-      compressedBlob = await canvas.convertToBlob({
-        type: 'image/jpeg',
-        quality: quality,
-      })
-    }
-
-    // 返回结果
-    const reader = new FileReader()
-    reader.onload = () => {
-      self.postMessage({
-        id,
-        success: true,
-        dataUrl: reader.result,
-        originalSize: blob.size,
-        compressedSize: compressedBlob.size,
-        priority,
-      })
-    }
-    reader.onerror = () => {
-      self.postMessage({ id, success: false, error: 'FileReader error', priority })
-    }
-    reader.readAsDataURL(compressedBlob)
-  } catch (error) {
-    self.postMessage({ id, success: false, error: error.message, priority })
-  }
-}
-`
+  // ========== Worker ѹ������ ==========
+  // Worker �ļ�: content/workers/image-compressor.worker.js
 
   let _compressorWorkers = []
   let _workerTaskId = 0
   const _workerPendingTasks = new Map()
   let _workerLoadIndex = 0
-  const _workerTaskQueue = [] // 优先级任务队列
+  const _workerTaskQueue = [] // ���ȼ��������
 
-  // 根据设备性能获取最优Worker数量
+  // �����豸���ܻ�ȡ����Worker����
   function _getOptimalWorkerCount() {
     const tier = detectDeviceTier()
     const configMax = state.config.workerCompress?.maxWorkers || 2
-    // 高端设备4个，中端2个，低端1个
+    // �߶��豸4�����ж�2�����Ͷ�1��
     const optimal = tier === 'high' ? 4 : tier === 'medium' ? 2 : 1
     return Math.min(optimal, configMax)
   }
 
-  // 创建单个Worker（支持健康检查重建）
+  // ��������Worker��֧�ֽ�������ؽ���
   function _createWorker(index) {
     try {
-      // 使用 Blob URL 创建 Worker（Manifest V3 兼容）
-      const blob = new Blob([_imageCompressorWorkerCode], { type: 'application/javascript' })
-      const url = URL.createObjectURL(blob)
-      const worker = new Worker(url)
-      URL.revokeObjectURL(url) // 立即释放，Worker 已加载
+      // ʹ�� chrome.runtime.getURL() ���ض��� Worker �ļ���Manifest V3 CSP ���ݣ�
+      const workerUrl = chrome.runtime.getURL('content/workers/image-compressor.worker.js')
+      const worker = new Worker(workerUrl)
 
       worker.onmessage = _handleWorkerMessage
       worker.onerror = (e) => {
-        console.error(`${LOG_PREFIX} Worker#${index}错误:`, e.message)
-        // 健康检查：自动重建崩溃的Worker
+        // ��� CSP ����
+        if (e.message && e.message.includes('Content Security Policy')) {
+          console.warn(`${LOG_PREFIX} Worker �� CSP ��ֹ������ Worker ѹ������`)
+          state.config.workerCompress.enabled = false
+          addLog('warn', 'worker', 'csp_blocked', {
+            error: e.message,
+            fallback: 'main_thread'
+          })
+          return
+        }
+
+        console.error(`${LOG_PREFIX} Worker#${index}����:`, e.message)
+        // ������飺�Զ��ؽ�������Worker
         state.stats.workerCrashCount = (state.stats.workerCrashCount || 0) + 1
         setTimeout(() => {
           if (_compressorWorkers[index] === worker) {
             _compressorWorkers[index] = _createWorker(index)
-            console.log(`${LOG_PREFIX} Worker#${index}已重建`)
+            console.log(`${LOG_PREFIX} Worker#${index}���ؽ�`)
           }
         }, 100)
       }
       return worker
     } catch (e) {
-      console.warn(`${LOG_PREFIX} Worker创建失败:`, e)
+      // ����ͬ�������� CSP ��ֹ��
+      if (e.message && e.message.includes('Content Security Policy')) {
+        console.warn(`${LOG_PREFIX} Worker ������ CSP ��ֹ������ Worker ѹ������`)
+        state.config.workerCompress.enabled = false
+      } else {
+        console.warn(`${LOG_PREFIX} Worker����ʧ��:`, e)
+      }
       return null
     }
   }
@@ -3334,16 +3513,16 @@ self.onmessage = async function (e) {
 
     if (_compressorWorkers.length > 0) {
       console.log(
-        `${LOG_PREFIX} 已初始化 ${_compressorWorkers.length} 个压缩Worker (设备等级: ${detectDeviceTier()})`
+        `${LOG_PREFIX} �ѳ�ʼ�� ${_compressorWorkers.length} ��ѹ��Worker (�豸�ȼ�: ${detectDeviceTier()})`
       )
-      // 预热：发送微型测试任务激活Worker
+      // Ԥ�ȣ�����΢�Ͳ������񼤻�Worker
       _warmupWorkers()
-      // 启动动态伸缩监控
+      // �����̬�������
       _startWorkerPoolMonitor()
     }
   }
 
-  // Worker预热
+  // WorkerԤ��
   function _warmupWorkers() {
     const testPng =
       'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
@@ -3360,7 +3539,7 @@ self.onmessage = async function (e) {
 
     _workerPendingTasks.delete(id)
 
-    // 记录耗时
+    // ��¼��ʱ
     const duration = Date.now() - task.startTime
     state.stats.workerCompressTotalMs = (state.stats.workerCompressTotalMs || 0) + duration
 
@@ -3373,7 +3552,7 @@ self.onmessage = async function (e) {
     }
   }
 
-  // 轮询分配Worker
+  // ��ѯ����Worker
   function _getAvailableWorker() {
     if (_compressorWorkers.length === 0) {return null}
     const worker = _compressorWorkers[_workerLoadIndex % _compressorWorkers.length]
@@ -3381,7 +3560,7 @@ self.onmessage = async function (e) {
     return worker
   }
 
-  // 检测跨域图片
+  // ������ͼƬ
   function _isCorsUrl(url) {
     if (!url || url.startsWith('data:')) {return false}
     try {
@@ -3392,13 +3571,13 @@ self.onmessage = async function (e) {
     }
   }
 
-  // 优先级队列处理
+  // ���ȼ����д���
   function _processWorkerQueue() {
     if (_workerTaskQueue.length === 0) {return}
     const worker = _getAvailableWorker()
     if (!worker) {return}
 
-    // 按优先级排序（高优先级先处理）
+    // �����ȼ����򣨸����ȼ��ȴ����
     _workerTaskQueue.sort((a, b) => b.priority - a.priority)
     const task = _workerTaskQueue.shift()
     if (!task) {return}
@@ -3419,7 +3598,7 @@ self.onmessage = async function (e) {
       resolve: (result) => {
         clearTimeout(timer)
         resolve(result)
-        // 处理下一个队列任务
+        // ������һ����������
         setTimeout(_processWorkerQueue, 0)
       },
       reject: (err) => {
@@ -3442,7 +3621,7 @@ self.onmessage = async function (e) {
         return
       }
 
-      // 高优先级直接处理，低优先级进队列
+      // �����ȼ�ֱ�Ӵ���������ȼ�������
       if (priority >= 5 || _workerTaskQueue.length === 0) {
         const id = ++_workerTaskId
         const timeout = state.config.workerCompress?.timeout || 5000
@@ -3469,7 +3648,7 @@ self.onmessage = async function (e) {
 
         worker.postMessage({ id, src, quality, maxWidth, maxHeight, priority, isCors })
       } else {
-        // 加入队列
+        // �������
         _workerTaskQueue.push({
           id: ++_workerTaskId,
           src,
@@ -3481,7 +3660,7 @@ self.onmessage = async function (e) {
           resolve,
           reject,
         })
-        // 触发队列处理
+        // �������д���
         setTimeout(_processWorkerQueue, 0)
       }
     })
@@ -3491,14 +3670,14 @@ self.onmessage = async function (e) {
     _compressorWorkers.forEach((w) => w.terminate())
     _compressorWorkers = []
     _workerPendingTasks.clear()
-    // 停止动态伸缩监控
+    // ֹͣ��̬�������
     if (_workerPoolMonitor) {
       clearInterval(_workerPoolMonitor)
       _workerPoolMonitor = null
     }
   }
 
-  // ========== 主线程降级压缩 ==========
+  // ========== ���߳̽���ѹ�� ==========
   async function _compressOnMainThread(src, quality, maxWidth, maxHeight, actualSize = null) {
     return new Promise((resolve) => {
       if (state._isNavigating) {
@@ -3557,19 +3736,69 @@ self.onmessage = async function (e) {
           resolve(null)
         }
       }
-      img.onerror = () => resolve(null)
+      img.onerror = async () => {
+        // ����ͼƬ����ʧ�ܣ�����ͨ�� background ����
+        if (_isCorsUrl(src)) {
+          try {
+            const response = await chrome.runtime.sendMessage({ type: 'FETCH_CORS_IMAGE', url: src })
+            if (response.success && response.dataUrl) {
+              // ʹ�ô�����ص� data URL ���¼���ͼƬ
+              const proxyImg = new Image()
+              proxyImg.onload = () => {
+                const bytes = actualSize || proxyImg.naturalWidth * proxyImg.naturalHeight * 4
+                if (bytes < state.config.imageMinSize) {
+                  state._compressCache.set(src, { skip: true })
+                  resolve(null)
+                  return
+                }
+                try {
+                  let { naturalWidth: w, naturalHeight: h } = proxyImg
+                  if (maxWidth > 0 && (w > maxWidth || h > maxHeight)) {
+                    const scale = maxWidth / Math.max(w, h)
+                    w = Math.round(w * scale)
+                    h = Math.round(h * scale)
+                  }
+                  const canvas = document.createElement('canvas')
+                  canvas.width = w
+                  canvas.height = h
+                  const ctx = canvas.getContext('2d')
+                  ctx.drawImage(proxyImg, 0, 0, w, h)
+                  const format = getSupportedImageFormat()
+                  canvas.toBlob((blob) => {
+                    if (blob && blob.size < bytes) {
+                      state.stats.corsProxyCompress = (state.stats.corsProxyCompress || 0) + 1
+                      const blobUrl = URL.createObjectURL(blob)
+                      resolve({ dataUrl: blobUrl, originalSize: bytes, compressedSize: blob.size })
+                    } else {
+                      resolve(null)
+                    }
+                  }, format.mime, quality)
+                } catch {
+                  resolve(null)
+                }
+              }
+              proxyImg.onerror = () => resolve(null)
+              proxyImg.src = response.dataUrl
+              return
+            }
+          } catch (e) {
+            addLog('warn', 'image', 'cors_proxy_failed', { url: src, error: e.message })
+          }
+        }
+        resolve(null)
+      }
       img.src = src
     })
   }
 
-  // ========== Worker 池动态伸缩 ==========
+  // ========== Worker �ض�̬���� ==========
   let _workerPoolMonitor = null
   const WORKER_POOL_CONFIG = {
     minWorkers: 1,
     maxWorkers: 4,
-    scaleUpThreshold: 3, // 连续积压任务数触发扩容
-    scaleDownThreshold: 5000, // 空闲时间(ms)触发缩容
-    monitorInterval: 2000, // 监控间隔
+    scaleUpThreshold: 3, // ������ѹ��������������
+    scaleDownThreshold: 5000, // ����ʱ��(ms)��������
+    monitorInterval: 2000, // ��ؼ��
   }
 
   function _startWorkerPoolMonitor() {
@@ -3582,19 +3811,19 @@ self.onmessage = async function (e) {
       const pendingCount = _workerPendingTasks.size
       const workerCount = _compressorWorkers.length
 
-      // 更新活跃时间
+      // ���»�Ծʱ��
       if (pendingCount > 0) {
         lastActiveTime = Date.now()
       }
 
-      // 扩容逻辑：积压任务持续增加
+      // �����߼�����ѹ�����������
       if (pendingCount >= WORKER_POOL_CONFIG.scaleUpThreshold) {
         consecutiveBacklog++
         if (consecutiveBacklog >= 2 && workerCount < WORKER_POOL_CONFIG.maxWorkers) {
           const newWorker = _createWorker(workerCount)
           if (newWorker) {
             _compressorWorkers.push(newWorker)
-            console.log(`${LOG_PREFIX} Worker池扩容至 ${_compressorWorkers.length} 个`)
+            console.log(`${LOG_PREFIX} Worker�������� ${_compressorWorkers.length} ��`)
           }
           consecutiveBacklog = 0
         }
@@ -3602,7 +3831,7 @@ self.onmessage = async function (e) {
         consecutiveBacklog = 0
       }
 
-      // 缩容逻辑：长时间空闲
+      // �����߼�����ʱ�����
       const idleTime = Date.now() - lastActiveTime
       if (
         idleTime > WORKER_POOL_CONFIG.scaleDownThreshold &&
@@ -3611,34 +3840,34 @@ self.onmessage = async function (e) {
         const removed = _compressorWorkers.pop()
         if (removed) {
           removed.terminate()
-          console.log(`${LOG_PREFIX} Worker池缩容至 ${_compressorWorkers.length} 个`)
+          console.log(`${LOG_PREFIX} Worker�������� ${_compressorWorkers.length} ��`)
         }
       }
     }, WORKER_POOL_CONFIG.monitorInterval)
   }
 
-  // ========== 自适应压缩 ==========
+  // ========== ����Ӧѹ�� ==========
   class AdaptiveCompressor {
     constructor(config) {
       this.config = config
       this.typeCache = new Map()
-      this.networkQuality = 'medium' // 独立的网络质量状态
+      this.networkQuality = 'medium' // ��������������״̬
       this._handleNetworkChange = null
     }
 
     init() {
       if (!this.config.enabled) {return}
 
-      // 独立检测网络质量，不依赖 PriorityOptimizer
+      // ����������������������� PriorityOptimizer
       this.detectNetworkQuality()
       this.listenNetworkChanges()
 
-      console.log(`${LOG_PREFIX} [AdaptiveCompressor] 初始化完成`)
+      console.log(`${LOG_PREFIX} [AdaptiveCompressor] ��ʼ�����`)
     }
 
     detectNetworkQuality() {
       if (!this.config.networkAdaptive.enabled) {return}
-      // 使用共享函数，统一网络质量检测
+      // ʹ�ù��������ͳһ�����������
       this.networkQuality = detectNetworkQuality()
     }
 
@@ -3674,7 +3903,7 @@ self.onmessage = async function (e) {
 
       this.typeCache.set(cacheKey, detectedType)
 
-      // 限制缓存大小，删除最旧的1000条而非全部清除
+      // ���ƻ����С��ɾ����ɵ�1000������ȫ�����
       if (this.typeCache.size > 5000) {
         const iter = this.typeCache.keys()
         for (let i = 0; i < 1000; i++) {
@@ -3691,9 +3920,9 @@ self.onmessage = async function (e) {
 
       let quality = baseParams.quality
       let maxWidth = baseParams.maxWidth
-      const deviceTier = detectDeviceTier() // 设备等级检测
+      const deviceTier = detectDeviceTier() // �豸�ȼ����
 
-      // 网络感知调整
+      // �����֪����
       if (this.config.networkAdaptive.enabled) {
         const networkQuality = state._lastNetworkQuality || 'medium'
         const adjustment = this.config.networkAdaptive.adjustments[networkQuality]
@@ -3701,7 +3930,7 @@ self.onmessage = async function (e) {
           quality = Math.min(1, quality * adjustment.qualityMultiplier)
         }
 
-        // 设备感知调整
+        // �豸��֪����
         const deviceAdjustments = this.config.networkAdaptive.deviceAdjustments
         if (deviceAdjustments) {
           const deviceAdjustment = deviceAdjustments[deviceTier]
@@ -3711,7 +3940,7 @@ self.onmessage = async function (e) {
         }
       }
 
-      // 尺寸感知调整
+      // �ߴ��֪����
       if (this.config.sizeAdaptive.enabled && originalSize) {
         if (originalSize < this.config.sizeAdaptive.smallImageThreshold) {
           quality = Math.min(1, quality * 1.1)
@@ -3721,10 +3950,10 @@ self.onmessage = async function (e) {
         }
       }
 
-      // 设置最低质量阈值
+      // �������������ֵ
       quality = Math.max(0.5, quality)
 
-      // 调试日志
+      // ������־
       addLog('debug', 'image', 'adaptive_params', {
         url,
         imageType,
@@ -3754,7 +3983,7 @@ self.onmessage = async function (e) {
     _adaptiveCompressor.init()
   }
 
-  // ========== 智能预加载 v2 ==========
+  // ========== ����Ԥ���� v2 ==========
   class SmartPreloadV2 {
     constructor(config) {
       this.config = config
@@ -3775,12 +4004,12 @@ self.onmessage = async function (e) {
       if (!this.config.enabled) {return}
 
       this.analyzePageStructure()
-      this.preloadCriticalResources() // 新增
+      this.preloadCriticalResources() // ����
       this.initScrollListener()
       this.initMouseListener()
       this.initDwellTimeTracker()
 
-      console.log(`${LOG_PREFIX} [SmartPreloadV2] 初始化完成`)
+      console.log(`${LOG_PREFIX} [SmartPreloadV2] ��ʼ�����`)
     }
 
     analyzePageStructure() {
@@ -3941,7 +4170,7 @@ self.onmessage = async function (e) {
     }
 
     _executePreload(url, reason) {
-      if (this._preloadUrls.has(url)) {return} // 去重
+      if (this._preloadUrls.has(url)) {return} // ȥ��
       this._preloadUrls.add(url)
       this.activePreloads++
       const isCritical = reason === 'aboveFold' || reason === 'hover' || reason === 'scroll-predict'
@@ -3986,7 +4215,7 @@ self.onmessage = async function (e) {
 
     preloadNextResources(count) {
       const viewportHeight = window.innerHeight
-      const images = document.querySelectorAll('img[data-src], img[src]')
+      const images = document.querySelectorAll('img[data-src], img[data-lazySrc], img[src]')
       let preloaded = 0
 
       for (const img of images) {
@@ -3994,7 +4223,7 @@ self.onmessage = async function (e) {
 
         const rect = img.getBoundingClientRect()
         if (rect.top > viewportHeight && rect.top < viewportHeight + 500) {
-          const url = img.dataset.src || img.src
+          const url = img.dataset.lazySrc || img.dataset.src || img.src
           if (url && !url.startsWith('data:') && !img.complete && img.naturalWidth === 0) {
             this.schedulePreload(url, 'scroll-predict', 1)
             preloaded++
@@ -4008,10 +4237,10 @@ self.onmessage = async function (e) {
       if (!article) {return}
 
       let count = 0
-      const images = article.querySelectorAll('img[data-src], img[src]')
+      const images = article.querySelectorAll('img[data-src], img[data-lazySrc], img[src]')
       images.forEach((img) => {
         if (count >= 10) {return}
-        const url = img.dataset.src || img.src
+        const url = img.dataset.lazySrc || img.dataset.src || img.src
         if (url && !url.startsWith('data:')) {
           this.schedulePreload(url, 'content-detail', 2)
           count++
@@ -4083,19 +4312,19 @@ self.onmessage = async function (e) {
     _smartPreloadV2.init()
   }
 
-  // ========== 页面跳转资源清理 ==========
+  // ========== ҳ����ת��Դ���� ==========
   /**
-   * 监听页面跳转，取消非可视区资源加载
-   * 使用 requestIdleCallback 延迟清理，不阻塞页面跳转
+   * ����ҳ����ת��ȡ���ǿ�������Դ����
+   * ʹ�� requestIdleCallback �ӳ������������ҳ����ת
    */
   function _initNavigationListener() {
     window.addEventListener(
       'pagehide',
       () => {
-        // 标记跳转状态，立即返回让页面跳转
+        // �����ת״̬������������ҳ����ת
         state._isNavigating = true
 
-        // 使用 requestIdleCallback 延迟清理，不阻塞
+        // ʹ�� requestIdleCallback �ӳ������������
         requestIdleCallback?.(
           () => {
             state.compressQueue = []
@@ -4112,13 +4341,13 @@ self.onmessage = async function (e) {
     )
   }
 
-  // ========== 初始化（异步但不阻塞）==========
+  // ========== ��ʼ�����첽����������==========
 
-  // 获取页面使用的 CDN 优先级
+  // ��ȡҳ��ʹ�õ� CDN ���ȼ�
   function _getCDNPriorities() {
     const pageCDNs = new Set()
 
-    // 扫描页面中的 script 和 link 元素
+    // ɨ��ҳ���е� script �� link Ԫ��
     const elements = document.querySelectorAll('script[src], link[href]')
     elements.forEach((el) => {
       const url = el.src || el.href
@@ -4133,7 +4362,7 @@ self.onmessage = async function (e) {
     return Array.from(pageCDNs)
   }
 
-  // 获取 URL 对应的 CDN 信息
+  // ��ȡ URL ��Ӧ�� CDN ��Ϣ
   function _getCDNInfo(url) {
     if (!window.CDNMappings?.CDN_SOURCES) {return null}
 
@@ -4144,7 +4373,7 @@ self.onmessage = async function (e) {
           return { id: cdn.id, name: cdn.name || cdn.id }
         }
       } catch (error) {
-        console.warn('[_getCDNInfo] 解析CDN URL失败:', error)
+        console.warn('[_getCDNInfo] ����CDN URLʧ��:', error)
       }
     }
     return null
@@ -4154,7 +4383,7 @@ self.onmessage = async function (e) {
     if (state.initialized) {return}
     state.initialized = true
 
-    // 0. LCP 指标收集（需要尽早启动观察）
+    // 0. LCP ָ���ռ�����Ҫ��������۲죩
     let lcpObserver = null
     try {
       if (typeof PerformanceObserver !== 'undefined') {
@@ -4167,94 +4396,97 @@ self.onmessage = async function (e) {
         lcpObserver.observe({ type: 'largest-contentful-paint', buffered: true })
       }
     } catch {
-      // 部分浏览器不支持 largest-contentful-paint 类型
+      // �����������֧�� largest-contentful-paint ����
     }
 
-    // 1. 加载配置（异步，不阻塞）
+    // 1. �������ã��첽����������
     _loadConfig()
 
-    // 注入LQIP样式
+    // ע��LQIP��ʽ
     _injectLqipCSS()
 
-    // 注入 content-visibility 样式
+    // ע�� content-visibility ��ʽ
     _injectContentVisibilityCSS()
 
-    // 1.1 恢复历史错误日志（异步，不阻塞）
+    // 1.1 �ָ���ʷ������־���첽����������
     _restoreErrorLogs()
 
-    // 2. CSP 预检（异步，不阻塞）
+    // 2. CSP Ԥ�죨�첽����������
     _precheckCSP()
 
     // 3. CDN preconnect
     _addCDNPreconnect()
 
-    // 全站DNS prefetch
+    // ȫվDNS prefetch
     _addGlobalDnsPrefetch()
 
-    // 初始化压缩Worker
+    // ��ʼ��ѹ��Worker
     _initCompressorWorkers()
 
-    // 初始化位置感知加载
+    // ��ʼ��λ�ø�֪����
     _initPositionAwareLoading()
 
-    // 初始化网络变化监听
+    // ��ʼ����ʽ�仯�۲�������Ҫ DOM ׼���ã�
+    _initAfterDOMReady()
+
+    // ��ʼ������仯����
     _initNetworkChangeListener()
 
-    // 4. CDN健康探测（异步，不阻塞）- 优先探测页面使用的 CDN
+    // 4. CDN����̽�⣨�첽����������- ����̽��ҳ��ʹ�õ� CDN
     if (window.CDNMappings?.probeAllCDNs) {
       const pageCDNs = _getCDNPriorities()
       let probePromise
       if (pageCDNs.length > 0) {
-        console.log(`${LOG_PREFIX} 优先探测页面使用的 CDN: ${pageCDNs.join(', ')}`)
-        // 先探测页面使用的 CDN，再探测其他 CDN
+        console.log(`${LOG_PREFIX} ����̽��ҳ��ʹ�õ� CDN: ${pageCDNs.join(', ')}`)
+        // ��̽��ҳ��ʹ�õ� CDN����̽������ CDN
         probePromise = window.CDNMappings.probeAllCDNs({ priorityIds: pageCDNs })
       } else {
         probePromise = window.CDNMappings.probeAllCDNs()
       }
-      // 探测完成后记录健康状态到日志缓冲区
+      // ̽����ɺ��¼����״̬����־������
       probePromise?.then?.(() => {
         const cdnHealth = window.CDNMappings?.getCDNHealth?.() || {}
         Object.entries(cdnHealth).forEach(([cdnId, health]) => {
           addLog('info', 'cdn', 'probe', {
             cdn: cdnId,
-            reason: health.healthy ? `RTT: ${health.rtt}ms` : '探测失败',
+            reason: health.healthy ? `RTT: ${health.rtt}ms` : '̽��ʧ��',
           })
         })
       })
     }
 
-    // 5. 启动 MutationObserver（兜底）
+    // 5. ��� MutationObserver�����ף�
     _observer.observe(document.documentElement, { childList: true, subtree: true })
 
-    // 6. 处理已有资源
+    // 6. ����������Դ
     document.querySelectorAll('script[src]').forEach(processScript)
     document.querySelectorAll('link[rel="stylesheet"]').forEach(processLink)
     document.querySelectorAll('img[src]').forEach(processImage)
-    // 处理已有iframe
+    // ��������iframe
     processIframeLazyLoad()
 
-    // 7. 消息监听
+    // 7. ��Ϣ����
     _initMessageListener()
 
-    // 1.14 初始化性能监控
+    // 1.14 ��ʼ�����ܼ��
     _initPerfMonitor()
 
-    // 1.15 初始化优先级优化
+    // 1.15 ��ʼ�����ȼ��Ż�
     _initPriorityOptimizer()
 
-    // 1.16 初始化内存优化
+    // 1.16 ��ʼ���ڴ��Ż�
     _initMemoryOptimizer()
 
-    // 1.17 初始化自适应压缩
+    // 1.17 ��ʼ������Ӧѹ��
     _initAdaptiveCompressor()
 
-    // 1.18 初始化智能预加载 v2
+    // 1.18 ��ʼ������Ԥ���� v2
     _initSmartPreloadV2()
 
-    // 1.19 初始化页面跳转监听
+    // 1.19 ��ʼ��ҳ����ת����
     _initNavigationListener()
 
-    // 8. 页面加载后收集性能指标并停止 LCP 观察
+    // 8. ҳ����غ��ռ�����ָ�겢ֹͣ LCP �۲�
     window.addEventListener(
       'load',
       () => {
@@ -4262,29 +4494,49 @@ self.onmessage = async function (e) {
           lcpObserver.disconnect()
         }
         state.performance = collectPerformanceMetrics()
-        // 保存每日统计数据用于趋势图表
+        // ����ÿ��ͳ��������������ͼ��
         saveDailyStats()
       },
       { once: true }
     )
 
-    // 9. 点击预览立即加载原图
+    // 9. ҳ��ɼ��Ա仯ʱ���¼�������ͼƬ
+    document.addEventListener(
+      'visibilitychange',
+      () => {
+        if (document.visibilityState === 'visible') {
+          // ���¼��������ڴ��� lazySrc ��ͼƬ
+          requestAnimationFrame(() => {
+            _recheckVisibleLazyImages()
+          })
+        }
+      }
+    )
+
+    // 10. ���Ԥ����������ԭͼ
     document.addEventListener(
       'click',
       (e) => {
-        const img = e.target.closest('img[data-_raLazyLoad="1"]')
+        const img = e.target.closest('img[data-_raLazyLoad="1"], img[data-lazySrc]')
         if (!img) {return}
 
-        const originalSrc = img.dataset.src
+        // ͳһ��� lazySrc �� src
+        const originalSrc = img.dataset.lazySrc || img.dataset.src
         if (!originalSrc || img.dataset.lazyLoaded === 'true') {return}
 
-        // 立即加载原图
+        // ���� lazySrc �����ظ�����
+        delete img.dataset.lazySrc
+
+        // ��������ԭͼ
         img.src = originalSrc
         img.dataset.lazyLoaded = 'true'
         img.loading = 'eager'
         if ('fetchPriority' in img) {img.fetchPriority = 'high'}
 
-        // 触发 LQIP 过渡
+        // ���ô�������
+        _setupImageErrorRetry(img, originalSrc)
+
+        // ���� LQIP ����
         _triggerLqipTransition(img)
 
         addLog('info', 'image', 'click_load', { url: originalSrc, reason: 'user_click_preview' })
@@ -4292,7 +4544,7 @@ self.onmessage = async function (e) {
       { capture: true }
     )
 
-    console.log(`${LOG_PREFIX} 初始化完成`)
+    console.log(`${LOG_PREFIX} ��ʼ�����`)
   }
 
   async function _loadConfig() {
@@ -4300,13 +4552,13 @@ self.onmessage = async function (e) {
       const result = await chrome.storage.local.get(CONFIG_KEY)
       let userConfig = result[CONFIG_KEY] || {}
 
-      // 配置迁移：自动升级旧版本配置
+      // ����Ǩ�ƣ��Զ������ɰ汾����
       if (window.ConfigMigrator && userConfig.version !== DEFAULT_CONFIG.version) {
         const migrationResult = await window.ConfigMigrator.migrate(userConfig)
         if (migrationResult?.config) {
           userConfig = migrationResult.config
           console.log(
-            `${LOG_PREFIX} 配置迁移完成: ${migrationResult.fromVersion} -> ${migrationResult.toVersion}`
+            `${LOG_PREFIX} ����Ǩ�����: ${migrationResult.fromVersion} -> ${migrationResult.toVersion}`
           )
         }
       }
@@ -4329,7 +4581,7 @@ self.onmessage = async function (e) {
         _observer.disconnect()
       }
     } catch (error) {
-      console.warn('[_loadConfig] 加载配置失败:', error)
+      console.warn('[_loadConfig] ��������ʧ��:', error)
     }
   }
 
@@ -4337,15 +4589,30 @@ self.onmessage = async function (e) {
     const metaCSP = document.querySelector('meta[http-equiv="Content-Security-Policy"]')
     if (metaCSP) {
       const content = metaCSP.getAttribute('content') || ''
+
+      // ��� script-src
       const scriptSrc = content.match(/script-src\s+([^;]+)/)
       if (scriptSrc && !/https?:|\*\./.test(scriptSrc[1])) {
         state.cspRestricted = true
         return
       }
+
+      // ��� worker-src��Ӱ�� Worker ������
+      const workerSrc = content.match(/worker-src\s+([^;]+)/)
+      if (workerSrc && !/blob:|data:|https?:|\*\./.test(workerSrc[1])) {
+        // worker-src ������ blob: �� data:������ Worker ѹ��
+        if (state.config.workerCompress) {
+          state.config.workerCompress.enabled = false
+          addLog('warn', 'worker', 'csp_restricted', {
+            directive: workerSrc[0],
+            fallback: 'main_thread'
+          })
+        }
+      }
     }
 
-    // 异步检测，不阻塞（跳过 CSP 检测，避免被 block）
-    // CSP 限制已通过 meta 标签预检处理
+    // �첽��⣬������������ CSP ��⣬���ⱻ block��
+    // CSP ������ͨ�� meta ��ǩԤ�촦��
   }
 
   function _addCDNPreconnect() {
@@ -4364,12 +4631,12 @@ self.onmessage = async function (e) {
         if (link.rel === 'preconnect') {link.crossOrigin = 'anonymous'}
         head.insertBefore(link, head.firstChild)
       } catch (error) {
-        console.warn('[_addCDNPreconnect] 添加CDN预连接失败:', error)
+        console.warn('[_addCDNPreconnect] ���CDNԤ����ʧ��:', error)
       }
     })
   }
 
-  // ========== 消息监听 ==========
+  // ========== ��Ϣ���� ==========
 
   function _initMessageListener() {
     chrome.runtime?.onMessage?.addListener((message, sender, sendResponse) => {
@@ -4427,7 +4694,7 @@ self.onmessage = async function (e) {
     })
   }
 
-  // ========== 性能指标收集 ==========
+  // ========== ����ָ���ռ� ==========
 
   function collectPerformanceMetrics() {
     try {
@@ -4464,7 +4731,7 @@ self.onmessage = async function (e) {
     }
   }
 
-  // ========== 配置导入导出 ==========
+  // ========== ���õ��뵼�� ==========
 
   function exportConfig() {
     const exportData = {
@@ -4479,28 +4746,28 @@ self.onmessage = async function (e) {
     try {
       const importData = JSON.parse(jsonString)
 
-      // 验证格式
+      // ��֤��ʽ
       if (!importData.version || !importData.config) {
-        return { success: false, error: '无效的配置格式' }
+        return { success: false, error: '��Ч�����ø�ʽ' }
       }
 
-      // 验证版本
+      // ��֤�汾
       if (importData.version !== '1.0') {
-        return { success: false, error: `不支持的配置版本: ${importData.version}` }
+        return { success: false, error: `��֧�ֵ����ð汾: ${importData.version}` }
       }
 
-      // 合并配置（保留现有配置的默认值）
+      // �ϲ����ã������������õ�Ĭ��ֵ��
       const mergedConfig = { ...DEFAULT_CONFIG, ...importData.config }
 
-      // 更新状态
+      // ����״̬
       state.config = mergedConfig
 
-      // 保存到 storage
+      // ���浽 storage
       chrome.storage.local.set({ [CONFIG_KEY]: mergedConfig })
 
       return { success: true, config: mergedConfig }
     } catch (e) {
-      return { success: false, error: `解析配置失败: ${e.message}` }
+      return { success: false, error: `��������ʧ��: ${e.message}` }
     }
   }
 
@@ -4510,7 +4777,7 @@ self.onmessage = async function (e) {
     return state.config
   }
 
-  // ========== 性能基线对比 ==========
+  // ========== ���ܻ��߶Ա� ==========
 
   const PERFORMANCE_BASELINE_KEY = 'resourceAcceleratorPerformanceBaseline'
 
@@ -4542,19 +4809,19 @@ self.onmessage = async function (e) {
 
       const current = state.performance
 
-      // 计算节省时间
+      // �����ʡʱ��
       const loadTimeSaved = baseline.loadEvent - current.loadEvent
       const loadTimePercent =
         baseline.loadEvent > 0 ? Math.round((loadTimeSaved / baseline.loadEvent) * 100) : 0
 
-      // 计算节省流量
+      // �����ʡ����
       const transferSizeSaved = baseline.totalTransferSize - (current.totalTransferSize || 0)
       const transferSizePercent =
         baseline.totalTransferSize > 0
           ? Math.round((transferSizeSaved / baseline.totalTransferSize) * 100)
           : 0
 
-      // 计算 LCP 改善
+      // ���� LCP ����
       const lcpSaved =
         baseline.lcp != null && current.lcp != null ? baseline.lcp - current.lcp : null
       const lcpPercent =
@@ -4596,11 +4863,11 @@ self.onmessage = async function (e) {
     chrome.storage.local.remove(PERFORMANCE_BASELINE_KEY)
   }
 
-  // ========== 每日统计与数据聚合 ==========
+  // ========== ÿ��ͳ�������ݾۺ� ==========
 
   const DAILY_STATS_KEY = 'resourceAcceleratorDailyStats'
 
-  // 保存当日统计数据
+  // ���浱��ͳ������
   function saveDailyStats() {
     if (!state.performance) {return}
 
@@ -4622,7 +4889,7 @@ self.onmessage = async function (e) {
       const allDaily = result[DAILY_STATS_KEY] || {}
       allDaily[today] = dailyData
 
-      // 保留最近30天数据
+      // �������30������
       const keys = Object.keys(allDaily).sort().slice(-30)
       const trimmed = {}
       keys.forEach((k) => {
@@ -4633,7 +4900,7 @@ self.onmessage = async function (e) {
     })
   }
 
-  // 聚合近 N 天统计数据
+  // �ۺϽ� N ��ͳ������
   async function aggregateDailyStats(days = 7) {
     try {
       const result = await chrome.storage.local.get(DAILY_STATS_KEY)
@@ -4672,7 +4939,7 @@ self.onmessage = async function (e) {
     }
   }
 
-  // 获取替换类型分布
+  // ��ȡ�滻���ͷֲ�
   function getStatsDistribution() {
     return {
       js: state.stats.jsReplaced || 0,
@@ -4683,7 +4950,7 @@ self.onmessage = async function (e) {
     }
   }
 
-  // ========== 导出 API ==========
+  // ========== ���� API ==========
 
   window.ResourceAccelerator = {
     init,
@@ -4720,7 +4987,7 @@ self.onmessage = async function (e) {
       _smartPreloadV2?.destroy()
       _destroyLazyLoadObserver()
       _terminateCompressorWorkers()
-      // 清理网络变化监听
+      // ��������仯����
       if (_networkChangeListener && navigator.connection) {
         navigator.connection.removeEventListener('change', _networkChangeListener)
       }
@@ -4734,10 +5001,10 @@ self.onmessage = async function (e) {
       document.createElement = _createElement
       Element.prototype.appendChild = _appendChild
       Element.prototype.insertBefore = _insertBefore
-      console.log(`${LOG_PREFIX} 已销毁`)
+      console.log(`${LOG_PREFIX} ������`)
     },
   }
 
-  // 立即初始化（同步）
+  // ������ʼ����ͬ����
   init()
 })()
