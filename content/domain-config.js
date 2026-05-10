@@ -29,6 +29,7 @@
     {
       patterns: ['*://*.douyin.com/*'],
       scripts: ['content/bundled/douyin.bundle.js'],
+      runAt: 'document_start',
     },
     {
       patterns: ['*://*.4hu.tv/*'],

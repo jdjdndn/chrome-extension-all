@@ -16,11 +16,13 @@
   // ========== 配置 ==========
   const CONFIG = {
     // 空闲任务超时时间（ms）
-    idleTimeout: 2000,
+    idleTimeout: 500,
     // 最大并发空闲任务数
     maxConcurrentIdle: 3,
     // 调试模式
     debug: false,
+    // 强制执行阈值（ms）- JS多的页面兜底
+    forceExecuteTimeout: 1000,
   }
 
   // ========== 状态 ==========
@@ -85,7 +87,6 @@
       return scheduler
         .postTask(callback, {
           priority: 'user-visible',
-          delay: options.timeout || CONFIG.idleTimeout,
         })
         .then(() => {
           callback({ didTimeout: false, timeRemaining: () => 50 })

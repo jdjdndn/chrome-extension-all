@@ -11,6 +11,11 @@
  *    - EventBus 集成
  * 4. 浏览器空闲时：
  *    - 非关键模块
+ *
+ * 优先级策略：
+ * - P0（立即）：关键域名、隐藏元素、拦截请求
+ * - P1（DOMContentLoaded）：自动化操作
+ * - P2（空闲）：统计、日志
  */
 
 ;(function () {
@@ -24,6 +29,65 @@
   window._mainScriptLoaded = true
 
   const hostname = window.location.hostname
+
+  // ========== 建议1：监控JS密集页面 ==========
+  const checkJSIntensity = () => {
+    const scriptCount = document.querySelectorAll('script').length
+    if (scriptCount > 100) {
+      console.warn(`[Main] JS密集页面检测：${scriptCount} 个脚本，跳过延迟加载`)
+      return true
+    }
+    return false
+  }
+
+  // ========== 建议2：MutationObserver提前介入 ==========
+  const setupEarlyIntervention = () => {
+    // 关键域名配置
+    const criticalDomains = ['douyin.com', 'youtube.com', 'github.com']
+    const isCritical = criticalDomains.some((domain) => hostname.includes(domain))
+
+    if (!isCritical) return
+
+    // 提前处理关键元素（隐藏、拦截）
+    const processCriticalElements = () => {
+      // 抖音特定处理
+      if (hostname.includes('douyin.com')) {
+        // 隐藏广告元素
+        const hideSelectors = [
+          '.qmhaloYp:nth-child(n):not(:nth-child(2)):not(:nth-child(5))',
+          '.ooIf2jbM',
+          '._e7lJDCC',
+          '#island_076c3',
+        ]
+        hideSelectors.forEach((selector) => {
+          try {
+            document.querySelectorAll(selector).forEach((el) => {
+              el.style.display = 'none'
+            })
+          } catch (e) {}
+        })
+      }
+    }
+
+    // 立即执行一次
+    processCriticalElements()
+
+    // 监听后续DOM变化
+    const observer = new MutationObserver(() => {
+      processCriticalElements()
+    })
+
+    observer.observe(document.documentElement || document.body, {
+      childList: true,
+      subtree: true,
+    })
+
+    // 3秒后停止监听（页面稳定后）
+    setTimeout(() => {
+      observer.disconnect()
+      console.log('[Main] 提前介入监听已停止')
+    }, 3000)
+  }
 
   /**
    * 动态加载脚本
@@ -132,21 +196,58 @@
     }
   }
 
-  // 启动初始化（使用 LoadScheduler 在空闲时执行）
-  if (window.LoadScheduler) {
-    window.LoadScheduler.registerIdle(
-      'main-init',
-      () => {
-        init().catch((err) => {
-          console.error('[Main] 初始化失败:', err)
-        })
-      },
-      { priority: 10 }
-    )
-  } else {
-    // 降级：直接执行
-    init().catch((err) => {
-      console.error('[Main] 初始化失败:', err)
-    })
+  // ========== 建议3：分优先级执行 ==========
+  const executeByPriority = () => {
+    const config = window.DomainConfig?.getScriptConfig(hostname)
+    const isCriticalDomain = config && config.runAtStart.length > 0
+    const isJSIntensive = checkJSIntensity()
+
+    // P0: 关键域名立即执行（避免空白）
+    if (isCriticalDomain || isJSIntensive) {
+      console.log('[Main] P0优先级：立即执行')
+      setupEarlyIntervention()
+      init().catch((err) => {
+        console.error('[Main] 初始化失败:', err)
+      })
+      return
+    }
+
+    // P1: DOMContentLoaded 后执行
+    const loadP1 = () => {
+      console.log('[Main] P1优先级：DOMContentLoaded 后执行')
+      init().catch((err) => {
+        console.error('[Main] 初始化失败:', err)
+      })
+    }
+
+    // P2: 空闲时执行
+    const loadP2 = () => {
+      if (window.LoadScheduler) {
+        console.log('[Main] P2优先级：空闲时执行')
+        window.LoadScheduler.registerIdle(
+          'main-init',
+          () => {
+            init().catch((err) => {
+              console.error('[Main] 初始化失败:', err)
+            })
+          },
+          { priority: 10 }
+        )
+      } else {
+        loadP1()
+      }
+    }
+
+    // 根据页面状态决定
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', loadP1)
+    } else if (document.readyState === 'interactive') {
+      loadP1()
+    } else {
+      loadP2()
+    }
   }
+
+  // 启动
+  executeByPriority()
 })()

@@ -27,6 +27,7 @@
     MESSAGE_TIMEOUT: 5000,
     HEARTBEAT_INTERVAL: 30000,
     MAX_RETRY: 3,
+    MAX_DATA_SIZE: 10 * 1024 * 1024, // 10MB（从1MB提升）
 
     // 功能开关
     ENABLE_CIRCUIT_BREAKER: true,
@@ -718,7 +719,7 @@
 
     async request(type, data = {}, options = {}) {
       if (!Utils.validateType(type)) throw new Error('Invalid message type');
-      if (!Utils.checkDataSize(data)) throw new Error('Data size exceeds limit');
+      if (!Utils.checkDataSize(data, CONFIG.MAX_DATA_SIZE)) throw new Error('Data size exceeds limit');
 
       return CircuitBreaker.execute(type, async () => {
         const { timeout = CONFIG.MESSAGE_TIMEOUT } = options;
@@ -757,7 +758,7 @@
 
     async publish(type, data = {}) {
       if (!Utils.validateType(type)) throw new Error('Invalid message type');
-      if (!Utils.checkDataSize(data)) throw new Error('Data size exceeds limit');
+      if (!Utils.checkDataSize(data, CONFIG.MAX_DATA_SIZE)) throw new Error('Data size exceeds limit');
 
       const message = {
         __eventbus__: true, id: Utils.generateId(),

@@ -5,15 +5,24 @@
  */
 
 self.onmessage = async function (e) {
-  const { id, src, quality, maxWidth, maxHeight } = e.data
+  const { id, src, quality, maxWidth, maxHeight, priority, isCors } = e.data
 
   try {
     // 1. 获取图片数据
-    const response = await fetch(src)
-    if (!response.ok) {
-      throw new Error(`fetch failed: ${response.status}`)
+    let blob
+    if (isCors) {
+      const response = await fetch(src, { mode: 'cors', credentials: 'omit' })
+      if (!response.ok) {
+        throw new Error(`cors_fetch_failed: ${response.status}`)
+      }
+      blob = await response.blob()
+    } else {
+      const response = await fetch(src)
+      if (!response.ok) {
+        throw new Error(`fetch failed: ${response.status}`)
+      }
+      blob = await response.blob()
     }
-    const blob = await response.blob()
 
     // 2. 创建 ImageBitmap
     const imageBitmap = await createImageBitmap(blob)
@@ -56,6 +65,7 @@ self.onmessage = async function (e) {
         dataUrl: reader.result,
         originalSize: blob.size,
         compressedSize: compressedBlob.size,
+        priority,
       })
     }
     reader.onerror = () => {
@@ -63,6 +73,7 @@ self.onmessage = async function (e) {
         id,
         success: false,
         error: 'FileReader error',
+        priority,
       })
     }
     reader.readAsDataURL(compressedBlob)
@@ -71,6 +82,7 @@ self.onmessage = async function (e) {
       id,
       success: false,
       error: error.message,
+      priority,
     })
   }
 }
