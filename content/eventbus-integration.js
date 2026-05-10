@@ -6,7 +6,7 @@
  * 使用 ScriptLoader 进行依赖管理
  */
 
-;(function () {
+(function () {
   'use strict'
 
   console.log('[EventBus集成] 初始化...')

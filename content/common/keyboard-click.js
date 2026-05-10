@@ -47,12 +47,12 @@ if (window.KeyboardClickLoaded) {
      */
     _deepElementFromPoint(x, y) {
       let el = document.elementFromPoint(x, y)
-      if (!el) return null
+      if (!el) {return null}
       // 递归穿透所有嵌套 shadow root
       let maxDepth = 20 // 防止无限循环
       while (el && el.shadowRoot && maxDepth-- > 0) {
         const inner = el.shadowRoot.elementFromPoint(x, y)
-        if (!inner || inner === el) break
+        if (!inner || inner === el) {break}
         el = inner
       }
       return el
@@ -71,7 +71,7 @@ if (window.KeyboardClickLoaded) {
       document.addEventListener(
         'mouseout',
         (e) => {
-          if (!e.relatedTarget) this.hoveredEl = null
+          if (!e.relatedTarget) {this.hoveredEl = null}
         },
         true
       )
@@ -97,10 +97,10 @@ if (window.KeyboardClickLoaded) {
         'keydown',
         (e) => {
           // 组合键（Ctrl+Space 等）不拦截
-          if (this._isComboKey(e)) return
+          if (this._isComboKey(e)) {return}
 
           // 输入框聚焦时不拦截
-          if (this._isInputFocused()) return
+          if (this._isInputFocused()) {return}
 
           switch (e.key) {
             case ' ':
@@ -120,11 +120,11 @@ if (window.KeyboardClickLoaded) {
 
             case 'x':
             case 'X':
-              if (!this.spaceHeld) this._doRightClick(e)
+              if (!this.spaceHeld) {this._doRightClick(e)}
               break
 
             case 'Escape':
-              if (this.spaceHeld) this._cancelSelect()
+              if (this.spaceHeld) {this._cancelSelect()}
               break
           }
         },
@@ -147,19 +147,19 @@ if (window.KeyboardClickLoaded) {
 
     _isInputFocused() {
       const el = document.activeElement
-      if (!el) return false
+      if (!el) {return false}
       const tag = el.tagName
 
       // 基本表单元素
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {return true}
 
       // contentEditable
-      if (el.isContentEditable) return true
+      if (el.isContentEditable) {return true}
 
       // ARIA 文本框 / 编辑器
       const role = el.getAttribute('role')
       if (role === 'textbox' || role === 'combobox' || role === 'searchbox' || role === 'editor')
-        return true
+        {return true}
 
       // 代码编辑器常见容器（CodeMirror, Monaco, ACE 等）
       if (
@@ -167,7 +167,7 @@ if (window.KeyboardClickLoaded) {
           '.CodeMirror, .monaco-editor, .ace_editor, .cm-editor, .CodeMirror-code, [class*="editor"]'
         )
       )
-        return true
+        {return true}
 
       // 某些 input type 不拦截（checkbox, radio, submit, button 等）
       if (tag === 'INPUT') {
@@ -183,7 +183,7 @@ if (window.KeyboardClickLoaded) {
           'range',
           'file',
         ]
-        if (nonTextTypes.includes(type)) return false
+        if (nonTextTypes.includes(type)) {return false}
       }
 
       return false
@@ -251,10 +251,10 @@ if (window.KeyboardClickLoaded) {
     }
 
     _extendSelectionTo(clientX, clientY) {
-      if (!this.selectAnchor) return
+      if (!this.selectAnchor) {return}
 
       const focus = this._rangeFromPoint(clientX, clientY)
-      if (!focus) return
+      if (!focus) {return}
 
       try {
         const range = document.createRange()
@@ -317,10 +317,10 @@ if (window.KeyboardClickLoaded) {
      */
     _findClickTarget(x, y) {
       let el = this._deepElementFromPoint(x, y)
-      if (!el) return null
+      if (!el) {return null}
 
       // 已经是媒体元素，直接返回
-      if (el.tagName === 'VIDEO' || el.tagName === 'AUDIO') return el
+      if (el.tagName === 'VIDEO' || el.tagName === 'AUDIO') {return el}
 
       // 检查当前位置下方是否有媒体元素被遮挡
       const all = document.elementsFromPoint(x, y)
@@ -339,7 +339,7 @@ if (window.KeyboardClickLoaded) {
       // 兜底：elementsFromPoint 无法找到 pointer-events:none 或 shadow DOM 内的 video
       if (!foundMedia && !this._isInteractiveElement(el)) {
         const media = this._findMediaByRect(x, y)
-        if (media) el = media
+        if (media) {el = media}
       }
 
       return el
@@ -359,7 +359,7 @@ if (window.KeyboardClickLoaded) {
       // 文档级 video/audio
       for (const media of document.querySelectorAll('video, audio')) {
         const found = check(media)
-        if (found) return found
+        if (found) {return found}
       }
 
       // shadow DOM 内的 video/audio
@@ -367,7 +367,7 @@ if (window.KeyboardClickLoaded) {
         if (host.shadowRoot) {
           for (const media of host.shadowRoot.querySelectorAll('video, audio')) {
             const found = check(media)
-            if (found) return found
+            if (found) {return found}
           }
         }
       }
@@ -377,7 +377,7 @@ if (window.KeyboardClickLoaded) {
 
     /** 判断元素是否为交互元素（按钮/链接等），交互元素应保留原始点击目标 */
     _isInteractiveElement(el) {
-      if (!el) return false
+      if (!el) {return false}
 
       // 检查元素本身及其祖先元素（向上查找5层）
       let current = el
@@ -387,22 +387,22 @@ if (window.KeyboardClickLoaded) {
 
       for (let i = 0; i < maxDepth && current && current !== document.body; i++) {
         // 检查标签
-        if (tags.includes(current.tagName)) return true
+        if (tags.includes(current.tagName)) {return true}
         // 检查 contentEditable
-        if (current.isContentEditable) return true
+        if (current.isContentEditable) {return true}
         // 检查 role 属性
         const role = current.getAttribute('role')
-        if (role && roles.includes(role)) return true
+        if (role && roles.includes(role)) {return true}
         // 检查 SVG 内部元素
-        if (current.tagName === 'SVG' || current.closest?.('svg')) return true
+        if (current.tagName === 'SVG' || current.closest?.('svg')) {return true}
         // 检查常见的可点击 CSS 类
         if (current.classList?.toString().match(/(btn|button|close|cancel|dismiss|icon)/i))
-          return true
+          {return true}
         // 检查 onclick 属性
-        if (current.hasAttribute?.('onclick')) return true
+        if (current.hasAttribute?.('onclick')) {return true}
         // 检查 tabindex（可聚焦元素通常可交互）
         if (current.hasAttribute?.('tabindex') && current.getAttribute('tabindex') !== '-1')
-          return true
+          {return true}
 
         current = current.parentElement
       }
@@ -413,7 +413,7 @@ if (window.KeyboardClickLoaded) {
     _isInShadowDOM(el) {
       let current = el
       while (current && current !== document.body) {
-        if (current.parentNode?.host) return true // parentNode.host 表示当前元素在 shadow root 内
+        if (current.parentNode?.host) {return true} // parentNode.host 表示当前元素在 shadow root 内
         current = current.parentNode
       }
       return false
@@ -423,7 +423,7 @@ if (window.KeyboardClickLoaded) {
     _doClick(e) {
       // 使用 _findClickTarget 查找真实点击目标（穿透覆盖层找到被遮挡的媒体元素）
       const el = this._findClickTarget(this.mouseX, this.mouseY)
-      if (!el || !el.isConnected) return
+      if (!el || !el.isConnected) {return}
       e.preventDefault()
       e.stopPropagation()
 
@@ -437,10 +437,17 @@ if (window.KeyboardClickLoaded) {
       const offsetX = clientX - rect.left
       const offsetY = clientY - rect.top
 
-      // Shadow DOM 内部元素使用 el.click()，确保原生点击行为正确触发
-      if (this._isInShadowDOM(el)) {
-        el.click()
-      } else {
+      // Shadow DOM 内部元素优先使用 el.click()（若存在），否则回退到 dispatchEvent
+      let clickSuccess = false
+      if (this._isInShadowDOM(el) && el instanceof Element && typeof el.click === 'function') {
+        try {
+          el.click()
+          clickSuccess = true
+        } catch {
+          // 某些特殊元素（SVG、跨 frame）调用 click() 可能失败，回退到 dispatchEvent
+        }
+      }
+      if (!clickSuccess) {
         // 1. mousedown
         el.dispatchEvent(
           new MouseEvent('mousedown', {
@@ -488,7 +495,7 @@ if (window.KeyboardClickLoaded) {
     // ========== X 右击 ==========
     _doRightClick(e) {
       const el = this._findClickTarget(this.mouseX, this.mouseY)
-      if (!el || !el.isConnected) return
+      if (!el || !el.isConnected) {return}
       e.preventDefault()
       e.stopPropagation()
       el.dispatchEvent(
@@ -525,7 +532,7 @@ if (window.KeyboardClickLoaded) {
 
     // ========== DOM 变化 ==========
     _startObserver() {
-      if (typeof DOMUtils === 'undefined') return
+      if (typeof DOMUtils === 'undefined') {return}
       this.observer = DOMUtils.createDebouncedObserver(() => {
         if (this.hoveredEl && !document.body.contains(this.hoveredEl)) {
           this.hoveredEl = null
@@ -538,7 +545,7 @@ if (window.KeyboardClickLoaded) {
 
     // ========== 销毁 ==========
     destroy() {
-      if (this.observer) this.observer.disconnect()
+      if (this.observer) {this.observer.disconnect()}
       this._cancelSelect()
       this.hoveredEl = null
       window.KeyboardClickLoaded = false

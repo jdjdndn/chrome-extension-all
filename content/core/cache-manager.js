@@ -1,7 +1,7 @@
 // ========== 缓存管理器 ==========
 // 智能缓存管理，支持多种缓存策略
 
-;(function () {
+(function () {
   'use strict'
 
   if (window.CacheManager) {
@@ -218,7 +218,7 @@
      */
     _has(cache, key) {
       const entry = cache.data.get(key)
-      if (!entry) return false
+      if (!entry) {return false}
       if (this._isExpired(entry)) {
         this._delete(cache, key)
         return false
@@ -322,7 +322,7 @@
      */
     _touch(cache, key) {
       const entry = cache.data.get(key)
-      if (!entry) return false
+      if (!entry) {return false}
 
       entry.expiresAt = Date.now() + entry.ttl
       this._recordAccess(cache, key)
@@ -357,7 +357,7 @@
      * 启动自动清理
      */
     _startAutoClean() {
-      if (this._cleanTimer) return
+      if (this._cleanTimer) {return}
 
       this._cleanTimer = setInterval(() => {
         this.cleanup()

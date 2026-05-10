@@ -6,7 +6,7 @@
 'use strict'
 ;(function () {
   // 避免重复初始化
-  if (window.ClipboardWatcherInitialized) return
+  if (window.ClipboardWatcherInitialized) {return}
   window.ClipboardWatcherInitialized = true
 
   /**
@@ -14,7 +14,7 @@
    * @param {string} text - 剪贴板内容
    */
   async function recordClipboard(text) {
-    if (!text || text.trim().length === 0) return
+    if (!text || text.trim().length === 0) {return}
 
     try {
       // 发送到 background 记录

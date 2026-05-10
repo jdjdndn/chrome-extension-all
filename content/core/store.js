@@ -1,7 +1,7 @@
 // ========== 统一状态管理 Store ==========
 // 类似 Redux 的轻量级状态管理，集成 StorageBridge
 
-;(function () {
+(function () {
   'use strict'
 
   if (window.AppStore) {
@@ -43,7 +43,7 @@
      * @returns {Promise<boolean>}
      */
     async init(options = {}) {
-      if (this.initialized) return true
+      if (this.initialized) {return true}
 
       const { storageArea = 'local', storageKey = 'appState', initialState = {} } = options
 
@@ -182,8 +182,8 @@
       let currentAction = action
       for (const middleware of this.middlewares) {
         const result = await middleware(currentAction)
-        if (result === false) return // 中间件拦截
-        if (result) currentAction = result
+        if (result === false) {return} // 中间件拦截
+        if (result) {currentAction = result}
       }
 
       const reducer = this.reducers.get(currentAction.type)
@@ -239,7 +239,7 @@
      * @returns {any}
      */
     get(path) {
-      if (!path) return this.state
+      if (!path) {return this.state}
 
       return path.split('.').reduce((obj, key) => {
         return obj?.[key]
@@ -255,7 +255,7 @@
       const keys = path.split('.')
       const lastKey = keys.pop()
       const target = keys.reduce((obj, key) => {
-        if (!obj[key]) obj[key] = {}
+        if (!obj[key]) {obj[key] = {}}
         return obj[key]
       }, this.state)
 

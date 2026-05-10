@@ -3,7 +3,7 @@
  * 通过 EventBus 处理来自 DevTools 面板的操作请求
  */
 
-;(function () {
+(function () {
   'use strict'
 
   // 防止重复初始化
@@ -46,7 +46,7 @@
    * 元素选择器（支持多种格式）
    */
   function selectElements(selector) {
-    if (!selector) return []
+    if (!selector) {return []}
 
     // XPath 格式 (以 // 或 ./ 开头)
     if (selector.startsWith('//') || selector.startsWith('./')) {
@@ -76,7 +76,7 @@
    * 获取元素信息
    */
   function getElementInfo(el) {
-    if (!el || !(el instanceof Element)) return null
+    if (!el || !(el instanceof Element)) {return null}
 
     const rect = el.getBoundingClientRect()
     const style = getComputedStyle(el)
@@ -291,7 +291,7 @@
     text(data = {}) {
       const { selector = 'body' } = data
       const el = document.querySelector(selector)
-      if (!el) return { error: '元素不存在' }
+      if (!el) {return { error: '元素不存在' }}
 
       return {
         selector,
@@ -306,7 +306,7 @@
     table(data = {}) {
       const { selector = 'table' } = data
       const table = document.querySelector(selector)
-      if (!table) return { error: '表格不存在', data: [] }
+      if (!table) {return { error: '表格不存在', data: [] }}
 
       const headers = Array.from(table.querySelectorAll('th')).map((th) => th.textContent.trim())
 

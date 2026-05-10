@@ -4,10 +4,10 @@
  * 确保消息一定能传达
  */
 
-;(function () {
+(function () {
   'use strict'
 
-  if (window.PopupBridge) return
+  if (window.PopupBridge) {return}
 
   const READY_CHECK_INTERVAL = 100
   const MAX_READY_WAIT = 5000

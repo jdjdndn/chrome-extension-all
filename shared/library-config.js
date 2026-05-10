@@ -3,7 +3,7 @@
  * 包含知名库定义、CDN 模板、函数提取规则
  */
 
-;(function () {
+(function () {
   'use strict'
 
   // ========== CDN 模板 ==========
@@ -178,7 +178,7 @@
    */
   function generateCDNUrl(lib) {
     const cdn = CDN_TEMPLATES[lib.cdn] || CDN_TEMPLATES.jsdelivr
-    let url = cdn.template
+    const url = cdn.template
       .replace('{name}', lib.id)
       .replace('{version}', lib.version)
       .replace('{path}', lib.path || cdn.defaultPath)
@@ -260,10 +260,10 @@
         continue
       }
 
-      if (inString) continue
+      if (inString) {continue}
 
       if (char === openChar) {
-        if (depth === 0) bodyStart = i
+        if (depth === 0) {bodyStart = i}
         depth++
       } else if (char === closeChar) {
         depth--
@@ -288,7 +288,7 @@
     }
 
     // 表达式体: 找到分号或换行
-    let end = startIndex
+    const end = startIndex
     let inString = false
     let stringChar = ''
     let parenDepth = 0
@@ -307,10 +307,10 @@
         continue
       }
 
-      if (inString) continue
+      if (inString) {continue}
 
-      if (char === '(') parenDepth++
-      if (char === ')') parenDepth--
+      if (char === '(') {parenDepth++}
+      if (char === ')') {parenDepth--}
 
       if (char === ';' && parenDepth === 0) {
         return code.substring(startIndex, i)

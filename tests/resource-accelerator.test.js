@@ -3,7 +3,7 @@
  * 在浏览器控制台中运行此测试
  */
 
-;(function () {
+(function () {
   'use strict'
 
   const ResourceAcceleratorTest = {
@@ -53,7 +53,7 @@
       // 测试CDNMappings是否存在
       this.assert(typeof window.CDNMappings !== 'undefined', 'CDNMappings模块已加载')
 
-      if (!window.CDNMappings) return
+      if (!window.CDNMappings) {return}
 
       // 测试JS库匹配
       const jqueryResult = window.CDNMappings.matchJSLibrary(
@@ -119,7 +119,7 @@
 
       this.assert(typeof window.JSReplacer !== 'undefined', 'JSReplacer模块已加载')
 
-      if (!window.JSReplacer) return
+      if (!window.JSReplacer) {return}
 
       // 测试实例化
       const replacer = new window.JSReplacer({ enabled: true })
@@ -142,7 +142,7 @@
 
       this.assert(typeof window.FontReplacer !== 'undefined', 'FontReplacer模块已加载')
 
-      if (!window.FontReplacer) return
+      if (!window.FontReplacer) {return}
 
       // 测试实例化
       const replacer = new window.FontReplacer({ enabled: true })
@@ -161,7 +161,7 @@
 
       this.assert(typeof window.ImageOptimizer !== 'undefined', 'ImageOptimizer模块已加载')
 
-      if (!window.ImageOptimizer) return
+      if (!window.ImageOptimizer) {return}
 
       // 测试实例化
       const optimizer = new window.ImageOptimizer({
@@ -193,7 +193,7 @@
         'ResourceAccelerator模块已加载'
       )
 
-      if (!window.ResourceAccelerator) return
+      if (!window.ResourceAccelerator) {return}
 
       // 测试实例化
       const accelerator = new window.ResourceAccelerator({

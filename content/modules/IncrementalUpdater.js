@@ -2,7 +2,7 @@
  * 增量更新策略模块
  * 对于大量选中元素，使用增量更新避免性能问题
  */
-;(function () {
+(function () {
   'use strict'
 
   class IncrementalUpdater {
@@ -30,7 +30,7 @@
      * 添加更新任务到队列
      */
     queueUpdate(task) {
-      if (!task || !task.element) return
+      if (!task || !task.element) {return}
 
       this.updateQueue.push({
         element: task.element,
@@ -52,7 +52,7 @@
      * 批量添加更新任务
      */
     queueBatch(tasks) {
-      if (!Array.isArray(tasks)) return
+      if (!Array.isArray(tasks)) {return}
 
       tasks.forEach((task) => this.queueUpdate(task))
     }
@@ -61,7 +61,7 @@
      * 调度处理
      */
     scheduleProcessing() {
-      if (this.isProcessing || this.updateQueue.length === 0) return
+      if (this.isProcessing || this.updateQueue.length === 0) {return}
 
       this.isProcessing = true
 

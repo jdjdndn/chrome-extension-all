@@ -1,7 +1,7 @@
 // ========== 扩展 API 模块 ==========
 // 提供更丰富的扩展点供第三方使用
 
-;(function () {
+(function () {
   'use strict'
 
   if (window.ExtensionAPI) {
@@ -153,10 +153,10 @@
       const results = []
 
       for (const [extId, extension] of this.extensions) {
-        if (extId === fromId) continue
+        if (extId === fromId) {continue}
 
         const handlers = extension.hooks[event]
-        if (!handlers || handlers.length === 0) continue
+        if (!handlers || handlers.length === 0) {continue}
 
         for (const handler of handlers) {
           try {

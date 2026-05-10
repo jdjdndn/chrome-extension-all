@@ -4,7 +4,7 @@
 
 // 注意：不要在生成的选择器中使用脚本添加的自定义属性（如 data-element-picker-uid）
 
-;(function () {
+(function () {
   'use strict'
 
   // 如果已存在实例，先清理旧实例
@@ -25,10 +25,10 @@
       })
       // 移除样式
       const oldStyle = document.getElementById('element-picker-styles')
-      if (oldStyle) oldStyle.remove()
+      if (oldStyle) {oldStyle.remove()}
       // 移除高亮层
       const oldOverlay = document.getElementById('element-picker-highlight')
-      if (oldOverlay) oldOverlay.remove()
+      if (oldOverlay) {oldOverlay.remove()}
     } catch (e) {
       // 忽略清理错误
     }
@@ -96,20 +96,20 @@
       while (current.parentElement && level < MAX_LEVEL) {
         const parent = current.parentElement
 
-        if (parent === document.body) break
+        if (parent === document.body) {break}
 
         // 获取可见且占位置的子元素
         const visibleChildren = Array.from(parent.children).filter((child) => {
           const style = window.getComputedStyle(child)
           // display: none - 完全不显示
-          if (style.display === 'none') return false
+          if (style.display === 'none') {return false}
           // position: absolute/fixed - 脱离文档流，不占位置
-          if (style.position === 'absolute' || style.position === 'fixed') return false
+          if (style.position === 'absolute' || style.position === 'fixed') {return false}
           return true
         })
 
         // 父元素只有一个可见子元素才继续
-        if (visibleChildren.length !== 1) break
+        if (visibleChildren.length !== 1) {break}
 
         // 检查大小是否相近
         const currentRect = current.getBoundingClientRect()
@@ -122,7 +122,7 @@
           Math.min(currentRect.height, parentRect.height) /
           Math.max(currentRect.height, parentRect.height)
 
-        if (widthRatio < SIZE_THRESHOLD || heightRatio < SIZE_THRESHOLD) break
+        if (widthRatio < SIZE_THRESHOLD || heightRatio < SIZE_THRESHOLD) {break}
 
         current = parent
         level++
@@ -142,7 +142,7 @@
      * 创建高亮覆盖层和尺寸提示
      */
     createHighlightOverlay() {
-      if (this.highlightOverlay) return
+      if (this.highlightOverlay) {return}
 
       // 高亮框
       this.highlightOverlay = document.createElement('div')
@@ -344,14 +344,14 @@
      * 鼠标悬停处理
      */
     onHover(event) {
-      if (!this.isActive) return
+      if (!this.isActive) {return}
 
       event.stopPropagation()
       const element = event.target
 
       // 忽略高亮层自身
-      if (element === this.highlightOverlay || element === this.sizeTooltip) return
-      if (element === this.breadcrumbEl || element === this.levelIndicator) return
+      if (element === this.highlightOverlay || element === this.sizeTooltip) {return}
+      if (element === this.breadcrumbEl || element === this.levelIndicator) {return}
 
       this.currentHoveredElement = element
       this.smartSelectLevel = 0 // 重置智能选择层级
@@ -362,7 +362,7 @@
      * 鼠标移出处理
      */
     onMouseOut(event) {
-      if (!this.isActive) return
+      if (!this.isActive) {return}
 
       const element = event.target
       const relatedTarget = event.relatedTarget
@@ -383,7 +383,7 @@
      * 鼠标离开文档处理
      */
     onMouseLeave(event) {
-      if (!this.isActive) return
+      if (!this.isActive) {return}
 
       // 鼠标离开文档时隐藏高亮
       if (event.target === document || event.target === document.body) {
@@ -396,11 +396,11 @@
      * 鼠标按下 - 开始框选
      */
     onMouseDown(event) {
-      if (!this.isActive) return
+      if (!this.isActive) {return}
       // 只响应左键 + Shift（框选模式）
-      if (event.button !== 0 || !event.shiftKey) return
+      if (event.button !== 0 || !event.shiftKey) {return}
       // 忽略高亮层自身
-      if (event.target === this.highlightOverlay || event.target === this.sizeTooltip) return
+      if (event.target === this.highlightOverlay || event.target === this.sizeTooltip) {return}
 
       this.isBoxSelecting = true
       this.boxSelectStart = { x: event.clientX, y: event.clientY }
@@ -422,7 +422,7 @@
      * 鼠标移动 - 更新框选区域
      */
     onMouseMove(event) {
-      if (!this.isActive || !this.isBoxSelecting) return
+      if (!this.isActive || !this.isBoxSelecting) {return}
 
       const startX = this.boxSelectStart.x
       const startY = this.boxSelectStart.y
@@ -451,7 +451,7 @@
      * 鼠标释放 - 完成框选
      */
     onMouseUp(event) {
-      if (!this.isBoxSelecting) return
+      if (!this.isBoxSelecting) {return}
 
       this.isBoxSelecting = false
 
@@ -506,7 +506,7 @@
           el === this.boxSelectOverlay ||
           el === this.previewOverlay
         )
-          return
+          {return}
 
         const rect = el.getBoundingClientRect()
 
@@ -586,7 +586,7 @@
           el === this.boxSelectOverlay ||
           el === this.previewOverlay
         )
-          return
+          {return}
 
         const rect = el.getBoundingClientRect()
 
@@ -686,7 +686,7 @@
 
       // 恢复历史状态
       const snapshot = this.selectionHistory[this.historyIndex]
-      if (!snapshot) return
+      if (!snapshot) {return}
 
       snapshot.forEach((item) => {
         const element = this.getElementByXPath(item.xpath)
@@ -745,7 +745,7 @@
     previewSelector(selector) {
       this.clearPreview()
 
-      if (!selector) return 0
+      if (!selector) {return 0}
 
       try {
         const elements = document.querySelectorAll(selector)
@@ -764,7 +764,7 @@
      * 滚动处理
      */
     onScroll(event) {
-      if (!this.isActive) return
+      if (!this.isActive) {return}
 
       // 更新高亮框位置
       if (this.currentHoveredElement) {
@@ -776,7 +776,7 @@
      * 窗口大小变化处理
      */
     onResize(event) {
-      if (!this.isActive) return
+      if (!this.isActive) {return}
 
       // 更新高亮框位置
       if (this.currentHoveredElement) {
@@ -788,7 +788,7 @@
      * 点击选择处理
      */
     onClick(event) {
-      if (!this.isActive) return
+      if (!this.isActive) {return}
 
       // 防止重复处理（使用 stopImmediatePropagation 阻止其他监听器）
       event.preventDefault()
@@ -798,7 +798,7 @@
       const element = event.target
 
       // 忽略高亮层自身
-      if (element === this.highlightOverlay || element === this.sizeTooltip) return
+      if (element === this.highlightOverlay || element === this.sizeTooltip) {return}
 
       // 智能选择：自动向上查找有效父级
       const smartElement = this.smartSelectElement(element)
@@ -838,7 +838,7 @@
         const selector = this.generateSelector(smartElement)
 
         // 验证选择器并获取匹配数量
-        let finalSelector = selector
+        const finalSelector = selector
         let matchCount = 1
         try {
           const found = document.querySelectorAll(selector)
@@ -870,7 +870,7 @@
      * @param {Element} element - 要选择的元素
      */
     selectSingleElement(element) {
-      if (!element || !element.tagName) return
+      if (!element || !element.tagName) {return}
 
       const xpath = this.getXPath(element)
       const selector = this.generateSelector(element)
@@ -932,8 +932,8 @@
      * 获取元素的 XPath（唯一标识）
      */
     getXPath(element) {
-      if (!element || element === document.body) return '/html/body'
-      if (element === document.documentElement) return '/html'
+      if (!element || element === document.body) {return '/html/body'}
+      if (element === document.documentElement) {return '/html'}
 
       // 如果元素有 ID，使用 ID
       if (element.id && !element.id.includes(' ') && !/^\d/.test(element.id)) {
@@ -960,7 +960,7 @@
         const part = tagName + '[' + index + ']'
         parts.unshift(part)
 
-        if (current === document.body) break
+        if (current === document.body) {break}
         current = current.parentNode
       }
 
@@ -989,7 +989,7 @@
      * 键盘按下处理
      */
     onKeyDown(event) {
-      if (!this.isActive) return
+      if (!this.isActive) {return}
 
       // Ctrl/Cmd 按下进入多选模式
       if (event.ctrlKey || event.metaKey) {
@@ -1060,7 +1060,7 @@
      * 键盘释放处理
      */
     onKeyUp(event) {
-      if (!this.isActive) return
+      if (!this.isActive) {return}
 
       // Ctrl/Cmd 释放退出多选模式
       if (!event.ctrlKey && !event.metaKey) {
@@ -1073,7 +1073,7 @@
      * @param {number} delta - 层级变化（正数向上，负数向下）
      */
     adjustSmartSelectLevel(delta) {
-      if (!this.currentHoveredElement) return
+      if (!this.currentHoveredElement) {return}
 
       const maxLevel = 10
       this.smartSelectLevel = Math.max(0, Math.min(maxLevel, this.smartSelectLevel + delta))
@@ -1081,7 +1081,7 @@
       // 根据层级向上选择父元素
       let targetElement = this.currentHoveredElement
       for (let i = 0; i < this.smartSelectLevel && targetElement.parentElement; i++) {
-        if (targetElement.parentElement === document.body) break
+        if (targetElement.parentElement === document.body) {break}
         targetElement = targetElement.parentElement
       }
 
@@ -1094,7 +1094,7 @@
      * 显示智能选择层级指示器
      */
     showLevelIndicator(level) {
-      if (!this.levelIndicator) return
+      if (!this.levelIndicator) {return}
 
       if (level > 0) {
         this.levelIndicator.textContent = `↑${level}`
@@ -1115,7 +1115,7 @@
      * 双击批量选择相同元素
      */
     onDoubleClick(event) {
-      if (!this.isActive) return
+      if (!this.isActive) {return}
 
       event.preventDefault()
       event.stopPropagation()
@@ -1124,8 +1124,8 @@
       const element = event.target
 
       // 忽略高亮层自身
-      if (element === this.highlightOverlay || element === this.sizeTooltip) return
-      if (element === this.breadcrumbEl) return
+      if (element === this.highlightOverlay || element === this.sizeTooltip) {return}
+      if (element === this.breadcrumbEl) {return}
 
       // 选择所有相同标签名的同级元素
       this.selectSimilarElements(0)
@@ -1136,17 +1136,17 @@
      * @param {number} mode - 0: 同级同标签, 1-9: 限制数量
      */
     selectSimilarElements(mode) {
-      if (!this.currentHoveredElement) return
+      if (!this.currentHoveredElement) {return}
 
       const element =
         this.smartSelectLevel > 0
           ? this.getAncestorAtLevel(this.currentHoveredElement, this.smartSelectLevel)
           : this.currentHoveredElement
 
-      if (!element) return
+      if (!element) {return}
 
       const parent = element.parentElement
-      if (!parent) return
+      if (!parent) {return}
 
       const tag = element.tagName
       const classes =
@@ -1159,8 +1159,8 @@
 
       // 找到同级相似元素
       let siblings = Array.from(parent.children).filter((child) => {
-        if (child === element) return true
-        if (child.tagName !== tag) return false
+        if (child === element) {return true}
+        if (child.tagName !== tag) {return false}
 
         // 如果有共同的 class，优先选择有相同 class 的
         if (classes.length > 0) {
@@ -1169,7 +1169,7 @@
               ? child.className.trim().split(' ')
               : []
           const hasCommonClass = classes.some((c) => childClasses.includes(c))
-          if (!hasCommonClass) return false
+          if (!hasCommonClass) {return false}
         }
 
         return true
@@ -1212,14 +1212,14 @@
      * 全选当前高亮元素的同级元素
      */
     selectAllSiblings() {
-      if (!this.currentHoveredElement) return
+      if (!this.currentHoveredElement) {return}
 
       const element =
         this.smartSelectLevel > 0
           ? this.getAncestorAtLevel(this.currentHoveredElement, this.smartSelectLevel)
           : this.currentHoveredElement
 
-      if (!element || !element.parentElement) return
+      if (!element || !element.parentElement) {return}
 
       const parent = element.parentElement
       const tag = element.tagName
@@ -1257,7 +1257,7 @@
     getAncestorAtLevel(element, level) {
       let current = element
       for (let i = 0; i < level && current.parentElement; i++) {
-        if (current.parentElement === document.body) break
+        if (current.parentElement === document.body) {break}
         current = current.parentElement
       }
       return current
@@ -1328,7 +1328,7 @@
      * 显示高亮和尺寸信息
      */
     showHighlight(element) {
-      if (!this.highlightOverlay) return
+      if (!this.highlightOverlay) {return}
 
       const rect = element.getBoundingClientRect()
 
@@ -1416,7 +1416,7 @@
      * 显示元素路径面包屑
      */
     showBreadcrumb(element, rect) {
-      if (!this.breadcrumbEl) return
+      if (!this.breadcrumbEl) {return}
 
       const path = []
       let current = element
@@ -1441,7 +1441,7 @@
 
         path.unshift(part)
 
-        if (current === document.body) break
+        if (current === document.body) {break}
         current = current.parentElement
       }
 
@@ -1525,7 +1525,7 @@
     showPageToast(message, color = '#10b981') {
       // 移除旧的 toast
       const oldToast = document.getElementById('element-picker-toast')
-      if (oldToast) oldToast.remove()
+      if (oldToast) {oldToast.remove()}
 
       // 创建新 toast
       const toast = document.createElement('div')
@@ -1625,7 +1625,7 @@
      * 通过唯一 ID 移除元素高亮
      */
     removeHighlightByUid(pickerUid) {
-      if (!pickerUid) return false
+      if (!pickerUid) {return false}
 
       // 通过唯一 ID 属性查找元素
       const element = document.querySelector(`[data-ep-uid="${pickerUid}"]`)
@@ -1686,24 +1686,24 @@
      * 使用多策略 BFS 算法，确保返回最短且精确的选择器
      */
     generateSelector(element) {
-      if (!element || !element.tagName) return ''
-      if (element === document.body) return 'body'
-      if (element === document.documentElement) return 'html'
+      if (!element || !element.tagName) {return ''}
+      if (element === document.body) {return 'body'}
+      if (element === document.documentElement) {return 'html'}
 
       // === Helper Functions ===
       const hasValidId = (node) => node && node.id && !node.id.includes(' ') && !/^\d/.test(node.id)
 
       const getValidClasses = (node) => {
-        if (!node.className || typeof node.className !== 'string') return []
+        if (!node.className || typeof node.className !== 'string') {return []}
         return node.className
           .trim()
           .split(' ')
           .filter((c) => {
-            if (!c || /^[0-9]/.test(c)) return false
+            if (!c || /^[0-9]/.test(c)) {return false}
             // 过滤动态生成的 class
             if (/^(css-|styled-|sc-|js-|_|__|Mui|jss|css_|_|ng-|React|react|vue-|v-)/.test(c))
-              return false
-            if (c.length > 40) return false
+              {return false}
+            if (c.length > 40) {return false}
             return /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(c)
           })
       }
@@ -1763,7 +1763,7 @@
       }
 
       const getValidAttributes = (node, forMerge = false) => {
-        if (!node.attributes) return []
+        if (!node.attributes) {return []}
         const skipAttrs = new Set([
           'data-ep-selected',
           'data-ep-uid',
@@ -1781,18 +1781,18 @@
         ])
         const attrs = []
         for (const attr of node.attributes) {
-          if (skipAttrs.has(attr.name)) continue
-          if (!attr.value || attr.value.length > 80) continue
-          if (/^\d+$/.test(attr.value)) continue
+          if (skipAttrs.has(attr.name)) {continue}
+          if (!attr.value || attr.value.length > 80) {continue}
+          if (/^\d+$/.test(attr.value)) {continue}
           if (forMerge && !STABLE_ATTRS.includes(attr.name) && !TEST_ATTRS.includes(attr.name))
-            continue
+            {continue}
           attrs.push({ name: attr.name, value: attr.value })
         }
         // 按优先级排序：测试属性 > 稳定属性 > 其他
         attrs.sort((a, b) => {
           const aIsTest = TEST_ATTRS.includes(a.name) ? 0 : 1
           const bIsTest = TEST_ATTRS.includes(b.name) ? 0 : 1
-          if (aIsTest !== bIsTest) return aIsTest - bIsTest
+          if (aIsTest !== bIsTest) {return aIsTest - bIsTest}
           const aIsStable = STABLE_ATTRS.includes(a.name) ? 0 : 1
           const bIsStable = STABLE_ATTRS.includes(b.name) ? 0 : 1
           return aIsStable - bIsStable
@@ -1803,7 +1803,7 @@
       // 获取元素在所有兄弟中的索引（用于 nth-child）
       const getNthChild = (node) => {
         const parent = node.parentElement
-        if (!parent) return 0
+        if (!parent) {return 0}
         const siblings = Array.from(parent.children)
         return siblings.length > 1 ? siblings.indexOf(node) + 1 : 0
       }
@@ -1811,7 +1811,7 @@
       // 获取元素在同类兄弟中的索引（用于 nth-of-type）
       const getNthOfType = (node) => {
         const parent = node.parentElement
-        if (!parent) return 0
+        if (!parent) {return 0}
         const siblings = Array.from(parent.children).filter((c) => c.tagName === node.tagName)
         return siblings.length > 1 ? siblings.indexOf(node) + 1 : 0
       }
@@ -1895,7 +1895,7 @@
 
       // 测试 Level 1
       for (const sel of candidates) {
-        if (isExactMatch(sel, element)) return sel
+        if (isExactMatch(sel, element)) {return sel}
       }
 
       // === Level 2: 双 class 组合 ===
@@ -1919,7 +1919,7 @@
 
         // 测试
         for (let i = candidates.length - 2; i < candidates.length; i++) {
-          if (isExactMatch(candidates[i], element)) return candidates[i]
+          if (isExactMatch(candidates[i], element)) {return candidates[i]}
         }
       }
 
@@ -1937,7 +1937,7 @@
               CSS.escape(attr.value) +
               '"]'
             candidates.push(sel)
-            if (isExactMatch(sel, element)) return sel
+            if (isExactMatch(sel, element)) {return sel}
           }
         }
       }
@@ -1951,26 +1951,26 @@
             .slice(0, 3)
             .map((c) => CSS.escape(c))
             .join('.')
-        if (isExactMatch(sel, element)) return sel
+        if (isExactMatch(sel, element)) {return sel}
       }
 
       // === Level 5: 带 nth-of-type / nth-child ===
       if (nthOfType > 0) {
         const sel = tag + ':nth-of-type(' + nthOfType + ')'
         candidates.push(sel)
-        if (isExactMatch(sel, element)) return sel
+        if (isExactMatch(sel, element)) {return sel}
       }
 
       if (nthChild > 0) {
         const sel = tag + ':nth-child(' + nthChild + ')'
         candidates.push(sel)
-        if (isExactMatch(sel, element)) return sel
+        if (isExactMatch(sel, element)) {return sel}
       }
 
       // class + nth-of-type
       if (classes.length > 0 && nthOfType > 0) {
         const sel = tag + '.' + CSS.escape(classes[0]) + ':nth-of-type(' + nthOfType + ')'
-        if (isExactMatch(sel, element)) return sel
+        if (isExactMatch(sel, element)) {return sel}
       }
 
       // === Level 6: 构建路径（从元素到有 ID 的祖先或 body） ===
@@ -2011,7 +2011,7 @@
 
           path.unshift(part)
 
-          if (cur === document.documentElement) break
+          if (cur === document.documentElement) {break}
           cur = cur.parentElement
           depth++
         }
@@ -2022,10 +2022,10 @@
       // 尝试不同深度的路径
       for (let depth = 2; depth <= 5; depth++) {
         const path = buildPath(element, depth)
-        if (path.length < 2) continue
+        if (path.length < 2) {continue}
 
         const selector = path.join(' > ')
-        if (isExactMatch(selector, element)) return selector
+        if (isExactMatch(selector, element)) {return selector}
 
         // 如果匹配多个，尝试添加更多细节到最后一层
         const result = testSelectorResult(selector, element)
@@ -2042,7 +2042,7 @@
                 .map((c) => CSS.escape(c))
                 .join('.')
             const enhancedSel = enhancedPath.join(' > ')
-            if (isExactMatch(enhancedSel, element)) return enhancedSel
+            if (isExactMatch(enhancedSel, element)) {return enhancedSel}
           }
 
           // 尝试添加属性
@@ -2051,7 +2051,7 @@
             enhancedPath[enhancedPath.length - 1] =
               lastPart + '[' + CSS.escape(attrs[0].name) + '="' + CSS.escape(attrs[0].value) + '"]'
             const enhancedSel = enhancedPath.join(' > ')
-            if (isExactMatch(enhancedSel, element)) return enhancedSel
+            if (isExactMatch(enhancedSel, element)) {return enhancedSel}
           }
 
           // 尝试添加 nth-of-type
@@ -2059,7 +2059,7 @@
             const enhancedPath = [...path]
             enhancedPath[enhancedPath.length - 1] = lastPart + ':nth-of-type(' + nthOfType + ')'
             const enhancedSel = enhancedPath.join(' > ')
-            if (isExactMatch(enhancedSel, element)) return enhancedSel
+            if (isExactMatch(enhancedSel, element)) {return enhancedSel}
           }
         }
       }
@@ -2073,15 +2073,15 @@
      * 获取合并后的选择器（异步版本）
      */
     async getMergedSelector() {
-      if (this.selectedElements.length === 0) return ''
-      if (this.selectedElements.length === 1) return this.selectedElements[0].selector
+      if (this.selectedElements.length === 0) {return ''}
+      if (this.selectedElements.length === 1) {return this.selectedElements[0].selector}
 
       const elements = this.selectedElements
         .map((item) => this.getElementByXPath(item.xpath))
         .filter((el) => el)
       if (elements.length === 0)
-        return this.selectedElements.map((item) => item.selector).join(', ')
-      if (elements.length === 1) return this.generateSelector(elements[0])
+        {return this.selectedElements.map((item) => item.selector).join(', ')}
+      if (elements.length === 1) {return this.generateSelector(elements[0])}
 
       return this._computeBestSelector(elements)
     }
@@ -2094,8 +2094,8 @@
      * @returns {Promise<string>} - 最佳选择器
      */
     async _computeBestSelector(elements, timeout = 3000) {
-      if (elements.length === 0) return ''
-      if (elements.length === 1) return this.generateSelector(elements[0])
+      if (elements.length === 0) {return ''}
+      if (elements.length === 1) {return this.generateSelector(elements[0])}
 
       // 提取特征
       const oldFeatures = elements.map((el) => this._extractElementFeatures(el))
@@ -2135,13 +2135,13 @@
      */
     _extractElementFeatures(element) {
       const getValidClasses = (node) => {
-        if (!node.className || typeof node.className !== 'string') return []
+        if (!node.className || typeof node.className !== 'string') {return []}
         return node.className
           .trim()
           .split(' ')
           .filter((c) => {
-            if (!c || /^[0-9]/.test(c)) return false
-            if (/^(css-|styled-|sc-|js-|_|__|Mui|jss|css_|_)/.test(c) || c.length > 30) return false
+            if (!c || /^[0-9]/.test(c)) {return false}
+            if (/^(css-|styled-|sc-|js-|_|__|Mui|jss|css_|_)/.test(c) || c.length > 30) {return false}
             return /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(c)
           })
       }
@@ -2173,7 +2173,7 @@
       ])
 
       const getValidAttributes = (node, forMerge = false) => {
-        if (!node.attributes) return []
+        if (!node.attributes) {return []}
         const skipAttrs = new Set([
           'data-ep-selected',
           'data-ep-uid',
@@ -2202,14 +2202,14 @@
         const attrs = []
         for (const attr of node.attributes) {
           // 如果是用于合并，只允许确定性属性
-          if (forMerge && !STABLE_ATTRS.has(attr.name)) continue
+          if (forMerge && !STABLE_ATTRS.has(attr.name)) {continue}
           if (
             skipAttrs.has(attr.name) ||
             !attr.value ||
             attr.value.length > 50 ||
             /^\d+$/.test(attr.value)
           )
-            continue
+            {continue}
           attrs.push({ name: attr.name, value: attr.value })
         }
         return attrs
@@ -2218,7 +2218,7 @@
       // 获取元素的伪类信息（用于智能合并）
       const getPseudoInfo = (node) => {
         const parent = node.parentElement
-        if (!parent) return { nthOfType: 0, isFirst: false, isLast: false, isOnly: false }
+        if (!parent) {return { nthOfType: 0, isFirst: false, isLast: false, isOnly: false }}
 
         const siblings = Array.from(parent.children).filter((c) => c.tagName === node.tagName)
         const index = siblings.indexOf(node)
@@ -2247,14 +2247,14 @@
 
           let selector = tag + id + cls
           // 添加伪类信息（用于后续合并）
-          if (pseudo.isFirst) selector += ':first-child'
-          else if (pseudo.isLast) selector += ':last-child'
-          else if (pseudo.isOnly) selector += ':only-child'
-          else if (pseudo.nthOfType > 0) selector += `:nth-child(${pseudo.nthOfType})`
+          if (pseudo.isFirst) {selector += ':first-child'}
+          else if (pseudo.isLast) {selector += ':last-child'}
+          else if (pseudo.isOnly) {selector += ':only-child'}
+          else if (pseudo.nthOfType > 0) {selector += `:nth-child(${pseudo.nthOfType})`}
 
           path.unshift(selector)
           current = current.parentElement
-          if (path.length >= 6) break // 限制路径深度
+          if (path.length >= 6) {break} // 限制路径深度
         }
         return path
       }
@@ -2338,13 +2338,13 @@
      * 内联获取有效 class 列表（用于 generateCandidates 中的 :not(.class) 排除）
      */
     _getValidClassesInline(node) {
-      if (!node.className || typeof node.className !== 'string') return []
+      if (!node.className || typeof node.className !== 'string') {return []}
       return node.className
         .trim()
         .split(' ')
         .filter((c) => {
-          if (!c || /^[0-9]/.test(c)) return false
-          if (/^(css-|styled-|sc-|js-|_|__|Mui|jss|css_|_)/.test(c) || c.length > 30) return false
+          if (!c || /^[0-9]/.test(c)) {return false}
+          if (/^(css-|styled-|sc-|js-|_|__|Mui|jss|css_|_)/.test(c) || c.length > 30) {return false}
           return /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(c)
         })
     }
@@ -2391,11 +2391,11 @@
       ])
 
       const getAttrs = (node) => {
-        if (!node.attributes) return []
+        if (!node.attributes) {return []}
         const attrs = []
         for (const attr of node.attributes) {
-          if (SKIP_ATTRS.has(attr.name)) continue
-          if (!attr.value || attr.value.length > 80 || /^\d+$/.test(attr.value)) continue
+          if (SKIP_ATTRS.has(attr.name)) {continue}
+          if (!attr.value || attr.value.length > 80 || /^\d+$/.test(attr.value)) {continue}
           attrs.push({ name: attr.name, value: attr.value })
         }
         attrs.sort((a, b) => {
@@ -2408,26 +2408,26 @@
 
       const getPseudos = (node) => {
         const parent = node.parentElement
-        if (!parent) return []
+        if (!parent) {return []}
         const pseudos = []
         const siblings = Array.from(parent.children)
         const sameType = siblings.filter((c) => c.tagName === node.tagName)
         const idx = sameType.indexOf(node)
         const allIdx = siblings.indexOf(node)
         if (sameType.length > 1) {
-          if (idx === 0) pseudos.push(':first-of-type')
-          if (idx === sameType.length - 1) pseudos.push(':last-of-type')
-          if (idx > 0) pseudos.push(':nth-of-type(' + (idx + 1) + ')')
+          if (idx === 0) {pseudos.push(':first-of-type')}
+          if (idx === sameType.length - 1) {pseudos.push(':last-of-type')}
+          if (idx > 0) {pseudos.push(':nth-of-type(' + (idx + 1) + ')')}
         }
         if (siblings.length > 1) {
-          if (allIdx === 0) pseudos.push(':first-child')
-          if (allIdx === siblings.length - 1) pseudos.push(':last-child')
-          if (allIdx > 0) pseudos.push(':nth-child(' + (allIdx + 1) + ')')
+          if (allIdx === 0) {pseudos.push(':first-child')}
+          if (allIdx === siblings.length - 1) {pseudos.push(':last-child')}
+          if (allIdx > 0) {pseudos.push(':nth-child(' + (allIdx + 1) + ')')}
         }
-        if (node.children.length === 0 && node.textContent.trim() === '') pseudos.push(':empty')
+        if (node.children.length === 0 && node.textContent.trim() === '') {pseudos.push(':empty')}
         try {
-          if (node.matches(':checked')) pseudos.push(':checked')
-          if (node.matches(':disabled')) pseudos.push(':disabled')
+          if (node.matches(':checked')) {pseudos.push(':checked')}
+          if (node.matches(':disabled')) {pseudos.push(':disabled')}
         } catch (e) {}
         return pseudos
       }
@@ -2482,27 +2482,27 @@
       const pseudos = (feat.pseudos || []).slice(0, 4)
 
       // === 1 part ===
-      if (tag) add(tag)
-      if (feat.id) add('#' + CSS.escape(feat.id))
-      for (const cls of classes) add('.' + CSS.escape(cls))
+      if (tag) {add(tag)}
+      if (feat.id) {add('#' + CSS.escape(feat.id))}
+      for (const cls of classes) {add('.' + CSS.escape(cls))}
       for (const attr of attrs)
-        add('[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]')
-      for (const pseudo of pseudos) add(tag ? tag + pseudo : pseudo)
+        {add('[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]')}
+      for (const pseudo of pseudos) {add(tag ? tag + pseudo : pseudo)}
 
-      if (maxParts < 2) return results.sort((a, b) => a.length - b.length)
+      if (maxParts < 2) {return results.sort((a, b) => a.length - b.length)}
 
       // === 2 parts ===
       if (tag) {
-        if (feat.id) add(tag + '#' + CSS.escape(feat.id))
-        for (const cls of classes) add(tag + '.' + CSS.escape(cls))
+        if (feat.id) {add(tag + '#' + CSS.escape(feat.id))}
+        for (const cls of classes) {add(tag + '.' + CSS.escape(cls))}
         for (const attr of attrs)
-          add(tag + '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]')
-        for (const pseudo of pseudos) add(tag + pseudo)
+          {add(tag + '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]')}
+        for (const pseudo of pseudos) {add(tag + pseudo)}
       }
       for (let i = 0; i < classes.length; i++) {
         for (let j = i + 1; j < classes.length; j++) {
           add('.' + CSS.escape(classes[i]) + '.' + CSS.escape(classes[j]))
-          if (tag) add(tag + '.' + CSS.escape(classes[i]) + '.' + CSS.escape(classes[j]))
+          if (tag) {add(tag + '.' + CSS.escape(classes[i]) + '.' + CSS.escape(classes[j]))}
         }
       }
       for (const cls of classes) {
@@ -2517,7 +2517,7 @@
               '"]'
           )
           if (tag)
-            add(
+            {add(
               tag +
                 '.' +
                 CSS.escape(cls) +
@@ -2526,24 +2526,24 @@
                 '="' +
                 CSS.escape(attr.value) +
                 '"]'
-            )
+            )}
         }
       }
       for (const cls of classes) {
         for (const pseudo of pseudos) {
           add('.' + CSS.escape(cls) + pseudo)
-          if (tag) add(tag + '.' + CSS.escape(cls) + pseudo)
+          if (tag) {add(tag + '.' + CSS.escape(cls) + pseudo)}
         }
       }
       for (const attr of attrs) {
         for (const pseudo of pseudos) {
           add('[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]' + pseudo)
           if (tag)
-            add(tag + '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]' + pseudo)
+            {add(tag + '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]' + pseudo)}
         }
       }
 
-      if (maxParts < 3) return results.sort((a, b) => a.length - b.length)
+      if (maxParts < 3) {return results.sort((a, b) => a.length - b.length)}
 
       // === 3 parts ===
       if (tag) {
@@ -2568,7 +2568,7 @@
         }
         for (const cls of classes) {
           for (const attr of attrs)
-            add(
+            {add(
               tag +
                 '.' +
                 CSS.escape(cls) +
@@ -2577,18 +2577,18 @@
                 '="' +
                 CSS.escape(attr.value) +
                 '"]'
-            )
-          for (const pseudo of pseudos) add(tag + '.' + CSS.escape(cls) + pseudo)
+            )}
+          for (const pseudo of pseudos) {add(tag + '.' + CSS.escape(cls) + pseudo)}
         }
         for (const attr of attrs) {
           for (const pseudo of pseudos)
-            add(tag + '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]' + pseudo)
+            {add(tag + '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]' + pseudo)}
         }
       }
       for (let i = 0; i < Math.min(classes.length, 3); i++) {
         for (let j = i + 1; j < Math.min(classes.length, 4); j++) {
           for (const attr of attrs.slice(0, 2))
-            add(
+            {add(
               '.' +
                 CSS.escape(classes[i]) +
                 '.' +
@@ -2598,20 +2598,20 @@
                 '="' +
                 CSS.escape(attr.value) +
                 '"]'
-            )
+            )}
           for (const pseudo of pseudos.slice(0, 2))
-            add('.' + CSS.escape(classes[i]) + '.' + CSS.escape(classes[j]) + pseudo)
+            {add('.' + CSS.escape(classes[i]) + '.' + CSS.escape(classes[j]) + pseudo)}
         }
       }
 
-      if (maxParts < 4) return results.sort((a, b) => a.length - b.length)
+      if (maxParts < 4) {return results.sort((a, b) => a.length - b.length)}
 
       // === 4 parts ===
       if (tag) {
         for (let i = 0; i < Math.min(classes.length, 3); i++) {
           for (let j = i + 1; j < Math.min(classes.length, 4); j++) {
             for (const attr of attrs.slice(0, 2))
-              add(
+              {add(
                 tag +
                   '.' +
                   CSS.escape(classes[i]) +
@@ -2622,13 +2622,13 @@
                   '="' +
                   CSS.escape(attr.value) +
                   '"]'
-              )
+              )}
           }
         }
         for (const cls of classes.slice(0, 2)) {
           for (const pseudo of pseudos.slice(0, 2)) {
             for (const attr of attrs.slice(0, 2))
-              add(
+              {add(
                 tag +
                   '.' +
                   CSS.escape(cls) +
@@ -2638,7 +2638,7 @@
                   '="' +
                   CSS.escape(attr.value) +
                   '"]'
-              )
+              )}
           }
         }
       }
@@ -2685,10 +2685,10 @@
       const targetParts = this._compoundCandidates(commonFeat, 2)
       for (const sel of compoundAll) {
         fragments.push({ type: 'target', sel })
-        if (tryYield(sel)) yield sel
+        if (tryYield(sel)) {yield sel}
       }
       for (const sel of targetParts) {
-        if (!fragments.some((f) => f.sel === sel)) fragments.push({ type: 'target', sel })
+        if (!fragments.some((f) => f.sel === sel)) {fragments.push({ type: 'target', sel })}
       }
 
       // ========== Phase 3: :not() 修饰符 ==========
@@ -2719,10 +2719,10 @@
                     : notIdx.map((i) => ':not(:nth-child(' + i + '))').join('')
                 fragments.push({ type: 'modifier', sel: notNth })
                 let s = tag + notNth
-                if (tryYield(s)) yield s
+                if (tryYield(s)) {yield s}
                 if (commonClasses.length > 0) {
                   s = tag + '.' + CSS.escape(commonClasses[0]) + notNth
-                  if (tryYield(s)) yield s
+                  if (tryYield(s)) {yield s}
                 }
               }
             }
@@ -2731,7 +2731,7 @@
             const notClasses = new Set()
             for (const ns of notSelected) {
               for (const cls of this._getValidClassesInline(ns)) {
-                if (!selectedClassSet.has(cls)) notClasses.add(cls)
+                if (!selectedClassSet.has(cls)) {notClasses.add(cls)}
               }
             }
             if (notClasses.size > 0 && notClasses.size <= 3) {
@@ -2743,7 +2743,7 @@
               fragments.push({ type: 'modifier', sel: notCls })
               if (tag) {
                 const s = tag + notCls
-                if (tryYield(s)) yield s
+                if (tryYield(s)) {yield s}
               }
             }
           }
@@ -2760,10 +2760,10 @@
           let s
           if (tag) {
             s = tag + isFull
-            if (tryYield(s)) yield s
+            if (tryYield(s)) {yield s}
           }
           s = isFull
-          if (tryYield(s)) yield s
+          if (tryYield(s)) {yield s}
         }
       }
 
@@ -2775,9 +2775,9 @@
           fragments.push({ type: 'ancestor', sel: aSel })
           for (const tSel of targetParts) {
             let s = aSel + ' ' + tSel
-            if (tryYield(s)) yield s
+            if (tryYield(s)) {yield s}
             s = aSel + ' > ' + tSel
-            if (tryYield(s)) yield s
+            if (tryYield(s)) {yield s}
           }
         }
       }
@@ -2790,9 +2790,9 @@
             fragments.push({ type: 'sibling', sel: sSel })
             for (const tSel of targetParts.slice(0, 5)) {
               let s = sSel + ' + ' + tSel
-              if (tryYield(s)) yield s
+              if (tryYield(s)) {yield s}
               s = sSel + ' ~ ' + tSel
-              if (tryYield(s)) yield s
+              if (tryYield(s)) {yield s}
             }
           }
         }
@@ -2808,13 +2808,13 @@
       for (const tSel of targetPool.slice(0, 5)) {
         targetVariants.push(tSel)
         for (const mod of modifierPool) {
-          if (tSel === tag || tSel.startsWith(tag + '.')) targetVariants.push(tSel + mod)
+          if (tSel === tag || tSel.startsWith(tag + '.')) {targetVariants.push(tSel + mod)}
         }
       }
 
       const sibVariants = [...siblingPool.slice(0, 3)]
       for (const sSel of siblingPool.slice(0, 3)) {
-        for (const mod of modifierPool.slice(0, 2)) sibVariants.push(sSel + mod)
+        for (const mod of modifierPool.slice(0, 2)) {sibVariants.push(sSel + mod)}
       }
 
       const crossCombos = []
@@ -2845,7 +2845,7 @@
       if (ancestorPool.length >= 2) {
         for (const a1 of ancestorPool.slice(0, 3)) {
           for (const a2 of ancestorPool.slice(0, 3)) {
-            if (a1 === a2) continue
+            if (a1 === a2) {continue}
             for (const tSel of targetVariants.slice(0, 3)) {
               crossCombos.push(a1 + ' > ' + a2 + ' > ' + tSel, a1 + ' ' + a2 + ' ' + tSel)
             }
@@ -2856,7 +2856,7 @@
       if (ancestorPool.length >= 2 && sibVariants.length > 0) {
         for (const a1 of ancestorPool.slice(0, 2)) {
           for (const a2 of ancestorPool.slice(0, 2)) {
-            if (a1 === a2) continue
+            if (a1 === a2) {continue}
             for (const sSel of sibVariants.slice(0, 2)) {
               for (const tSel of targetPool.slice(0, 2)) {
                 crossCombos.push(a1 + ' ' + a2 + ' > ' + sSel + ' + ' + tSel)
@@ -2870,7 +2870,7 @@
       const uniqueCombos = [...new Set(crossCombos)].filter((s) => !yielded.has(s))
       uniqueCombos.sort((a, b) => a.length - b.length)
       for (const sel of uniqueCombos) {
-        if (tryYield(sel)) yield sel
+        if (tryYield(sel)) {yield sel}
       }
 
       // ========== Phase 6: 三级路径 ==========
@@ -2884,9 +2884,9 @@
             for (const s2 of anc2Sels.slice(0, 3)) {
               for (const tSel of targetParts.slice(0, 3)) {
                 let s = s1 + ' > ' + s2 + ' > ' + tSel
-                if (tryYield(s)) yield s
+                if (tryYield(s)) {yield s}
                 s = s1 + ' ' + s2 + ' ' + tSel
-                if (tryYield(s)) yield s
+                if (tryYield(s)) {yield s}
               }
             }
           }
@@ -2907,26 +2907,26 @@
           let s
           if (consecutive && start === 1 && end === allChildren.length) {
             s = tag
-            if (tryYield(s)) yield s
+            if (tryYield(s)) {yield s}
           } else if (consecutive) {
             if (start === 1) {
               s = tag + ':nth-child(-n+' + end + ')'
-              if (tryYield(s)) yield s
+              if (tryYield(s)) {yield s}
             } else if (end === allChildren.length) {
               s = tag + ':nth-child(n+' + start + ')'
-              if (tryYield(s)) yield s
+              if (tryYield(s)) {yield s}
             } else {
               s = tag + ':nth-child(n+' + start + '):nth-child(-n+' + end + ')'
-              if (tryYield(s)) yield s
+              if (tryYield(s)) {yield s}
             }
           }
           if (indices.every((i) => i % 2 === 1) && indices.length > 2) {
             s = tag + ':nth-child(odd)'
-            if (tryYield(s)) yield s
+            if (tryYield(s)) {yield s}
           }
           if (indices.every((i) => i % 2 === 0) && indices.length > 2) {
             s = tag + ':nth-child(even)'
-            if (tryYield(s)) yield s
+            if (tryYield(s)) {yield s}
           }
         }
       }
@@ -2936,14 +2936,14 @@
         let cur = el
         while (cur && cur !== document.documentElement) {
           const p = cur.parentElement
-          if (!p) break
+          if (!p) {break}
           const idx = Array.from(p.children).indexOf(cur) + 1
           path.unshift(cur.tagName.toLowerCase() + ':nth-child(' + idx + ')')
           cur = p
         }
         if (path.length > 0) {
           const s = path.join(' > ')
-          if (tryYield(s)) yield s
+          if (tryYield(s)) {yield s}
         }
       }
     }
@@ -2954,12 +2954,12 @@
     _isExactMatchForAll(selector, targetElements) {
       try {
         const found = document.querySelectorAll(selector)
-        if (found.length !== targetElements.length) return false
+        if (found.length !== targetElements.length) {return false}
 
         // 检查是否所有目标元素都被匹配
         const targetSet = new Set(targetElements)
         for (const el of found) {
-          if (!targetSet.has(el)) return false
+          if (!targetSet.has(el)) {return false}
         }
         return true
       } catch (e) {

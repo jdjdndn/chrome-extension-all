@@ -4,10 +4,10 @@
  * 基于 EventBus 实现
  */
 
-;(function () {
+(function () {
   'use strict'
 
-  if (window.ContentBridge) return
+  if (window.ContentBridge) {return}
 
   const READY_TIMEOUT = 5000 // 5秒超时
   const PING_INTERVAL = 30000 // 30秒心跳
@@ -73,7 +73,7 @@
         uptime: Date.now() - state.initTime,
         messageCount: state.messageCount,
       }
-      if (sendResponse) sendResponse(response)
+      if (sendResponse) {sendResponse(response)}
       return response
     }
 
@@ -83,7 +83,7 @@
         ready: state.isReady,
         initTime: state.initTime,
       }
-      if (sendResponse) sendResponse(response)
+      if (sendResponse) {sendResponse(response)}
       return response
     }
 
@@ -94,7 +94,7 @@
           detail: { width: message.width },
         })
       )
-      if (sendResponse) sendResponse({ ok: true })
+      if (sendResponse) {sendResponse({ ok: true })}
       return { ok: true }
     }
 
@@ -105,7 +105,7 @@
           detail: { enabled: message.enabled },
         })
       )
-      if (sendResponse) sendResponse({ ok: true })
+      if (sendResponse) {sendResponse({ ok: true })}
       return { ok: true }
     }
 
@@ -116,7 +116,7 @@
    * 初始化 EventBus 监听
    */
   function initEventBusListeners() {
-    if (!isEventBusReady()) return
+    if (!isEventBusReady()) {return}
 
     // 订阅 ping 消息
     EventBus.subscribe('__eb_ping__', (data, context) => {
@@ -148,7 +148,7 @@
 
   // 启动心跳
   const heartbeatInterval = setInterval(async () => {
-    if (document.hidden) return // 页面隐藏时不发送心跳
+    if (document.hidden) {return} // 页面隐藏时不发送心跳
 
     const heartbeatData = {
       type: 'CONTENT_HEARTBEAT',

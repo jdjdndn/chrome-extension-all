@@ -1,7 +1,7 @@
 // ========== 规则冲突检测模块 ==========
 // 在导入规则时检测并提示冲突
 
-;(function () {
+(function () {
   'use strict'
 
   if (window.RuleConflictDetector) {
@@ -36,12 +36,12 @@
       const conflicts = []
 
       for (const newSelector of newSelectors) {
-        if (!newSelector || typeof newSelector !== 'string') continue
+        if (!newSelector || typeof newSelector !== 'string') {continue}
 
         const normalized = newSelector.trim()
 
         for (const existing of existingSelectors) {
-          if (!existing || typeof existing !== 'string') continue
+          if (!existing || typeof existing !== 'string') {continue}
 
           const normalizedExisting = existing.trim()
 

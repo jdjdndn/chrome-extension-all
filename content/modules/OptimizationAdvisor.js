@@ -2,7 +2,7 @@
  * 选择器优化建议引擎
  * 噪声分析选择器并提供优化建议
  */
-;(function () {
+(function () {
   'use strict'
 
   // 最佳实践规则
@@ -363,7 +363,7 @@
      * 检查可访问性
      */
     _checkAccessibility(selector, element) {
-      if (!element) return
+      if (!element) {return}
 
       // 检查交互元素
       const interactiveTags = ['button', 'a', 'input', 'select', 'textarea']
@@ -559,7 +559,7 @@
 
       this.suggestions.sort((a, b) => {
         const orderDiff = (severityOrder[a.severity] || 99) - (severityOrder[b.severity] || 99)
-        if (orderDiff !== 0) return orderDiff
+        if (orderDiff !== 0) {return orderDiff}
         // 同等严重程度，正向建议放后面
         return (a.isPositive ? 1 : 0) - (b.isPositive ? 1 : 0)
       })
@@ -613,10 +613,10 @@
      * 获取等级
      */
     _getGrade(score) {
-      if (score >= 90) return { level: 'A', label: '优秀', color: '#10b981' }
-      if (score >= 75) return { level: 'B', label: '良好', color: '#34d399' }
-      if (score >= 60) return { level: 'C', label: '一般', color: '#fbbf24' }
-      if (score >= 40) return { level: 'D', label: '较差', color: '#f97316' }
+      if (score >= 90) {return { level: 'A', label: '优秀', color: '#10b981' }}
+      if (score >= 75) {return { level: 'B', label: '良好', color: '#34d399' }}
+      if (score >= 60) {return { level: 'C', label: '一般', color: '#fbbf24' }}
+      if (score >= 40) {return { level: 'D', label: '较差', color: '#f97316' }}
       return { level: 'F', label: '差', color: '#ef4444' }
     }
 
@@ -629,9 +629,9 @@
       const suggestions = this.suggestions.filter((s) => s.severity === 'suggestion').length
 
       const parts = []
-      if (critical > 0) parts.push(`${critical} 个严重问题`)
-      if (warnings > 0) parts.push(`${warnings} 个警告`)
-      if (suggestions > 0) parts.push(`${suggestions} 条建议`)
+      if (critical > 0) {parts.push(`${critical} 个严重问题`)}
+      if (warnings > 0) {parts.push(`${warnings} 个警告`)}
+      if (suggestions > 0) {parts.push(`${suggestions} 条建议`)}
 
       return parts.length > 0 ? `发现 ${parts.join('，')}` : '选择器状态良好'
     }
@@ -645,18 +645,18 @@
       // 语法检查
       try {
         const count = document.querySelectorAll(selector).length
-        if (count === 0) issues.push('不匹配')
-        if (count > 1) issues.push('多个匹配')
+        if (count === 0) {issues.push('不匹配')}
+        if (count > 1) {issues.push('多个匹配')}
       } catch {
         issues.push('语法错误')
       }
 
       // 长度检查
-      if (selector.length > 100) issues.push('过长')
+      if (selector.length > 100) {issues.push('过长')}
 
       // 稳定性检查
-      if (/:nth-/.test(selector)) issues.push('位置选择器')
-      if (/[.#](css-|styled-|sc-)/.test(selector)) issues.push('不稳定class')
+      if (/:nth-/.test(selector)) {issues.push('位置选择器')}
+      if (/[.#](css-|styled-|sc-)/.test(selector)) {issues.push('不稳定class')}
 
       return {
         isValid: issues.length === 0,

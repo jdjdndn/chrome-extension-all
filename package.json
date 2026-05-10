@@ -18,7 +18,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint . --ignore-pattern dist",
-    "lint:fix": "eslint . --ignore-pattern dist --fix"
+    "lint:fix": "eslint . --ignore-pattern dist --fix",
+    "lint:dataset": "node scripts/check-dataset-selectors.js"
   },
   "devDependencies": {
     "@types/chrome": "^0.1.40",
@@ -44,7 +45,7 @@
     ]
   },
   "simple-git-hooks": {
-    "pre-commit": "npx lint-staged && npm run typecheck"
+    "pre-commit": "npx lint-staged && npm run typecheck && npm run lint:dataset"
   },
   "engines": {
     "node": ">=14.0.0"

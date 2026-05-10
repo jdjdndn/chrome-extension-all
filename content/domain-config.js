@@ -3,12 +3,12 @@
  * 统一管理所有域名的脚本加载配置
  */
 
-;(function () {
+(function () {
   'use strict'
 
   // 域名匹配工具
   function matchDomain(pattern, hostname) {
-    if (pattern === '*') return true
+    if (pattern === '*') {return true}
     if (pattern.startsWith('*://')) {
       // *://*.example.com/* -> 匹配 example.com 及其子域名
       const domain = pattern.replace('*://*.', '').replace('*://', '').replace('/*', '')

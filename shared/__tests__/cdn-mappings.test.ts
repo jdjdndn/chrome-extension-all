@@ -64,7 +64,6 @@ describe('cdn-mappings', () => {
   describe('buildCDNUrl', () => {
     const bootcdn = CDN_SOURCES.find((s) => s.id === 'bootcdn')!
     const jsdelivr = CDN_SOURCES.find((s) => s.id === 'jsdelivr')!
-    const fontMirror = CDN_SOURCES.find((s) => s.id === 'fontMirror')!
 
     const libConfig = {
       name: 'jquery',
@@ -80,11 +79,6 @@ describe('cdn-mappings', () => {
     it('should build URL for npm format', () => {
       const url = buildCDNUrl(jsdelivr, libConfig, '3.6.0', 'jquery.min.js')
       expect(url).toBe('https://cdn.jsdelivr.net/npm/jquery@3.6.0/jquery.min.js')
-    })
-
-    it('should return null for unsupported format', () => {
-      const url = buildCDNUrl(fontMirror, libConfig, '1.0.0', 'file.css')
-      expect(url).toBeNull()
     })
 
     it('should use defaultVersion if version is not provided', () => {

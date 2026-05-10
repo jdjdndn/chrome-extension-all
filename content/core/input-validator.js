@@ -1,7 +1,7 @@
 // ========== 输入验证模块 ==========
 // 对用户输入进行严格验证和转义
 
-;(function () {
+(function () {
   'use strict'
 
   if (window.InputValidator) {

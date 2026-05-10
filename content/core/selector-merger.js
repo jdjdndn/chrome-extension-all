@@ -1,7 +1,7 @@
 // ========== 选择器智能合并模块 ==========
 // 提供选择器冲突检测、去重、智能合并功能
 
-;(function () {
+(function () {
   'use strict'
 
   if (window.SelectorMerger) {
@@ -118,10 +118,10 @@
      * @returns {string}
      */
     normalize(selector) {
-      if (!selector || typeof selector !== 'string') return ''
+      if (!selector || typeof selector !== 'string') {return ''}
 
       // 去除多余空格
-      let normalized = selector
+      const normalized = selector
         .trim()
         .replace(/\s+/g, ' ')
         .replace(/\s*([>+~,])\s*/g, '$1')
@@ -137,7 +137,7 @@
      * @returns {boolean}
      */
     validate(selector) {
-      if (!selector || typeof selector !== 'string') return false
+      if (!selector || typeof selector !== 'string') {return false}
 
       try {
         document.querySelector(selector)

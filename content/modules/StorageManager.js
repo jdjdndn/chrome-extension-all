@@ -2,7 +2,7 @@
  * 存储管理模块
  * 负责用户偏好和选择历史的持久化存储
  */
-;(function () {
+(function () {
   'use strict'
 
   const STORAGE_KEYS = {
@@ -268,7 +268,7 @@ ${data
     getCache(key, maxAge = 60000) {
       // 默认1分钟
       const cached = this.cache.get(key)
-      if (!cached) return null
+      if (!cached) {return null}
 
       if (Date.now() - cached.timestamp > maxAge) {
         this.cache.delete(key)

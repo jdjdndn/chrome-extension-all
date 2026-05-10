@@ -18,7 +18,7 @@
  * - P2（空闲）：统计、日志
  */
 
-;(function () {
+(function () {
   'use strict'
 
   // 防止重复注入
@@ -46,7 +46,7 @@
     const criticalDomains = ['douyin.com', 'youtube.com', 'github.com']
     const isCritical = criticalDomains.some((domain) => hostname.includes(domain))
 
-    if (!isCritical) return
+    if (!isCritical) {return}
 
     // 提前处理关键元素（隐藏、拦截）
     const processCriticalElements = () => {

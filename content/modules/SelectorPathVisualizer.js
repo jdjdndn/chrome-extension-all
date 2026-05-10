@@ -2,7 +2,7 @@
  * 选择器路径可视化模块
  * 在页面上显示选择器的匹配路径
  */
-;(function () {
+(function () {
   'use strict'
 
   class SelectorPathVisualizer {
@@ -173,7 +173,7 @@
      * 显示选择器路径
      */
     show(element, selector, options = {}) {
-      if (!element || !selector) return
+      if (!element || !selector) {return}
 
       this.currentPath = this._parseSelector(selector)
       this.currentElement = element
@@ -205,7 +205,7 @@
      * 更新位置
      */
     updatePosition() {
-      if (!this.isVisible || !this.currentElement) return
+      if (!this.isVisible || !this.currentElement) {return}
 
       // 可以根据需要更新位置
       const rect = this.currentElement.getBoundingClientRect()
@@ -247,7 +247,7 @@
         const classMatches = part.match(/\.([a-zA-Z_-][a-zA-Z0-9_-]*)/g)
         if (classMatches) {
           segment.classes = classMatches.map((m) => m.slice(1))
-          if (!segment.id) segment.type = 'class'
+          if (!segment.id) {segment.type = 'class'}
         }
 
         // 提取属性
@@ -259,7 +259,7 @@
               return match ? { name: match[1], value: match[2] || '' } : null
             })
             .filter(Boolean)
-          if (!segment.id && segment.classes.length === 0) segment.type = 'attr'
+          if (!segment.id && segment.classes.length === 0) {segment.type = 'attr'}
         }
 
         // 提取 nth
@@ -279,14 +279,14 @@
      * 构建路径 HTML
      */
     _buildPathHtml(path, options) {
-      if (!path || path.length === 0) return ''
+      if (!path || path.length === 0) {return ''}
 
       const segments = path.map((seg, index) => {
         const isLast = index === path.length - 1
         let displayText = ''
         let className = 'ep-path-segment ' + seg.type
 
-        if (isLast) className += ' current'
+        if (isLast) {className += ' current'}
 
         // 构建显示文本
         if (seg.id) {
@@ -352,7 +352,7 @@
       `
 
         document.body.appendChild(highlight)
-        if (!this._nodeHighlights) this._nodeHighlights = []
+        if (!this._nodeHighlights) {this._nodeHighlights = []}
         this._nodeHighlights.push(highlight)
 
         current = current.parentElement
@@ -375,8 +375,8 @@
      */
     destroy() {
       this.hide()
-      if (this.container) this.container.remove()
-      if (this.style) this.style.remove()
+      if (this.container) {this.container.remove()}
+      if (this.style) {this.style.remove()}
     }
   }
 

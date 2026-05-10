@@ -9,8 +9,8 @@ window.__mockEnabled = false
 // 获取 mock 数据
 window.getMockData = function (method, url) {
   // 检查总开关
-  if (window.__mockEnabled !== true) return null
-  if (!window.__mockData) return null
+  if (window.__mockEnabled !== true) {return null}
+  if (!window.__mockData) {return null}
 
   // 精确匹配
   const key = `${method}:${url}`
@@ -39,7 +39,7 @@ window.getMockData = function (method, url) {
 
 // 设置 mock 数据
 window.setMockData = function (method, url, data) {
-  if (!window.__mockData) window.__mockData = {}
+  if (!window.__mockData) {window.__mockData = {}}
   const key = `${method}:${url}`
   window.__mockData[key] = { data, enabled: true }
   console.log('[Inject] Mock 规则已设置:', key)
@@ -58,7 +58,7 @@ window.getMockGlobalEnabled = function () {
 
 // 切换单个 mock 开关
 window.toggleMockRule = function (method, url, enabled) {
-  if (!window.__mockData) return
+  if (!window.__mockData) {return}
   const key = `${method}:${url}`
   if (window.__mockData[key]) {
     window.__mockData[key].enabled = enabled
@@ -68,7 +68,7 @@ window.toggleMockRule = function (method, url, enabled) {
 
 // 获取所有 mock 规则
 window.getAllMockRules = function () {
-  if (!window.__mockData) return []
+  if (!window.__mockData) {return []}
   return Object.keys(window.__mockData).map((key) => {
     const parts = key.split(':')
     const method = parts[0]
@@ -169,13 +169,13 @@ if (!window._injectOriginalXHR) {
           Object.defineProperty(xhr, 'response', { value: responseBody, writable: false })
 
           xhr.getResponseHeader = function (header) {
-            if (header.toLowerCase() === 'content-type') return 'application/json'
-            if (header.toLowerCase() === 'x-mock-intercepted') return 'true'
+            if (header.toLowerCase() === 'content-type') {return 'application/json'}
+            if (header.toLowerCase() === 'x-mock-intercepted') {return 'true'}
             return null
           }
 
-          if (xhr.onreadystatechange) xhr.onreadystatechange()
-          if (xhr.onload) xhr.onload()
+          if (xhr.onreadystatechange) {xhr.onreadystatechange()}
+          if (xhr.onload) {xhr.onload()}
           xhr.dispatchEvent(new Event('load'))
         }, 10)
 

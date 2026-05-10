@@ -1,7 +1,7 @@
 // ========== 插件系统 ==========
 // 为站点脚本提供插件化扩展能力
 
-;(function () {
+(function () {
   'use strict'
 
   if (window.PluginSystem) {
@@ -64,7 +64,7 @@
 
       // 验证插件结构
       const validatedPlugin = this.validatePlugin(plugin)
-      if (!validatedPlugin) return false
+      if (!validatedPlugin) {return false}
 
       this.plugins.set(plugin.name, validatedPlugin)
       console.log(`[PluginSystem] 注册插件: ${plugin.name} v${plugin.version || '1.0.0'}`)
@@ -181,7 +181,7 @@
      */
     async checkDependencies(name) {
       const plugin = this.plugins.get(name)
-      if (!plugin || !plugin.dependencies.length) return true
+      if (!plugin || !plugin.dependencies.length) {return true}
 
       for (const dep of plugin.dependencies) {
         const depName = typeof dep === 'string' ? dep : dep.name
@@ -204,7 +204,7 @@
      */
     async executeHook(hookName, data) {
       const hookQueue = this.hooks[hookName]
-      if (!hookQueue || !hookQueue.length) return
+      if (!hookQueue || !hookQueue.length) {return}
 
       for (const { plugin, handler } of hookQueue) {
         try {
@@ -252,7 +252,7 @@
     async destroy(name) {
       const instance = this.instances.get(name)
       const plugin = this.plugins.get(name)
-      if (!instance || !plugin) return false
+      if (!instance || !plugin) {return false}
 
       try {
         await this.executeHook('beforeCleanup', { plugin, instance })
@@ -284,7 +284,7 @@
      */
     setEnabled(name, enabled) {
       const plugin = this.plugins.get(name)
-      if (!plugin) return false
+      if (!plugin) {return false}
       plugin.enabled = enabled
       console.log(`[PluginSystem] ${enabled ? '启用' : '禁用'}插件: ${name}`)
       return true
@@ -341,7 +341,7 @@
        * 优化选择器列表
        */
       optimize(selectors) {
-        if (!Array.isArray(selectors)) return []
+        if (!Array.isArray(selectors)) {return []}
 
         return selectors
           .filter((s) => s && typeof s === 'string' && s.trim())
@@ -396,7 +396,7 @@
        * 从分组移除关键词
        */
       removeFromGroup(groupName, keywords) {
-        if (!this.settings.groups[groupName]) return []
+        if (!this.settings.groups[groupName]) {return []}
         const words = Array.isArray(keywords) ? keywords : [keywords]
         this.settings.groups[groupName] = this.settings.groups[groupName].filter(
           (k) => !words.includes(k)
@@ -481,7 +481,7 @@
        * 结束计时
        */
       timeEnd(label) {
-        if (!this._timers?.[label]) return null
+        if (!this._timers?.[label]) {return null}
         const elapsed = performance.now() - this._timers[label]
         this.record(label, elapsed)
         delete this._timers[label]

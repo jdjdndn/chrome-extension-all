@@ -3,7 +3,7 @@
 // 依赖: content/utils/logger.js, storage.js, dom.js, messaging.js
 // 核心: content/core/store.js, content/core/services.js, content/core/pipeline.js
 
-;(function () {
+(function () {
   'use strict'
 
   // 防止重复注入
@@ -26,7 +26,7 @@
    * 注册 L2 核心层初始化回调
    */
   function registerL2InitCallbacks() {
-    if (!window.LazyInitManager) return
+    if (!window.LazyInitManager) {return}
 
     // Store 初始化
     LazyInitManager.registerInitCallback(
@@ -58,7 +58,7 @@
    * 注册 L4 功能层初始化回调
    */
   function registerL4InitCallbacks() {
-    if (!window.LazyInitManager) return
+    if (!window.LazyInitManager) {return}
 
     // 隐藏元素功能初始化
     LazyInitManager.registerInitCallback(
@@ -84,7 +84,7 @@
       return
     }
     // Check if already injected to avoid duplicate injection
-    if (window._injectScriptInjected) return
+    if (window._injectScriptInjected) {return}
     window._injectScriptInjected = true
 
     const script = document.createElement('script')
@@ -139,7 +139,7 @@
   const PRINT_THROTTLE_DELAY = 3000
 
   function throttledPrintUrls() {
-    if (printTimer || !settings.debugMode) return
+    if (printTimer || !settings.debugMode) {return}
 
     printTimer = setTimeout(() => {
       if (collectedUrls.size > 0) {
@@ -170,7 +170,7 @@
   // ========== Hide Elements Functionality ==========
   const HIDE_ELEMENTS_STYLE_ID = 'extension-hide-elements-style'
 
-  let hideElementsState = {
+  const hideElementsState = {
     enabled: false,
     selectors: [],
   }
@@ -190,7 +190,7 @@
    * Apply hide elements by creating/updating style tag
    */
   function applyHideElementsStyle(selectors) {
-    if (!isDOMUtilsReady()) return
+    if (!isDOMUtilsReady()) {return}
 
     if (!selectors || selectors.length === 0) {
       DOMUtils.removeStyle(HIDE_ELEMENTS_STYLE_ID)
@@ -210,7 +210,7 @@
     hideElementsState.enabled = enabled
     hideElementsState.selectors = selectors
 
-    if (!isDOMUtilsReady()) return
+    if (!isDOMUtilsReady()) {return}
 
     if (enabled && selectors && selectors.length > 0) {
       applyHideElementsStyle(selectors)

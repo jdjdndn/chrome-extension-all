@@ -3,7 +3,7 @@
  * 用于在 DevTools 中监控 EventBus 活动
  */
 
-;(function () {
+(function () {
   'use strict'
 
   // 状态
@@ -193,7 +193,7 @@
 
   // 渲染消息列表
   function renderMessages() {
-    if (!elements.messageItems) return
+    if (!elements.messageItems) {return}
 
     const searchTerm = elements.messageSearch?.value?.toLowerCase() || ''
     const filtered = searchTerm
@@ -236,7 +236,7 @@
   // 显示消息详情
   function showMessageDetail(id) {
     const msg = state.messages.find((m) => m.id == id)
-    if (!msg || !elements.messageDetail) return
+    if (!msg || !elements.messageDetail) {return}
 
     elements.messageDetail.style.display = 'block'
     elements.messageDetail.textContent = JSON.stringify(msg, null, 2)
@@ -255,7 +255,7 @@
   // 更新连接状态
   function updateConnectionStatus(status) {
     state.connectionStatus = status
-    if (!elements.connectionStatus) return
+    if (!elements.connectionStatus) {return}
 
     const statusMap = {
       connected: { class: 'connected', text: '已连接' },
@@ -282,11 +282,11 @@
     const received = state.messages.filter((m) => m.direction === 'receive').length
     const failed = state.messages.filter((m) => m.error).length
 
-    if (elements.statSent) elements.statSent.textContent = sent
-    if (elements.statReceived) elements.statReceived.textContent = received
-    if (elements.statFailed) elements.statFailed.textContent = failed
-    if (elements.statSubscriptions) elements.statSubscriptions.textContent = '0'
-    if (elements.statUptime) elements.statUptime.textContent = formatUptime(Date.now())
+    if (elements.statSent) {elements.statSent.textContent = sent}
+    if (elements.statReceived) {elements.statReceived.textContent = received}
+    if (elements.statFailed) {elements.statFailed.textContent = failed}
+    if (elements.statSubscriptions) {elements.statSubscriptions.textContent = '0'}
+    if (elements.statUptime) {elements.statUptime.textContent = formatUptime(Date.now())}
   }
 
   // 从数据更新统计
@@ -333,7 +333,7 @@
 
   // 回放录制
   async function replayRecording() {
-    if (state.recordings.length === 0) return
+    if (state.recordings.length === 0) {return}
 
     for (const msg of state.recordings) {
       try {
@@ -370,7 +370,7 @@
 
   // 渲染录制列表
   function renderRecordings() {
-    if (!elements.recordingItems) return
+    if (!elements.recordingItems) {return}
 
     if (state.recordings.length === 0) {
       elements.recordingItems.innerHTML = `
@@ -414,7 +414,7 @@
 
   // 格式化时间
   function formatTime(timestamp) {
-    if (!timestamp) return ''
+    if (!timestamp) {return ''}
     const d = new Date(timestamp)
     return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}.${(d.getMilliseconds() / 1000).toFixed(3).slice(2)}`
   }
@@ -422,8 +422,8 @@
   // 格式化运行时间
   function formatUptime(startTime) {
     const seconds = Math.floor((Date.now() - startTime) / 1000)
-    if (seconds < 60) return `${seconds}s`
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}m`
+    if (seconds < 60) {return `${seconds}s`}
+    if (seconds < 3600) {return `${Math.floor(seconds / 60)}m`}
     return `${Math.floor(seconds / 3600)}h`
   }
 

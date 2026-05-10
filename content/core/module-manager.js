@@ -1,7 +1,7 @@
 // ========== 模块热插拔管理 ==========
 // 支持动态加载/卸载模块
 
-;(function () {
+(function () {
   'use strict'
 
   if (window.ModuleManager) {

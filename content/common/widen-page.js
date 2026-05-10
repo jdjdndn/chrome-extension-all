@@ -83,19 +83,19 @@ function initWidenPage() {
 
     // 递归遍历，最多 3 层深度（body > div > div > div）
     function scan(root, depth) {
-      if (depth > 3) return
+      if (depth > 3) {return}
       for (const el of root.children) {
-        if (el.id === STYLE_ID) continue
-        if (EXCLUDE_TAGS.has(el.tagName)) continue
-        if (el.offsetParent === null && el.style.position !== 'fixed') continue // 不可见
-        if (EXCLUDE_SELECTORS.some((sel) => el.matches(sel))) continue
+        if (el.id === STYLE_ID) {continue}
+        if (EXCLUDE_TAGS.has(el.tagName)) {continue}
+        if (el.offsetParent === null && el.style.position !== 'fixed') {continue} // 不可见
+        if (EXCLUDE_SELECTORS.some((sel) => el.matches(sel))) {continue}
 
         const style = getComputedStyle(el)
         const maxWidth = style.maxWidth
         const width = style.width
 
         // 跳过 display:inline 元素
-        if (style.display === 'inline' || style.display === 'none') continue
+        if (style.display === 'inline' || style.display === 'none') {continue}
 
         // 检查是否有宽度约束
         let hasMaxWidthConstraint = false
@@ -156,14 +156,14 @@ function initWidenPage() {
    * 为元素生成一个简短的唯一选择器
    */
   function buildSelector(el) {
-    if (el.id) return '#' + CSS.escape(el.id)
+    if (el.id) {return '#' + CSS.escape(el.id)}
     let path = el.tagName.toLowerCase()
     if (el.className && typeof el.className === 'string') {
       const cls = el.className
         .trim()
         .split(/\s+/)
         .find((c) => c && c.length < 30)
-      if (cls) path += '.' + CSS.escape(cls)
+      if (cls) {path += '.' + CSS.escape(cls)}
     }
     return path
   }
@@ -186,7 +186,7 @@ function initWidenPage() {
     const seen = new Set()
     const rules = []
     for (const item of elements) {
-      if (seen.has(item.selector)) continue
+      if (seen.has(item.selector)) {continue}
       seen.add(item.selector)
 
       const w = width + 'vw'
@@ -222,7 +222,7 @@ function initWidenPage() {
 
   function remove() {
     const el = document.getElementById(STYLE_ID)
-    if (el) el.remove()
+    if (el) {el.remove()}
   }
 
   // 监听来自 popup 的实时宽度更新

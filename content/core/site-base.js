@@ -1,7 +1,7 @@
 // ========== 站点脚本基类 ==========
 // 提供站点脚本的通用能力
 
-;(function () {
+(function () {
   'use strict'
 
   if (window.SiteBase) {
@@ -118,7 +118,7 @@
      * 注册阻止域名到 Background
      */
     async registerBlockedDomains() {
-      if (this.blockedDomains.length === 0) return
+      if (this.blockedDomains.length === 0) {return}
 
       try {
         // 优先使用 Services
@@ -202,11 +202,11 @@
      * 从本地服务器加载数据
      */
     async loadFromServer(path) {
-      if (!this.state.localServerAvailable) return null
+      if (!this.state.localServerAvailable) {return null}
 
       try {
         const response = await fetch(`${this.localServerUrl}/api/data/${path}/${this.domain}`)
-        if (!response.ok) return null
+        if (!response.ok) {return null}
 
         const data = await response.json()
         return data?.success ? data.data : null
@@ -219,7 +219,7 @@
      * 保存数据到本地服务器
      */
     async saveToServer(path, data) {
-      if (!this.state.localServerAvailable) return false
+      if (!this.state.localServerAvailable) {return false}
 
       try {
         const response = await fetch(`${this.localServerUrl}/api/data/${path}/${this.domain}`, {

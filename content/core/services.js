@@ -1,7 +1,7 @@
 // ========== 服务层抽象 ==========
 // 统一封装与 Background 的通信，提供缓存、重试等能力
 
-;(function () {
+(function () {
   'use strict'
 
   if (window.Services) {
@@ -18,7 +18,7 @@
 
     get(key) {
       const item = this.cache.get(key)
-      if (!item) return null
+      if (!item) {return null}
 
       if (Date.now() - item.timestamp > item.ttl) {
         this.cache.delete(key)

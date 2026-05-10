@@ -1,7 +1,7 @@
 // ========== 站点脚本工厂 ==========
 // 统一工厂模式创建和管理站点脚本实例
 
-;(function () {
+(function () {
   'use strict'
 
   if (window.SiteFactory) {
@@ -81,7 +81,7 @@
      */
     unregister(name) {
       const config = this.sites.get(name)
-      if (!config) return false
+      if (!config) {return false}
 
       // 清理域名映射
       for (const domain of config.domains) {
@@ -136,7 +136,7 @@
      * @returns {boolean}
      */
     matchPattern(domain, pattern) {
-      if (pattern === '*') return true
+      if (pattern === '*') {return true}
 
       // 转换为正则表达式
       const regexStr = pattern.replace(/\./g, '\\.').replace(/\*/g, '.*')
@@ -240,7 +240,7 @@
      */
     async destroy(name) {
       const instance = this.activeInstances.get(name)
-      if (!instance) return false
+      if (!instance) {return false}
 
       try {
         // 调用实例的清理方法
@@ -297,7 +297,7 @@
      */
     setEnabled(name, enabled) {
       const config = this.sites.get(name)
-      if (!config) return false
+      if (!config) {return false}
       config.enabled = enabled
       console.log(`[SiteFactory] ${enabled ? '启用' : '禁用'}站点: ${name}`)
       return true

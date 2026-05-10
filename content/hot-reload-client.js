@@ -7,7 +7,7 @@
  * 生产构建不会包含此文件
  */
 
-;(function () {
+(function () {
   'use strict'
 
   // 环境检测：检查是否在开发环境

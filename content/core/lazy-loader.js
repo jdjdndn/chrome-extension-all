@@ -1,7 +1,7 @@
 // ========== 延迟加载模块 ==========
 // 按需加载核心模块，减少初始加载时间
 
-;(function () {
+(function () {
   'use strict'
 
   if (window.LazyLoader) {

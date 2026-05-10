@@ -3,7 +3,7 @@
  * 在浏览器控制台中运行此测试
  */
 
-;(function () {
+(function () {
   'use strict'
 
   const Test = {

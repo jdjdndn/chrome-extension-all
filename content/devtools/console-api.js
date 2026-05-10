@@ -3,7 +3,7 @@
  * 注入到页面上下文，提供调试工具函数
  */
 
-;(function () {
+(function () {
   'use strict'
 
   // 防止重复注入
@@ -62,7 +62,7 @@
   window.$parent = function (element, selector) {
     let el = element?.parentElement
     while (el) {
-      if (!selector || el.matches(selector)) return el
+      if (!selector || el.matches(selector)) {return el}
       el = el.parentElement
     }
     return null
@@ -74,7 +74,7 @@
    * @param {string} selector - 过滤选择器
    */
   window.$children = function (element, selector = null) {
-    if (!element) return []
+    if (!element) {return []}
     const children = Array.from(element.children)
     return selector ? children.filter((c) => c.matches(selector)) : children
   }
@@ -85,7 +85,7 @@
    * @param {string} selector - 过滤选择器
    */
   window.$siblings = function (element, selector = null) {
-    if (!element?.parentElement) return []
+    if (!element?.parentElement) {return []}
     const siblings = Array.from(element.parentElement.children).filter((c) => c !== element)
     return selector ? siblings.filter((c) => c.matches(selector)) : siblings
   }
@@ -270,7 +270,7 @@
     const elements = document.querySelectorAll(selector)
     for (const el of elements) {
       el.click()
-      if (delay > 0) await new Promise((r) => setTimeout(r, delay))
+      if (delay > 0) {await new Promise((r) => setTimeout(r, delay))}
     }
     console.log(`[DevTools Helper] 已点击 ${elements.length} 个元素`)
     return elements.length
@@ -284,7 +284,7 @@
   window.scrollToElement = function (target, behavior = 'smooth') {
     if (typeof target === 'string') {
       const el = document.querySelector(target)
-      if (el) el.scrollIntoView({ behavior, block: 'center' })
+      if (el) {el.scrollIntoView({ behavior, block: 'center' })}
     } else if (typeof target === 'number') {
       window.scrollTo({ top: target, behavior })
     } else if (target instanceof Element) {
@@ -435,7 +435,7 @@
   window.waitFor = function (selector, timeout = 10000) {
     return new Promise((resolve, reject) => {
       const el = document.querySelector(selector)
-      if (el) return resolve(el)
+      if (el) {return resolve(el)}
 
       const observer = new MutationObserver(() => {
         const el = document.querySelector(selector)

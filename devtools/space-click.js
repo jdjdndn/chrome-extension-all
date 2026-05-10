@@ -1,6 +1,6 @@
 // 键盘快捷操作（devtools 面板）
 // Space(短按): 点击 | Space(长按): 选文本 | X: 右击
-;(function () {
+(function () {
   'use strict'
   let mouseX = 0,
     mouseY = 0
@@ -20,7 +20,7 @@
     (e) => {
       mouseX = e.clientX
       mouseY = e.clientY
-      if (spaceHeld) extendSelection(e.clientX, e.clientY)
+      if (spaceHeld) {extendSelection(e.clientX, e.clientY)}
     },
     true
   )
@@ -37,7 +37,7 @@
           active.tagName === 'SELECT' ||
           active.isContentEditable)
       )
-        return
+        {return}
 
       switch (e.key) {
         case ' ':
@@ -55,10 +55,10 @@
           break
         case 'x':
         case 'X':
-          if (!spaceHeld) doRightClick(e)
+          if (!spaceHeld) {doRightClick(e)}
           break
         case 'Escape':
-          if (spaceHeld) cancelSelect()
+          if (spaceHeld) {cancelSelect()}
           break
       }
     },
@@ -68,7 +68,7 @@
   window.addEventListener(
     'keyup',
     (e) => {
-      if (e.key === ' ') onSpaceUp(e)
+      if (e.key === ' ') {onSpaceUp(e)}
     },
     true
   )
@@ -106,7 +106,7 @@
 
   function startTextSelection() {
     const anchor = rangeFromPoint(mouseX, mouseY)
-    if (!anchor) return // 鼠标下没有文本，不进入选择模式
+    if (!anchor) {return} // 鼠标下没有文本，不进入选择模式
 
     spaceHeld = true
     selectAnchor = anchor
@@ -119,11 +119,11 @@
   // 递归穿透 shadow root，获取坐标处最深层元素
   function deepElementFromPoint(x, y) {
     let el = document.elementFromPoint(x, y)
-    if (!el) return null
+    if (!el) {return null}
     let maxDepth = 20
     while (el && el.shadowRoot && maxDepth-- > 0) {
       const inner = el.shadowRoot.elementFromPoint(x, y)
-      if (!inner || inner === el) break
+      if (!inner || inner === el) {break}
       el = inner
     }
     return el
@@ -132,9 +132,9 @@
   /** 查找真正的点击目标：优先选择被覆盖层遮挡的媒体元素 */
   function findClickTarget(x, y) {
     let el = deepElementFromPoint(x, y)
-    if (!el) return null
+    if (!el) {return null}
 
-    if (el.tagName === 'VIDEO' || el.tagName === 'AUDIO') return el
+    if (el.tagName === 'VIDEO' || el.tagName === 'AUDIO') {return el}
 
     const all = document.elementsFromPoint(x, y)
     for (const candidate of all) {
@@ -150,17 +150,17 @@
 
   function isInteractiveElement(el) {
     const tags = ['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA', 'LABEL']
-    if (tags.includes(el.tagName)) return true
-    if (el.isContentEditable) return true
+    if (tags.includes(el.tagName)) {return true}
+    if (el.isContentEditable) {return true}
     const role = el.getAttribute('role')
     if (['button', 'link', 'tab', 'menuitem', 'checkbox', 'radio', 'switch'].includes(role))
-      return true
+      {return true}
     return false
   }
 
   function doClick(e) {
     const el = findClickTarget(mouseX, mouseY)
-    if (!el || !el.isConnected) return
+    if (!el || !el.isConnected) {return}
     e.preventDefault()
     e.stopPropagation()
 
@@ -203,7 +203,7 @@
 
   function doRightClick(e) {
     const el = findClickTarget(mouseX, mouseY)
-    if (!el || !el.isConnected) return
+    if (!el || !el.isConnected) {return}
     e.preventDefault()
     e.stopPropagation()
     el.dispatchEvent(
@@ -219,9 +219,9 @@
   }
 
   function extendSelection(cx, cy) {
-    if (!selectAnchor) return
+    if (!selectAnchor) {return}
     const focus = rangeFromPoint(cx, cy)
-    if (!focus) return
+    if (!focus) {return}
     try {
       const range = document.createRange()
       const a = selectAnchor
@@ -240,7 +240,7 @@
   }
 
   function rangeFromPoint(x, y) {
-    if (document.caretRangeFromPoint) return document.caretRangeFromPoint(x, y)
+    if (document.caretRangeFromPoint) {return document.caretRangeFromPoint(x, y)}
     if (document.caretPositionFromPoint) {
       const pos = document.caretPositionFromPoint(x, y)
       if (pos) {

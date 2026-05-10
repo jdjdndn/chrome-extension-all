@@ -2,7 +2,7 @@
  * 智能推荐增强模块
  * 基于元素特征和历史数据提供选择器推荐
  */
-;(function () {
+(function () {
   'use strict'
 
   class SmartRecommender {
@@ -136,7 +136,7 @@
     _analyzeContext(element) {
       const recommendations = []
       const parent = element.parentElement
-      if (!parent) return recommendations
+      if (!parent) {return recommendations}
 
       const tag = element.tagName.toLowerCase()
       const parentTag = parent.tagName.toLowerCase()
@@ -234,7 +234,7 @@
       const recommendations = []
       const currentSelector = this.selectorEngine?.generateSelector(element)
 
-      if (!currentSelector) return recommendations
+      if (!currentSelector) {return recommendations}
 
       // 检查选择器质量问题
       const quality = this.selectorEngine?.analyzeSelectorQuality(currentSelector)

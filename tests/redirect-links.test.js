@@ -3,7 +3,7 @@
  * 在浏览器控制台中运行此测试（需先加载 redirect-links.js）
  */
 
-;(function () {
+(function () {
   'use strict'
 
   const RedirectLinksTest = {
@@ -43,7 +43,7 @@
     testConfigExists() {
       console.log('\n--- 配置测试 ---')
       this.assert(typeof REDIRECT_LINKS_CONFIG !== 'undefined', 'REDIRECT_LINKS_CONFIG 已定义')
-      if (typeof REDIRECT_LINKS_CONFIG === 'undefined') return
+      if (typeof REDIRECT_LINKS_CONFIG === 'undefined') {return}
 
       this.assert(Array.isArray(REDIRECT_LINKS_CONFIG.LINK_PATTERNS), 'LINK_PATTERNS 是数组')
       this.assert(Array.isArray(REDIRECT_LINKS_CONFIG.TARGET_PARAMS), 'TARGET_PARAMS 是数组')
@@ -192,7 +192,7 @@
     testLinkPatterns() {
       console.log('\n--- LINK_PATTERNS 测试 ---')
 
-      if (typeof REDIRECT_LINKS_CONFIG === 'undefined') return
+      if (typeof REDIRECT_LINKS_CONFIG === 'undefined') {return}
 
       const patterns = REDIRECT_LINKS_CONFIG.LINK_PATTERNS
       this.assert(
@@ -254,7 +254,7 @@
     testSkipDomains() {
       console.log('\n--- SKIP_DOMAINS 测试 ---')
 
-      if (typeof REDIRECT_LINKS_CONFIG === 'undefined') return
+      if (typeof REDIRECT_LINKS_CONFIG === 'undefined') {return}
 
       const skipDomains = REDIRECT_LINKS_CONFIG.SKIP_DOMAINS
       this.assert(skipDomains.includes('github.com'), 'SKIP_DOMAINS 包含 github.com')

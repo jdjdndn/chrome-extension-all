@@ -1,7 +1,7 @@
 // ========== 批量操作处理器 ==========
 // 支持批量执行操作，并发控制、进度追踪、错误处理
 
-;(function () {
+(function () {
   'use strict'
 
   if (window.BatchOps) {

@@ -2,7 +2,7 @@
  * DevTools Tools Panel 逻辑
  */
 
-;(function () {
+(function () {
   'use strict'
 
   // ========== 状态管理 ==========
@@ -235,7 +235,7 @@
    */
   async function reinjectSnippet(id) {
     const snippet = state.consoleSnippets.find((s) => s.id === id)
-    if (!snippet) return
+    if (!snippet) {return}
 
     updateStatus('正在重新注入...')
 
@@ -253,7 +253,7 @@
    */
   function editConsoleSnippet(id) {
     const snippet = state.consoleSnippets.find((s) => s.id === id)
-    if (!snippet) return
+    if (!snippet) {return}
 
     // 加载到编辑区
     document.getElementById('code-editor').value = snippet.code
@@ -338,7 +338,7 @@
     // 绑定展开/收起
     container.querySelectorAll('.console-snippet-header').forEach((header) => {
       header.addEventListener('click', (e) => {
-        if (e.target.tagName === 'BUTTON') return
+        if (e.target.tagName === 'BUTTON') {return}
         header.parentElement.classList.toggle('expanded')
       })
     })
@@ -417,7 +417,7 @@
    */
   function renderPopularLibraries() {
     const container = document.getElementById('popular-libs')
-    if (!container || typeof LibraryConfig === 'undefined') return
+    if (!container || typeof LibraryConfig === 'undefined') {return}
 
     const libs = LibraryConfig.getAllLibraries()
     container.innerHTML = libs
@@ -448,7 +448,7 @@
    */
   function renderLoadedLibs() {
     const container = document.getElementById('loaded-libs-list')
-    if (!container) return
+    if (!container) {return}
 
     if (state.loadedLibs.length === 0) {
       container.innerHTML = '<div style="color:#666; font-size:11px;">暂无已加载的库</div>'
@@ -695,7 +695,7 @@
     // 如果还没有提取函数，先提取
     if (state.extractedFunctions.length === 0) {
       await extractLocalFunctions()
-      if (state.extractedFunctions.length === 0) return
+      if (state.extractedFunctions.length === 0) {return}
     }
 
     updateStatus('正在注入函数...')

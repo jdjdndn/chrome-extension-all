@@ -2,7 +2,7 @@
 // 使用 SiteBase 基类重构，集成关键词过滤功能
 // 使用 ScriptLoader 进行依赖管理
 
-;(function () {
+(function () {
   'use strict'
 
   if (window.BiliScriptLoaded) {
@@ -215,7 +215,7 @@
        * 保存关键词到本地服务
        */
       async saveKeywordsToServer(keywords) {
-        if (!this.state.localServerAvailable) return false
+        if (!this.state.localServerAvailable) {return false}
         try {
           await this.localServerFetch(`/api/data/keywords/${this.domain}`, {
             method: 'POST',
@@ -263,7 +263,7 @@
        * 从本地服务加载选择器（覆盖父类方法）
        */
       async loadFromServer(path) {
-        if (!this.state.localServerAvailable) return null
+        if (!this.state.localServerAvailable) {return null}
 
         try {
           const result = await this.localServerFetch(`/api/data/${path}/${this.domain}`)
@@ -283,7 +283,7 @@
        * 保存选择器到本地服务（覆盖父类方法）
        */
       async saveToServer(path, data) {
-        if (!this.state.localServerAvailable) return false
+        if (!this.state.localServerAvailable) {return false}
 
         try {
           await this.localServerFetch(`/api/data/${path}/${this.domain}`, {

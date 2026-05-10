@@ -53,7 +53,7 @@ class SiteScript {
    * 初始化脚本
    */
   async init() {
-    if (this.initialized) return
+    if (this.initialized) {return}
 
     try {
       console.log(`[${this.siteName}] 脚本初始化...`)
@@ -356,7 +356,7 @@ class SiteScript {
   debounce(func, delay = 300) {
     let timer = null
     return (...args) => {
-      if (timer) clearTimeout(timer)
+      if (timer) {clearTimeout(timer)}
       timer = setTimeout(() => func.apply(this, args), delay)
     }
   }

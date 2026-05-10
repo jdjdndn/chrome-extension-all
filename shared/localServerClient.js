@@ -3,7 +3,7 @@
  * 用于与 local-data-server 通信
  */
 
-;(function () {
+(function () {
   'use strict'
 
   // 默认配置

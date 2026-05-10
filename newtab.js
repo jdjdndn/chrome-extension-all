@@ -23,7 +23,7 @@ const QUOTES = [
 function loadDailyQuote() {
   const quoteText = document.getElementById('quote-text')
   const quoteAuthor = document.getElementById('quote-author')
-  if (!quoteText) return
+  if (!quoteText) {return}
 
   // 根据日期选择一言（每天固定）
   const today = new Date()
@@ -43,12 +43,12 @@ async function loadWeather() {
   const tempEl = document.getElementById('weather-temp')
   const descEl = document.getElementById('weather-desc')
   const iconEl = document.getElementById('weather-icon')
-  if (!tempEl) return
+  if (!tempEl) {return}
 
   try {
     // 使用免费的天气API (wttr.in)
     const response = await fetch('https://wttr.in/?format=j1')
-    if (!response.ok) throw new Error('Weather API failed')
+    if (!response.ok) {throw new Error('Weather API failed')}
 
     const data = await response.json()
     const current = data.current_condition[0]
@@ -67,22 +67,22 @@ async function loadWeather() {
 }
 
 function getWeatherIcon(code) {
-  if (code === 113) return '☀️'
-  if (code === 116) return '⛅'
-  if (code === 119 || code === 122) return '☁️'
+  if (code === 113) {return '☀️'}
+  if (code === 116) {return '⛅'}
+  if (code === 119 || code === 122) {return '☁️'}
   if (
     [176, 263, 266, 293, 296, 299, 302, 305, 308, 311, 314, 317, 320, 353, 356, 359].includes(code)
   )
-    return '🌧️'
+    {return '🌧️'}
   if (
     [
       179, 182, 185, 227, 230, 281, 284, 323, 326, 329, 332, 335, 338, 350, 362, 365, 368, 371, 374,
       377,
     ].includes(code)
   )
-    return '❄️'
-  if ([200, 386, 389, 392, 395].includes(code)) return '⛈️'
-  if ([143, 248, 260].includes(code)) return '🌫️'
+    {return '❄️'}
+  if ([200, 386, 389, 392, 395].includes(code)) {return '⛈️'}
+  if ([143, 248, 260].includes(code)) {return '🌫️'}
   return '🌤️'
 }
 
@@ -262,7 +262,7 @@ function getDomainEmoji(domain) {
   }
 
   for (const [key, emoji] of Object.entries(domainEmojis)) {
-    if (domain.includes(key)) return emoji
+    if (domain.includes(key)) {return emoji}
   }
 
   // 默认图标
@@ -284,7 +284,7 @@ function createDomainIcon(domain) {
 
 // 获取页面标题
 function getPageTitle(url, title) {
-  if (title && title.trim()) return title
+  if (title && title.trim()) {return title}
 
   try {
     const urlObj = new URL(url)
@@ -367,7 +367,7 @@ async function loadHistory() {
 // 加载书签
 async function loadBookmarks() {
   const bookmarksContainer = document.getElementById('bookmarksContainer')
-  if (!bookmarksContainer) return
+  if (!bookmarksContainer) {return}
 
   try {
     const tree = await chrome.bookmarks.getTree()
@@ -563,7 +563,7 @@ function solarToLunar(year, month, day) {
   let yearDays
   while (lunarYear < 2100 && offset > 0) {
     yearDays = getLunarYearDays(lunarYear)
-    if (offset < yearDays) break
+    if (offset < yearDays) {break}
     offset -= yearDays
     lunarYear++
   }
@@ -860,10 +860,10 @@ function loadQuickLinks() {
 // 添加新快捷方式
 document.getElementById('addLinkBtn').addEventListener('click', () => {
   const title = prompt('请输入网站名称:')
-  if (!title) return
+  if (!title) {return}
 
   const url = prompt('请输入网站URL:')
-  if (!url) return
+  if (!url) {return}
 
   const iconOptions = ['🌐', '🔗', '📌', '⭐', '🚀', '💡', '🎯', '📱', '💻', '🎨']
   const icon = iconOptions[Math.floor(Math.random() * iconOptions.length)]
@@ -1047,7 +1047,7 @@ async function performUnifiedSearch(query) {
   // 获取选中的搜索源
   const sources = []
   document.querySelectorAll('[data-source]').forEach((cb) => {
-    if (cb.checked) sources.push(cb.dataset.source)
+    if (cb.checked) {sources.push(cb.dataset.source)}
   })
 
   const results = await UnifiedSearch.search(query, { sources, limit: 10 })
@@ -1198,16 +1198,16 @@ function renderUnifiedResults(results, query) {
 
 // 格式化时间
 function formatTime(timestamp) {
-  if (!timestamp) return ''
+  if (!timestamp) {return ''}
   const date = new Date(timestamp)
   const now = new Date()
   const diff = now - date
   const days = Math.floor(diff / (24 * 60 * 60 * 1000))
 
-  if (days === 0) return '今天'
-  if (days === 1) return '昨天'
-  if (days < 7) return `${days}天前`
-  if (days < 30) return `${Math.floor(days / 7)}周前`
+  if (days === 0) {return '今天'}
+  if (days === 1) {return '昨天'}
+  if (days < 7) {return `${days}天前`}
+  if (days < 30) {return `${Math.floor(days / 7)}周前`}
   return `${Math.floor(days / 30)}月前`
 }
 
@@ -1596,7 +1596,7 @@ function hideModal() {
 
 modalCancel.addEventListener('click', hideModal)
 modalOverlay.addEventListener('click', (e) => {
-  if (e.target === modalOverlay) hideModal()
+  if (e.target === modalOverlay) {hideModal()}
 })
 
 // 添加分类
@@ -1657,7 +1657,7 @@ modalConfirm.addEventListener('click', () => {
 
 // Enter 键确认
 modalInput1.addEventListener('keypress', (e) => {
-  if (e.key === 'Enter') modalInput2.focus()
+  if (e.key === 'Enter') {modalInput2.focus()}
 })
 modalInput2.addEventListener('keypress', (e) => {
   if (e.key === 'Enter') {
@@ -1669,7 +1669,7 @@ modalInput2.addEventListener('keypress', (e) => {
   }
 })
 modalInput3.addEventListener('keypress', (e) => {
-  if (e.key === 'Enter') modalConfirm.click()
+  if (e.key === 'Enter') {modalConfirm.click()}
 })
 
 // 加载学习资源
@@ -1823,7 +1823,7 @@ document.getElementById('importBookmarkBtn').addEventListener('click', importFro
     (e) => {
       mouseX = e.clientX
       mouseY = e.clientY
-      if (spaceHeld) extendSelectionTo(e.clientX, e.clientY)
+      if (spaceHeld) {extendSelectionTo(e.clientX, e.clientY)}
     },
     true
   )
@@ -1831,10 +1831,10 @@ document.getElementById('importBookmarkBtn').addEventListener('click', importFro
   // 判断是否为输入框聚焦
   function isInputFocused() {
     const el = document.activeElement
-    if (!el) return false
+    if (!el) {return false}
     const tag = el.tagName
-    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true
-    if (el.isContentEditable) return true
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {return true}
+    if (el.isContentEditable) {return true}
     if (tag === 'INPUT') {
       const type = (el.type || '').toLowerCase()
       const nonText = [
@@ -1848,7 +1848,7 @@ document.getElementById('importBookmarkBtn').addEventListener('click', importFro
         'range',
         'file',
       ]
-      if (nonText.includes(type)) return false
+      if (nonText.includes(type)) {return false}
     }
     return false
   }
@@ -1856,9 +1856,9 @@ document.getElementById('importBookmarkBtn').addEventListener('click', importFro
   document.addEventListener(
     'keydown',
     (e) => {
-      if (e.key !== ' ') return
-      if (e.ctrlKey || e.metaKey || e.altKey) return
-      if (isInputFocused()) return
+      if (e.key !== ' ') {return}
+      if (e.ctrlKey || e.metaKey || e.altKey) {return}
+      if (isInputFocused()) {return}
 
       e.preventDefault()
       e.stopImmediatePropagation()
@@ -1877,9 +1877,9 @@ document.getElementById('importBookmarkBtn').addEventListener('click', importFro
   document.addEventListener(
     'keyup',
     (e) => {
-      if (e.key !== ' ') return
-      if (e.ctrlKey || e.metaKey || e.altKey) return
-      if (isInputFocused()) return
+      if (e.key !== ' ') {return}
+      if (e.ctrlKey || e.metaKey || e.altKey) {return}
+      if (isInputFocused()) {return}
 
       e.preventDefault()
       e.stopImmediatePropagation()
@@ -1918,7 +1918,7 @@ document.getElementById('importBookmarkBtn').addEventListener('click', importFro
 
   function doClick() {
     const el = document.elementFromPoint(mouseX, mouseY)
-    if (!el) return
+    if (!el) {return}
     el.dispatchEvent(
       new MouseEvent('mousedown', {
         bubbles: true,
@@ -1955,7 +1955,7 @@ document.getElementById('importBookmarkBtn').addEventListener('click', importFro
     const anchor = document.caretRangeFromPoint
       ? document.caretRangeFromPoint(mouseX, mouseY)
       : null
-    if (!anchor) return
+    if (!anchor) {return}
     spaceHeld = true
     selectAnchor = anchor
     const sel = window.getSelection()
@@ -1965,9 +1965,9 @@ document.getElementById('importBookmarkBtn').addEventListener('click', importFro
   }
 
   function extendSelectionTo(cx, cy) {
-    if (!selectAnchor) return
+    if (!selectAnchor) {return}
     const focus = document.caretRangeFromPoint ? document.caretRangeFromPoint(cx, cy) : null
-    if (!focus) return
+    if (!focus) {return}
     try {
       const range = document.createRange()
       const cmp = selectAnchor.startContainer.compareDocumentPosition(focus.startContainer)

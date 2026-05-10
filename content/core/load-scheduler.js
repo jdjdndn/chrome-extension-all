@@ -5,7 +5,7 @@
  * 2. 非关键模块在浏览器空闲时加载
  */
 
-;(function () {
+(function () {
   'use strict'
 
   if (window.LoadScheduler) {
@@ -61,7 +61,7 @@
    * 日志输出
    */
   function log(message, level = 'info') {
-    if (!CONFIG.debug && level !== 'error') return
+    if (!CONFIG.debug && level !== 'error') {return}
 
     const prefix = '[LoadScheduler]'
     switch (level) {
@@ -72,7 +72,7 @@
         console.warn(prefix, message)
         break
       default:
-        if (CONFIG.debug) console.log(prefix, message)
+        if (CONFIG.debug) {console.log(prefix, message)}
     }
   }
 
@@ -121,7 +121,7 @@
    * 启动空闲任务调度
    */
   function startIdleScheduler() {
-    if (state.idleCallbackId !== null) return
+    if (state.idleCallbackId !== null) {return}
 
     function scheduleIdle(deadline) {
       // 检查是否有空闲时间
@@ -170,7 +170,7 @@
 
     function onInteraction() {
       state.isIdle = false
-      if (interactionTimer) clearTimeout(interactionTimer)
+      if (interactionTimer) {clearTimeout(interactionTimer)}
 
       // 用户交互后 1 秒视为空闲
       interactionTimer = setTimeout(() => {

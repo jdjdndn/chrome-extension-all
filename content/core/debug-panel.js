@@ -1,7 +1,7 @@
 // ========== 调试工具面板 ==========
 // 开发调试工具，方便调试和诊断
 
-;(function () {
+(function () {
   'use strict'
 
   if (window.DebugPanel) {
@@ -52,7 +52,7 @@
      * @param {object} data - 附加数据
      */
     log(message, level = 'info', data = null) {
-      if (!this.enabled && level !== 'error') return
+      if (!this.enabled && level !== 'error') {return}
 
       const entry = {
         timestamp: Date.now(),

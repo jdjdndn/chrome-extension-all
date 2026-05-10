@@ -63,12 +63,12 @@
 
   // ==================== 环境检测（优化） ====================
   const ENV = (() => {
-    if (typeof chrome === 'undefined' || !chrome.runtime?.id) return 'unknown';
-    if (typeof chrome.devtools !== 'undefined') return 'devtools';
+    if (typeof chrome === 'undefined' || !chrome.runtime?.id) {return 'unknown';}
+    if (typeof chrome.devtools !== 'undefined') {return 'devtools';}
     if (typeof window !== 'undefined' && window.location?.protocol === 'chrome-extension:') {
       const path = window.location.pathname;
-      if (path.includes('popup')) return 'popup';
-      if (path.includes('options')) return 'options';
+      if (path.includes('popup')) {return 'popup';}
+      if (path.includes('options')) {return 'options';}
       return 'extension_page';
     }
     if (typeof window !== 'undefined' && ['https:', 'http:'].includes(window.location?.protocol)) {
@@ -90,11 +90,11 @@
       try { return await fn(); } catch { return fallback; }
     },
     deepClone: (obj) => {
-      if (!obj || typeof obj !== 'object') return obj;
-      if (obj instanceof Date) return new Date(obj);
-      if (Array.isArray(obj)) return obj.map(Utils.deepClone);
+      if (!obj || typeof obj !== 'object') {return obj;}
+      if (obj instanceof Date) {return new Date(obj);}
+      if (Array.isArray(obj)) {return obj.map(Utils.deepClone);}
       const clone = {};
-      for (const k in obj) if (Object.hasOwn(obj, k)) clone[k] = Utils.deepClone(obj[k]);
+      for (const k in obj) {if (Object.hasOwn(obj, k)) {clone[k] = Utils.deepClone(obj[k]);}}
       return clone;
     },
     log: (prefix, msg, force = false) => (force || CONFIG.DEBUG_MODE) && console.log(`[${prefix}]`, msg),
@@ -136,7 +136,7 @@
     },
 
     async execute(type, fn) {
-      if (!CONFIG.ENABLE_CIRCUIT_BREAKER) return fn();
+      if (!CONFIG.ENABLE_CIRCUIT_BREAKER) {return fn();}
 
       const breaker = this.getOrCreate(type);
       const now = Date.now();
@@ -179,16 +179,16 @@
     timer: null,
 
     start() {
-      if (this.timer || !CONFIG.ENABLE_DEDUPLICATION) return;
+      if (this.timer || !CONFIG.ENABLE_DEDUPLICATION) {return;}
       this.timer = setInterval(() => {
         const now = Date.now();
         for (const [key, time] of this.cache) {
-          if (now - time > CONFIG.DEDUPLICATION_WINDOW) this.cache.delete(key);
+          if (now - time > CONFIG.DEDUPLICATION_WINDOW) {this.cache.delete(key);}
         }
         // 限制缓存大小
         if (this.cache.size > CONFIG.DEDUPLICATION_MAX_SIZE) {
           const entries = [...this.cache].slice(0, this.cache.size - 4000);
-          for (const [k] of entries) this.cache.delete(k);
+          for (const [k] of entries) {this.cache.delete(k);}
         }
       }, CONFIG.DEDUPLICATION_WINDOW);
     },
@@ -198,10 +198,10 @@
     },
 
     check(message) {
-      if (!CONFIG.ENABLE_DEDUPLICATION) return false;
+      if (!CONFIG.ENABLE_DEDUPLICATION) {return false;}
       const key = `${message.type}:${message.from}:${JSON.stringify(message.data).slice(0, 200)}`;
       const now = Date.now();
-      if (this.cache.has(key) && now - this.cache.get(key) < CONFIG.DEDUPLICATION_WINDOW) return true;
+      if (this.cache.has(key) && now - this.cache.get(key) < CONFIG.DEDUPLICATION_WINDOW) {return true;}
       this.cache.set(key, now);
       return false;
     },
@@ -217,7 +217,7 @@
     THROTTLE_MS: 100, // 100ms 节流
 
     enable() {
-      if (ENV !== 'content_script') return;
+      if (ENV !== 'content_script') {return;}
       this.enabled = true;
       Utils.log('DevToolsMonitor', 'Enabled');
     },
@@ -230,7 +230,7 @@
 
     // 记录事件（带节流）
     logEvent(eventType, message, direction = 'publish') {
-      if (!this.enabled || ENV !== 'content_script') return;
+      if (!this.enabled || ENV !== 'content_script') {return;}
 
       this.eventQueue.push({
         type: message.type,
@@ -287,7 +287,7 @@
     queue: [],
 
     async save() {
-      if (!CONFIG.ENABLE_PERSISTENCE || !isChromeExtension) return;
+      if (!CONFIG.ENABLE_PERSISTENCE || !isChromeExtension) {return;}
       try {
         await chrome.storage.local.set({
           [CONFIG.PERSISTENCE_KEY]: {
@@ -299,7 +299,7 @@
     },
 
     async load() {
-      if (!CONFIG.ENABLE_PERSISTENCE || !isChromeExtension) return;
+      if (!CONFIG.ENABLE_PERSISTENCE || !isChromeExtension) {return;}
       try {
         const result = await chrome.storage.local.get(CONFIG.PERSISTENCE_KEY);
         if (result[CONFIG.PERSISTENCE_KEY]?.queue) {
@@ -320,7 +320,7 @@
     errorCount: 0,
 
     start() {
-      if (this.timer || !CONFIG.ENABLE_HEALTH_CHECK) return;
+      if (this.timer || !CONFIG.ENABLE_HEALTH_CHECK) {return;}
       this.timer = setInterval(async () => {
         const status = await this.check();
         this.lastCheck = status;
@@ -383,12 +383,12 @@
     isConnecting: false,
 
     initPort() {
-      if (!isDevTools || this.port) return;
+      if (!isDevTools || this.port) {return;}
       try {
         this.port = chrome.runtime.connect({ name: 'eventbus-devtools' });
         this.reconnectCount = 0;
         this.port.onMessage.addListener((msg) => {
-          if (msg.__eventbus__) EventBus._handleMessage(msg);
+          if (msg.__eventbus__) {EventBus._handleMessage(msg);}
         });
         this.port.onDisconnect.addListener(() => {
           this.port = null;
@@ -403,7 +403,7 @@
     },
 
     scheduleReconnect() {
-      if (this.reconnectCount >= CONFIG.PORT_MAX_RECONNECT || this.isConnecting) return;
+      if (this.reconnectCount >= CONFIG.PORT_MAX_RECONNECT || this.isConnecting) {return;}
       this.isConnecting = true;
       this.reconnectCount++;
       setTimeout(() => {
@@ -420,7 +420,7 @@
 
     sendToPort(tabId, message) {
       const port = this.ports.get(tabId);
-      if (!port) return false;
+      if (!port) {return false;}
       try {
         port.postMessage(message);
         return true;
@@ -444,21 +444,21 @@
 
     async send(target, message) {
       try {
-        if (target?.tabId && this.sendToPort(target.tabId, message)) return;
+        if (target?.tabId && this.sendToPort(target.tabId, message)) {return;}
 
         if (isDevTools && this.port) {
           try { this.port.postMessage(message); return; } catch {}
         }
 
-        if (ENV === 'content_script') return await chrome.runtime.sendMessage(message);
+        if (ENV === 'content_script') {return await chrome.runtime.sendMessage(message);}
         if (ENV === 'background') {
-          if (target?.tabId) return await chrome.tabs.sendMessage(target.tabId, message);
+          if (target?.tabId) {return await chrome.tabs.sendMessage(target.tabId, message);}
           return await chrome.runtime.sendMessage(message);
         }
 
         if (chrome.tabs?.query) {
           const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-          if (tabs[0]?.id) return await chrome.tabs.sendMessage(tabs[0].id, message);
+          if (tabs[0]?.id) {return await chrome.tabs.sendMessage(tabs[0].id, message);}
         }
         return await chrome.runtime.sendMessage(message);
       } catch (error) {
@@ -499,7 +499,7 @@
     },
 
     onMessage(callback) {
-      if (!isChromeExtension) return;
+      if (!isChromeExtension) {return;}
       chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         console.log('[EventBus Transport] 收到消息:', msg?.type, msg);
         const result = callback(msg, sender);
@@ -522,15 +522,15 @@
     latencies: [],
 
     log(type, msg) {
-      if (!CONFIG.ENABLE_TRACKING) return;
+      if (!CONFIG.ENABLE_TRACKING) {return;}
       this.messages.push({ timestamp: Date.now(), type, ...msg });
-      if (this.messages.length > CONFIG.MAX_TRACKING_SIZE) this.messages.shift();
+      if (this.messages.length > CONFIG.MAX_TRACKING_SIZE) {this.messages.shift();}
     },
 
     recordLatency(startTime) {
       const latency = Date.now() - startTime;
       this.latencies.push(latency);
-      if (this.latencies.length > 100) this.latencies.shift();
+      if (this.latencies.length > 100) {this.latencies.shift();}
       this.stats.avgLatency = Math.round(this.latencies.reduce((a, b) => a + b, 0) / this.latencies.length);
     },
 
@@ -546,9 +546,9 @@
 
     getHistory(filter = {}) {
       let h = [...this.messages];
-      if (filter.type) h = h.filter(m => m.type === filter.type);
-      if (filter.since) h = h.filter(m => m.timestamp > filter.since);
-      if (filter.limit) h = h.slice(-filter.limit);
+      if (filter.type) {h = h.filter(m => m.type === filter.type);}
+      if (filter.since) {h = h.filter(m => m.timestamp > filter.since);}
+      if (filter.limit) {h = h.slice(-filter.limit);}
       return h;
     },
 
@@ -565,25 +565,25 @@
     hooks: { beforeSend: [], afterReceive: [], beforeHandler: [], afterHandler: [], onError: [] },
 
     register(plugin) {
-      if (!plugin?.name) throw new Error('Plugin needs name');
+      if (!plugin?.name) {throw new Error('Plugin needs name');}
       this.plugins.set(plugin.name, { ...plugin, installedAt: Date.now() });
       if (plugin.hooks) {
         for (const [hook, handler] of Object.entries(plugin.hooks)) {
-          if (this.hooks[hook]) this.hooks[hook].push({ name: plugin.name, handler });
+          if (this.hooks[hook]) {this.hooks[hook].push({ name: plugin.name, handler });}
         }
       }
       plugin.init?.();
     },
 
     async executeHook(hook, data) {
-      if (!this.hooks[hook]) return;
+      if (!this.hooks[hook]) {return;}
       for (const { handler } of this.hooks[hook]) {
         await Utils.safeExecute(async () => handler(data), null);
       }
     },
 
     getList: () => [...PluginSystem.plugins.values()],
-    clear() { this.plugins.clear(); for (const h of Object.values(this.hooks)) h.length = 0; }
+    clear() { this.plugins.clear(); for (const h of Object.values(this.hooks)) {h.length = 0;} }
   };
 
   // ==================== 消息模板系统 ====================
@@ -591,7 +591,7 @@
     templates: new Map(),
 
     define(name, template) {
-      if (!name || typeof name !== 'string') throw new Error('Template name required');
+      if (!name || typeof name !== 'string') {throw new Error('Template name required');}
       this.templates.set(name, {
         name,
         schema: template.schema || {},
@@ -669,9 +669,9 @@
     },
 
     async sendToActiveTab(type, data) {
-      if (!chrome.tabs?.query) return null;
+      if (!chrome.tabs?.query) {return null;}
       const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (!tabs[0]?.id) return null;
+      if (!tabs[0]?.id) {return null;}
       return this.sendToContent(tabs[0].id, type, data);
     },
 
@@ -680,7 +680,7 @@
     },
 
     async getCurrentTabId() {
-      if (!chrome.tabs?.query) return null;
+      if (!chrome.tabs?.query) {return null;}
       const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
       return tabs[0]?.id;
     },
@@ -702,13 +702,13 @@
     Chrome: ChromeAPI,
 
     async init() {
-      if (State.isReady) return;
+      if (State.isReady) {return;}
 
       await Persistence.load();
       Deduplication.start();
       HealthCheck.start();
 
-      if (isDevTools) Transport.initPort();
+      if (isDevTools) {Transport.initPort();}
       Transport.onMessage(this._handleMessage.bind(this));
       this._startHeartbeat();
 
@@ -718,8 +718,8 @@
     },
 
     async request(type, data = {}, options = {}) {
-      if (!Utils.validateType(type)) throw new Error('Invalid message type');
-      if (!Utils.checkDataSize(data, CONFIG.MAX_DATA_SIZE)) throw new Error('Data size exceeds limit');
+      if (!Utils.validateType(type)) {throw new Error('Invalid message type');}
+      if (!Utils.checkDataSize(data, CONFIG.MAX_DATA_SIZE)) {throw new Error('Data size exceeds limit');}
 
       return CircuitBreaker.execute(type, async () => {
         const { timeout = CONFIG.MESSAGE_TIMEOUT } = options;
@@ -757,8 +757,8 @@
     },
 
     async publish(type, data = {}) {
-      if (!Utils.validateType(type)) throw new Error('Invalid message type');
-      if (!Utils.checkDataSize(data, CONFIG.MAX_DATA_SIZE)) throw new Error('Data size exceeds limit');
+      if (!Utils.validateType(type)) {throw new Error('Invalid message type');}
+      if (!Utils.checkDataSize(data, CONFIG.MAX_DATA_SIZE)) {throw new Error('Data size exceeds limit');}
 
       const message = {
         __eventbus__: true, id: Utils.generateId(),
@@ -773,14 +773,14 @@
     },
 
     subscribe(type, callback) {
-      if (!type || typeof callback !== 'function') throw new Error('Invalid params');
-      if (!State.subscriptions.has(type)) State.subscriptions.set(type, []);
+      if (!type || typeof callback !== 'function') {throw new Error('Invalid params');}
+      if (!State.subscriptions.has(type)) {State.subscriptions.set(type, []);}
       State.subscriptions.get(type).push(callback);
       return () => this.off(type, callback);
     },
 
     on(type, handler) {
-      if (!type || typeof handler !== 'function') throw new Error('Invalid params');
+      if (!type || typeof handler !== 'function') {throw new Error('Invalid params');}
       State.handlers.set(type, handler);
     },
 
@@ -788,7 +788,7 @@
       if (callback && State.subscriptions.has(type)) {
         const subs = State.subscriptions.get(type);
         const idx = subs.indexOf(callback);
-        if (idx > -1) subs.splice(idx, 1);
+        if (idx > -1) {subs.splice(idx, 1);}
       } else {
         State.subscriptions.delete(type);
         State.handlers.delete(type);
@@ -841,9 +841,9 @@
 
     _generateRecommendations(stats, health) {
       const recs = [];
-      if (stats.avgLatency > 500) recs.push('Consider optimizing message handlers');
-      if (stats.timeout > stats.sent * 0.1) recs.push('High timeout rate - check target availability');
-      if (health.issues?.length > 0) recs.push(...health.issues);
+      if (stats.avgLatency > 500) {recs.push('Consider optimizing message handlers');}
+      if (stats.timeout > stats.sent * 0.1) {recs.push('High timeout rate - check target availability');}
+      if (health.issues?.length > 0) {recs.push(...health.issues);}
       return recs;
     },
 
@@ -892,16 +892,16 @@
     },
 
     async _handleMessage(message, sender) {
-      if (!message?.__eventbus__ || message.from === State.id) return;
+      if (!message?.__eventbus__ || message.from === State.id) {return;}
 
-      if (Deduplication.check(message)) return;
+      if (Deduplication.check(message)) {return;}
 
       State.messageCount++;
       Tracking.stats.received++;
       Tracking.log('receive', { type: message.type, from: message.from });
       DevToolsMonitor.logEvent('receive', message, 'receive');
 
-      if (message.type === MSG.PING) return { type: MSG.PONG, from: State.id };
+      if (message.type === MSG.PING) {return { type: MSG.PONG, from: State.id };}
       if (message.type === MSG.PONG) {
         State.connections.set(message.from, { lastSeen: Date.now() });
         return;
@@ -920,8 +920,8 @@
         }
         return;
       }
-      if (message.type === MSG.HEALTH_CHECK) return await HealthCheck.check();
-      if (message.type === MSG.SNAPSHOT) return this.getState();
+      if (message.type === MSG.HEALTH_CHECK) {return await HealthCheck.check();}
+      if (message.type === MSG.SNAPSHOT) {return this.getState();}
 
       const handler = State.handlers.get(message.type);
       const subscribers = State.subscriptions.get(message.type) || [];
@@ -948,7 +948,7 @@
 
     _heartbeatTimer: null,
     _startHeartbeat() {
-      if (typeof window === 'undefined') return;
+      if (typeof window === 'undefined') {return;}
       this._heartbeatTimer = setInterval(() => {
         this.publish(MSG.HEARTBEAT, {});
         const now = Date.now();
@@ -976,7 +976,7 @@
   }
 
   // ES6 模块支持
-  if (typeof module !== 'undefined' && module.exports) module.exports = EventBus;
+  if (typeof module !== 'undefined' && module.exports) {module.exports = EventBus;}
 
   console.log('[EventBus V4.6.0] Chrome Extension Optimized Edition loaded');
 })();

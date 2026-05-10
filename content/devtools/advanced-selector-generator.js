@@ -7,7 +7,7 @@
  * - 多层 :not() 链
  */
 
-;(function () {
+(function () {
   'use strict'
 
   // ========== 常量定义 ==========
@@ -88,16 +88,16 @@
    * 获取有效的 class 列表
    */
   function getValidClasses(node) {
-    if (!node.className || typeof node.className !== 'string') return []
+    if (!node.className || typeof node.className !== 'string') {return []}
     return node.className
       .trim()
       .split(' ')
       .filter((c) => {
-        if (!c || /^[0-9]/.test(c)) return false
+        if (!c || /^[0-9]/.test(c)) {return false}
         // 过滤动态生成的 class
         if (/^(css-|styled-|sc-|js-|_|__|Mui|jss|css_|_|ng-|React|react|vue-|v-)/.test(c))
-          return false
-        if (c.length > 40) return false
+          {return false}
+        if (c.length > 40) {return false}
         return /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(c)
       })
   }
@@ -106,21 +106,21 @@
    * 获取有效属性列表
    */
   function getValidAttributes(node, forMerge = false) {
-    if (!node.attributes) return []
+    if (!node.attributes) {return []}
     const attrs = []
     for (const attr of node.attributes) {
-      if (SKIP_ATTRS.has(attr.name)) continue
-      if (!attr.value || attr.value.length > 80) continue
-      if (/^\d+$/.test(attr.value)) continue
+      if (SKIP_ATTRS.has(attr.name)) {continue}
+      if (!attr.value || attr.value.length > 80) {continue}
+      if (/^\d+$/.test(attr.value)) {continue}
       // 如果是用于合并，只允许确定性属性
-      if (forMerge && !STABLE_ATTRS.has(attr.name) && !TEST_ATTRS.includes(attr.name)) continue
+      if (forMerge && !STABLE_ATTRS.has(attr.name) && !TEST_ATTRS.includes(attr.name)) {continue}
       attrs.push({ name: attr.name, value: attr.value })
     }
     // 按优先级排序：测试属性 > 稳定属性 > 其他
     attrs.sort((a, b) => {
       const aIsTest = TEST_ATTRS.includes(a.name) ? 0 : 1
       const bIsTest = TEST_ATTRS.includes(b.name) ? 0 : 1
-      if (aIsTest !== bIsTest) return aIsTest - bIsTest
+      if (aIsTest !== bIsTest) {return aIsTest - bIsTest}
       const aIsStable = STABLE_ATTRS.has(a.name) ? 0 : 1
       const bIsStable = STABLE_ATTRS.has(b.name) ? 0 : 1
       return aIsStable - bIsStable
@@ -133,7 +133,7 @@
    */
   function getNthChild(node) {
     const parent = node.parentElement
-    if (!parent) return 0
+    if (!parent) {return 0}
     const siblings = Array.from(parent.children)
     return siblings.length > 1 ? siblings.indexOf(node) + 1 : 0
   }
@@ -143,7 +143,7 @@
    */
   function getNthOfType(node) {
     const parent = node.parentElement
-    if (!parent) return 0
+    if (!parent) {return 0}
     const siblings = Array.from(parent.children).filter((c) => c.tagName === node.tagName)
     return siblings.length > 1 ? siblings.indexOf(node) + 1 : 0
   }
@@ -186,9 +186,9 @@
    * 使用多策略 BFS 算法，确保返回最短且精确的选择器
    */
   function generateSelector(element) {
-    if (!element || !element.tagName) return ''
-    if (element === document.body) return 'body'
-    if (element === document.documentElement) return 'html'
+    if (!element || !element.tagName) {return ''}
+    if (element === document.body) {return 'body'}
+    if (element === document.documentElement) {return 'html'}
 
     const tag = element.tagName.toLowerCase()
     const classes = getValidClasses(element)
@@ -237,7 +237,7 @@
 
     // 测试 Level 1
     for (const sel of candidates) {
-      if (isExactMatch(sel, element)) return sel
+      if (isExactMatch(sel, element)) {return sel}
     }
 
     // === Level 2: 双 class 组合 ===
@@ -259,7 +259,7 @@
       )
 
       for (let i = candidates.length - 2; i < candidates.length; i++) {
-        if (isExactMatch(candidates[i], element)) return candidates[i]
+        if (isExactMatch(candidates[i], element)) {return candidates[i]}
       }
     }
 
@@ -277,7 +277,7 @@
             CSS.escape(attr.value) +
             '"]'
           candidates.push(sel)
-          if (isExactMatch(sel, element)) return sel
+          if (isExactMatch(sel, element)) {return sel}
         }
       }
     }
@@ -291,32 +291,32 @@
           .slice(0, 3)
           .map((c) => CSS.escape(c))
           .join('.')
-      if (isExactMatch(sel, element)) return sel
+      if (isExactMatch(sel, element)) {return sel}
     }
 
     // === Level 5: 带 nth-of-type / nth-child ===
     if (nthOfType > 0) {
       const sel = tag + ':nth-of-type(' + nthOfType + ')'
       candidates.push(sel)
-      if (isExactMatch(sel, element)) return sel
+      if (isExactMatch(sel, element)) {return sel}
     }
 
     if (nthChild > 0) {
       const sel = tag + ':nth-child(' + nthChild + ')'
       candidates.push(sel)
-      if (isExactMatch(sel, element)) return sel
+      if (isExactMatch(sel, element)) {return sel}
     }
 
     // class + nth-of-type
     if (classes.length > 0 && nthOfType > 0) {
       const sel = tag + '.' + CSS.escape(classes[0]) + ':nth-of-type(' + nthOfType + ')'
-      if (isExactMatch(sel, element)) return sel
+      if (isExactMatch(sel, element)) {return sel}
     }
 
     // === Level 6: 构建路径 ===
     const path = buildPath(element, 5)
     const selector = path.join(' > ')
-    if (isExactMatch(selector, element)) return selector
+    if (isExactMatch(selector, element)) {return selector}
 
     // 尝试增强路径
     const result = testSelectorResult(selector, element)
@@ -333,7 +333,7 @@
             .map((c) => CSS.escape(c))
             .join('.')
         const enhancedSel = enhancedPath.join(' > ')
-        if (isExactMatch(enhancedSel, element)) return enhancedSel
+        if (isExactMatch(enhancedSel, element)) {return enhancedSel}
       }
     }
 
@@ -379,7 +379,7 @@
 
       path.unshift(part)
 
-      if (cur === document.documentElement) break
+      if (cur === document.documentElement) {break}
       cur = cur.parentElement
       depth++
     }
@@ -394,8 +394,8 @@
    * 支持 DEFAULT_HIDE_SELECTORS 的高级模式
    */
   function generateBatchSelector(elements) {
-    if (!elements || elements.length === 0) return ''
-    if (elements.length === 1) return generateSelector(elements[0])
+    if (!elements || elements.length === 0) {return ''}
+    if (elements.length === 1) {return generateSelector(elements[0])}
 
     // 提取共同特征
     const common = findCommonFeatures(elements)
@@ -405,35 +405,35 @@
 
     // 策略 1: 共同 tag + :nth-child(n):not(:nth-child(X))
     const nthChildPattern = tryNthChildPattern(elements, common)
-    if (nthChildPattern) candidates.push(nthChildPattern)
+    if (nthChildPattern) {candidates.push(nthChildPattern)}
 
     // 策略 2: 共同祖先 + 子选择器 + :not()
     const ancestorNotPattern = tryAncestorNotPattern(elements, common)
-    if (ancestorNotPattern) candidates.push(...ancestorNotPattern)
+    if (ancestorNotPattern) {candidates.push(...ancestorNotPattern)}
 
     // 策略 3: 兄弟选择器 + 任意元素 (+*)
     const siblingPattern = trySiblingPattern(elements, common)
-    if (siblingPattern) candidates.push(...siblingPattern)
+    if (siblingPattern) {candidates.push(...siblingPattern)}
 
     // 策略 4: 属性包含选择器 [class*="xxx"]
     const attrContainsPattern = tryAttrContainsPattern(elements, common)
-    if (attrContainsPattern) candidates.push(...attrContainsPattern)
+    if (attrContainsPattern) {candidates.push(...attrContainsPattern)}
 
     // 策略 5: :is() 多选一
     const isPattern = tryIsPattern(elements, common)
-    if (isPattern) candidates.push(isPattern)
+    if (isPattern) {candidates.push(isPattern)}
 
     // 策略 6: 共同类名组合
     const classPattern = tryClassPattern(elements, common)
-    if (classPattern) candidates.push(...classPattern)
+    if (classPattern) {candidates.push(...classPattern)}
 
     // 按精确度和长度排序
     candidates.sort((a, b) => {
       // 优先精确匹配
       const aExact = a.matchCount === elements.length
       const bExact = b.matchCount === elements.length
-      if (aExact && !bExact) return -1
-      if (!aExact && bExact) return 1
+      if (aExact && !bExact) {return -1}
+      if (!aExact && bExact) {return 1}
       // 其次按长度
       return a.selector.length - b.selector.length
     })
@@ -496,7 +496,7 @@
    * 找出共同祖先
    */
   function findCommonAncestor(elements) {
-    if (elements.length === 0) return null
+    if (elements.length === 0) {return null}
 
     // 获取第一个元素的祖先链
     const firstAncestors = []
@@ -521,24 +521,24 @@
    * 选择所有子元素但排除特定位置
    */
   function tryNthChildPattern(elements, common) {
-    if (!common.parent) return null
+    if (!common.parent) {return null}
 
     const parent = common.parent
     const allChildren = Array.from(parent.children)
     const elementSet = new Set(elements)
 
     // 检查是否所有元素都是同一父元素的子元素
-    if (!elements.every((el) => el.parentElement === parent)) return null
+    if (!elements.every((el) => el.parentElement === parent)) {return null}
 
     // 找出未被选中的子元素索引
     const notSelected = allChildren.filter((c) => !elementSet.has(c))
 
     // 如果排除的数量少于选中的数量，使用 :not() 模式
-    if (notSelected.length === 0 || notSelected.length >= elements.length) return null
-    if (notSelected.length > 5) return null // 太多排除项，不划算
+    if (notSelected.length === 0 || notSelected.length >= elements.length) {return null}
+    if (notSelected.length > 5) {return null} // 太多排除项，不划算
 
     const tag = common.tag
-    if (!tag) return null
+    if (!tag) {return null}
 
     // 构建 :not(:nth-child(X)) 链
     const notIndices = notSelected
@@ -546,7 +546,7 @@
       .map((c) => allChildren.indexOf(c) + 1)
       .sort((a, b) => a - b)
 
-    if (notIndices.length === 0) return null
+    if (notIndices.length === 0) {return null}
 
     const notChain = notIndices.map((i) => ':not(:nth-child(' + i + '))').join('')
 
@@ -580,11 +580,11 @@
   function tryAncestorNotPattern(elements, common) {
     const results = []
     const ancestor = common.ancestor
-    if (!ancestor || ancestor === document.body) return results
+    if (!ancestor || ancestor === document.body) {return results}
 
     // 生成祖先选择器
     const ancestorSel = generateSelector(ancestor)
-    if (!ancestorSel) return results
+    if (!ancestorSel) {return results}
 
     const tag = common.tag || '*'
 
@@ -658,7 +658,7 @@
     if (prevSiblings.size <= 3) {
       for (const prev of prevSiblings) {
         const prevSel = generateSelector(prev)
-        if (!prevSel) continue
+        if (!prevSel) {continue}
 
         // prev + * (任意下一个兄弟)
         const sel1 = prevSel + ' + *'
@@ -696,7 +696,7 @@
       return classes
     })
 
-    if (allClasses.some((c) => c.length === 0)) return results
+    if (allClasses.some((c) => c.length === 0)) {return results}
 
     // 找出共同的 class 前缀/后缀/子串
     const firstClasses = allClasses[0]
@@ -734,16 +734,16 @@
    * 策略 5: :is() 多选一
    */
   function tryIsPattern(elements, common) {
-    if (elements.length > 10) return null // 太多元素，:is() 会太长
+    if (elements.length > 10) {return null} // 太多元素，:is() 会太长
 
     // 为每个元素生成简短选择器
     const sels = []
     for (const el of elements) {
       const sel = generateShortSelector(el)
-      if (sel) sels.push(sel)
+      if (sel) {sels.push(sel)}
     }
 
-    if (sels.length !== elements.length) return null
+    if (sels.length !== elements.length) {return null}
 
     // 构建 :is() 选择器
     const isSel = ':is(' + sels.join(', ') + ')'
@@ -778,7 +778,7 @@
   function tryClassPattern(elements, common) {
     const results = []
 
-    if (common.classes.length === 0) return results
+    if (common.classes.length === 0) {return results}
 
     const tag = common.tag || ''
 

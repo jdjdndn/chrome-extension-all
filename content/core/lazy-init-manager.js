@@ -9,7 +9,7 @@
  * - L4 功能层：首次使用时初始化
  */
 
-;(function () {
+(function () {
   'use strict'
 
   if (window.LazyInitManager) {

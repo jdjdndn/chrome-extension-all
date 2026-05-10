@@ -3,7 +3,7 @@
  * 为现有脚本添加 EventBus 支持，而不修改原有代码
  */
 
-;(function () {
+(function () {
   'use strict'
 
   console.log('[EventBus集成] 开始集成...')

@@ -203,7 +203,7 @@ class CSPBypassManager {
         script.id = options.id
       }
 
-      ;(options.target || document.head).appendChild(script)
+      (options.target || document.head).appendChild(script)
 
       console.log(`[CSPBypass] Injected JS code (${code.length} bytes)`)
     } else if (type === 'css') {
@@ -214,7 +214,7 @@ class CSPBypassManager {
         style.id = options.id
       }
 
-      ;(options.target || document.head).appendChild(style)
+      (options.target || document.head).appendChild(style)
 
       console.log(`[CSPBypass] Injected CSS code (${code.length} bytes)`)
     }

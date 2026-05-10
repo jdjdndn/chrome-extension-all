@@ -26,7 +26,7 @@ const SearchHistory = {
    * @param {string} query - 搜索词
    */
   async add(query) {
-    if (!query || query.trim().length < 2) return
+    if (!query || query.trim().length < 2) {return}
 
     query = query.trim().toLowerCase()
     const history = await this.getAll()
@@ -49,7 +49,7 @@ const SearchHistory = {
     // 按词频和时间排序，保留热门
     history.sort((a, b) => {
       // 词频优先
-      if (b.count !== a.count) return b.count - a.count
+      if (b.count !== a.count) {return b.count - a.count}
       // 时间次之
       return b.lastTime - a.lastTime
     })
@@ -84,7 +84,7 @@ const SearchHistory = {
    * @returns {Promise<Array>}
    */
   async getSuggestions(prefix, limit = 5) {
-    if (!prefix || prefix.length < 1) return []
+    if (!prefix || prefix.length < 1) {return []}
 
     const history = await this.getAll()
     const lowerPrefix = prefix.toLowerCase()

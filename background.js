@@ -2425,9 +2425,6 @@ const CDN_REDIRECT_DOMAINS = [
   'cdn.staticfile.org',
   'lf3-cdn-tos.bytecdntp.com',
   'cdn.jsdelivr.net',
-  'fonts.font.im',
-  'gstatic.font.im',
-  'fonts.loli.net',
 ]
 
 // CDN 白名单规则ID范围 (ID 900-999)
@@ -2510,7 +2507,7 @@ const CDNRegistry = {
    */
   isCDNUrl(url) {
     const hostname = this._extractDomain(url)
-    if (!hostname) return false
+    if (!hostname) {return false}
     return this.getAllDomains().some(
       (domain) => hostname === domain || hostname.endsWith('.' + domain)
     )
@@ -2554,49 +2551,9 @@ async function updateCDNAllowlistRules() {
 }
 
 // DNR CDN重定向规则 (ID 3000-3099)
-// 策略: 通用域名替换(高覆盖) + 具体路径变换(精准映射)
+// 策略: 只保留已知公共库的精确规则，避免重定向私有库导致404
 // 资源类型: stylesheet + font (CSP友好, JS走DOM层安全替换)
 const CDN_REDIRECT_RULES = [
-  // ===== Google Fonts → fonts.font.im (CSS + 字体文件) =====
-  {
-    id: 3001,
-    regex: '^https://fonts\\.googleapis\\.com/(css2.*)',
-    sub: 'https://fonts.font.im/\\1',
-  },
-  {
-    id: 3002,
-    regex: '^https://fonts\\.googleapis\\.com/(css\\?.*)',
-    sub: 'https://fonts.font.im/\\1',
-  },
-  {
-    id: 3003,
-    regex: '^https://fonts\\.googleapis\\.com/(earlyaccess.*)',
-    sub: 'https://fonts.font.im/\\1',
-  },
-  {
-    id: 3004,
-    regex: '^https://fonts\\.googleapis\\.com/(icon.*)',
-    sub: 'https://fonts.font.im/\\1',
-  },
-  // Google Fonts 字体文件 (woff2/woff/ttf)
-  { id: 3005, regex: '^https://fonts\\.gstatic\\.com/(.*)', sub: 'https://gstatic.font.im/\\1' },
-
-  // ===== 通用域名替换 (路径结构一致, 直接换域名) =====
-  // cdnjs.cloudflare.com → bootcdn (覆盖数百个CSS框架/字体/图标库)
-  {
-    id: 3010,
-    regex: '^https://cdnjs\\.cloudflare\\.com/ajax/libs/(.*)',
-    sub: 'https://cdn.bootcdn.net/ajax/libs/\\1',
-  },
-  // unpkg.com → jsDelivr (加/npm/前缀, 路径兼容)
-  { id: 3011, regex: '^https://unpkg\\.com/(.*)', sub: 'https://cdn.jsdelivr.net/npm/\\1' },
-  // ajax.googleapis.com → bootcdn
-  {
-    id: 3012,
-    regex: '^https://ajax\\.googleapis\\.com/ajax/libs/(.*)',
-    sub: 'https://cdn.bootcdn.net/ajax/libs/\\1',
-  },
-
   // ===== 路径变换替换 (源路径与目标路径结构不同) =====
   // bootstrapcdn → bootcdn (路径需加/ajax/libs/)
   {
@@ -2937,7 +2894,105 @@ if (chrome.declarativeNetRequest?.onRuleMatchedDebug) {
     if (info.rule.id >= 1000 && info.rule.id < 2000) {
       recordBlockedRequest(info.request.url, info.request.tabId)
     }
+    // 记录 CDN 重定向规则 (3000-3099)
+    if (info.rule.id >= 3000 && info.rule.id < 3100) {
+      // 从规则推断重定向后的 URL
+      const redirectUrl = CDNRedirectFallback.getRedirectUrl(
+        info.request.url,
+        info.rule.id
+      )
+      if (redirectUrl) {
+        CDNRedirectFallback.recordUrlMapping(info.request.url, redirectUrl)
+      }
+    }
   })
+}
+
+// ========== CDN 重定向错误回退 (ID 3000-3099) ==========
+const CDNRedirectFallback = {
+  // 存储原始URL映射: redirectUrl -> originalUrl
+  _urlMapping: new Map(),
+
+  // 根据规则ID和正则推断重定向后的URL
+  getRedirectUrl(originalUrl, ruleId) {
+    const rule = CDN_REDIRECT_RULES.find((r) => r.id === ruleId)
+    if (!rule) {return null}
+
+    try {
+      const regex = new RegExp(rule.regex)
+      const match = originalUrl.match(regex)
+      if (match) {
+        // 执行正则替换
+        return originalUrl.replace(regex, rule.sub)
+      }
+    } catch (e) {
+      console.error('[CDN Fallback] Regex error:', e)
+    }
+    return null
+  },
+
+  recordUrlMapping(originalUrl, redirectUrl) {
+    this._urlMapping.set(redirectUrl, originalUrl)
+    // 限制大小
+    if (this._urlMapping.size > 1000) {
+      const firstKey = this._urlMapping.keys().next().value
+      this._urlMapping.delete(firstKey)
+    }
+  },
+
+  getOriginalUrl(redirectUrl) {
+    return this._urlMapping.get(redirectUrl)
+  },
+}
+
+// 监听 CDN 域名的响应，检测 404
+if (chrome.webRequest?.onCompleted) {
+  chrome.webRequest.onCompleted.addListener(
+    (details) => {
+      // 只检测 CDN 域名的失败响应
+      if (details.statusCode >= 400 && details.statusCode < 500) {
+        const originalUrl = CDNRedirectFallback.getOriginalUrl(details.url)
+        if (originalUrl) {
+          console.warn(
+            `[CDN Fallback] ${details.statusCode} for ${details.url}, original: ${originalUrl}`
+          )
+          // 通知 content script 回退
+          chrome.tabs
+            .sendMessage(details.tabId, {
+              type: 'CDN_REDIRECT_FALLBACK',
+              originalUrl,
+              failedUrl: details.url,
+              statusCode: details.statusCode,
+            })
+            .catch(() => {
+              // tab 可能已关闭
+            })
+        }
+      }
+    },
+    { urls: ['*://cdn.bootcdn.net/*', '*://cdn.jsdelivr.net/*', '*://cdn.staticfile.org/*'] }
+  )
+}
+
+// 监听 webRequest onErrorOccurred
+if (chrome.webRequest?.onErrorOccurred) {
+  chrome.webRequest.onErrorOccurred.addListener(
+    (details) => {
+      const originalUrl = CDNRedirectFallback.getOriginalUrl(details.url)
+      if (originalUrl) {
+        console.warn(`[CDN Fallback] Error for ${details.url}, original: ${originalUrl}`)
+        chrome.tabs
+          .sendMessage(details.tabId, {
+            type: 'CDN_REDIRECT_FALLBACK',
+            originalUrl,
+            failedUrl: details.url,
+            error: details.error,
+          })
+          .catch(() => {})
+      }
+    },
+    { urls: ['*://cdn.bootcdn.net/*', '*://cdn.jsdelivr.net/*', '*://cdn.staticfile.org/*'] }
+  )
 }
 
 // 初始化统计数据

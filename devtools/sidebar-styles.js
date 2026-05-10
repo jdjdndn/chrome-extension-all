@@ -35,7 +35,7 @@ let backgroundPort = null
 let connectionAttempts = 0
 
 function connectToBackground() {
-  if (backgroundPort) return backgroundPort
+  if (backgroundPort) {return backgroundPort}
 
   try {
     backgroundPort = chrome.runtime.connect({ name: 'devtools-panel' })
@@ -135,7 +135,7 @@ function showToast(message, isError = false) {
 
 // Escape HTML
 function escapeHtml(text) {
-  if (text === null || text === undefined) return ''
+  if (text === null || text === undefined) {return ''}
   const div = document.createElement('div')
   div.textContent = String(text)
   return div.innerHTML
@@ -1672,7 +1672,7 @@ function renderComputedStyles(styles) {
 // Handle style change
 function handleStyleChange(e) {
   const property = e.target.dataset.property
-  if (!property) return
+  if (!property) {return}
 
   const value = e.target.value.replace(/!important$/, '').trim()
   const important = e.target.value.includes('!important')
@@ -2375,8 +2375,8 @@ function testSelector(selector) {
     }
 
     const count = result.count
-    let text = count === 1 ? '唯一匹配' : `匹配 ${count} 个元素`
-    let type = count === 1 ? 'success' : count > 10 ? 'warning' : ''
+    const text = count === 1 ? '唯一匹配' : `匹配 ${count} 个元素`
+    const type = count === 1 ? 'success' : count > 10 ? 'warning' : ''
 
     updateTesterResult(count, text, type, result.elements)
   })
@@ -2386,7 +2386,7 @@ function testSelector(selector) {
  * 更新测试结果
  */
 function updateTesterResult(count, text, type, elements = []) {
-  if (!testerResult) return
+  if (!testerResult) {return}
 
   const countEl = testerResult.querySelector('.result-count')
   const textEl = testerResult.querySelector('.result-text')
@@ -2405,12 +2405,12 @@ function updateTesterResult(count, text, type, elements = []) {
     let preview = elements
       .map((el) => {
         let str = el.tag
-        if (el.id) str += '#' + el.id
-        if (el.className) str += '.' + el.className.split(' ')[0]
+        if (el.id) {str += '#' + el.id}
+        if (el.className) {str += '.' + el.className.split(' ')[0]}
         return str
       })
       .join(', ')
-    if (count > 5) preview += ' ...'
+    if (count > 5) {preview += ' ...'}
     textEl.textContent = text + ' | ' + preview
   }
 }
@@ -2489,7 +2489,7 @@ if (testBtn) {
 
 if (testerClose) {
   testerClose.addEventListener('click', () => {
-    if (testerPanel) testerPanel.style.display = 'none'
+    if (testerPanel) {testerPanel.style.display = 'none'}
   })
 }
 
@@ -2511,7 +2511,7 @@ if (testerInput) {
 if (testerHighlight) {
   testerHighlight.addEventListener('click', () => {
     const selector = testerInput?.value || currentSelector
-    if (selector) highlightMatches(selector)
+    if (selector) {highlightMatches(selector)}
   })
 }
 
@@ -2541,7 +2541,7 @@ const batchResult = document.getElementById('batch-result')
  * 更新批量操作参数面板
  */
 function updateBatchParams() {
-  if (!batchAction || !batchParams) return
+  if (!batchAction || !batchParams) {return}
 
   const action = batchAction.value
   let html = ''
@@ -2585,7 +2585,7 @@ function executeBatchAction(preview = false) {
     return
   }
 
-  let params = {}
+  const params = {}
 
   // 获取参数
   const classInput = document.getElementById('batch-class-name')
@@ -2594,11 +2594,11 @@ function executeBatchAction(preview = false) {
   const stylePropInput = document.getElementById('batch-style-prop')
   const styleValueInput = document.getElementById('batch-style-value')
 
-  if (classInput) params.className = classInput.value
-  if (attrNameInput) params.attrName = attrNameInput.value
-  if (attrValueInput) params.attrValue = attrValueInput.value
-  if (stylePropInput) params.styleProp = stylePropInput.value
-  if (styleValueInput) params.styleValue = styleValueInput.value
+  if (classInput) {params.className = classInput.value}
+  if (attrNameInput) {params.attrName = attrNameInput.value}
+  if (attrValueInput) {params.attrValue = attrValueInput.value}
+  if (stylePropInput) {params.styleProp = stylePropInput.value}
+  if (styleValueInput) {params.styleValue = styleValueInput.value}
 
   // 构建执行脚本
   const script = `
@@ -2691,7 +2691,7 @@ function executeBatchAction(preview = false) {
  * 显示批量操作结果
  */
 function showBatchResult(message, isError) {
-  if (!batchResult) return
+  if (!batchResult) {return}
   batchResult.textContent = message
   batchResult.className = 'batch-result visible ' + (isError ? 'error' : 'success')
 }
@@ -2712,7 +2712,7 @@ if (batchBtn) {
 
 if (batchClose) {
   batchClose.addEventListener('click', () => {
-    if (batchPanel) batchPanel.style.display = 'none'
+    if (batchPanel) {batchPanel.style.display = 'none'}
   })
 }
 
@@ -2743,7 +2743,7 @@ let filterDebounceTimer = null
  */
 function filterStyles(keyword) {
   const sections = stylesContainer?.querySelectorAll('.selector-section')
-  if (!sections) return
+  if (!sections) {return}
 
   const useTag = filterTag?.checked ?? true
   const useClass = filterClass?.checked ?? true
@@ -2794,7 +2794,7 @@ if (filterInput) {
   })
 }
 
-;[filterTag, filterClass, filterId].forEach((el) => {
+[filterTag, filterClass, filterId].forEach((el) => {
   if (el) {
     el.addEventListener('change', () => {
       filterStyles(filterInput?.value || '')
@@ -2956,11 +2956,11 @@ function loadSettings() {
   const compactMode = document.getElementById('setting-compact-mode')
   const strategy = document.getElementById('setting-strategy')
 
-  if (autoPreview) autoPreview.checked = settings.autoPreview
-  if (showMatched) showMatched.checked = settings.showMatched
-  if (showInherited) showInherited.checked = settings.showInherited
-  if (compactMode) compactMode.checked = settings.compactMode
-  if (strategy) strategy.value = settings.strategy
+  if (autoPreview) {autoPreview.checked = settings.autoPreview}
+  if (showMatched) {showMatched.checked = settings.showMatched}
+  if (showInherited) {showInherited.checked = settings.showInherited}
+  if (compactMode) {compactMode.checked = settings.compactMode}
+  if (strategy) {strategy.value = settings.strategy}
 
   // 应用紧凑模式
   document.body.classList.toggle('compact', settings.compactMode)
@@ -2974,7 +2974,7 @@ function saveSettings() {
 }
 
 // 设置变更监听
-;[
+[
   'setting-auto-preview',
   'setting-show-matched',
   'setting-show-inherited',
@@ -3145,7 +3145,7 @@ function updateSelectedElementsPanel() {
  */
 function highlightElementById(id) {
   const element = selectedElements.find((el) => el.id === id)
-  if (!element) return
+  if (!element) {return}
 
   const script = `
     (function() {
@@ -3204,8 +3204,8 @@ function startElementPicker() {
   console.log('[Sidebar] 启动元素拾取器')
 
   // 更新按钮状态
-  if (startPickerBtn) startPickerBtn.style.display = 'none'
-  if (stopPickerBtn) stopPickerBtn.style.display = 'block'
+  if (startPickerBtn) {startPickerBtn.style.display = 'none'}
+  if (stopPickerBtn) {stopPickerBtn.style.display = 'block'}
 
   // 发送消息到 content script
   chrome.devtools.inspectedWindow.eval(
@@ -3237,8 +3237,8 @@ function stopElementPicker() {
   console.log('[Sidebar] 停止元素拾取器')
 
   // 更新按钮状态
-  if (startPickerBtn) startPickerBtn.style.display = 'block'
-  if (stopPickerBtn) stopPickerBtn.style.display = 'none'
+  if (startPickerBtn) {startPickerBtn.style.display = 'block'}
+  if (stopPickerBtn) {stopPickerBtn.style.display = 'none'}
 
   // 发送消息到 content script
   chrome.devtools.inspectedWindow.eval(`
@@ -3316,8 +3316,8 @@ if (optimizeMergedBtn) {
  * - 复杂 :not() 组合
  */
 function generateMergedSelector() {
-  if (selectedElements.length === 0) return null
-  if (selectedElements.length === 1) return selectedElements[0].selector
+  if (selectedElements.length === 0) {return null}
+  if (selectedElements.length === 1) {return selectedElements[0].selector}
 
   const selectors = selectedElements.map((el) => el.selector)
   const startTime = Date.now()
@@ -3334,7 +3334,7 @@ function generateMergedSelector() {
 
   // === 策略 2: 共同前缀合并 ===
   const parts = selectors.map((s) => s.split(/\s*>\s*/))
-  let commonPrefix = []
+  const commonPrefix = []
   const minLen = Math.min(...parts.map((p) => p.length))
 
   for (let i = 0; i < minLen; i++) {
@@ -3355,22 +3355,22 @@ function generateMergedSelector() {
       // 尝试各种高级合并模式
       const advancedMerged = tryAdvancedMerge(remainders, commonPrefix)
       if (advancedMerged)
-        candidates.push({ selector: advancedMerged, priority: 90, strategy: 'advanced' })
+        {candidates.push({ selector: advancedMerged, priority: 90, strategy: 'advanced' })}
 
       const notMerged = tryNotMergeForRemainders(remainders, commonPrefix)
-      if (notMerged) candidates.push({ selector: notMerged, priority: 88, strategy: 'not-nth' })
+      if (notMerged) {candidates.push({ selector: notMerged, priority: 88, strategy: 'not-nth' })}
 
       const attrMerged = tryAttrContainsMerge(remainders, commonPrefix)
       if (attrMerged)
-        candidates.push({ selector: attrMerged, priority: 85, strategy: 'attr-contains' })
+        {candidates.push({ selector: attrMerged, priority: 85, strategy: 'attr-contains' })}
 
       const structuralMerged = tryStructuralMerge(remainders, commonPrefix)
       if (structuralMerged)
-        candidates.push({ selector: structuralMerged, priority: 82, strategy: 'structural' })
+        {candidates.push({ selector: structuralMerged, priority: 82, strategy: 'structural' })}
 
       const complexNotMerged = tryComplexNotMerge(remainders, commonPrefix)
       if (complexNotMerged)
-        candidates.push({ selector: complexNotMerged, priority: 80, strategy: 'complex-not' })
+        {candidates.push({ selector: complexNotMerged, priority: 80, strategy: 'complex-not' })}
 
       // :is() 合并
       if (remainders.length <= 5 && remainders.every((r) => r.length < 50)) {
@@ -3383,251 +3383,251 @@ function generateMergedSelector() {
 
   // === 策略 3: :not() 排除模式 ===
   const notMerged = tryNotMerge(selectors)
-  if (notMerged) candidates.push({ selector: notMerged, priority: 85, strategy: 'not' })
+  if (notMerged) {candidates.push({ selector: notMerged, priority: 85, strategy: 'not' })}
 
   // === 策略 4: 兄弟选择器模式 ===
   const siblingMerged = trySiblingMerge(selectors)
-  if (siblingMerged) candidates.push({ selector: siblingMerged, priority: 80, strategy: 'sibling' })
+  if (siblingMerged) {candidates.push({ selector: siblingMerged, priority: 80, strategy: 'sibling' })}
 
   // === 策略 5: :has() 选择器模式 ===
   if (Date.now() - startTime < MAX_TIME) {
     const hasMerged = tryHasMerge(selectors)
-    if (hasMerged) candidates.push({ selector: hasMerged, priority: 78, strategy: 'has' })
+    if (hasMerged) {candidates.push({ selector: hasMerged, priority: 78, strategy: 'has' })}
   }
 
   // === 策略 6: 共同祖先 + 后代选择器 ===
   if (Date.now() - startTime < MAX_TIME) {
     const ancestorMerged = tryAncestorMerge(selectors)
     if (ancestorMerged)
-      candidates.push({ selector: ancestorMerged, priority: 75, strategy: 'ancestor' })
+      {candidates.push({ selector: ancestorMerged, priority: 75, strategy: 'ancestor' })}
   }
 
   // === 策略 7: 属性包含选择器 ===
   if (Date.now() - startTime < MAX_TIME) {
     const attrMerged = tryAttrContainsMergeGlobal(selectors)
-    if (attrMerged) candidates.push({ selector: attrMerged, priority: 72, strategy: 'attr-global' })
+    if (attrMerged) {candidates.push({ selector: attrMerged, priority: 72, strategy: 'attr-global' })}
   }
 
   // === 策略 8: 结构伪类模式 ===
   if (Date.now() - startTime < MAX_TIME) {
     const structMerged = tryStructuralPseudoMerge(selectors)
-    if (structMerged) candidates.push({ selector: structMerged, priority: 70, strategy: 'pseudo' })
+    if (structMerged) {candidates.push({ selector: structMerged, priority: 70, strategy: 'pseudo' })}
   }
 
   // === 策略 9: 属性前缀/后缀模式 ===
   if (Date.now() - startTime < MAX_TIME) {
     const prefixSuffixMerged = tryAttrPrefixSuffixMerge(selectors)
     if (prefixSuffixMerged)
-      candidates.push({
+      {candidates.push({
         selector: prefixSuffixMerged,
         priority: 68,
         strategy: 'attr-prefix-suffix',
-      })
+      })}
   }
 
   // === 策略 10: 嵌套 :not():is() 组合 ===
   if (Date.now() - startTime < MAX_TIME) {
     const nestedMerged = tryNestedPseudoMerge(selectors)
     if (nestedMerged)
-      candidates.push({ selector: nestedMerged, priority: 65, strategy: 'nested-pseudo' })
+      {candidates.push({ selector: nestedMerged, priority: 65, strategy: 'nested-pseudo' })}
   }
 
   // === 策略 11: 共同属性模式 ===
   if (Date.now() - startTime < MAX_TIME) {
     const attrValueMerged = tryCommonAttrMerge(selectors)
     if (attrValueMerged)
-      candidates.push({ selector: attrValueMerged, priority: 62, strategy: 'common-attr' })
+      {candidates.push({ selector: attrValueMerged, priority: 62, strategy: 'common-attr' })}
   }
 
   // === 策略 12: 路径优化 ===
   if (Date.now() - startTime < MAX_TIME) {
     const pathOptimized = tryPathOptimization(selectors)
     if (pathOptimized)
-      candidates.push({ selector: pathOptimized, priority: 60, strategy: 'path-opt' })
+      {candidates.push({ selector: pathOptimized, priority: 60, strategy: 'path-opt' })}
   }
 
   // === 策略 13: 模糊匹配模式 ===
   if (Date.now() - startTime < MAX_TIME) {
     const fuzzyMerged = tryFuzzyMerge(selectors)
-    if (fuzzyMerged) candidates.push({ selector: fuzzyMerged, priority: 55, strategy: 'fuzzy' })
+    if (fuzzyMerged) {candidates.push({ selector: fuzzyMerged, priority: 55, strategy: 'fuzzy' })}
   }
 
   // === 策略 14: :where() 低优先级合并 ===
   if (Date.now() - startTime < MAX_TIME) {
     const whereMerged = tryWhereMerge(selectors)
-    if (whereMerged) candidates.push({ selector: whereMerged, priority: 58, strategy: 'where' })
+    if (whereMerged) {candidates.push({ selector: whereMerged, priority: 58, strategy: 'where' })}
   }
 
   // === 策略 15: 倒数选择器 :nth-last-child ===
   if (Date.now() - startTime < MAX_TIME) {
     const nthLastMerged = tryNthLastMerge(selectors)
     if (nthLastMerged)
-      candidates.push({ selector: nthLastMerged, priority: 72, strategy: 'nth-last' })
+      {candidates.push({ selector: nthLastMerged, priority: 72, strategy: 'nth-last' })}
   }
 
   // === 策略 16: :empty 空元素选择器 ===
   if (Date.now() - startTime < MAX_TIME) {
     const emptyMerged = tryEmptyMerge(selectors)
-    if (emptyMerged) candidates.push({ selector: emptyMerged, priority: 70, strategy: 'empty' })
+    if (emptyMerged) {candidates.push({ selector: emptyMerged, priority: 70, strategy: 'empty' })}
   }
 
   // === 策略 17: :checked/:disabled/:enabled 状态选择器 ===
   if (Date.now() - startTime < MAX_TIME) {
     const stateMerged = tryStateMerge(selectors)
-    if (stateMerged) candidates.push({ selector: stateMerged, priority: 75, strategy: 'state' })
+    if (stateMerged) {candidates.push({ selector: stateMerged, priority: 75, strategy: 'state' })}
   }
 
   // === 策略 18: :not() 多重排除链 ===
   if (Date.now() - startTime < MAX_TIME) {
     const multiNotMerged = tryMultiNotMerge(selectors)
     if (multiNotMerged)
-      candidates.push({ selector: multiNotMerged, priority: 78, strategy: 'multi-not' })
+      {candidates.push({ selector: multiNotMerged, priority: 78, strategy: 'multi-not' })}
   }
 
   // === 策略 19: :is() + :not() 组合 ===
   if (Date.now() - startTime < MAX_TIME) {
     const isNotMerged = tryIsNotMerge(selectors)
-    if (isNotMerged) candidates.push({ selector: isNotMerged, priority: 76, strategy: 'is-not' })
+    if (isNotMerged) {candidates.push({ selector: isNotMerged, priority: 76, strategy: 'is-not' })}
   }
 
   // === 策略 20: 属性正则匹配 [attr~=value] ===
   if (Date.now() - startTime < MAX_TIME) {
     const attrRegexMerged = tryAttrRegexMerge(selectors)
     if (attrRegexMerged)
-      candidates.push({ selector: attrRegexMerged, priority: 66, strategy: 'attr-regex' })
+      {candidates.push({ selector: attrRegexMerged, priority: 66, strategy: 'attr-regex' })}
   }
 
   // === 策略 21: :nth-child(An+B) 公式模式 ===
   if (Date.now() - startTime < MAX_TIME) {
     const formulaMerged = tryNthFormulaMerge(selectors)
     if (formulaMerged)
-      candidates.push({ selector: formulaMerged, priority: 74, strategy: 'nth-formula' })
+      {candidates.push({ selector: formulaMerged, priority: 74, strategy: 'nth-formula' })}
   }
 
   // === 策略 22: :only-child/:only-of-type ===
   if (Date.now() - startTime < MAX_TIME) {
     const onlyMerged = tryOnlyMerge(selectors)
-    if (onlyMerged) candidates.push({ selector: onlyMerged, priority: 71, strategy: 'only' })
+    if (onlyMerged) {candidates.push({ selector: onlyMerged, priority: 71, strategy: 'only' })}
   }
 
   // === 策略 23: 通配符优化 ===
   if (Date.now() - startTime < MAX_TIME) {
     const wildcardMerged = tryWildcardMerge(selectors)
     if (wildcardMerged)
-      candidates.push({ selector: wildcardMerged, priority: 50, strategy: 'wildcard' })
+      {candidates.push({ selector: wildcardMerged, priority: 50, strategy: 'wildcard' })}
   }
 
   // === 策略 24: :has() + 后代组合 ===
   if (Date.now() - startTime < MAX_TIME) {
     const hasDescMerged = tryHasDescendantMerge(selectors)
     if (hasDescMerged)
-      candidates.push({ selector: hasDescMerged, priority: 67, strategy: 'has-desc' })
+      {candidates.push({ selector: hasDescMerged, priority: 67, strategy: 'has-desc' })}
   }
 
   // === 策略 25: 多层级路径压缩 ===
   if (Date.now() - startTime < MAX_TIME) {
     const compressedMerged = tryPathCompression(selectors)
     if (compressedMerged)
-      candidates.push({ selector: compressedMerged, priority: 63, strategy: 'path-compress' })
+      {candidates.push({ selector: compressedMerged, priority: 63, strategy: 'path-compress' })}
   }
 
   // === 策略 26: 相邻兄弟组 ~ ===
   if (Date.now() - startTime < MAX_TIME) {
     const generalSiblingMerged = tryGeneralSiblingMerge(selectors)
     if (generalSiblingMerged)
-      candidates.push({ selector: generalSiblingMerged, priority: 73, strategy: 'general-sibling' })
+      {candidates.push({ selector: generalSiblingMerged, priority: 73, strategy: 'general-sibling' })}
   }
 
   // === 策略 27: :lang() 语言选择器 ===
   if (Date.now() - startTime < MAX_TIME) {
     const langMerged = tryLangMerge(selectors)
-    if (langMerged) candidates.push({ selector: langMerged, priority: 64, strategy: 'lang' })
+    if (langMerged) {candidates.push({ selector: langMerged, priority: 64, strategy: 'lang' })}
   }
 
   // === 策略 28: :dir() 方向选择器 ===
   if (Date.now() - startTime < MAX_TIME) {
     const dirMerged = tryDirMerge(selectors)
-    if (dirMerged) candidates.push({ selector: dirMerged, priority: 64, strategy: 'dir' })
+    if (dirMerged) {candidates.push({ selector: dirMerged, priority: 64, strategy: 'dir' })}
   }
 
   // === 策略 29: :target/:focus/:hover 状态 ===
   if (Date.now() - startTime < MAX_TIME) {
     const targetMerged = tryTargetMerge(selectors)
-    if (targetMerged) candidates.push({ selector: targetMerged, priority: 69, strategy: 'target' })
+    if (targetMerged) {candidates.push({ selector: targetMerged, priority: 69, strategy: 'target' })}
   }
 
   // === 策略 30: 深度选择器 ::deep / >>> ===
   if (Date.now() - startTime < MAX_TIME) {
     const deepMerged = tryDeepMerge(selectors)
-    if (deepMerged) candidates.push({ selector: deepMerged, priority: 52, strategy: 'deep' })
+    if (deepMerged) {candidates.push({ selector: deepMerged, priority: 52, strategy: 'deep' })}
   }
 
   // === 策略 31: :is() + 属性组合 ===
   if (Date.now() - startTime < MAX_TIME) {
     const isAttrMerged = tryIsAttrMerge(selectors)
-    if (isAttrMerged) candidates.push({ selector: isAttrMerged, priority: 74, strategy: 'is-attr' })
+    if (isAttrMerged) {candidates.push({ selector: isAttrMerged, priority: 74, strategy: 'is-attr' })}
   }
 
   // === 策略 32: :where() + :not() 组合 ===
   if (Date.now() - startTime < MAX_TIME) {
     const whereNotMerged = tryWhereNotMerge(selectors)
     if (whereNotMerged)
-      candidates.push({ selector: whereNotMerged, priority: 56, strategy: 'where-not' })
+      {candidates.push({ selector: whereNotMerged, priority: 56, strategy: 'where-not' })}
   }
 
   // === 策略 33: 偶数/奇数模式 ===
   if (Date.now() - startTime < MAX_TIME) {
     const evenOddMerged = tryEvenOddMerge(selectors)
     if (evenOddMerged)
-      candidates.push({ selector: evenOddMerged, priority: 73, strategy: 'even-odd' })
+      {candidates.push({ selector: evenOddMerged, priority: 73, strategy: 'even-odd' })}
   }
 
   // === 策略 34: :not(:first-child) 排除模式 ===
   if (Date.now() - startTime < MAX_TIME) {
     const notFirstLastMerged = tryNotFirstLastMerge(selectors)
     if (notFirstLastMerged)
-      candidates.push({ selector: notFirstLastMerged, priority: 67, strategy: 'not-first-last' })
+      {candidates.push({ selector: notFirstLastMerged, priority: 67, strategy: 'not-first-last' })}
   }
 
   // === 策略 35: 多属性组合 ===
   if (Date.now() - startTime < MAX_TIME) {
     const multiAttrMerged = tryMultiAttrMerge(selectors)
     if (multiAttrMerged)
-      candidates.push({ selector: multiAttrMerged, priority: 71, strategy: 'multi-attr' })
+      {candidates.push({ selector: multiAttrMerged, priority: 71, strategy: 'multi-attr' })}
   }
 
   // === 策略 36: :is() + :nth-child 组合 ===
   if (Date.now() - startTime < MAX_TIME) {
     const isNthMerged = tryIsNthMerge(selectors)
-    if (isNthMerged) candidates.push({ selector: isNthMerged, priority: 70, strategy: 'is-nth' })
+    if (isNthMerged) {candidates.push({ selector: isNthMerged, priority: 70, strategy: 'is-nth' })}
   }
 
   // === 策略 37: :has(> :not(:empty)) 非空子元素 ===
   if (Date.now() - startTime < MAX_TIME) {
     const hasNotEmptyMerged = tryHasNotEmptyMerge(selectors)
     if (hasNotEmptyMerged)
-      candidates.push({ selector: hasNotEmptyMerged, priority: 59, strategy: 'has-not-empty' })
+      {candidates.push({ selector: hasNotEmptyMerged, priority: 59, strategy: 'has-not-empty' })}
   }
 
   // === 策略 38: 属性值模式匹配 ===
   if (Date.now() - startTime < MAX_TIME) {
     const attrPatternMerged = tryAttrPatternMerge(selectors)
     if (attrPatternMerged)
-      candidates.push({ selector: attrPatternMerged, priority: 66, strategy: 'attr-pattern' })
+      {candidates.push({ selector: attrPatternMerged, priority: 66, strategy: 'attr-pattern' })}
   }
 
   // === 策略 39: :is() + 多 class 组合 ===
   if (Date.now() - startTime < MAX_TIME) {
     const isMultiClassMerged = tryIsMultiClassMerge(selectors)
     if (isMultiClassMerged)
-      candidates.push({ selector: isMultiClassMerged, priority: 72, strategy: 'is-multi-class' })
+      {candidates.push({ selector: isMultiClassMerged, priority: 72, strategy: 'is-multi-class' })}
   }
 
   // 选择最优结果
   if (candidates.length > 0) {
     // 按优先级排序，优先级相同则选最短的
     candidates.sort((a, b) => {
-      if (a.priority !== b.priority) return b.priority - a.priority
+      if (a.priority !== b.priority) {return b.priority - a.priority}
       return a.selector.length - b.selector.length
     })
     return candidates[0].selector
@@ -3854,7 +3854,7 @@ function tryAttrRegexMerge(selectors) {
     allClasses.push(classes)
   }
 
-  if (allClasses.length === 0 || allClasses.some((c) => c.length === 0)) return null
+  if (allClasses.length === 0 || allClasses.some((c) => c.length === 0)) {return null}
 
   // 找出共同的词（用空格分隔的 class）
   const firstClasses = allClasses[0]
@@ -4185,7 +4185,7 @@ function tryIsAttrMerge(selectors) {
     allAttrs.push(attrs)
   }
 
-  if (allAttrs.length === 0 || allAttrs.some((a) => a.length === 0)) return null
+  if (allAttrs.length === 0 || allAttrs.some((a) => a.length === 0)) {return null}
 
   // 找出共同的属性名
   const firstAttrNames = allAttrs[0].map((a) => a.name)
@@ -4348,7 +4348,7 @@ function tryMultiAttrMerge(selectors) {
     allAttrs.push(attrs)
   }
 
-  if (allAttrs.length === 0 || allAttrs.some((a) => a.size === 0)) return null
+  if (allAttrs.length === 0 || allAttrs.some((a) => a.size === 0)) {return null}
 
   // 找出所有共同的属性
   const commonAttrs = []
@@ -4458,7 +4458,7 @@ function tryAttrPatternMerge(selectors) {
     allAttrs.push(attrs)
   }
 
-  if (allAttrs.length === 0 || allAttrs.some((a) => a.length === 0)) return null
+  if (allAttrs.length === 0 || allAttrs.some((a) => a.length === 0)) {return null}
 
   // 找出属性值中的共同模式
   const firstAttrs = allAttrs[0]
@@ -4524,7 +4524,7 @@ function tryIsMultiClassMerge(selectors) {
     allClasses.push(classes)
   }
 
-  if (allClasses.length === 0 || allClasses.some((c) => c.length === 0)) return null
+  if (allClasses.length === 0 || allClasses.some((c) => c.length === 0)) {return null}
 
   // 找出每个选择器的第一个 class
   const firstClasses = allClasses.map((c) => c[0])
@@ -4582,8 +4582,8 @@ function tryStructuralMerge(remainders, commonPrefix) {
 
   // 检查是否都是第一个或最后一个
   const firstLast = remainders.map((r) => {
-    if (r.includes(':first-child')) return 'first'
-    if (r.includes(':last-child')) return 'last'
+    if (r.includes(':first-child')) {return 'first'}
+    if (r.includes(':last-child')) {return 'last'}
     return null
   })
 
@@ -4651,7 +4651,7 @@ function tryStructuralPseudoMerge(selectors) {
   const pseudoPattern = /:(first|last|nth|only)-(child|of-type)/
   const hasPseudo = selectors.every((s) => pseudoPattern.test(s))
 
-  if (!hasPseudo) return null
+  if (!hasPseudo) {return null}
 
   // 提取基础选择器和伪类
   const parsed = selectors
@@ -4697,7 +4697,7 @@ function tryAttrPrefixSuffixMerge(selectors) {
     allAttrs.push(attrs)
   }
 
-  if (allAttrs.length === 0 || allAttrs.some((a) => a.length === 0)) return null
+  if (allAttrs.length === 0 || allAttrs.some((a) => a.length === 0)) {return null}
 
   // 找出共同的前缀或后缀
   const firstAttrs = allAttrs[0]
@@ -4804,7 +4804,7 @@ function tryCommonAttrMerge(selectors) {
     allAttrs.push(attrs)
   }
 
-  if (allAttrs.length === 0 || allAttrs.some((a) => a.size === 0)) return null
+  if (allAttrs.length === 0 || allAttrs.some((a) => a.size === 0)) {return null}
 
   // 找出共同的属性
   const firstAttrs = allAttrs[0]
@@ -4917,7 +4917,7 @@ function tryFuzzyMerge(selectors) {
 function tryAdvancedMerge(remainders, commonPrefix) {
   // 检查是否都是简单的 tag 或 tag.class 形式
   const simplePattern = /^[a-z]+(\.[a-zA-Z_-][a-zA-Z0-9_-]*)?$/
-  if (!remainders.every((r) => simplePattern.test(r))) return null
+  if (!remainders.every((r) => simplePattern.test(r))) {return null}
 
   // 提取 tags 和 classes
   const tags = new Set()
@@ -4926,7 +4926,7 @@ function tryAdvancedMerge(remainders, commonPrefix) {
     const match = r.match(/^([a-z]+)(?:\.([a-zA-Z_-][a-zA-Z0-9_-]*))?$/)
     if (match) {
       tags.add(match[1])
-      if (match[2]) classes.add(match[2])
+      if (match[2]) {classes.add(match[2])}
     }
   }
 
@@ -5070,7 +5070,7 @@ function tryClassMerge(selectors) {
   }
 
   // 找出共同 class
-  if (allClasses.length === 0) return null
+  if (allClasses.length === 0) {return null}
   const commonClasses = [...allClasses[0]].filter((cls) => allClasses.every((set) => set.has(cls)))
 
   if (commonClasses.length > 0) {
@@ -5096,7 +5096,7 @@ function tryNotMerge(selectors) {
   })
 
   // 检查是否有共同父级
-  if (parsed.length < 2) return null
+  if (parsed.length < 2) {return null}
 
   // 找出共同父级路径
   const firstParts = parsed[0].parts.slice(0, -1)
@@ -5105,7 +5105,7 @@ function tryNotMerge(selectors) {
   // 检查所有选择器是否共享相同父级
   const sameParent = parsed.every((p) => p.parts.slice(0, -1).join(' > ') === commonParent)
 
-  if (!sameParent) return null
+  if (!sameParent) {return null}
 
   // 提取最后的 nth-child 信息
   const lastParts = parsed.map((p) => p.last)
@@ -5143,7 +5143,7 @@ function tryNotMerge(selectors) {
 
   // 尝试 :not(.class) 模式
   const notClassMerged = tryNotClassMerge(parsed, commonParent, lastParts)
-  if (notClassMerged) return notClassMerged
+  if (notClassMerged) {return notClassMerged}
 
   return null
 }
@@ -5245,7 +5245,7 @@ function tryAncestorMerge(selectors) {
   const paths = selectors.map((s) => s.split(/\s*>\s*/))
 
   // 找出共同祖先（路径前缀）
-  let commonAncestor = []
+  const commonAncestor = []
   const minLen = Math.min(...paths.map((p) => p.length - 1)) // 不包括最后一个
 
   for (let i = 0; i < minLen; i++) {
@@ -5300,7 +5300,7 @@ function tryAttrContainsMergeGlobal(selectors) {
     }
   }
 
-  if (allClasses.length === 0) return null
+  if (allClasses.length === 0) {return null}
 
   // 找出共同 class 子串
   const firstClasses = allClasses[0]
@@ -5326,7 +5326,7 @@ function tryAttrContainsMergeGlobal(selectors) {
  * 更新合并选择器显示
  */
 function updateMergedSelector(selector) {
-  if (!mergedSelectorDisplay) return
+  if (!mergedSelectorDisplay) {return}
 
   if (!selector) {
     mergedSelectorDisplay.innerHTML = '<code>-</code>'
@@ -5343,7 +5343,7 @@ function updateMergedSelector(selector) {
  */
 function highlightElement(id) {
   const element = selectedElements.find((el) => el.id === id)
-  if (!element) return
+  if (!element) {return}
 
   const script = `
     (function() {
@@ -5575,7 +5575,7 @@ class VirtualScroller {
   }
 
   update() {
-    if (!this.container || this.items.length === 0) return
+    if (!this.container || this.items.length === 0) {return}
 
     const containerHeight = this.container.clientHeight
     const visibleCount = Math.ceil(containerHeight / this.itemHeight) + 2
@@ -5614,7 +5614,7 @@ class VirtualScroller {
  * 基于选中模式推荐更优选择器
  */
 function recommendBetterSelector(selectedElements) {
-  if (!selectedElements || selectedElements.length === 0) return null
+  if (!selectedElements || selectedElements.length === 0) {return null}
 
   const recommendations = []
 
@@ -5676,7 +5676,7 @@ function analyzeSelectionPatterns(elements) {
     commonParentClass: null,
   }
 
-  if (elements.length < 2) return result
+  if (elements.length < 2) {return result}
 
   // 检查是否同级
   const parents = new Set(elements.map((el) => el.parentElement))
@@ -5713,7 +5713,7 @@ function analyzeSelectionPatterns(elements) {
 function detectSelectorIssues(selector) {
   const issues = []
 
-  if (!selector) return issues
+  if (!selector) {return issues}
 
   // 检查过于具体的选择器
   const parts = selector.split(/\s*>\s*|\s+/)

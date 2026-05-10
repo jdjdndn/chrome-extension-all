@@ -38,7 +38,7 @@ if (window.DocGeneratorLoaded) {
     }
 
     init() {
-      if (document.getElementById(CONTAINER_ID)) return
+      if (document.getElementById(CONTAINER_ID)) {return}
       this.createUI()
       this.bindEvents()
       this.registerToPositionManager()
@@ -126,7 +126,7 @@ if (window.DocGeneratorLoaded) {
     }
 
     injectStyles() {
-      if (document.getElementById('yc-doc-generator-styles')) return
+      if (document.getElementById('yc-doc-generator-styles')) {return}
 
       const style = document.createElement('style')
       style.id = 'yc-doc-generator-styles'
@@ -785,7 +785,7 @@ if (window.DocGeneratorLoaded) {
 
       header.addEventListener('mousedown', (e) => {
         // 忽略按钮点击
-        if (e.target.closest('button')) return
+        if (e.target.closest('button')) {return}
 
         this.isDragging = true
         this.dragStart = { x: e.clientX, y: e.clientY }
@@ -807,7 +807,7 @@ if (window.DocGeneratorLoaded) {
       })
 
       document.addEventListener('mousemove', (e) => {
-        if (!this.isDragging) return
+        if (!this.isDragging) {return}
 
         const dx = this.dragStart.x - e.clientX
         const dy = e.clientY - this.dragStart.y
@@ -856,7 +856,7 @@ if (window.DocGeneratorLoaded) {
     // 确保面板在可视区域内
     ensurePanelInViewport() {
       const panel = document.getElementById(PANEL_ID)
-      if (!panel || panel.classList.contains('yc-doc-hidden')) return
+      if (!panel || panel.classList.contains('yc-doc-hidden')) {return}
 
       const rect = panel.getBoundingClientRect()
       const currentRight = parseInt(panel.style.right) || 70
@@ -1033,7 +1033,7 @@ if (window.DocGeneratorLoaded) {
 
       headings.forEach((h) => {
         const text = h.textContent.trim()
-        if (this.isHiddenElement(h)) return
+        if (this.isHiddenElement(h)) {return}
         if (text && text.length < 100) {
           const link = this.findLink(h)
           sections.push({
@@ -1072,7 +1072,7 @@ if (window.DocGeneratorLoaded) {
       const roleHeadings = document.querySelectorAll('[role="heading"]')
       roleHeadings.forEach((el) => {
         const text = el.textContent.trim()
-        if (this.isHiddenElement(el)) return
+        if (this.isHiddenElement(el)) {return}
         if (text && text.length >= 2 && text.length < 100 && !seenTexts.has(text)) {
           seenTexts.add(text)
           const ariaLevel = el.getAttribute('aria-level') || '2'
@@ -1089,9 +1089,9 @@ if (window.DocGeneratorLoaded) {
         const elements = document.querySelectorAll(pattern)
         elements.forEach((el) => {
           const text = el.textContent.trim()
-          if (this.isHiddenElement(el)) return
+          if (this.isHiddenElement(el)) {return}
           // 排除导航区域内的元素
-          if (this.isInNavigationArea(el)) return
+          if (this.isInNavigationArea(el)) {return}
           if (text && text.length >= 2 && text.length < 100 && !seenTexts.has(text)) {
             seenTexts.add(text)
             sections.push({
@@ -1107,8 +1107,8 @@ if (window.DocGeneratorLoaded) {
       const boldElements = document.querySelectorAll('strong, b')
       boldElements.forEach((el) => {
         const text = el.textContent.trim()
-        if (this.isHiddenElement(el)) return
-        if (this.isInNavigationArea(el)) return
+        if (this.isHiddenElement(el)) {return}
+        if (this.isInNavigationArea(el)) {return}
 
         // 检查是否为独立行（可能是小标题）
         const parent = el.parentElement
@@ -1148,14 +1148,14 @@ if (window.DocGeneratorLoaded) {
 
       // 查找主要内容区域
       const mainContent = this.findMainContentArea()
-      if (!mainContent) return sections
+      if (!mainContent) {return sections}
 
       // 获取所有段落
       const paragraphs = mainContent.querySelectorAll('p, div > br, article > div')
       const validParagraphs = []
 
       paragraphs.forEach((p) => {
-        if (this.isHiddenElement(p)) return
+        if (this.isHiddenElement(p)) {return}
         const text = p.textContent.trim()
         // 有效段落：有一定长度，不是纯链接
         if (text.length >= 20 && text.length <= 500) {
@@ -1163,7 +1163,7 @@ if (window.DocGeneratorLoaded) {
         }
       })
 
-      if (validParagraphs.length === 0) return sections
+      if (validParagraphs.length === 0) {return sections}
 
       // 智能分割策略：每 5-8 个段落提取一个作为大纲项
       const segmentSize = Math.max(5, Math.min(8, Math.floor(validParagraphs.length / 10) + 3))
@@ -1172,7 +1172,7 @@ if (window.DocGeneratorLoaded) {
       for (let i = 0; i < validParagraphs.length; i += segmentSize) {
         const para = validParagraphs[i]
         // 提取段落首句作为标题
-        let title = this.extractFirstSentence(para.text)
+        const title = this.extractFirstSentence(para.text)
         if (title && title.length >= 5 && title.length < 80 && !seenTexts.has(title)) {
           seenTexts.add(title)
           sections.push({
@@ -1254,11 +1254,11 @@ if (window.DocGeneratorLoaded) {
         const role = parent.getAttribute('role')
         const className = parent.className || ''
 
-        if (['nav', 'header', 'footer'].includes(tagName)) return true
-        if (role === 'navigation' || role === 'menu') return true
+        if (['nav', 'header', 'footer'].includes(tagName)) {return true}
+        if (role === 'navigation' || role === 'menu') {return true}
 
         const navPatterns = /\b(nav|menu|sidebar|navigation|navbar|topbar|header-nav|footer-nav)\b/i
-        if (navPatterns.test(className)) return true
+        if (navPatterns.test(className)) {return true}
 
         parent = parent.parentElement
       }
@@ -1267,18 +1267,18 @@ if (window.DocGeneratorLoaded) {
 
     // 检查元素是否隐藏
     isHiddenElement(el) {
-      if (!el) return true
+      if (!el) {return true}
 
       const style = window.getComputedStyle(el)
 
-      if (style.display === 'none') return true
-      if (style.visibility === 'hidden') return true
-      if (style.visibility === 'collapse') return true
-      if (parseFloat(style.opacity) === 0) return true
+      if (style.display === 'none') {return true}
+      if (style.visibility === 'hidden') {return true}
+      if (style.visibility === 'collapse') {return true}
+      if (parseFloat(style.opacity) === 0) {return true}
 
-      if (style.display === 'contents') return false
+      if (style.display === 'contents') {return false}
 
-      if (this.isClippedHidden(style)) return true
+      if (this.isClippedHidden(style)) {return true}
 
       if (el.offsetWidth <= 2 || el.offsetHeight <= 2) {
         return true
@@ -1376,13 +1376,13 @@ if (window.DocGeneratorLoaded) {
       const href = linkEl.getAttribute('href') || ''
 
       // 1. 排除锚点链接（用于 tab 切换或页内跳转）
-      if (href.startsWith('#')) return true
+      if (href.startsWith('#')) {return true}
 
       // 2. 排除 JS 链接
-      if (href.startsWith('javascript:')) return true
+      if (href.startsWith('javascript:')) {return true}
 
       // 3. 排除空链接
-      if (!href.trim() || href === '#') return true
+      if (!href.trim() || href === '#') {return true}
 
       // 4. 检查是否在导航区域内
       let parent = linkEl.parentElement
@@ -1448,21 +1448,21 @@ if (window.DocGeneratorLoaded) {
 
       links.forEach((link) => {
         // 检查是否隐藏
-        if (this.isHiddenElement(link)) return
+        if (this.isHiddenElement(link)) {return}
 
         // 检查是否为导航链接
-        if (this.isNavigationLink(link)) return
+        if (this.isNavigationLink(link)) {return}
 
         // 解析重定向链接，获取真实 URL
         const url = this.unwrapRedirectUrl(link.href)
         const text = link.textContent.trim()
 
         // 去重
-        if (seenUrls.has(url)) return
+        if (seenUrls.has(url)) {return}
         seenUrls.add(url)
 
         // 过滤无效链接
-        if (!text || text.length < 1) return
+        if (!text || text.length < 1) {return}
 
         this.collectedLinks.push({
           text: text.substring(0, 100), // 限制文本长度
@@ -1495,7 +1495,7 @@ if (window.DocGeneratorLoaded) {
 
       links.forEach((link) => {
         // 检查是否隐藏
-        if (this.isHiddenElement(link)) return
+        if (this.isHiddenElement(link)) {return}
 
         const href = link.href
         const match = href.match(githubRepoPathPattern)
@@ -1509,15 +1509,15 @@ if (window.DocGeneratorLoaded) {
             /^(features|pricing|security|about|blog|careers|press|shop|sponsors|topics|trending|collections|events|explore|settings|notifications|pulls|issues|marketplace|orgs|new|import|gist)$/i,
           ]
 
-          if (excludePatterns.some((p) => p.test(owner))) return
+          if (excludePatterns.some((p) => p.test(owner))) {return}
 
           // 排除组织页面
-          if (href.match(/^https?:\/\/github\.com\/orgs\//)) return
+          if (href.match(/^https?:\/\/github\.com\/orgs\//)) {return}
 
           const repoKey = `${owner}/${repo}`
 
           // 去重
-          if (seenRepos.has(repoKey)) return
+          if (seenRepos.has(repoKey)) {return}
           seenRepos.add(repoKey)
 
           const text = link.textContent.trim() || repo
@@ -1543,7 +1543,7 @@ if (window.DocGeneratorLoaded) {
     // 更新 GitHub 仓库面板内容
     updateGithubPanel() {
       const githubContent = document.querySelector('.yc-doc-content-github')
-      if (!githubContent) return
+      if (!githubContent) {return}
 
       if (this.githubRepos.length === 0) {
         githubContent.innerHTML = `
@@ -1677,7 +1677,7 @@ if (window.DocGeneratorLoaded) {
     // 更新链接面板内容
     updateLinksPanel() {
       const linksContent = document.querySelector('.yc-doc-content-links')
-      if (!linksContent) return
+      if (!linksContent) {return}
 
       if (this.collectedLinks.length === 0) {
         linksContent.innerHTML = `
@@ -1735,16 +1735,16 @@ if (window.DocGeneratorLoaded) {
 
       if (sections.length > 0) {
         const filteredSections = sections.filter((s) => {
-          if (s.text === title) return false
+          if (s.text === title) {return false}
           const normalizedTitle = title.replace(/\s+/g, ' ').trim()
           const normalizedText = s.text.replace(/\s+/g, ' ').trim()
-          if (normalizedTitle === normalizedText) return false
+          if (normalizedTitle === normalizedText) {return false}
           return true
         })
 
         const seenTexts = new Set()
         const uniqueSections = filteredSections.filter((s) => {
-          if (seenTexts.has(s.text)) return false
+          if (seenTexts.has(s.text)) {return false}
           seenTexts.add(s.text)
           return true
         })
@@ -2023,7 +2023,7 @@ if (window.DocGeneratorLoaded) {
 
     showToast(message) {
       const existing = document.querySelector('.yc-doc-toast')
-      if (existing) existing.remove()
+      if (existing) {existing.remove()}
 
       const toast = document.createElement('div')
       toast.className = 'yc-doc-toast'

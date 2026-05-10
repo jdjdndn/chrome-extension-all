@@ -100,7 +100,7 @@ const DownloadsSearch = {
    * @returns {string}
    */
   formatSize(bytes) {
-    if (!bytes || bytes === -1) return '未知'
+    if (!bytes || bytes === -1) {return '未知'}
     const units = ['B', 'KB', 'MB', 'GB', 'TB']
     let i = 0
     while (bytes >= 1024 && i < units.length - 1) {

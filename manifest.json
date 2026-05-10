@@ -10,6 +10,8 @@
     "scripting",
     "declarativeNetRequest",
     "declarativeNetRequestFeedback",
+    "webNavigation",
+    "webRequest",
     "cookies",
     "browsingData",
     "bookmarks",

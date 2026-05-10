@@ -2,7 +2,7 @@
  * 模块入口文件
  * 整合所有模块并导出
  */
-;(function () {
+(function () {
   'use strict'
 
   // 检查依赖
@@ -82,7 +82,7 @@
      * 初始化所有模块
      */
     async init() {
-      if (this.initialized) return
+      if (this.initialized) {return}
 
       try {
         await this.loader.loadAll()

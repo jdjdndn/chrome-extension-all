@@ -19,7 +19,7 @@
  * await ScriptLoader.waitFor(['EventBus', 'MessagingUtils']);
  */
 
-;(function () {
+(function () {
   'use strict'
 
   // 防止重复加载
@@ -242,7 +242,7 @@
    * 日志输出
    */
   function log(message, level = 'info') {
-    if (!state.debugMode && level !== 'error') return
+    if (!state.debugMode && level !== 'error') {return}
 
     const prefix = '[ScriptLoader]'
     switch (level) {
@@ -307,7 +307,7 @@
        * 执行队列中的所有初始化调用
        */
       async process() {
-        if (isProcessing || queue.length === 0) return
+        if (isProcessing || queue.length === 0) {return}
 
         isProcessing = true
         log(`队列 "${queueName}" 开始处理，共 ${queue.length} 项`)

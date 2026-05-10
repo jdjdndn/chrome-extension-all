@@ -90,7 +90,7 @@ function initRedirectLinks() {
     for (let i = 0; i < 3; i++) {
       const prev = decoded
       decoded = decodeURIComponent(decoded)
-      if (prev === decoded) break
+      if (prev === decoded) {break}
     }
     return decoded
   }
@@ -123,7 +123,7 @@ function initRedirectLinks() {
    * 从 URL 中提取真实目标链接
    */
   function extractTargetUrl(href) {
-    if (!href) return null
+    if (!href) {return null}
 
     try {
       const urlObj = new URL(href)
@@ -135,7 +135,7 @@ function initRedirectLinks() {
           try {
             const decoded = decodeUrlValue(value)
             const url = extractUrlFromString(decoded)
-            if (url) return url
+            if (url) {return url}
           } catch (e) {
             /* 解码失败，继续 */
           }
@@ -168,7 +168,7 @@ function initRedirectLinks() {
 
     links.forEach((link) => {
       link.setAttribute(PROCESSED_ATTR, 'true')
-      if (!link || !link.host) return
+      if (!link || !link.host) {return}
 
       // 白名单域名跳过替换
       if (
@@ -176,12 +176,12 @@ function initRedirectLinks() {
           (domain) => link.hostname === domain || link.hostname.endsWith('.' + domain)
         )
       )
-        return
+        {return}
 
       // 匹配特定链接模式，设置新窗口打开
       const shouldOpenBlank = LINK_PATTERNS.some((pattern) => {
-        if (typeof pattern === 'string') return link.href.includes(pattern)
-        if (pattern instanceof RegExp) return pattern.test(link.href)
+        if (typeof pattern === 'string') {return link.href.includes(pattern)}
+        if (pattern instanceof RegExp) {return pattern.test(link.href)}
         return false
       })
 

@@ -541,7 +541,7 @@
       let evictSize = 0
 
       for (const [key, entry] of state._compressCache.entries()) {
-        if (!entry || entry.skip) continue
+        if (!entry || entry.skip) {continue}
 
         const accessCount = entry.accessCount || 1
         const age = now - (entry.lastAccess || entry.timestamp || now)
@@ -1829,7 +1829,7 @@
    * ִ�п�����ͼƬ���
    */
   function _doRecheckVisibleLazyImages() {
-    const lazyImages = document.querySelectorAll('img[data-lazySrc]:not([data-lazyLoaded="true"])')
+    const lazyImages = document.querySelectorAll('img[data-lazy-src]:not([data-lazy-loaded="true"])')
 
     lazyImages.forEach((img) => {
       // ���Ԫ���Ƿ�ɼ�
@@ -4215,7 +4215,7 @@
 
     preloadNextResources(count) {
       const viewportHeight = window.innerHeight
-      const images = document.querySelectorAll('img[data-src], img[data-lazySrc], img[src]')
+      const images = document.querySelectorAll('img[data-src], img[data-lazy-src], img[src]')
       let preloaded = 0
 
       for (const img of images) {
@@ -4237,7 +4237,7 @@
       if (!article) {return}
 
       let count = 0
-      const images = article.querySelectorAll('img[data-src], img[data-lazySrc], img[src]')
+      const images = article.querySelectorAll('img[data-src], img[data-lazysrc], img[src]')
       images.forEach((img) => {
         if (count >= 10) {return}
         const url = img.dataset.lazySrc || img.dataset.src || img.src
@@ -4431,6 +4431,12 @@
 
     // ��ʼ������仯����
     _initNetworkChangeListener()
+    // 初始化完成后立即检查视口内的懒加载图片
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        _doRecheckVisibleLazyImages()
+      }, 100)
+    })
 
     // 4. CDN����̽�⣨�첽����������- ����̽��ҳ��ʹ�õ� CDN
     if (window.CDNMappings?.probeAllCDNs) {
@@ -4517,7 +4523,7 @@
     document.addEventListener(
       'click',
       (e) => {
-        const img = e.target.closest('img[data-_raLazyLoad="1"], img[data-lazySrc]')
+        const img = e.target.closest('img[data--ra-lazy-load="1"], img[data-lazy-src]')
         if (!img) {return}
 
         // ͳһ��� lazySrc �� src
@@ -4638,6 +4644,34 @@
 
   // ========== ��Ϣ���� ==========
 
+  // ========== CDN 重定向失败回退 ==========
+  function _handleCDNFallback(originalUrl, failedUrl, reason) {
+    addLog('warn', 'cdn', 'fallback', { originalUrl, failedUrl, reason })
+
+    // 查找使用失败 URL 的 stylesheet link 元素
+    const links = document.querySelectorAll('link[rel="stylesheet"]')
+    for (const link of links) {
+      if (link.href === failedUrl) {
+        // 创建新的 link 元素使用原始 URL
+        const newLink = document.createElement('link')
+        newLink.rel = 'stylesheet'
+        newLink.href = originalUrl
+        newLink.dataset._raFallback = '1'
+        newLink.dataset._raOriginalFailed = failedUrl
+
+        // 插入到失败的 link 之后
+        link.parentNode?.insertBefore(newLink, link.nextSibling)
+
+        // 移除失败的 link
+        link.remove()
+
+        addLog('info', 'cdn', 'fallback_success', { originalUrl, failedUrl })
+        state.stats.fallbacks = (state.stats.fallbacks || 0) + 1
+        break
+      }
+    }
+  }
+
   function _initMessageListener() {
     chrome.runtime?.onMessage?.addListener((message, sender, sendResponse) => {
       if (message.type === 'RESOURCE_ACCELERATOR_GET_STATS') {
@@ -4689,6 +4723,11 @@
         aggregateDailyStats(message.days || 7).then((data) => {
           sendResponse({ success: true, data })
         })
+        return true
+      }
+      // CDN 重定向失败回退
+      if (message.type === 'CDN_REDIRECT_FALLBACK') {
+        _handleCDNFallback(message.originalUrl, message.failedUrl, message.statusCode || message.error)
         return true
       }
     })
@@ -5008,3 +5047,4 @@
   // ������ʼ����ͬ����
   init()
 })()
+

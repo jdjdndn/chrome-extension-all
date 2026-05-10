@@ -1,7 +1,7 @@
 // ========== 规则导入导出管理模块 ==========
 // 支持规则批量导入导出和云同步
 
-;(function () {
+(function () {
   'use strict'
 
   if (window.RuleManager) {
@@ -41,7 +41,7 @@
      * 初始化
      */
     async init(options = {}) {
-      if (this.initialized) return true
+      if (this.initialized) {return true}
 
       this.config = { ...this.config, ...options }
       await this._loadFromStorage()
@@ -186,7 +186,7 @@
      * 删除规则
      */
     async deleteRule(id) {
-      if (!this.rules.has(id)) return false
+      if (!this.rules.has(id)) {return false}
 
       this.rules.delete(id)
       await this._saveToStorage()
@@ -231,8 +231,8 @@
      * 验证规则
      */
     _validateRule(rule) {
-      if (!rule || typeof rule !== 'object') return false
-      if (rule.type && !['selector', 'keyword', 'domain'].includes(rule.type)) return false
+      if (!rule || typeof rule !== 'object') {return false}
+      if (rule.type && !['selector', 'keyword', 'domain'].includes(rule.type)) {return false}
       return true
     },
 
@@ -264,7 +264,7 @@
      * 从分组移除
      */
     async removeFromGroup(groupName, ruleIds) {
-      if (!this.groups[groupName]) return []
+      if (!this.groups[groupName]) {return []}
 
       const ids = Array.isArray(ruleIds) ? ruleIds : [ruleIds]
       this.groups[groupName] = this.groups[groupName].filter((id) => !ids.includes(id))
@@ -299,7 +299,7 @@
       if (groups) {
         const groupIds = new Set()
         for (const groupName of groups) {
-          ;(this.groups[groupName] || []).forEach((id) => groupIds.add(id))
+          (this.groups[groupName] || []).forEach((id) => groupIds.add(id))
         }
         rules = rules.filter((r) => groupIds.has(r.id))
       }

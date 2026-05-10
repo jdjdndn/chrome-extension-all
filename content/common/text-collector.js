@@ -33,7 +33,7 @@ if (window.TextCollectorLoaded) {
     }
 
     init() {
-      if (document.getElementById(CONTAINER_ID)) return
+      if (document.getElementById(CONTAINER_ID)) {return}
       this.createUI()
       this.bindEvents()
       this.registerToPositionManager()
@@ -125,7 +125,7 @@ if (window.TextCollectorLoaded) {
     }
 
     injectStyles() {
-      if (document.getElementById('yc-text-collector-styles')) return
+      if (document.getElementById('yc-text-collector-styles')) {return}
 
       const style = document.createElement('style')
       style.id = 'yc-text-collector-styles'
@@ -621,7 +621,7 @@ if (window.TextCollectorLoaded) {
 
       header.addEventListener('mousedown', (e) => {
         // 忽略按钮点击
-        if (e.target.closest('button')) return
+        if (e.target.closest('button')) {return}
 
         this.isDragging = true
         this.dragStart = { x: e.clientX, y: e.clientY }
@@ -643,7 +643,7 @@ if (window.TextCollectorLoaded) {
       })
 
       document.addEventListener('mousemove', (e) => {
-        if (!this.isDragging) return
+        if (!this.isDragging) {return}
 
         const dx = this.dragStart.x - e.clientX
         const dy = e.clientY - this.dragStart.y
@@ -693,7 +693,7 @@ if (window.TextCollectorLoaded) {
     // 确保面板在可视区域内
     ensurePanelInViewport() {
       const panel = document.getElementById(PANEL_ID)
-      if (!panel || panel.classList.contains('yc-hidden')) return
+      if (!panel || panel.classList.contains('yc-hidden')) {return}
 
       const rect = panel.getBoundingClientRect()
       const currentRight = parseInt(panel.style.right) || 70
@@ -776,24 +776,24 @@ if (window.TextCollectorLoaded) {
 
     // 元素选择处理
     handleMouseOver(e) {
-      if (this.selectionMode !== 'element') return
-      if (!e.target || typeof e.target.closest !== 'function') return
-      if (e.target.closest(`#${CONTAINER_ID}`)) return
+      if (this.selectionMode !== 'element') {return}
+      if (!e.target || typeof e.target.closest !== 'function') {return}
+      if (e.target.closest(`#${CONTAINER_ID}`)) {return}
 
       e.target.classList.add('yc-highlight-element')
     }
 
     handleMouseOut(e) {
-      if (this.selectionMode !== 'element') return
-      if (!e.target || typeof e.target.classList?.remove !== 'function') return
+      if (this.selectionMode !== 'element') {return}
+      if (!e.target || typeof e.target.classList?.remove !== 'function') {return}
 
       e.target.classList.remove('yc-highlight-element')
     }
 
     handleClick(e) {
-      if (this.selectionMode !== 'element') return
-      if (!e.target || typeof e.target.closest !== 'function') return
-      if (e.target.closest(`#${CONTAINER_ID}`)) return
+      if (this.selectionMode !== 'element') {return}
+      if (!e.target || typeof e.target.closest !== 'function') {return}
+      if (e.target.closest(`#${CONTAINER_ID}`)) {return}
 
       const text = e.target.innerText?.trim()
       if (text) {
@@ -806,8 +806,8 @@ if (window.TextCollectorLoaded) {
 
     // 区域选择处理
     handleRegionStart(e) {
-      if (this.selectionMode !== 'region') return
-      if (e.target.closest(`#${CONTAINER_ID}`)) return
+      if (this.selectionMode !== 'region') {return}
+      if (e.target.closest(`#${CONTAINER_ID}`)) {return}
 
       this.isSelecting = true
       this.selectionStart = { x: e.clientX, y: e.clientY }
@@ -821,7 +821,7 @@ if (window.TextCollectorLoaded) {
     }
 
     handleRegionMove(e) {
-      if (!this.isSelecting || this.selectionMode !== 'region') return
+      if (!this.isSelecting || this.selectionMode !== 'region') {return}
 
       const box = document.getElementById(SELECTION_BOX_ID)
       const x = Math.min(e.clientX, this.selectionStart.x)
@@ -836,7 +836,7 @@ if (window.TextCollectorLoaded) {
     }
 
     handleRegionEnd(e) {
-      if (!this.isSelecting || this.selectionMode !== 'region') return
+      if (!this.isSelecting || this.selectionMode !== 'region') {return}
 
       this.isSelecting = false
       const box = document.getElementById(SELECTION_BOX_ID)
@@ -876,7 +876,7 @@ if (window.TextCollectorLoaded) {
           nodeRect.bottom > rect.top
         ) {
           const text = node.textContent.trim()
-          if (text) texts.push(text)
+          if (text) {texts.push(text)}
         }
       }
 
@@ -894,7 +894,7 @@ if (window.TextCollectorLoaded) {
     }
 
     collectText(text, source = 'text') {
-      if (!text || text.length < 2) return
+      if (!text || text.length < 2) {return}
 
       // 去重：检查是否已存在相同文本
       const normalizedText = text.trim().substring(0, 1000)
@@ -1025,7 +1025,7 @@ if (window.TextCollectorLoaded) {
     }
 
     clear() {
-      if (this.collectedItems.length === 0) return
+      if (this.collectedItems.length === 0) {return}
 
       this.collectedItems = []
       this.updateUI()
@@ -1034,7 +1034,7 @@ if (window.TextCollectorLoaded) {
 
     showToast(message) {
       const existing = document.querySelector('.yc-toast')
-      if (existing) existing.remove()
+      if (existing) {existing.remove()}
 
       const toast = document.createElement('div')
       toast.className = 'yc-toast'

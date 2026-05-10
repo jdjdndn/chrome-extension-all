@@ -2,7 +2,7 @@
  * 高亮管理模块
  * 负责元素高亮显示和管理
  */
-;(function () {
+(function () {
   'use strict'
 
   class Highlighter {
@@ -94,7 +94,7 @@
     showHover(element) {
       this._removeHover()
 
-      if (!element) return
+      if (!element) {return}
 
       const rect = element.getBoundingClientRect()
       const overlay = this._createOverlay(rect, 'hover')
@@ -116,7 +116,7 @@
      * 添加选中高亮
      */
     addSelected(element, pickerUid, index) {
-      if (this.overlays.has(pickerUid)) return
+      if (this.overlays.has(pickerUid)) {return}
 
       const rect = element.getBoundingClientRect()
       const overlay = this._createOverlay(rect, 'selected')
@@ -175,7 +175,7 @@
         const rect = element.getBoundingClientRect()
         const overlay = this._createOverlay(rect, 'preview')
         this.container.appendChild(overlay)
-        if (!this._previews) this._previews = []
+        if (!this._previews) {this._previews = []}
         this._previews.push(overlay)
       })
     }
@@ -225,8 +225,8 @@
       this.clearAll()
       this.clearPreview()
       this.hideHover()
-      if (this.container) this.container.remove()
-      if (this.style) this.style.remove()
+      if (this.container) {this.container.remove()}
+      if (this.style) {this.style.remove()}
     }
   }
 

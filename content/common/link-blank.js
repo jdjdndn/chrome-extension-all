@@ -43,22 +43,22 @@ function initLinkBlank() {
 
   function shouldSkip(anchor) {
     // 已设置 target
-    if (anchor.target === '_blank') return true
+    if (anchor.target === '_blank') {return true}
     // 标记为不处理
-    if (anchor.hasAttribute(NO_TARGET_ATTR)) return true
+    if (anchor.hasAttribute(NO_TARGET_ATTR)) {return true}
     // 没有有效 href
-    if (!anchor.href || anchor.href.startsWith('javascript:')) return true
+    if (!anchor.href || anchor.href.startsWith('javascript:')) {return true}
     // 同源链接
-    if (!isCrossOrigin(anchor)) return true
+    if (!isCrossOrigin(anchor)) {return true}
     return false
   }
 
   function processAnchors(anchors) {
     anchors.forEach((anchor) => {
-      if (anchor.hasAttribute(PROCESSED_ATTR)) return
+      if (anchor.hasAttribute(PROCESSED_ATTR)) {return}
       anchor.setAttribute(PROCESSED_ATTR, 'true')
 
-      if (shouldSkip(anchor)) return
+      if (shouldSkip(anchor)) {return}
 
       // 检查父级是否有多个链接（导航菜单）
       let parent = anchor.parentElement

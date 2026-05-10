@@ -93,18 +93,18 @@ if (window.ListLinkSplitViewLoaded) {
      */
     handleClick(e) {
       // 检查是否按住 Alt 键
-      if (!e.altKey) return
+      if (!e.altKey) {return}
 
       // 获取点击的链接
       const link = e.target.closest('a[href]')
-      if (!link) return
+      if (!link) {return}
 
       console.log('[列表链接拆分视图] Alt+点击检测到，链接:', link.href)
 
       // 检查是否是列表中的链接
       const isList = this.isListLink(link)
       console.log('[列表链接拆分视图] 是否列表链接:', isList)
-      if (!isList) return
+      if (!isList) {return}
 
       // 阻止默认行为
       e.preventDefault()
@@ -194,7 +194,7 @@ if (window.ListLinkSplitViewLoaded) {
 
       // 检查链接是否在重复结构中（列表项的特征）
       const parent = link.parentElement
-      if (!parent) return true // 无法判断时默认允许
+      if (!parent) {return true} // 无法判断时默认允许
 
       // 向上查找可能的列表项容器
       let candidate = parent
@@ -284,15 +284,15 @@ if (window.ListLinkSplitViewLoaded) {
      */
     getSimilarSiblings(element) {
       const parent = element.parentElement
-      if (!parent) return []
+      if (!parent) {return []}
 
       const tagName = element.tagName
       const className = element.className
 
       // 查找相同标签和相似类名的兄弟元素
       const siblings = Array.from(parent.children).filter((child) => {
-        if (child === element) return false
-        if (child.tagName !== tagName) return false
+        if (child === element) {return false}
+        if (child.tagName !== tagName) {return false}
 
         // 检查类名相似度
         if (className && child.className) {

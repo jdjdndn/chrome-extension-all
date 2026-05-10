@@ -4,7 +4,7 @@
  * 仅在开发模式下使用
  */
 
-;(function () {
+(function () {
   // 检查是否在扩展环境中
   if (typeof chrome === 'undefined' || !chrome.alarms) {
     return
@@ -21,7 +21,7 @@
   async function checkForUpdates() {
     try {
       const response = await fetch(`${HOT_RELOAD_URL}/check-build?last=${lastBuildTimestamp}`)
-      if (!response.ok) return
+      if (!response.ok) {return}
 
       const data = await response.json()
 
@@ -43,7 +43,7 @@
 
   // 监听alarm
   chrome.alarms.onAlarm.addListener(async (alarm) => {
-    if (alarm.name !== ALARM_NAME) return
+    if (alarm.name !== ALARM_NAME) {return}
     await checkForUpdates()
   })
 

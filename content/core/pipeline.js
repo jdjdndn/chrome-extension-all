@@ -1,7 +1,7 @@
 // ========== 消息管道系统 ==========
 // 用于复杂流程的流水线处理
 
-;(function () {
+(function () {
   'use strict'
 
   if (window.Pipeline) {

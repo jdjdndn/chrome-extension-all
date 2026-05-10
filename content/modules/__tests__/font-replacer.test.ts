@@ -135,7 +135,7 @@ describe('FontReplacer', () => {
 
       const mockMatch = {
         name: 'Google Fonts',
-        cdnUrl: 'https://fonts.loli.net/css?family=Roboto',
+        cdnUrl: 'https://cdn.jsdelivr.net/css?family=Roboto',
       }
       ;(window.CDNMatchers.matchFont as any).mockReturnValue(mockMatch)
 
@@ -167,7 +167,7 @@ describe('FontReplacer', () => {
         configurable: true,
       })
       ;(window.CDNMatchers.matchFont as any).mockReturnValue({
-        cdnUrl: 'https://fonts.loli.net/test',
+        cdnUrl: 'https://cdn.jsdelivr.net/test',
       })
 
       replacer.processLink(link)
@@ -232,7 +232,7 @@ describe('FontReplacer', () => {
       link.rel = 'stylesheet'
       link.href = 'https://fonts.googleapis.com/test'
       ;(window.CDNMatchers.matchFont as any).mockReturnValue({
-        cdnUrl: 'https://fonts.loli.net/test',
+        cdnUrl: 'https://cdn.jsdelivr.net/test',
       })
 
       replacer.processLink(link)
@@ -247,7 +247,7 @@ describe('FontReplacer', () => {
       link.rel = 'stylesheet'
       link.href = 'https://fonts.googleapis.com/test'
       ;(window.CDNMatchers.matchFont as any).mockReturnValue({
-        cdnUrl: 'https://fonts.loli.net/test',
+        cdnUrl: 'https://cdn.jsdelivr.net/test',
       })
 
       replacer.processLink(link)

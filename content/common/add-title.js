@@ -57,13 +57,13 @@ function initAddTitle() {
     }
 
     // 看不见的不处理
-    if (dom.offsetWidth === 0) return false
+    if (dom.offsetWidth === 0) {return false}
 
     // 获取文本内容的实际尺寸
     const cloneDom = hasAbsChild ? dom.cloneNode(true) : dom
     // 移除绝对定位的子元素（如果有）
     if (hasAbsChild) {
-      ;[...cloneDom.childNodes].forEach((node) => {
+      [...cloneDom.childNodes].forEach((node) => {
         if (node.nodeType === 1 && getComputedStyle(node).position === 'absolute') {
           node.remove()
         }
@@ -106,28 +106,28 @@ function initAddTitle() {
 
   // 处理 a 链接
   function addTitleToAnchor(anchor) {
-    if (!anchor || anchor.hasAttribute(PROCESSED_ATTR)) return
+    if (!anchor || anchor.hasAttribute(PROCESSED_ATTR)) {return}
     anchor.setAttribute(PROCESSED_ATTR, 'true')
 
     const text = anchor.textContent.trim()
-    if (!text) return
+    if (!text) {return}
 
     anchor.title = text
   }
 
   // 处理溢出元素
   function addTitleToOverflowElement(textNode) {
-    if (!textNode || textNode.nodeType !== Node.TEXT_NODE) return
+    if (!textNode || textNode.nodeType !== Node.TEXT_NODE) {return}
 
     const dom = textNode.parentNode
-    if (!dom || dom.hasAttribute(PROCESSED_ATTR) || dom.title) return
+    if (!dom || dom.hasAttribute(PROCESSED_ATTR) || dom.title) {return}
 
     const text = textNode.textContent.trim()
-    if (!text) return
+    if (!text) {return}
 
     // 排除不需要处理的标签
     const excludedTags = ['SCRIPT', 'STYLE', 'TEXTAREA', 'INPUT', 'SELECT', 'A']
-    if (excludedTags.includes(dom.tagName)) return
+    if (excludedTags.includes(dom.tagName)) {return}
 
     // 检查是否溢出
     if (isTextOverflow(dom)) {

@@ -1,7 +1,7 @@
 // ========== 配置管理器 ==========
 // 统一管理所有配置，支持导入导出、版本控制、默认值
 
-;(function () {
+(function () {
   'use strict'
 
   if (window.ConfigManager) {
@@ -45,7 +45,7 @@
      * @param {object} options - 配置选项
      */
     async init(options = {}) {
-      if (this.initialized) return true
+      if (this.initialized) {return true}
 
       const {
         storageKey = 'appConfig',
@@ -129,7 +129,7 @@
      * @returns {any}
      */
     get(path, defaultValue = undefined) {
-      if (!path) return this.config
+      if (!path) {return this.config}
 
       const keys = path.split('.')
       let value = this.config
@@ -166,7 +166,7 @@
       const keys = path.split('.')
       const lastKey = keys.pop()
       const target = keys.reduce((obj, key) => {
-        if (!obj[key]) obj[key] = {}
+        if (!obj[key]) {obj[key] = {}}
         return obj[key]
       }, this.config)
 
@@ -205,7 +205,7 @@
      */
     _validate(path, value) {
       const schema = this.schemas[path]
-      if (!schema) return true
+      if (!schema) {return true}
 
       // 类型验证
       if (schema.type) {
@@ -222,8 +222,8 @@
 
       // 范围验证
       if (typeof value === 'number') {
-        if (schema.min !== undefined && value < schema.min) return false
-        if (schema.max !== undefined && value > schema.max) return false
+        if (schema.min !== undefined && value < schema.min) {return false}
+        if (schema.max !== undefined && value > schema.max) {return false}
       }
 
       // 自定义验证
@@ -303,7 +303,7 @@
      */
     async rollback(steps = 1) {
       const historyIndex = this.history.length - steps
-      if (historyIndex < 0) return false
+      if (historyIndex < 0) {return false}
 
       const targetHistory = this.history.slice(0, historyIndex)
       this.history = []
@@ -416,7 +416,7 @@
       let value = this.defaults
 
       for (const key of keys) {
-        if (value === null || value === undefined) return undefined
+        if (value === null || value === undefined) {return undefined}
         value = value[key]
       }
 

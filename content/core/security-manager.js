@@ -1,7 +1,7 @@
 // ========== 安全管理模块 ==========
 // 加密存储敏感数据（如 Token）
 
-;(function () {
+(function () {
   'use strict'
 
   if (window.SecurityManager) {

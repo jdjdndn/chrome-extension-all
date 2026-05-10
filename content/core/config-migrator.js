@@ -1,7 +1,7 @@
 // ========== 配置版本迁移模块 ==========
 // 自动迁移旧版本配置到新版本
 
-;(function () {
+(function () {
   'use strict'
 
   if (window.ConfigMigrator) {
@@ -106,8 +106,8 @@
       for (let i = 0; i < 3; i++) {
         const aVal = aParts[i] || 0
         const bVal = bParts[i] || 0
-        if (aVal > bVal) return 1
-        if (aVal < bVal) return -1
+        if (aVal > bVal) {return 1}
+        if (aVal < bVal) {return -1}
       }
       return 0
     },

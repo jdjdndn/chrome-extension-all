@@ -27,7 +27,7 @@ chrome.devtools.panels.create(
   'Tool-info',
   null, // Use default icon
   'devtools/console.html',
-  function (panel) {
+  (panel) => {
     console.log('Console panel created')
   }
 )
@@ -37,7 +37,7 @@ chrome.devtools.panels.create(
   'DevTools Tools',
   null, // Use default icon
   'devtools/tools-panel.html',
-  function (panel) {
+  (panel) => {
     console.log('DevTools Tools panel created')
   }
 )

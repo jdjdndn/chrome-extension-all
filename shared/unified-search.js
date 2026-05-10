@@ -198,18 +198,18 @@ const UnifiedSearch = {
         const url = (item.url || '').toLowerCase()
 
         // 标题完全匹配
-        if (title === lowerQuery) score += 100
+        if (title === lowerQuery) {score += 100}
         // 标题开头匹配
-        else if (title.startsWith(lowerQuery)) score += 80
+        else if (title.startsWith(lowerQuery)) {score += 80}
         // 标题包含
-        else if (title.includes(lowerQuery)) score += 60
+        else if (title.includes(lowerQuery)) {score += 60}
 
         // URL匹配
-        if (url.includes(lowerQuery)) score += 40
+        if (url.includes(lowerQuery)) {score += 40}
 
         // 访问次数/匹配次数加权
-        if (item.visitCount) score += Math.min(item.visitCount, 20)
-        if (item.matchCount) score += Math.min(item.matchCount * 5, 25)
+        if (item.visitCount) {score += Math.min(item.visitCount, 20)}
+        if (item.matchCount) {score += Math.min(item.matchCount * 5, 25)}
 
         allResults.push({ ...item, source, score })
       })

@@ -122,12 +122,12 @@ function generateSelector(data) {
 
 // 生成合并选择器
 function generateMergedSelector(elements) {
-  if (!elements || elements.length === 0) return null
-  if (elements.length === 1) return generateSelector(elements[0])
+  if (!elements || elements.length === 0) {return null}
+  if (elements.length === 1) {return generateSelector(elements[0])}
 
   // 找出共同特征
   const common = findCommonFeatures(elements)
-  if (!common) return null
+  if (!common) {return null}
 
   // 生成候选选择器
   const candidates = []
@@ -236,7 +236,7 @@ function escapeCss(str) {
 }
 
 function findSemanticClass(classes) {
-  if (!classes || classes.length === 0) return null
+  if (!classes || classes.length === 0) {return null}
 
   const semantic = classes.find((c) =>
     /^(btn|button|link|nav|menu|item|card|list|form|input|container|wrapper|header|footer|content|title|text|icon)/i.test(
@@ -247,7 +247,7 @@ function findSemanticClass(classes) {
 }
 
 function findStableAttribute(attributes) {
-  if (!attributes || attributes.length === 0) return null
+  if (!attributes || attributes.length === 0) {return null}
 
   return attributes.find(
     (attr) =>
@@ -265,7 +265,7 @@ function buildPathSelector(path, tag, nthOfType) {
 }
 
 function findCommonFeatures(elements) {
-  if (!elements || elements.length === 0) return null
+  if (!elements || elements.length === 0) {return null}
 
   const common = {
     tag: null,
@@ -275,7 +275,7 @@ function findCommonFeatures(elements) {
 
   // 共同标签
   const tags = new Set(elements.map((el) => el.tag))
-  if (tags.size === 1) common.tag = [...tags][0]
+  if (tags.size === 1) {common.tag = [...tags][0]}
 
   // 共同 class
   if (elements[0].classes && elements[0].classes.length > 0) {

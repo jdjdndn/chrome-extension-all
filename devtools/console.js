@@ -82,7 +82,7 @@ function connectToBackground() {
     return null
   }
 
-  if (backgroundPort) return backgroundPort
+  if (backgroundPort) {return backgroundPort}
 
   try {
     backgroundPort = chrome.runtime.connect({ name: 'devtools-panel' })
@@ -106,7 +106,7 @@ function connectToBackground() {
 
       console.log('[DevTools] Port 连接断开，准备重连...')
       // 延迟重连
-      if (portReconnectTimer) clearTimeout(portReconnectTimer)
+      if (portReconnectTimer) {clearTimeout(portReconnectTimer)}
       portReconnectTimer = setTimeout(connectToBackground, 1000)
     })
 
@@ -124,7 +124,7 @@ function connectToBackground() {
   } catch (error) {
     console.error('[DevTools] Port 连接失败:', error)
     // 延迟重试
-    if (portReconnectTimer) clearTimeout(portReconnectTimer)
+    if (portReconnectTimer) {clearTimeout(portReconnectTimer)}
     portReconnectTimer = setTimeout(connectToBackground, 2000)
     return null
   }
@@ -212,7 +212,7 @@ const LINE_LIMIT = 8
 let itemIdCounter = 0
 
 // 存储数据结构
-let storageSections = {
+const storageSections = {
   'storage-local': { title: '本地存储', icon: '💾', type: 'local', data: null },
   'storage-sync': { title: '同步存储', icon: '🔄', type: 'sync', data: null },
   'storage-session': { title: '会话存储', icon: '⚡', type: 'session', data: null },
@@ -344,7 +344,7 @@ const copyMergedSelectorBtn = document.getElementById('copy-merged-selector-btn'
 const applyHideBtn = document.getElementById('apply-hide-btn')
 
 // 批量选择状态
-let batchPickerState = {
+const batchPickerState = {
   isActive: false,
   selectedElements: [], // { selector, tagName, id, className }
   mergedSelector: '', // 匹配所有已选元素的合并选择器
@@ -631,7 +631,7 @@ function updateSelectedElementsUI() {
 // 更新选择器行列表显示
 function updateSelectorOptionsDisplay() {
   const container = document.getElementById('selector-options-container')
-  if (!container) return
+  if (!container) {return}
 
   const checkedElements = []
   batchSelectedList.querySelectorAll('.batch-item-checkbox:checked').forEach((checkbox) => {
@@ -688,7 +688,7 @@ function updateSelectorOptionsDisplay() {
   // 点击行复制
   container.querySelectorAll('.selector-line').forEach((el) => {
     el.addEventListener('click', async (e) => {
-      if (e.target.closest('.selector-line-copy')) return
+      if (e.target.closest('.selector-line-copy')) {return}
       const index = parseInt(el.dataset.index)
       const selector = lines[index]?.selector
       if (selector) {
@@ -716,7 +716,7 @@ function updateSelectorOptionsDisplay() {
 async function querySelectorLineMatches(lines) {
   for (let i = 0; i < lines.length; i++) {
     const countEl = document.querySelector(`.selector-line-match[data-index="${i}"]`)
-    if (!countEl) continue
+    if (!countEl) {continue}
 
     const count = await getSelectorMatchCount(lines[i].selector)
 
@@ -803,7 +803,7 @@ function setupHighlightCleanup() {
   window.addEventListener('beforeunload', clearHighlight)
   // 页面隐藏时清理
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) clearHighlight()
+    if (document.hidden) {clearHighlight()}
   })
   // 失去焦点时清理
   window.addEventListener('blur', clearHighlight)
@@ -854,7 +854,7 @@ function removeStatePseudoClasses(selector) {
  * 每个选项都包含精确性验证
  */
 function generateSelectorLines(elements) {
-  if (!elements || elements.length === 0) return []
+  if (!elements || elements.length === 0) {return []}
 
   const lines = []
   const seenSelectors = new Set()
@@ -892,10 +892,10 @@ function generateSelectorLines(elements) {
 // 获取所有当前显示的选择器（逗号分隔合并）
 function getAllCombinedSelector() {
   const container = document.getElementById('selector-options-container')
-  if (!container) return null
+  if (!container) {return null}
 
   const codeEls = container.querySelectorAll('.selector-line-text')
-  if (codeEls.length === 0) return null
+  if (codeEls.length === 0) {return null}
 
   const selectors = [...codeEls].map((el) => el.textContent)
   return selectors.join(', ')
@@ -908,7 +908,7 @@ function parseSelectorParts(selector) {
   // 处理 :is() 中的逗号，避免被错误分割
   const isPattern = /:is\([^)]+\)/g
   const isMatches = []
-  let temp = selector.replace(isPattern, (match) => {
+  const temp = selector.replace(isPattern, (match) => {
     isMatches.push(match)
     return `<<IS${isMatches.length - 1}>>`
   })
@@ -930,15 +930,15 @@ function parseSelectorParts(selector) {
  */
 function isEssentialPart(part) {
   // 有 :nth-child(n) 其中 n > 1
-  if (/:nth-child\([2-9]\d*\)/.test(part)) return true
+  if (/:nth-child\([2-9]\d*\)/.test(part)) {return true}
   // 有 ID
-  if (/#[a-zA-Z]/.test(part)) return true
+  if (/#[a-zA-Z]/.test(part)) {return true}
   // 有类名
-  if (/\.[a-zA-Z]/.test(part)) return true
+  if (/\.[a-zA-Z]/.test(part)) {return true}
   // 有属性选择器
-  if (/\[[^\]]+\]/.test(part)) return true
+  if (/\[[^\]]+\]/.test(part)) {return true}
   // 有 :is()
-  if (/:is\(/.test(part)) return true
+  if (/:is\(/.test(part)) {return true}
 
   return false
 }
@@ -948,7 +948,7 @@ function isEssentialPart(part) {
  * 找出所有元素的共同祖先，然后使用后代选择器
  */
 function tryCommonAncestorMerge(elements) {
-  if (elements.length < 2) return null
+  if (elements.length < 2) {return null}
 
   const selectors = elements.map((el) => el.selector)
   const pathsArray = selectors.map((s) => s.split(/\s*>\s*/))
@@ -968,7 +968,7 @@ function tryCommonAncestorMerge(elements) {
   }
 
   // 如果没有共同前缀，返回 null
-  if (commonPrefixLength === 0) return null
+  if (commonPrefixLength === 0) {return null}
 
   // 构建共同祖先选择器
   const ancestorParts = pathsArray[0].slice(0, commonPrefixLength)
@@ -1001,7 +1001,7 @@ function tryCommonAncestorMerge(elements) {
  * 尝试合并后代选择器
  */
 function tryMergeDescendants(descendantParts) {
-  if (descendantParts.length < 2) return null
+  if (descendantParts.length < 2) {return null}
 
   // 检查第一层是否可以合并
   const firstLevel = descendantParts.map((d) => d[0])
@@ -1053,10 +1053,10 @@ function tryMergeLayerByParts(parts) {
     // 找出不同的部分
     for (const part of parsed) {
       const diff = []
-      if (part.id) diff.push(`#${part.id}`)
-      if (part.classes?.length > 0) diff.push(part.classes.map((c) => `.${c}`).join(''))
-      if (part.nthChild && part.nthChild !== 1) diff.push(`:nth-child(${part.nthChild})`)
-      if (diff.length > 0) differences.push(diff.join(''))
+      if (part.id) {diff.push(`#${part.id}`)}
+      if (part.classes?.length > 0) {diff.push(part.classes.map((c) => `.${c}`).join(''))}
+      if (part.nthChild && part.nthChild !== 1) {diff.push(`:nth-child(${part.nthChild})`)}
+      if (diff.length > 0) {differences.push(diff.join(''))}
     }
 
     if (differences.length > 0 && differences.length <= 5) {
@@ -1077,7 +1077,7 @@ function tryMergeLayerByParts(parts) {
  * 增强版：支持路径分析、确定性属性过滤
  */
 function tryIsMerge(elements) {
-  if (elements.length < 2) return null
+  if (elements.length < 2) {return null}
 
   // 确定性属性白名单（用于合并）
   const STABLE_ATTRS = new Set([
@@ -1109,7 +1109,7 @@ function tryIsMerge(elements) {
   // 提取每个元素的特征选择器
   const featureSelectors = elements.map((el) => {
     // 优先使用 ID
-    if (el.id) return '#' + CSS.escape(el.id)
+    if (el.id) {return '#' + CSS.escape(el.id)}
 
     // 使用类名
     if (el.className) {
@@ -1181,11 +1181,11 @@ function tryIsMerge(elements) {
  * 尝试使用共同类名合并
  */
 function tryCommonClassMerge(elements) {
-  if (elements.length < 2) return null
+  if (elements.length < 2) {return null}
 
   // 获取所有元素的类名
   const allClasses = elements.map((el) => {
-    if (!el.className) return []
+    if (!el.className) {return []}
     return el.className
       .split(' ')
       .filter(
@@ -1194,7 +1194,7 @@ function tryCommonClassMerge(elements) {
   })
 
   // 找出共同类名
-  if (allClasses.length === 0 || allClasses[0].length === 0) return null
+  if (allClasses.length === 0 || allClasses[0].length === 0) {return null}
 
   const commonClasses = allClasses[0].filter((cls) =>
     allClasses.every((classes) => classes.includes(cls))
@@ -1284,7 +1284,7 @@ async function getCheckedSelectors() {
     }
   })
 
-  if (checkedElements.length === 0) return []
+  if (checkedElements.length === 0) {return []}
   return checkedElements.map((el) => el.selector)
 }
 
@@ -1555,7 +1555,7 @@ async function initBatchPicker() {
   document.addEventListener('keydown', (e) => {
     // 只在批量选择区域可见时响应
     const batchInfo = document.getElementById('batch-selected-info')
-    if (!batchInfo || batchInfo.style.display === 'none') return
+    if (!batchInfo || batchInfo.style.display === 'none') {return}
 
     // Ctrl+A: 全选
     if (e.ctrlKey && e.key === 'a') {
@@ -1610,9 +1610,9 @@ function escapeHtml(text) {
 
 // 获取值类型样式类名
 function getValueTypeClass(value) {
-  if (typeof value === 'number') return 'number'
-  if (typeof value === 'boolean') return 'boolean'
-  if (typeof value === 'object' && value !== null) return 'object'
+  if (typeof value === 'number') {return 'number'}
+  if (typeof value === 'boolean') {return 'boolean'}
+  if (typeof value === 'object' && value !== null) {return 'object'}
   return ''
 }
 
@@ -1649,7 +1649,7 @@ function highlightJson(jsonStr) {
 
 // 渲染带行号和折叠功能的代码编辑器风格JSON
 function renderCodeEditor(jsonStr, maxLines = 10, editable = false) {
-  if (!jsonStr) return '<div class="code-editor-empty">(无数据)</div>'
+  if (!jsonStr) {return '<div class="code-editor-empty">(无数据)</div>'}
 
   let parsed
   let formatted
@@ -1730,7 +1730,7 @@ function renderCodeEditor(jsonStr, maxLines = 10, editable = false) {
 // 切换代码编辑器折叠状态
 window.toggleCodeEditor = function (id, collapse) {
   const container = document.getElementById(id)
-  if (!container) return
+  if (!container) {return}
 
   const preview = container.querySelector('.code-body-preview')
   const full = container.querySelector('.code-body-full')
@@ -1747,7 +1747,7 @@ window.toggleCodeEditor = function (id, collapse) {
 // 复制代码编辑器内容
 window.copyCodeEditor = function (id) {
   const container = document.getElementById(id)
-  if (!container) return
+  if (!container) {return}
 
   // 获取所有行内容
   const lines = container.querySelectorAll('.line-content')
@@ -1775,12 +1775,12 @@ let previewCounter = 0
 
 // 获取折叠值的预览文本
 function getPreviewText(value, maxLength = 50) {
-  if (value === null) return 'null'
-  if (value === undefined) return 'undefined'
-  if (typeof value === 'boolean') return String(value)
-  if (typeof value === 'number') return String(value)
+  if (value === null) {return 'null'}
+  if (value === undefined) {return 'undefined'}
+  if (typeof value === 'boolean') {return String(value)}
+  if (typeof value === 'number') {return String(value)}
   if (typeof value === 'string') {
-    if (value.length <= maxLength) return `"${value}"`
+    if (value.length <= maxLength) {return `"${value}"`}
     return `"${value.substring(0, maxLength)}…"`
   }
   if (Array.isArray(value)) {
@@ -1788,7 +1788,7 @@ function getPreviewText(value, maxLength = 50) {
   }
   if (typeof value === 'object') {
     const keys = Object.keys(value)
-    if (keys.length === 0) return '{}'
+    if (keys.length === 0) {return '{}'}
     return `{${keys.length}}`
   }
   return String(value)
@@ -2095,7 +2095,7 @@ function renderJsonPreviewValue(value, depth = 0, key = null) {
 
 // 切换JSON预览节点展开/折叠
 function toggleJsonPreviewNode(node) {
-  if (!node) return
+  if (!node) {return}
 
   const isCollapsed = node.classList.contains('collapsed')
   const toggle = node.querySelector(':scope > .json-node-content > .json-toggle')
@@ -2105,15 +2105,15 @@ function toggleJsonPreviewNode(node) {
   if (isCollapsed) {
     node.classList.remove('collapsed')
     node.classList.add('expanded')
-    if (toggle) toggle.classList.add('expanded')
-    if (collapsedView) collapsedView.style.display = 'none'
-    if (expandedView) expandedView.style.display = 'inline'
+    if (toggle) {toggle.classList.add('expanded')}
+    if (collapsedView) {collapsedView.style.display = 'none'}
+    if (expandedView) {expandedView.style.display = 'inline'}
   } else {
     node.classList.add('collapsed')
     node.classList.remove('expanded')
-    if (toggle) toggle.classList.remove('expanded')
-    if (collapsedView) collapsedView.style.display = 'inline'
-    if (expandedView) expandedView.style.display = 'none'
+    if (toggle) {toggle.classList.remove('expanded')}
+    if (collapsedView) {collapsedView.style.display = 'inline'}
+    if (expandedView) {expandedView.style.display = 'none'}
   }
 }
 
@@ -2185,7 +2185,7 @@ function setupJsonPreviewEvents(container) {
 
 // 渲染完整的JSON预览容器（Chrome DevTools风格）
 function renderJsonPreview(jsonStr) {
-  if (!jsonStr) return '<div class="json-preview-empty">(无数据)</div>'
+  if (!jsonStr) {return '<div class="json-preview-empty">(无数据)</div>'}
 
   let parsed
   let formattedStr = ''
@@ -2257,11 +2257,11 @@ function renderEditableJsonPreview(jsonStr, textareaId) {
 // Setup events for editable JSON preview
 function setupEditableJsonEvents(container, textareaId) {
   const textarea = document.getElementById(textareaId)
-  if (!textarea) return
+  if (!textarea) {return}
 
   container.addEventListener('click', (e) => {
     const target = e.target
-    if (!target.classList.contains('json-preview-btn')) return
+    if (!target.classList.contains('json-preview-btn')) {return}
 
     const action = target.dataset.action
     if (action === 'format') {
@@ -2338,7 +2338,7 @@ function renderEditableCodeEditor(value, textareaId, maxLines = 10) {
 // Toggle editable code view
 window.toggleEditableCode = function (wrapperId, textareaId, showPreview) {
   const wrapper = document.getElementById(wrapperId)
-  if (!wrapper) return
+  if (!wrapper) {return}
 
   const preview = wrapper.querySelector('.editable-preview')
   const full = wrapper.querySelector('.editable-full')
@@ -2351,7 +2351,7 @@ window.toggleEditableCode = function (wrapperId, textareaId, showPreview) {
     full.style.display = 'block'
     // Focus textarea
     const textarea = document.getElementById(textareaId)
-    if (textarea) textarea.focus()
+    if (textarea) {textarea.focus()}
   }
 }
 
@@ -2468,7 +2468,7 @@ outputEl.addEventListener('click', (e) => {
       const isCollapsed = treeItem.classList.contains('collapsed')
       e.target.textContent = isCollapsed ? '▶' : '▼'
       const children = treeItem.querySelector('.json-tree-children')
-      if (children) children.style.display = isCollapsed ? 'none' : 'block'
+      if (children) {children.style.display = isCollapsed ? 'none' : 'block'}
     }
     return
   }
@@ -2477,7 +2477,7 @@ outputEl.addEventListener('click', (e) => {
   const btn = e.target.closest('.toggle-btn')
   if (btn) {
     const container = btn.closest('.value-container, .object-value-wrapper, .json-tree-item')
-    if (!container) return
+    if (!container) {return}
 
     if (container.classList.contains('value-container')) {
       container.classList.toggle('expanded')
@@ -2487,10 +2487,10 @@ outputEl.addEventListener('click', (e) => {
     } else if (container.classList.contains('json-tree-item')) {
       container.classList.toggle('collapsed')
       const icon = container.querySelector('.json-tree-toggle')
-      if (icon) icon.textContent = container.classList.contains('collapsed') ? '▶' : '▼'
+      if (icon) {icon.textContent = container.classList.contains('collapsed') ? '▶' : '▼'}
       const children = container.querySelector('.json-tree-children')
       if (children)
-        children.style.display = container.classList.contains('collapsed') ? 'none' : 'block'
+        {children.style.display = container.classList.contains('collapsed') ? 'none' : 'block'}
     }
     return
   }
@@ -2560,7 +2560,7 @@ function syntaxHighlight(json) {
     .replace(/>/g, '&gt;')
     .replace(
       /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
-      function (match) {
+      (match) => {
         let cls = 'json-number'
         if (/^"/.test(match)) {
           if (/:$/.test(match)) {
@@ -2843,7 +2843,7 @@ function getTypeLabel(type) {
 
 // 检查请求类型是否匹配过滤器
 function matchesTypeFilter(reqType, filter) {
-  if (filter === 'all') return true
+  if (filter === 'all') {return true}
   const type = reqType?.toLowerCase()
 
   if (filter === 'xhr') {
@@ -2918,7 +2918,7 @@ async function saveMockFilterSettings() {
 
 // 渲染排除模式列表
 function renderExcludePatterns() {
-  if (!excludePatternsList) return
+  if (!excludePatternsList) {return}
 
   if (mockFilterSettings.excludePatterns.length === 0) {
     excludePatternsList.innerHTML =
@@ -2948,7 +2948,7 @@ function renderExcludePatterns() {
 
 // 添加排除模式
 function addExcludePattern(pattern) {
-  if (!pattern || pattern.trim() === '') return
+  if (!pattern || pattern.trim() === '') {return}
 
   // Split by space and add each pattern
   const patterns = pattern
@@ -2994,7 +2994,7 @@ function isExtensionContextValid() {
 
 // 检查错误是否由于上下文失效导致
 function isContextInvalidatedError(error) {
-  if (!error) return false
+  if (!error) {return false}
   const message = error.message || error.toString()
   return (
     message.includes('Extension context invalidated') ||
@@ -3007,7 +3007,7 @@ function isContextInvalidatedError(error) {
 // 显示上下文失效警告
 function showContextInvalidatedWarning() {
   // 检查是否已存在警告
-  if (document.getElementById('context-invalidated-warning')) return
+  if (document.getElementById('context-invalidated-warning')) {return}
 
   const warning = document.createElement('div')
   warning.id = 'context-invalidated-warning'
@@ -3043,7 +3043,7 @@ async function loadBlockedDomainsToExclude() {
     if (response && response.allDomainBlockedData) {
       // Get current domain's blocked domains
       const currentDomain = currentInspectedDomain
-      let blockedList = []
+      const blockedList = []
 
       // Get blocked domains for current domain
       const blockedDomainsMap = response.allDomainBlockedData.blockedDomains || {}
@@ -3106,8 +3106,8 @@ function getShortUrl(url) {
 
 // Format bytes
 function formatBytes(bytes) {
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  if (bytes < 1024) {return bytes + ' B'}
+  if (bytes < 1024 * 1024) {return (bytes / 1024).toFixed(1) + ' KB'}
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
 }
 
@@ -3963,7 +3963,7 @@ function handleRequest(harEntry) {
   // Get request info from HAR entry structure
   // harEntry.request contains: url, method, headers, etc.
   const req = harEntry.request
-  if (!req) return
+  if (!req) {return}
 
   const url = req.url
   const method = req.method || 'GET'
@@ -4697,7 +4697,7 @@ let bookmarksViewMode = 'grid' // 'tree' or 'grid'
 
 // Flatten bookmark tree into array for search
 function flattenBookmarkTree(node, array) {
-  if (!node) return
+  if (!node) {return}
 
   if (node.url) {
     array.push(node)
@@ -4724,11 +4724,11 @@ function countBookmarkItems(node) {
 
 // Find bookmark node by id in tree
 function findBookmarkNode(node, id) {
-  if (node.id === id) return node
+  if (node.id === id) {return node}
   if (node.children) {
     for (const child of node.children) {
       const found = findBookmarkNode(child, id)
-      if (found) return found
+      if (found) {return found}
     }
   }
   return null
@@ -4753,16 +4753,16 @@ function formatDate(dateString) {
   const diffHours = Math.floor(diffMs / 3600000)
   const diffDays = Math.floor(diffMs / 86400000)
 
-  if (diffMins < 1) return '刚刚'
-  if (diffMins < 60) return `${diffMins} 分钟前`
-  if (diffHours < 24) return `${diffHours} 小时前`
-  if (diffDays < 7) return `${diffDays} 天前`
+  if (diffMins < 1) {return '刚刚'}
+  if (diffMins < 60) {return `${diffMins} 分钟前`}
+  if (diffHours < 24) {return `${diffHours} 小时前`}
+  if (diffDays < 7) {return `${diffDays} 天前`}
   return date.toLocaleDateString('zh-CN')
 }
 
 // Load bookmarks from chrome.bookmarks API
 async function loadBookmarks() {
-  if (!bookmarksList) return
+  if (!bookmarksList) {return}
 
   bookmarksList.innerHTML = '<div class="bookmarks-loading">加载中...</div>'
   console.log('[书签] 开始加载...')
@@ -4797,24 +4797,24 @@ async function loadBookmarks() {
 
 // Render bookmarks tree root
 function renderBookmarksTreeRoot(rootNode) {
-  if (!bookmarksList) return
+  if (!bookmarksList) {return}
 
   if (!rootNode || !rootNode.children || rootNode.children.length === 0) {
     bookmarksList.innerHTML =
       '<div class="bookmarks-empty"><div class="icon">📭</div><div>暂无书签</div></div>'
-    if (bookmarksCount) bookmarksCount.textContent = '0 个书签'
+    if (bookmarksCount) {bookmarksCount.textContent = '0 个书签'}
     return
   }
 
   const totalCount = countBookmarkItems(rootNode)
-  if (bookmarksCount) bookmarksCount.textContent = `${totalCount} 个书签`
+  if (bookmarksCount) {bookmarksCount.textContent = `${totalCount} 个书签`}
 
   bookmarksList.innerHTML = renderBookmarksTree(rootNode.children, bookmarksList, 0)
 }
 
 // Render bookmarks in tree structure
 function renderBookmarksTree(nodes, container, level = 0) {
-  if (!nodes || !Array.isArray(nodes)) return ''
+  if (!nodes || !Array.isArray(nodes)) {return ''}
 
   let html = ''
   const isGridMode = bookmarksViewMode === 'grid'
@@ -4886,16 +4886,16 @@ function countBookmarkItems(node) {
 
 // Render bookmarks list
 function renderBookmarks(bookmarks) {
-  if (!bookmarksList) return
+  if (!bookmarksList) {return}
 
   if (bookmarks.length === 0) {
     bookmarksList.innerHTML =
       '<div class="bookmarks-empty"><div class="icon">📭</div><div>暂无书签</div></div>'
-    if (bookmarksCount) bookmarksCount.textContent = '0 个书签'
+    if (bookmarksCount) {bookmarksCount.textContent = '0 个书签'}
     return
   }
 
-  if (bookmarksCount) bookmarksCount.textContent = `${bookmarks.length} 个书签`
+  if (bookmarksCount) {bookmarksCount.textContent = `${bookmarks.length} 个书签`}
 
   // For search results, show flat list
   bookmarksList.innerHTML = bookmarks
@@ -4945,10 +4945,10 @@ function searchBookmarksInTree(query) {
   if (filtered.length === 0) {
     bookmarksList.innerHTML =
       '<div class="bookmarks-empty"><div class="icon">🔍</div><div>未找到匹配的书签</div></div>'
-    if (bookmarksCount) bookmarksCount.textContent = `找到 0 个书签`
+    if (bookmarksCount) {bookmarksCount.textContent = `找到 0 个书签`}
   } else {
     renderBookmarks(filtered)
-    if (bookmarksCount) bookmarksCount.textContent = `找到 ${filtered.length} 个书签`
+    if (bookmarksCount) {bookmarksCount.textContent = `找到 ${filtered.length} 个书签`}
   }
 }
 
@@ -5094,7 +5094,7 @@ document.addEventListener('click', () => {
 // Context menu actions
 bookmarkContextMenu?.addEventListener('click', (e) => {
   const action = e.target.closest('.context-menu-item')
-  if (!action) return
+  if (!action) {return}
 
   const actionType = action.dataset.action
   const bookmarkId = currentEditingBookmark?.id
@@ -5120,7 +5120,7 @@ bookmarkContextMenu?.addEventListener('click', (e) => {
 // Open bookmark edit dialog
 async function openBookmarkEditDialog(bookmarkId) {
   const bookmark = await chrome.bookmarks.get(bookmarkId)
-  if (!bookmark || bookmark.length === 0) return
+  if (!bookmark || bookmark.length === 0) {return}
 
   const b = bookmark[0]
   currentEditingBookmark = b
@@ -5187,7 +5187,7 @@ async function createNewBookmark(parentId = null) {
 async function deleteBookmark(bookmarkId) {
   // Check if it's a folder
   const bookmark = await chrome.bookmarks.get(bookmarkId)
-  if (!bookmark || bookmark.length === 0) return
+  if (!bookmark || bookmark.length === 0) {return}
 
   const isFolder = !bookmark[0].url
   const confirmMsg = isFolder
@@ -5371,10 +5371,10 @@ function initDragAndDrop() {
 
 function handleDragStart(e) {
   const dragHandle = e.target.closest('.bookmark-drag-handle')
-  if (!dragHandle) return
+  if (!dragHandle) {return}
 
   const target = dragHandle.closest('.bookmark-item, .bookmark-folder')
-  if (!target) return
+  if (!target) {return}
 
   draggedItem = target
   draggedItemType = target.classList.contains('bookmark-folder') ? 'folder' : 'bookmark'
@@ -5450,7 +5450,7 @@ function handleDragOver(e) {
   e.dataTransfer.dropEffect = 'move'
 
   const target = e.target.closest('.bookmark-item, .bookmark-folder')
-  if (!target || target === draggedItem) return
+  if (!target || target === draggedItem) {return}
 
   // Check if target is a descendant of dragged item
   if (draggedItem && draggedItem.contains(target)) {
@@ -5569,7 +5569,7 @@ function handleDragEnter(e) {
 
       // Update the icon
       const icon = folder.querySelector('.bookmark-folder-icon')
-      if (icon) icon.textContent = '▼'
+      if (icon) {icon.textContent = '▼'}
 
       // Clear hover state
       hoveredFolder = null
@@ -5582,7 +5582,7 @@ async function handleDrop(e) {
   e.preventDefault()
 
   const target = e.target.closest('.bookmark-item, .bookmark-folder')
-  if (!target || !draggedItem || target === draggedItem) return
+  if (!target || !draggedItem || target === draggedItem) {return}
 
   // Check if target is a descendant of dragged item
   if (draggedItem.contains(target)) {
@@ -5634,7 +5634,7 @@ async function handleDrop(e) {
           (el) => el.classList.contains('bookmark-item') || el.classList.contains('bookmark-folder')
         )
 
-        let targetIndex = siblings.indexOf(target)
+        const targetIndex = siblings.indexOf(target)
 
         await chrome.bookmarks.move(draggedId, {
           parentId: parentFolder?.dataset.id || targetNode.parentId,
@@ -5651,7 +5651,7 @@ async function handleDrop(e) {
         (el) => el.classList.contains('bookmark-item') || el.classList.contains('bookmark-folder')
       )
 
-      let targetIndex = siblings.indexOf(target)
+      const targetIndex = siblings.indexOf(target)
 
       await chrome.bookmarks.move(draggedId, {
         parentId: parentFolder?.dataset.id || targetNode.parentId,
@@ -5675,11 +5675,11 @@ async function findBookmarkNodeInTree(id) {
   const tree = await chrome.bookmarks.getTree()
 
   function findNode(node, targetId) {
-    if (node.id === targetId) return node
+    if (node.id === targetId) {return node}
     if (node.children) {
       for (const child of node.children) {
         const found = findNode(child, targetId)
-        if (found) return found
+        if (found) {return found}
       }
     }
     return null
@@ -5725,7 +5725,7 @@ function getHistoryTimeRange(rangeType) {
 
 // Load history from chrome.history API
 async function loadHistory() {
-  if (!historyList) return
+  if (!historyList) {return}
 
   historyList.innerHTML = '<div class="history-loading">加载中...</div>'
   console.log('[历史] 开始加载...')
@@ -5762,16 +5762,16 @@ async function loadHistory() {
 
 // Render history list grouped by date
 function renderHistory(historyItems) {
-  if (!historyList) return
+  if (!historyList) {return}
 
   if (historyItems.length === 0) {
     historyList.innerHTML =
       '<div class="history-empty"><div class="icon">📭</div><div>暂无历史记录</div></div>'
-    if (historyCount) historyCount.textContent = '0 条记录'
+    if (historyCount) {historyCount.textContent = '0 条记录'}
     return
   }
 
-  if (historyCount) historyCount.textContent = `${historyItems.length} 条记录`
+  if (historyCount) {historyCount.textContent = `${historyItems.length} 条记录`}
 
   // Group by date
   const grouped = groupHistoryByDate(historyItems)
@@ -5969,7 +5969,7 @@ function handleEventBusMessages(events) {
 
 // 渲染EventBus消息列表
 function renderEventBusMessages() {
-  if (!eventbusMessageList) return
+  if (!eventbusMessageList) {return}
 
   const filterText = eventbusFilter?.value?.toLowerCase() || ''
   const directionFilter = eventbusDirectionFilter?.value || 'all'
@@ -6035,16 +6035,16 @@ function updateEventBusStats() {
   const failedEl = document.getElementById('eventbus-failed')
   const latencyEl = document.getElementById('eventbus-latency')
 
-  if (sentEl) sentEl.textContent = eventbusStats.sent
-  if (receivedEl) receivedEl.textContent = eventbusStats.received
-  if (failedEl) failedEl.textContent = eventbusStats.failed
+  if (sentEl) {sentEl.textContent = eventbusStats.sent}
+  if (receivedEl) {receivedEl.textContent = eventbusStats.received}
+  if (failedEl) {failedEl.textContent = eventbusStats.failed}
 
   // 计算平均延迟
   if (eventbusStats.latencies.length > 0) {
     const avg = Math.round(
       eventbusStats.latencies.reduce((a, b) => a + b, 0) / eventbusStats.latencies.length
     )
-    if (latencyEl) latencyEl.textContent = avg + 'ms'
+    if (latencyEl) {latencyEl.textContent = avg + 'ms'}
   }
 }
 

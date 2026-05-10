@@ -2,7 +2,7 @@
  * DOM 监听模块
  * 监听 DOM 变化并更新相关状态
  */
-;(function () {
+(function () {
   'use strict'
 
   class DOMWatcher {
@@ -18,7 +18,7 @@
      * 启动监听
      */
     start() {
-      if (this.isActive || !document.body) return
+      if (this.isActive || !document.body) {return}
 
       this.isActive = true
       this.observer = new MutationObserver((mutations) => {

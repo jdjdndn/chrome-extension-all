@@ -4,7 +4,7 @@
  * 包含所有 V4 测试功能 + V5 新功能测试
  */
 
-;(function () {
+(function () {
   'use strict'
 
   window.EventBusTestV5 = {
@@ -108,7 +108,7 @@
       console.log('[Test 4] 断路器...')
       try {
         EventBus.on('CB_TEST_V5', () => {
-          if (Math.random() > 0.5) throw new Error('Random error')
+          if (Math.random() > 0.5) {throw new Error('Random error')}
           return { success: true }
         })
 
@@ -171,8 +171,8 @@
           },
           validate: (data) => {
             const errors = []
-            if (!data.userId) errors.push('userId is required')
-            if (!data.action) errors.push('action is required')
+            if (!data.userId) {errors.push('userId is required')}
+            if (!data.action) {errors.push('action is required')}
             return errors.length > 0 ? errors : null
           },
         })

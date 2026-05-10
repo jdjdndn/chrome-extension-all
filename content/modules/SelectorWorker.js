@@ -5,7 +5,7 @@
  * Manifest V3 兼容：使用 chrome.runtime.getURL() 加载独立 Worker 文件
  * 避免 CSP 限制导致的 Blob URL 创建失败
  */
-;(function () {
+(function () {
   'use strict'
 
   // 确定性属性白名单（用于元素数据提取）
@@ -93,7 +93,7 @@
             return
           }
           // 已禁用时不处理
-          if (!this._isAvailable) return
+          if (!this._isAvailable) {return}
           console.error('[SelectorWorker] Worker error:', e)
           // 尝试重建 Worker
           this._handleWorkerError(e)
@@ -137,7 +137,7 @@
      * @private
      */
     _fallbackGenerateSelector(element) {
-      if (!element || !element.tagName) return null
+      if (!element || !element.tagName) {return null}
 
       const tag = element.tagName.toLowerCase()
       const id = element.id
@@ -210,7 +210,7 @@
     generateMergedSelector(elements) {
       // 降级：Worker 不可用时返回第一个元素的选择器
       if (!this.isAvailable()) {
-        if (!elements || elements.length === 0) return Promise.resolve(null)
+        if (!elements || elements.length === 0) {return Promise.resolve(null)}
         return Promise.resolve(this._fallbackGenerateSelector(elements[0]))
       }
 
@@ -257,7 +257,7 @@
      * 提取元素数据（用于传递给 Worker）
      */
     _extractElementData(element) {
-      if (!element || !element.tagName) return null
+      if (!element || !element.tagName) {return null}
 
       const tag = element.tagName.toLowerCase()
       const id = element.id || null

@@ -2,7 +2,7 @@
  * 虚拟列表渲染模块
  * 用于高效渲染大量选中元素列表
  */
-;(function () {
+(function () {
   'use strict'
 
   class VirtualList {
@@ -104,7 +104,7 @@
      * 渲染可见项目
      */
     _render() {
-      if (!this.container) return
+      if (!this.container) {return}
 
       // 创建占位容器
       const wrapper = document.createElement('div')

@@ -86,7 +86,7 @@ const TabContentSearch = {
       acceptNode: function (node) {
         // 排除脚本、样式等
         const parent = node.parentElement
-        if (!parent) return NodeFilter.FILTER_REJECT
+        if (!parent) {return NodeFilter.FILTER_REJECT}
         const tag = parent.tagName.toLowerCase()
         if (['script', 'style', 'noscript', 'iframe', 'svg'].includes(tag)) {
           return NodeFilter.FILTER_REJECT

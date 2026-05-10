@@ -14,6 +14,7 @@ import '../core/load-scheduler.js'
 // 资源加速器必须最先加载，以便拦截后续所有资源请求
 import '../../shared/cdn-mappings.js'
 import '../modules/resource-accelerator.js'
+import '../modules/csp-bypass-integration.js'
 
 // ========== 空闲模块（浏览器空闲时加载） ==========
 // 基础设施模块

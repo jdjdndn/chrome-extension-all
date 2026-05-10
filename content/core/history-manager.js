@@ -1,7 +1,7 @@
 // ========== 操作历史记录 ==========
 // 讒持用户操作历史，支持撤销和重做
 
-;(function () {
+(function () {
   'use strict'
 
   if (window.HistoryManager) {
@@ -82,7 +82,7 @@
      * @param {object} options - 选项
      */
     async record(action, data, options = {}) {
-      if (!this.config.enabled) return
+      if (!this.config.enabled) {return}
 
       const record = {
         id: `hist_${Date.now()}_${Math.random().toString(36)}`,

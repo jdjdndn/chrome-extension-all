@@ -119,7 +119,7 @@ function copyDirectory(src, dest, verbose = true) {
       // 检查是否应该忽略
       const shouldIgnore = SYNC_CONFIG.ignorePatterns.some((pattern) => pattern.test(entry.name))
 
-      if (shouldIgnore) continue
+      if (shouldIgnore) {continue}
 
       if (entry.isDirectory()) {
         if (!fs.existsSync(destPath)) {
@@ -219,16 +219,16 @@ async function watchFiles() {
 
 // 递归监控目录
 function watchDirectory(srcDir, destDir) {
-  if (!fs.existsSync(srcDir)) return
+  if (!fs.existsSync(srcDir)) {return}
 
   // 跳过已打包的目录
   const absDir = path.resolve(root, srcDir).replace(/\\/g, '/')
   const relDir = path.relative(root, absDir).replace(/\\/g, '/')
-  if (SYNC_CONFIG.bundledDirs.some((dir) => relDir === dir)) return
+  if (SYNC_CONFIG.bundledDirs.some((dir) => relDir === dir)) {return}
 
   // 监控当前目录
   fs.watch(srcDir, (eventType, filename) => {
-    if (!filename) return
+    if (!filename) {return}
 
     const srcPath = path.join(srcDir, filename)
     const destPath = path.join(destDir, filename)
@@ -236,7 +236,7 @@ function watchDirectory(srcDir, destDir) {
     // 检查是否应该忽略
     const shouldIgnore = SYNC_CONFIG.ignorePatterns.some((pattern) => pattern.test(filename))
 
-    if (shouldIgnore) return
+    if (shouldIgnore) {return}
 
     const now = new Date().toLocaleTimeString()
 
