@@ -5,7 +5,13 @@
  */
 
 self.onmessage = async function (e) {
-  const { id, src, quality, maxWidth, maxHeight, priority, isCors } = e.data
+  const { type, id, src, quality, maxWidth, maxHeight, priority, isCors } = e.data
+
+  // 处理心跳ping
+  if (type === 'ping') {
+    self.postMessage({ type: 'pong', id })
+    return
+  }
 
   try {
     // 1. 获取图片数据
@@ -27,14 +33,9 @@ self.onmessage = async function (e) {
     // 2. 创建 ImageBitmap
     const imageBitmap = await createImageBitmap(blob)
 
-    // 3. 计算目标尺寸
-    let width = imageBitmap.width
-    let height = imageBitmap.height
-    if (maxWidth > 0 && (width > maxWidth || height > maxHeight)) {
-      const ratio = Math.min(maxWidth / width, maxHeight / height)
-      width = Math.floor(width * ratio)
-      height = Math.floor(height * ratio)
-    }
+    // 3. 保持原始尺寸
+    const width = imageBitmap.width
+    const height = imageBitmap.height
 
     // 4. 使用 OffscreenCanvas 压缩
     const canvas = new OffscreenCanvas(width, height)

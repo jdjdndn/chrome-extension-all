@@ -116,12 +116,18 @@ function initTextToLink() {
 
   // 过滤链接，必须包含顶级域名或为合法IPv4
   function filterLinks(links) {
-    if (!links) {return []}
+    if (!links) {
+      return []
+    }
     return links.filter((link) => {
-      if (!link) {return false}
+      if (!link) {
+        return false
+      }
       // 支持字符串数组或匹配对象数组
       let linkStr = Array.isArray(link) ? link[0] : link
-      if (typeof linkStr !== 'string') {return false}
+      if (typeof linkStr !== 'string') {
+        return false
+      }
       // 清理链接末尾的非 URL 字符
       linkStr = cleanLinkEnd(linkStr)
       // 更新原数组中的值
@@ -136,7 +142,9 @@ function initTextToLink() {
           const num = Number(part)
           return num === num && num >= 0 && num <= 255
         })
-      if (isIpv4) {return true}
+      if (isIpv4) {
+        return true
+      }
       // 检查是否包含顶级域名
       return TOP_LEVEL_DOMAINS.some((tld) => linkStr.includes(`.${tld}`))
     })
@@ -171,7 +179,9 @@ function initTextToLink() {
 
   // 分割文本为文本和链接段
   function splitText(text, arr) {
-    if (!arr.length) {return [{ text, type: 'text' }]}
+    if (!arr.length) {
+      return [{ text, type: 'text' }]
+    }
     let lastIndex = 0
     const returnArr = []
     arr.forEach((item, i) => {
@@ -213,10 +223,14 @@ function initTextToLink() {
 
   // 检查是否有父辈元素是 a 链接
   function hasAnchorAncestor(node) {
-    if (!node || !node.parentNode) {return false}
+    if (!node || !node.parentNode) {
+      return false
+    }
     let current = node.parentNode
     while (current && current !== document.body) {
-      if (current.tagName === 'A') {return true}
+      if (current.tagName === 'A') {
+        return true
+      }
       current = current.parentNode
     }
     return false
@@ -224,14 +238,22 @@ function initTextToLink() {
 
   // 遍历 DOM 树收集包含链接的文本节点
   function createTextNodeTree(matchObj = {}, node, parent) {
-    if (!node) {return matchObj}
-    if (parent && EXCLUDED_TAGS.includes(parent.nodeName)) {return matchObj}
-    if (hasAnchorAncestor(node)) {return matchObj}
+    if (!node) {
+      return matchObj
+    }
+    if (parent && EXCLUDED_TAGS.includes(parent.nodeName)) {
+      return matchObj
+    }
+    if (hasAnchorAncestor(node)) {
+      return matchObj
+    }
 
     if (node.nodeType === Node.TEXT_NODE) {
       const textContent = node.textContent
       // 空文本或纯空白不处理
-      if (!textContent || textContent.trim().length === 0) {return matchObj}
+      if (!textContent || textContent.trim().length === 0) {
+        return matchObj
+      }
       const matches = getTextLinks(textContent)
       matches.forEach((match) => {
         if (matchObj[match] && matchObj[match].length > 0) {
@@ -267,12 +289,16 @@ function initTextToLink() {
         const nodeList = removeDuplicates(matchObj[match])
         nodeList.forEach((node) => {
           // 检查节点是否仍在 DOM 中
-          if (!node.parentNode) {return}
+          if (!node.parentNode) {
+            return
+          }
           const generateNodeList = splitText(node.textContent, getTextLinksList(node.textContent))
           traverseArrayBackward(generateNodeList, ({ type, text }, _i, isLast) => {
             try {
               // 再次检查节点是否仍在 DOM 中
-              if (!node.parentNode) {return}
+              if (!node.parentNode) {
+                return
+              }
               if (isLast) {
                 node.parentNode.replaceChild(createNode(type, text), node)
               } else if (node.nextSibling) {
@@ -306,7 +332,7 @@ function initTextToLink() {
     const debouncedProcessLinks = DOMUtils.debounce(processLinks, 500)
 
     // 使用 MutationObserver 监听 DOM 变化
-    const observer = new MutationObserver((mutations) => {
+    const observer = new MutationObserver(() => {
       debouncedProcessLinks()
     })
 

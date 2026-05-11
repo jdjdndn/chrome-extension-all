@@ -22,6 +22,11 @@ async function activateContentScript() {
 // DevTools 打开时立即激活
 activateContentScript()
 
+// Create Hot Reload panel (开发模式)
+chrome.devtools.panels.create('Hot Reload', null, 'devtools/hot-reload-panel.html', (panel) => {
+  console.log('[DevTools] Hot Reload panel created')
+})
+
 // Create Console panel
 chrome.devtools.panels.create(
   'Tool-info',

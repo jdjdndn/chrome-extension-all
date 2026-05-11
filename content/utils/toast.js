@@ -56,10 +56,11 @@ function ensureContainer() {
  * @param {number} [options.duration=3000] - 显示时长（毫秒）
  * @param {string} [options.type='info'] - 类型：info, success, warning, error
  * @param {string} [options.position='top-right'] - 位置
+ * @param {string} [options.detail] - 点击查看的详情内容
  * @returns {Object} Toast实例，包含close方法
  */
 export function toast(message, options = {}) {
-  const { duration = 3000, type = 'info', position = 'top-right' } = options
+  const { duration = 3000, type = 'info', detail } = options
 
   ensureContainer()
 
@@ -76,7 +77,25 @@ export function toast(message, options = {}) {
   const toastEl = document.createElement('div')
   toastEl.className = 'toast-item'
   toastEl.dataset.toastId = id
-  toastEl.textContent = message
+
+  // 内容容器
+  const contentEl = document.createElement('div')
+  contentEl.textContent = message
+
+  toastEl.appendChild(contentEl)
+
+  // 如果有详情，添加点击查看
+  if (detail) {
+    const detailBtn = document.createElement('span')
+    detailBtn.textContent = ' [详情]'
+    detailBtn.style.cssText = 'text-decoration: underline; cursor: pointer; margin-left: 4px;'
+    detailBtn.onclick = (e) => {
+      e.stopPropagation()
+      alert(detail)
+    }
+    contentEl.appendChild(detailBtn)
+  }
+
   toastEl.style.cssText = `
     ${typeStyles[type] || typeStyles.info}
     padding: 12px 20px;
@@ -86,6 +105,7 @@ export function toast(message, options = {}) {
     animation: toast-slide-in 0.3s ease-out;
     max-width: 300px;
     word-wrap: break-word;
+    cursor: ${detail ? 'pointer' : 'default'};
   `
 
   toastContainer.appendChild(toastEl)
@@ -93,7 +113,9 @@ export function toast(message, options = {}) {
   // 自动关闭
   let timeoutId = null
   const close = () => {
-    if (timeoutId) clearTimeout(timeoutId)
+    if (timeoutId) {
+      clearTimeout(timeoutId)
+    }
     toastEl.style.animation = 'toast-slide-out 0.3s ease-in'
     setTimeout(() => toastEl.remove(), 300)
   }

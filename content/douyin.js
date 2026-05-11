@@ -189,13 +189,10 @@
     return null
   }
 
-  function isAutoPlayEnabled() {
-    const switchBtn = findAutoPlaySwitch()
-    return switchBtn && switchBtn.classList.contains('xg-switch-checked')
-  }
-
   function clickSwitch(btn) {
-    if (!btn) {return false}
+    if (!btn) {
+      return false
+    }
     const rect = btn.getBoundingClientRect()
     const clientX = rect.left + rect.width / 2
     const clientY = rect.top + rect.height / 2
@@ -261,8 +258,12 @@
       this.uuid.set(video, uuid)
     },
     getUUID(video) {
-      if (!video) {return generateUUID()}
-      if (!this.uuid.has(video)) {this.uuid.set(video, generateUUID())}
+      if (!video) {
+        return generateUUID()
+      }
+      if (!this.uuid.has(video)) {
+        this.uuid.set(video, generateUUID())
+      }
       return this.uuid.get(video)
     },
     setLiveHandled(video, value) {
@@ -310,11 +311,15 @@
       logger.debug('[定时器管理] 所有定时器已清除')
     },
     start() {
-      if (this.isRunning) {return}
+      if (this.isRunning) {
+        return
+      }
       this.isRunning = true
       this.factories.forEach((factory) => {
         const timerId = factory()
-        if (timerId !== undefined) {this.add(timerId)}
+        if (timerId !== undefined) {
+          this.add(timerId)
+        }
       })
     },
     restart() {
@@ -375,16 +380,24 @@
     cancel(videoId) {
       const check = this.activeChecks.get(videoId)
       if (check) {
-        if (check.intervalId) {clearInterval(check.intervalId)}
-        if (check.timeoutId) {clearTimeout(check.timeoutId)}
+        if (check.intervalId) {
+          clearInterval(check.intervalId)
+        }
+        if (check.timeoutId) {
+          clearTimeout(check.timeoutId)
+        }
         this.activeChecks.delete(videoId)
       }
     },
 
     cancelAll() {
       this.activeChecks.forEach((check) => {
-        if (check.intervalId) {clearInterval(check.intervalId)}
-        if (check.timeoutId) {clearTimeout(check.timeoutId)}
+        if (check.intervalId) {
+          clearInterval(check.intervalId)
+        }
+        if (check.timeoutId) {
+          clearTimeout(check.timeoutId)
+        }
       })
       this.activeChecks.clear()
       logger.debug(`[二次检测] 所有检测任务已取消`)
@@ -409,7 +422,9 @@
     const video = container.querySelector('video')
     if (video) {
       const playerId = video.getAttribute('data-xgplayerid')
-      if (playerId) {return playerId}
+      if (playerId) {
+        return playerId
+      }
     }
     return null
   }
@@ -417,7 +432,9 @@
   // 获取稳定的视频ID（优先data-xgplayerid，降级用UUID）
   function getStableVideoId(videoBody) {
     const realId = getRealVideoId(videoBody)
-    if (realId) {return realId}
+    if (realId) {
+      return realId
+    }
     return videoBody ? getVideoUUID(videoBody) : generateUUID()
   }
 
@@ -454,9 +471,15 @@
     const timerMap = new Map()
     return (id, ...args) => {
       const hasTimer = timerMap.has(id)
-      if (hasTimer) {clearTimeout(timerMap.get(id))}
-      if (!id || args.length !== 2) {return}
-      if (!hasTimer) {fn.apply(this, args)}
+      if (hasTimer) {
+        clearTimeout(timerMap.get(id))
+      }
+      if (!id || args.length !== 2) {
+        return
+      }
+      if (!hasTimer) {
+        fn.apply(this, args)
+      }
       const timer = setTimeout(() => timerMap.delete(id), delay)
       timerMap.set(id, timer)
     }
@@ -485,16 +508,13 @@
   }
 
   function updateVideoHistory(videoId) {
-    if (videoHistory.length > 0 && videoHistory[videoHistory.length - 1] === videoId) {return}
+    if (videoHistory.length > 0 && videoHistory[videoHistory.length - 1] === videoId) {
+      return
+    }
     videoHistory.push(videoId)
-    if (videoHistory.length > VIDEO_HISTORY_SIZE) {videoHistory.shift()}
-  }
-
-  function clearProcessedVideo(videoId) {
-    if (!videoId) {return}
-    const keysToDelete = [...processedVideos].filter((key) => key.endsWith(`_${videoId}`))
-    keysToDelete.forEach((key) => processedVideos.delete(key))
-    if (keysToDelete.length > 0) {logger.debug(`[清理] 移除已离开视频的处理记录`)}
+    if (videoHistory.length > VIDEO_HISTORY_SIZE) {
+      videoHistory.shift()
+    }
   }
 
   // ========== 核心功能 ==========
@@ -527,32 +547,6 @@
       key: 'ArrowDown',
       code: 'ArrowDown',
     })
-    return false
-  }
-
-  // 点击上一个视频按钮
-  function clickPrevButton() {
-    // 首选：播放器切换按钮
-    const prevBtn = findOne('div.xgplayer-playswitch-prev')
-    if (prevBtn && isElementInViewportAndVisible(prevBtn)) {
-      logger.debug('[导航] 点击 xgplayer-playswitch-prev 按钮')
-      prevBtn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
-      prevBtn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }))
-      prevBtn.click()
-      return true
-    }
-    // 备选1：data-e2e 按钮
-    const prevBtn2 = findOne('[data-e2e="video-switch-prev-arrow"]')
-    if (prevBtn2 && isElementInViewportAndVisible(prevBtn2)) {
-      logger.debug('[导航] 点击 data-e2e 上一个按钮')
-      prevBtn2.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
-      prevBtn2.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }))
-      prevBtn2.click()
-      return true
-    }
-    // 备选2：键盘上箭头
-    logger.debug('[导航] 使用键盘上箭头')
-    triggerKeyboardEvent('prev_video', 'keydown', { keyCode: 38, key: 'ArrowUp', code: 'ArrowUp' })
     return false
   }
 
@@ -613,7 +607,9 @@
   }
 
   function skipToNextVideo(reason) {
-    if (!canExecuteAction('skip_video', THROTTLE_CONFIG.SKIP_VIDEO)) {return}
+    if (!canExecuteAction('skip_video', THROTTLE_CONFIG.SKIP_VIDEO)) {
+      return
+    }
     const currentVideoBody = findOne('.playerContainer')
     const currentId = currentVideoBody ? getStableVideoId(currentVideoBody) : null
     logger.debug(`[自动下滑] 原因: ${reason}`)
@@ -621,11 +617,15 @@
     // 优先点击按钮，备选键盘
     clickNextButton()
 
-    if (currentId) {VideoChangeChecker.start(currentId, reason)}
+    if (currentId) {
+      VideoChangeChecker.start(currentId, reason)
+    }
   }
 
   function isElementInViewportAndVisible(element) {
-    if (typeof DOMUtils === 'undefined') {return false}
+    if (typeof DOMUtils === 'undefined') {
+      return false
+    }
     return DOMUtils.isElementInViewport(element, { checkVisibility: true, checkDimensions: true })
   }
 
@@ -655,21 +655,29 @@
   }
 
   function skipAD(videoBody) {
-    if (videoBody && VideoStateManager.isSkipAd(videoBody)) {return}
+    if (videoBody && VideoStateManager.isSkipAd(videoBody)) {
+      return
+    }
 
     const adResult = detectAdSvg()
     if (adResult.detected) {
       logger.debug(`[广告检测] 检测到${adResult.type}标识 (${adResult.path})`)
-      if (videoBody) {VideoStateManager.setSkipAd(videoBody, true)}
+      if (videoBody) {
+        VideoStateManager.setSkipAd(videoBody, true)
+      }
       triggerKeyboardEvent('skipAD_mark', 'keydown', { keyCode: 82, key: 'r', code: 'KeyR' })
       setTimeout(() => skipToNextVideo(adResult.type), 200)
     }
   }
 
   function detectAIContent(videoBody) {
-    if (!videoBody) {return false}
+    if (!videoBody) {
+      return false
+    }
     const videoId = getStableVideoId(videoBody)
-    if (processedVideos.has(`skip_ai_${videoId}`)) {return false}
+    if (processedVideos.has(`skip_ai_${videoId}`)) {
+      return false
+    }
     const safetyBar = findOne('.safetyBar')
     if (safetyBar?.innerText.includes('AI')) {
       logger.debug('[AI检测] safetyBar.innerText:', safetyBar.innerText)
@@ -678,18 +686,10 @@
     return false
   }
 
-  function skipAi(videoBody) {
-    const videoId = getStableVideoId(videoBody)
-    const skipKey = `skip_ai_${videoId}`
-    if (detectAIContent(videoBody)) {
-      logger.debug('[AI检测] 检测到AI相关内容')
-      processedVideos.add(skipKey)
-      skipToNextVideo('AI生成内容')
-    }
-  }
-
   function checkNotInterestedKeywords(videoBody) {
-    if (!videoBody) {return null}
+    if (!videoBody) {
+      return null
+    }
     let tagList = []
 
     // 获取所有候选元素并过滤可视区域内的
@@ -727,7 +727,9 @@
   function handleNotInterested(videoBody) {
     const videoId = getStableVideoId(videoBody)
     const skipKey = `not_interested_${videoId}`
-    if (processedVideos.has(skipKey)) {return}
+    if (processedVideos.has(skipKey)) {
+      return
+    }
 
     const matchedKeyword = checkNotInterestedKeywords(videoBody)
     if (matchedKeyword) {
@@ -738,19 +740,27 @@
   }
 
   function isLiveStream(video) {
-    if (!video) {return false}
+    if (!video) {
+      return false
+    }
     const text = video.innerText || ''
     return text.includes('点击或按\n进入直播间') || text.includes('上滑继续看视频')
   }
 
   function detectAndSkipLive() {
     const videoBody = findOne('.playerContainer')
-    if (videoBody) {return false} // 有普通视频容器，不是直播
+    if (videoBody) {
+      return false
+    } // 有普通视频容器，不是直播
 
     const livePlayer = findOne('.douyin-player')
-    if (!livePlayer) {return false}
+    if (!livePlayer) {
+      return false
+    }
 
-    if (VideoStateManager.isLiveHandled(livePlayer)) {return true} // 已处理过
+    if (VideoStateManager.isLiveHandled(livePlayer)) {
+      return true
+    } // 已处理过
 
     if (isLiveStream(livePlayer)) {
       logger.debug('[直播检测] 检测到直播，准备跳过')
@@ -792,7 +802,7 @@
     }
   }
 
-  function autoOpenComment(videoBody) {
+  function autoOpenComment() {
     // 检查评论区是否已打开
     const commentPanel = findOne('#videoSideCard') || findOne('[class*="comment"]')
     if (commentPanel && commentPanel.offsetWidth > 0) {
@@ -818,7 +828,9 @@
     const regex =
       /\b((?:(?:[01]?\d|2[0-3]):[0-5]\d:[0-5]\d)|(?:(?:[01]?\d|2[0-3]):[0-5]\d)|(?:[1-9]|1[0-2]):[0-5]\d\s*(?:AM|PM))\b/g
     for (const match of timeStr.matchAll(regex)) {
-      if (offset >= match.index && offset < match.index + match[0].length) {return match[0]}
+      if (offset >= match.index && offset < match.index + match[0].length) {
+        return match[0]
+      }
     }
     return null
   }
@@ -835,7 +847,9 @@
   function setupCommentClickListener(container) {
     VideoStateManager.setCommentListener(container, true)
     container.addEventListener('click', (e) => {
-      if (e.target.nodeName !== 'SPAN') {return}
+      if (e.target.nodeName !== 'SPAN') {
+        return
+      }
 
       let offset
       if (document.caretPositionFromPoint) {
@@ -847,7 +861,9 @@
       }
 
       const match = matchTimeStr(e.target.innerText, offset)
-      if (!match) {return}
+      if (!match) {
+        return
+      }
 
       const currentTime = timeToSeconds(match)
       const video = findOne('video')
@@ -927,7 +943,9 @@
       return
     }
 
-    if (currentVideoId === videoId) {return}
+    if (currentVideoId === videoId) {
+      return
+    }
 
     // 判断是否是手动返回（在更新历史之前检查）
     const isGoingBack = isManualNavigation(videoId)
@@ -1013,7 +1031,7 @@
 
     // ========== 第四步：其他自动操作 ==========
     autoStar()
-    autoOpenComment(videoBody)
+    autoOpenComment()
   }
 
   // 清理超出历史范围的视频记录
@@ -1124,7 +1142,9 @@
   // 添加自定义样式
   function injectCustomStyles() {
     const styleId = 'douyin-custom-styles'
-    if (document.getElementById(styleId)) {return}
+    if (document.getElementById(styleId)) {
+      return
+    }
 
     const style = document.createElement('style')
     style.id = styleId
@@ -1169,7 +1189,9 @@
           if (hasVideo || hasLive) {
             logger.debug(' 视频/直播容器已出现，开始处理')
             obs.disconnect()
-            if (timeoutId) {clearTimeout(timeoutId)}
+            if (timeoutId) {
+              clearTimeout(timeoutId)
+            }
             processCurrentVideo()
           }
         })
@@ -1195,7 +1217,9 @@
     // 监听用户上滑操作，取消自动下滑检测
     document.addEventListener('keydown', (e) => {
       // 跳过脚本自动触发的键盘事件，仅响应用户操作
-      if (isAutoTriggered) {return}
+      if (isAutoTriggered) {
+        return
+      }
       if (e.key === 'ArrowUp' || e.keyCode === 38) {
         logger.debug('[用户操作] 检测到键盘上滑，取消所有自动下滑检测')
         lastNavigationDirection = 'up'
@@ -1231,7 +1255,9 @@
       (e) => {
         for (const touch of e.changedTouches) {
           const tracker = touchTracker.get(touch.identifier)
-          if (!tracker) {continue}
+          if (!tracker) {
+            continue
+          }
 
           const touchEndY = touch.clientY
           const deltaY = touchEndY - tracker.startY
@@ -1280,7 +1306,9 @@
         if (e.deltaY < 0) {
           wheelDeltaY += Math.abs(e.deltaY)
           // 累积滚动量检测
-          if (wheelTimeout) {clearTimeout(wheelTimeout)}
+          if (wheelTimeout) {
+            clearTimeout(wheelTimeout)
+          }
           wheelTimeout = setTimeout(() => {
             if (wheelDeltaY > 50) {
               logger.debug(
@@ -1296,7 +1324,9 @@
         // deltaY > 0 表示向下滚动（手动下滑）
         if (e.deltaY > 0) {
           wheelDeltaY -= e.deltaY
-          if (wheelTimeout) {clearTimeout(wheelTimeout)}
+          if (wheelTimeout) {
+            clearTimeout(wheelTimeout)
+          }
           wheelTimeout = setTimeout(() => {
             if (wheelDeltaY < -50) {
               logger.debug(

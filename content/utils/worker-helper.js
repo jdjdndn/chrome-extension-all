@@ -106,7 +106,9 @@ export class WorkerPool {
    * 扩容 Worker 池
    */
   scaleUp() {
-    if (this.workers.length >= this.maxWorkers) return null
+    if (this.workers.length >= this.maxWorkers) {
+      return null
+    }
     const worker = this._createWorker()
     if (worker) {
       this.workers.push(worker)
@@ -119,7 +121,9 @@ export class WorkerPool {
    * 缩容 Worker 池
    */
   scaleDown() {
-    if (this.workers.length <= this.minWorkers) return false
+    if (this.workers.length <= this.minWorkers) {
+      return false
+    }
     const worker = this.workers.pop()
     if (worker) {
       worker.terminate()
@@ -132,7 +136,9 @@ export class WorkerPool {
    * 重建崩溃的 Worker
    */
   rebuild(index) {
-    if (index < 0 || index >= this.workers.length) return false
+    if (index < 0 || index >= this.workers.length) {
+      return false
+    }
     const oldWorker = this.workers[index]
     if (oldWorker) {
       oldWorker.terminate()

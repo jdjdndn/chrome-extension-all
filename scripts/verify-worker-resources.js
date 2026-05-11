@@ -10,7 +10,9 @@ const ROOT = resolve('.')
 
 function findWorkerFiles(dir) {
   const workers = []
-  if (!existsSync(dir)) return workers
+  if (!existsSync(dir)) {
+    return workers
+  }
 
   const entries = readdirSync(dir, { withFileTypes: true })
   for (const entry of entries) {

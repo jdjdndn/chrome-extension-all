@@ -137,7 +137,9 @@ async function waitForElements(selectors, timeout = 10000) {
 function createDebouncedObserver(callback, debounceMs = 300) {
   let timer = null
   const observer = new MutationObserver(() => {
-    if (timer) clearTimeout(timer)
+    if (timer) {
+      clearTimeout(timer)
+    }
     timer = setTimeout(callback, debounceMs)
   })
   return observer
@@ -152,7 +154,9 @@ function createDebouncedObserver(callback, debounceMs = 300) {
 function debounce(func, delay = 300) {
   let timer = null
   return function (...args) {
-    if (timer) clearTimeout(timer)
+    if (timer) {
+      clearTimeout(timer)
+    }
     timer = setTimeout(() => func.apply(this, args), delay)
   }
 }
@@ -218,7 +222,9 @@ function onBodyReady(callback) {
  * @returns {boolean}
  */
 function isElementInViewport(element, options = {}) {
-  if (!element) return false
+  if (!element) {
+    return false
+  }
 
   const { checkVisibility = false, checkDimensions = false } = options
 

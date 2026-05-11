@@ -136,7 +136,9 @@
     _analyzeContext(element) {
       const recommendations = []
       const parent = element.parentElement
-      if (!parent) {return recommendations}
+      if (!parent) {
+        return recommendations
+      }
 
       const tag = element.tagName.toLowerCase()
       const parentTag = parent.tagName.toLowerCase()
@@ -217,7 +219,7 @@
     /**
      * 历史模式分析
      */
-    _analyzePatterns(element) {
+    _analyzePatterns() {
       const recommendations = []
 
       // 分析选择历史中的模式
@@ -234,7 +236,9 @@
       const recommendations = []
       const currentSelector = this.selectorEngine?.generateSelector(element)
 
-      if (!currentSelector) {return recommendations}
+      if (!currentSelector) {
+        return recommendations
+      }
 
       // 检查选择器质量问题
       const quality = this.selectorEngine?.analyzeSelectorQuality(currentSelector)

@@ -62,10 +62,14 @@
 
   // ========== 版本提取工具 ==========
   function extractVersion(url, patterns) {
-    if (!url) {return null}
+    if (!url) {
+      return null
+    }
     for (const pattern of patterns) {
       const match = url.match(pattern)
-      if (match && match[1]) {return match[1]}
+      if (match && match[1]) {
+        return match[1]
+      }
     }
     return null
   }
@@ -85,11 +89,23 @@
 
   /**
    * 构建CDN URL
+   * 支持 fileByFormat 为不同 CDN 格式指定不同文件路径
+   * 支持 packageByFormat 为不同 CDN 格式指定不同包名
    */
   function buildCDNUrl(cdn, libConfig, version, file) {
     const ver = version || libConfig.defaultVersion
-    const pkg = libConfig.package || libConfig.name
-    const f = file || libConfig.file
+
+    // 支持不同 CDN 格式的包名映射（如 lodash.js 在七牛云上）
+    let pkg = libConfig.package || libConfig.name
+    if (libConfig.packageByFormat && libConfig.packageByFormat[cdn.format]) {
+      pkg = libConfig.packageByFormat[cdn.format]
+    }
+
+    // 支持不同 CDN 格式的文件路径映射
+    let f = file || libConfig.file
+    if (libConfig.fileByFormat && libConfig.fileByFormat[cdn.format]) {
+      f = libConfig.fileByFormat[cdn.format]
+    }
 
     if (cdn.format === 'bootcdn') {
       return cdn.baseUrl + pkg + '/' + ver + '/' + f
@@ -108,6 +124,11 @@
       versionPatterns: [/jquery[\/-](\d+\.\d+\.\d+)/i, /jquery[\/-](\d+\.\d+)/i],
       package: 'jquery',
       file: 'jquery.min.js',
+      // npm 格式 CDN 需要 dist/ 前缀
+      fileByFormat: {
+        npm: 'dist/jquery.min.js',
+        bootcdn: 'jquery.min.js',
+      },
       defaultVersion: '3.7.1',
       global: '$',
       cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr'],
@@ -147,6 +168,11 @@
       versionPatterns: [/vue[\/@](\d+\.\d+\.\d+)/i],
       package: 'vue',
       file: 'dist/vue.global.prod.min.js',
+      // unpkg 上没有压缩版，用 .js 版本
+      fileByFormat: {
+        npm: 'dist/vue.global.js',
+        bootcdn: 'vue.global.prod.min.js',
+      },
       defaultVersion: '3.4.21',
       global: 'Vue',
       cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr'],
@@ -156,6 +182,10 @@
       versionPatterns: [/lodash[\/-](\d+\.\d+\.\d+)/i, /lodash\.js\/(\d+\.\d+\.\d+)/i],
       package: 'lodash',
       file: 'lodash.min.js',
+      // 七牛云等 bootcdn 格式 CDN 的包名是 lodash.js
+      packageByFormat: {
+        bootcdn: 'lodash.js',
+      },
       defaultVersion: '4.17.21',
       global: '_',
       cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr'],
@@ -600,7 +630,9 @@
    * 返回 { packageName, version } 或 null
    */
   function extractPackageInfo(url) {
-    if (!url || typeof url !== 'string') {return null}
+    if (!url || typeof url !== 'string') {
+      return null
+    }
 
     try {
       const urlObj = new URL(url)
@@ -616,11 +648,15 @@
           if (version) {
             version = version.replace(/^v/i, '')
             // 只保留有效版本格式
-            if (!/^\d+\.\d+/.test(version)) {version = null}
+            if (!/^\d+\.\d+/.test(version)) {
+              version = null
+            }
           }
 
           // 跳过已知的非包名模式
-          if (skipPackage(packageName)) {continue}
+          if (skipPackage(packageName)) {
+            continue
+          }
 
           return { packageName, version }
         }
@@ -634,7 +670,9 @@
    * 判断是否应跳过的包名（静态资源、非JS库等）
    */
   function skipPackage(name) {
-    if (!name) {return true}
+    if (!name) {
+      return true
+    }
     const lower = name.toLowerCase()
     // 跳过常见非包名路径
     const skipList = [
@@ -672,7 +710,9 @@
    */
   function smartMatchJSLibrary(url) {
     const info = extractPackageInfo(url)
-    if (!info) {return null}
+    if (!info) {
+      return null
+    }
 
     const { packageName, version } = info
     const fallbackVersion = version || 'latest'
@@ -717,7 +757,9 @@
    * 返回 { packageName, version, file } 或 null
    */
   async function queryJsdelivrAPI(packageName) {
-    if (!packageName) {return null}
+    if (!packageName) {
+      return null
+    }
 
     // 检查缓存
     const cached = _jsdelivrCache.get(packageName)
@@ -800,10 +842,14 @@
    */
   async function dynamicMatchJSLibrary(url) {
     const info = extractPackageInfo(url)
-    if (!info) {return null}
+    if (!info) {
+      return null
+    }
 
     const pkgInfo = await queryJsdelivrAPI(info.packageName)
-    if (!pkgInfo) {return null}
+    if (!pkgInfo) {
+      return null
+    }
 
     const version = info.version || pkgInfo.version
     const jsdelivrUrl = `https://cdn.jsdelivr.net/npm/${pkgInfo.packageName}@${version}/${pkgInfo.file}`
@@ -829,7 +875,9 @@
   // ========== 匹配方法 ==========
 
   function matchFromMap(url, map, type) {
-    if (!url || typeof url !== 'string') {return null}
+    if (!url || typeof url !== 'string') {
+      return null
+    }
 
     for (const [name, config] of Object.entries(map)) {
       for (const pattern of config.patterns) {
@@ -845,10 +893,25 @@
             }
           }
 
-          // 提取版本
-          const version = config.versionPatterns
-            ? extractVersion(url, config.versionPatterns)
-            : null
+          // 提取版本：优先从匹配的 pattern 中提取，再用 versionPatterns
+          let version = null
+          const match = url.match(pattern)
+          if (match && match[1]) {
+            version = match[1] // 从 pattern 捕获组提取
+          }
+          if (!version && config.versionPatterns) {
+            version = extractVersion(url, config.versionPatterns)
+          }
+
+          // 关键修复：配置了版本提取规则但无法提取版本时，跳过替换
+          // 避免：jquery.min.js 无版本号 → 强制使用 3.7.1 → API 不兼容
+          if (
+            (config.versionPatterns && config.versionPatterns.length > 0 && !version) ||
+            (pattern.source.includes('\\d') && !version)
+          ) {
+            // 跳过此库，保留原始 URL
+            continue
+          }
 
           // 按CDN降级链尝试(考虑健康状态)
           const cdnOrder = config.cdnOrder || ['jsdelivr', 'unpkg']
@@ -885,12 +948,18 @@
 
     for (const cdnId of effectiveOrder) {
       const cdn = CDN_BY_ID[cdnId]
-      if (!cdn || cdn._disabled) {continue}
+      if (!cdn || cdn._disabled) {
+        continue
+      }
       const url = buildCDNUrl(cdn, config, version, config.file)
-      if (url) {urls.push({ url, cdnId })}
+      if (url) {
+        urls.push({ url, cdnId })
+      }
     }
 
-    if (urls.length === 0) {return null}
+    if (urls.length === 0) {
+      return null
+    }
 
     const [primary, ...fallbacks] = urls
     primary.fallbackUrls = fallbacks
@@ -900,7 +969,9 @@
   function matchJSLibrary(url) {
     // 优先使用硬编码映射
     const hardcoded = matchFromMap(url, JS_CDN_MAP, 'js')
-    if (hardcoded) {return hardcoded}
+    if (hardcoded) {
+      return hardcoded
+    }
 
     // 硬编码匹配失败，尝试智能 URL 解析
     return smartMatchJSLibrary(url)
@@ -913,11 +984,15 @@
   async function matchJSLibraryAsync(url) {
     // 优先使用硬编码映射
     const hardcoded = matchFromMap(url, JS_CDN_MAP, 'js')
-    if (hardcoded) {return hardcoded}
+    if (hardcoded) {
+      return hardcoded
+    }
 
     // 尝试智能 URL 解析（同步）
     const smart = smartMatchJSLibrary(url)
-    if (smart) {return smart}
+    if (smart) {
+      return smart
+    }
 
     // 最后尝试 jsDelivr API 动态查询（异步）
     return await dynamicMatchJSLibrary(url)
@@ -969,9 +1044,15 @@
       const aIdx = priorityIds.indexOf(a.id)
       const bIdx = priorityIds.indexOf(b.id)
       // 优先级列表中的 CDN 排在前面，按列表顺序排序；不在列表中的保持原顺序
-      if (aIdx !== -1 && bIdx !== -1) {return aIdx - bIdx}
-      if (aIdx !== -1) {return -1}
-      if (bIdx !== -1) {return 1}
+      if (aIdx !== -1 && bIdx !== -1) {
+        return aIdx - bIdx
+      }
+      if (aIdx !== -1) {
+        return -1
+      }
+      if (bIdx !== -1) {
+        return 1
+      }
       return 0
     })
 

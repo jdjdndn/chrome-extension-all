@@ -1,0 +1,208 @@
+{
+  "cdnHealth": {
+    "bootcdn": {
+      "id": "bootcdn",
+      "name": "BootCDN",
+      "healthy": false,
+      "rtt": null,
+      "error": "fetch failed"
+    },
+    "staticfile": {
+      "id": "staticfile",
+      "name": "七牛云",
+      "healthy": true,
+      "rtt": 438,
+      "status": 200
+    },
+    "bytecdntp": {
+      "id": "bytecdntp",
+      "name": "字节CDN",
+      "healthy": false,
+      "rtt": 190,
+      "status": 404
+    },
+    "jsdelivr": {
+      "id": "jsdelivr",
+      "name": "jsDelivr",
+      "healthy": false,
+      "rtt": 641,
+      "status": 400
+    },
+    "cdnjs": {
+      "id": "cdnjs",
+      "name": "cdnjs",
+      "healthy": false,
+      "rtt": null,
+      "error": "The operation was aborted due to timeout"
+    },
+    "unpkg": {
+      "id": "unpkg",
+      "name": "unpkg",
+      "healthy": true,
+      "rtt": 1008,
+      "status": 200
+    }
+  },
+  "libraryTests": [
+    {
+      "cdn": "七牛云",
+      "cdnId": "staticfile",
+      "library": "jquery",
+      "url": "https://cdn.staticfile.org/jquery/3.7.1/jquery.min.js",
+      "success": true,
+      "rtt": 300,
+      "size": null,
+      "contentType": "text/javascript; charset=utf-8",
+      "isJS": true
+    },
+    {
+      "cdn": "unpkg",
+      "cdnId": "unpkg",
+      "library": "jquery",
+      "url": "https://unpkg.com/jquery@3.7.1/dist/jquery.min.js",
+      "success": true,
+      "rtt": 1374,
+      "size": null,
+      "contentType": "text/javascript; charset=utf-8",
+      "isJS": true
+    },
+    {
+      "cdn": "七牛云",
+      "cdnId": "staticfile",
+      "library": "react",
+      "url": "https://cdn.staticfile.org/react/18.2.0/umd/react.production.min.js",
+      "success": true,
+      "rtt": 79,
+      "size": null,
+      "contentType": "text/javascript; charset=utf-8",
+      "isJS": true
+    },
+    {
+      "cdn": "unpkg",
+      "cdnId": "unpkg",
+      "library": "react",
+      "url": "https://unpkg.com/react@18.2.0/umd/react.production.min.js",
+      "success": true,
+      "rtt": 931,
+      "size": null,
+      "contentType": "text/javascript; charset=utf-8",
+      "isJS": true
+    },
+    {
+      "cdn": "七牛云",
+      "cdnId": "staticfile",
+      "library": "vue",
+      "url": "https://cdn.staticfile.org/vue/3.4.21/vue.global.prod.min.js",
+      "success": true,
+      "rtt": 78,
+      "size": null,
+      "contentType": "text/javascript; charset=utf-8",
+      "isJS": true
+    },
+    {
+      "cdn": "unpkg",
+      "cdnId": "unpkg",
+      "library": "vue",
+      "url": "https://unpkg.com/vue@3.4.21/dist/vue.global.js",
+      "success": true,
+      "rtt": 304,
+      "size": null,
+      "contentType": "text/javascript; charset=utf-8",
+      "isJS": true
+    },
+    {
+      "cdn": "七牛云",
+      "cdnId": "staticfile",
+      "library": "lodash",
+      "url": "https://cdn.staticfile.org/lodash.js/4.17.21/lodash.min.js",
+      "success": true,
+      "rtt": 250,
+      "size": null,
+      "contentType": "text/javascript; charset=utf-8",
+      "isJS": true
+    },
+    {
+      "cdn": "unpkg",
+      "cdnId": "unpkg",
+      "library": "lodash",
+      "url": "https://unpkg.com/lodash@4.17.21/lodash.min.js",
+      "success": true,
+      "rtt": 242,
+      "size": null,
+      "contentType": "text/javascript; charset=utf-8",
+      "isJS": true
+    },
+    {
+      "cdn": "七牛云",
+      "cdnId": "staticfile",
+      "library": "axios",
+      "url": "https://cdn.staticfile.org/axios/1.6.7/axios.min.js",
+      "success": true,
+      "rtt": 74,
+      "size": null,
+      "contentType": "text/javascript; charset=utf-8",
+      "isJS": true
+    },
+    {
+      "cdn": "unpkg",
+      "cdnId": "unpkg",
+      "library": "axios",
+      "url": "https://unpkg.com/axios@1.6.7/dist/axios.min.js",
+      "success": true,
+      "rtt": 919,
+      "size": null,
+      "contentType": "text/javascript; charset=utf-8",
+      "isJS": true
+    },
+    {
+      "cdn": "七牛云",
+      "cdnId": "staticfile",
+      "library": "echarts",
+      "url": "https://cdn.staticfile.org/echarts/5.5.0/echarts.min.js",
+      "success": true,
+      "rtt": 101,
+      "size": null,
+      "contentType": "text/javascript; charset=utf-8",
+      "isJS": true
+    },
+    {
+      "cdn": "unpkg",
+      "cdnId": "unpkg",
+      "library": "echarts",
+      "url": "https://unpkg.com/echarts@5.5.0/dist/echarts.min.js",
+      "success": true,
+      "rtt": 297,
+      "size": null,
+      "contentType": "text/javascript; charset=utf-8",
+      "isJS": true
+    },
+    {
+      "cdn": "七牛云",
+      "cdnId": "staticfile",
+      "library": "dayjs",
+      "url": "https://cdn.staticfile.org/dayjs/1.11.10/dayjs.min.js",
+      "success": true,
+      "rtt": 215,
+      "size": null,
+      "contentType": "text/javascript; charset=utf-8",
+      "isJS": true
+    },
+    {
+      "cdn": "unpkg",
+      "cdnId": "unpkg",
+      "library": "dayjs",
+      "url": "https://unpkg.com/dayjs@1.11.10/dayjs.min.js",
+      "success": true,
+      "rtt": 223,
+      "size": null,
+      "contentType": "text/javascript; charset=utf-8",
+      "isJS": true
+    }
+  ],
+  "summary": {
+    "total": 14,
+    "passed": 14,
+    "failed": 0,
+    "warnings": 0
+  }
+}

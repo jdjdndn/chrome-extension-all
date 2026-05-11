@@ -53,7 +53,9 @@ export function createScriptGuard(scriptName) {
 export function withScriptGuard(scriptName, initFn) {
   const guard = createScriptGuard(scriptName)
   return function (...args) {
-    if (guard.check()) return
+    if (guard.check()) {
+      return
+    }
     const result = initFn.apply(this, args)
     guard.markInitialized()
     return result

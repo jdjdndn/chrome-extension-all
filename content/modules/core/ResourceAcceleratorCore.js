@@ -1,6 +1,6 @@
 /**
  * 资源加速器核心引擎
- * 负责插件管理、事件协调、配置管理
+ * 负责插件管理、事件协调、配置管理、错误边界
  */
 
 export class ResourceAcceleratorCore {
@@ -10,13 +10,126 @@ export class ResourceAcceleratorCore {
       initialized: false,
       plugins: new Map(),
       eventListeners: new Map(),
-      caches: new Map()
+      caches: new Map(),
+      degradedModules: new Set(), // 降级模块集合
+      errorLog: [], // 错误日志
     }
+
+    // 降级策略
+    this.fallbackStrategies = new Map()
 
     // 绑定方法
     this.emit = this.emit.bind(this)
     this.on = this.on.bind(this)
     this.off = this.off.bind(this)
+    this.handleError = this.handleError.bind(this)
+  }
+
+  /**
+   * 注册降级策略
+   * @param {string} moduleName - 模块名称
+   * @param {Function} fallback - 降级函数
+   */
+  registerFallback(moduleName, fallback) {
+    this.fallbackStrategies.set(moduleName, fallback)
+    console.log(`[ResourceAcceleratorCore] Fallback registered: ${moduleName}`)
+  }
+
+  /**
+   * 全局错误处理
+   * @param {Error} error - 错误对象
+   * @param {string} moduleName - 模块名称
+   * @param {Object} context - 上下文信息
+   */
+  handleError(error, moduleName, context = {}) {
+    const errorRecord = {
+      timestamp: new Date().toISOString(),
+      module: moduleName,
+      error: error.message,
+      stack: error.stack,
+      context,
+    }
+
+    // 记录错误日志
+    this.state.errorLog.push(errorRecord)
+    if (this.state.errorLog.length > 100) {
+      this.state.errorLog.shift()
+    }
+
+    console.error(`[ResourceAcceleratorCore] Error in ${moduleName}:`, error)
+
+    // 触发错误事件
+    this.emit('error', errorRecord)
+
+    // 尝试降级
+    const fallback = this.fallbackStrategies.get(moduleName)
+    if (fallback) {
+      try {
+        this.state.degradedModules.add(moduleName)
+        const result = fallback(error, context)
+
+        // 发送降级通知
+        this.emit('module:degraded', {
+          module: moduleName,
+          fallback: true,
+          timestamp: Date.now(),
+        })
+
+        return result
+      } catch (fallbackError) {
+        console.error(`[ResourceAcceleratorCore] Fallback failed for ${moduleName}:`, fallbackError)
+        this._disableModule(moduleName)
+      }
+    } else {
+      this._disableModule(moduleName)
+    }
+
+    return null
+  }
+
+  /**
+   * 禁用模块
+   * @param {string} moduleName - 模块名称
+   */
+  _disableModule(moduleName) {
+    this.state.degradedModules.add(moduleName)
+
+    this.emit('module:disabled', {
+      module: moduleName,
+      reason: 'error',
+      timestamp: Date.now(),
+    })
+
+    console.warn(`[ResourceAcceleratorCore] Module disabled: ${moduleName}`)
+  }
+
+  /**
+   * 检查模块是否可用
+   * @param {string} moduleName - 模块名称
+   * @returns {boolean}
+   */
+  isModuleAvailable(moduleName) {
+    return !this.state.degradedModules.has(moduleName)
+  }
+
+  /**
+   * 安全执行（带错误边界）
+   * @param {string} moduleName - 模块名称
+   * @param {Function} fn - 执行函数
+   * @param {Object} context - 上下文
+   * @returns {any}
+   */
+  async safeExecute(moduleName, fn, context = {}) {
+    if (!this.isModuleAvailable(moduleName)) {
+      console.warn(`[ResourceAcceleratorCore] Module ${moduleName} is disabled, skipping`)
+      return null
+    }
+
+    try {
+      return await fn()
+    } catch (error) {
+      return this.handleError(error, moduleName, context)
+    }
   }
 
   /**
@@ -81,7 +194,7 @@ export class ResourceAcceleratorCore {
           await plugin.init()
           console.log(`[ResourceAcceleratorCore] Plugin initialized: ${name}`)
         } catch (error) {
-          console.error(`[ResourceAcceleratorCore] Failed to init plugin ${name}:`, error)
+          this.handleError(error, name, { phase: 'init' })
         }
       }
     }
@@ -111,6 +224,8 @@ export class ResourceAcceleratorCore {
     this.state.plugins.clear()
     this.state.eventListeners.clear()
     this.state.caches.clear()
+    this.state.degradedModules.clear()
+    this.state.errorLog = []
     this.state.initialized = false
 
     console.log('[ResourceAcceleratorCore] All plugins destroyed')
@@ -123,9 +238,11 @@ export class ResourceAcceleratorCore {
    */
   emit(event, data) {
     const listeners = this.state.eventListeners.get(event)
-    if (!listeners) return
+    if (!listeners) {
+      return
+    }
 
-    listeners.forEach(listener => {
+    listeners.forEach((listener) => {
       try {
         listener(data)
       } catch (error) {
@@ -177,8 +294,8 @@ export class ResourceAcceleratorCore {
       stats: {
         hits: 0,
         misses: 0,
-        evictions: 0
-      }
+        evictions: 0,
+      },
     }
 
     this.state.caches.set(name, cache)
@@ -193,7 +310,9 @@ export class ResourceAcceleratorCore {
    */
   getCache(name) {
     const cache = this.state.caches.get(name)
-    if (!cache) return null
+    if (!cache) {
+      return null
+    }
 
     return this._createCacheInterface(cache)
   }
@@ -233,7 +352,7 @@ export class ResourceAcceleratorCore {
 
         cache.data.set(key, {
           value,
-          time: Date.now()
+          time: Date.now(),
         })
       },
 
@@ -250,9 +369,22 @@ export class ResourceAcceleratorCore {
         return {
           ...cache.stats,
           size: cache.data.size,
-          hitRate: total > 0 ? cache.stats.hits / total : 0
+          hitRate: total > 0 ? cache.stats.hits / total : 0,
         }
-      }
+      },
+    }
+  }
+
+  /**
+   * 获取健康状态
+   * @returns {Object}
+   */
+  getHealthStatus() {
+    return {
+      initialized: this.state.initialized,
+      plugins: this.state.plugins.size,
+      degradedModules: Array.from(this.state.degradedModules),
+      recentErrors: this.state.errorLog.slice(-10),
     }
   }
 
@@ -266,7 +398,9 @@ export class ResourceAcceleratorCore {
     const visiting = new Set()
 
     const visit = (name) => {
-      if (visited.has(name)) return
+      if (visited.has(name)) {
+        return
+      }
       if (visiting.has(name)) {
         throw new Error(`Circular dependency detected: ${name}`)
       }
@@ -274,7 +408,9 @@ export class ResourceAcceleratorCore {
       visiting.add(name)
 
       const plugin = this.state.plugins.get(name)
-      if (!plugin) return
+      if (!plugin) {
+        return
+      }
 
       const meta = plugin.constructor.meta
       const dependencies = meta?.dependencies || []

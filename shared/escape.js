@@ -11,7 +11,9 @@
  * @returns {string} - 转义后的文本
  */
 export function escapeHtml(text) {
-  if (!text) return ''
+  if (!text) {
+    return ''
+  }
   return String(text)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -26,7 +28,9 @@ export function escapeHtml(text) {
  * @returns {string} - 原始文本
  */
 export function unescapeHtml(html) {
-  if (!html) return ''
+  if (!html) {
+    return ''
+  }
   return String(html)
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
@@ -41,6 +45,8 @@ export function unescapeHtml(html) {
  * @returns {string} - 转义后的文本
  */
 export function escapeAttribute(text) {
-  if (!text) return ''
+  if (!text) {
+    return ''
+  }
   return String(text).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
 }

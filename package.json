@@ -11,6 +11,7 @@
     "bundle": "node scripts/build-site-bundles.js",
     "bundle:watch": "node scripts/build-site-bundles.js --watch",
     "clean": "node scripts/watch-and-sync.js --clean",
+    "clean:cache": "node -e \"require('./scripts/incremental-build.js').clearCache()\"",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
@@ -19,7 +20,8 @@
     "format:check": "prettier --check .",
     "lint": "eslint . --ignore-pattern dist",
     "lint:fix": "eslint . --ignore-pattern dist --fix",
-    "lint:dataset": "node scripts/check-dataset-selectors.js"
+    "lint:dataset": "node scripts/check-dataset-selectors.js",
+    "verify:cdn": "node scripts/verify-cdn-urls.js"
   },
   "devDependencies": {
     "@types/chrome": "^0.1.40",

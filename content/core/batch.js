@@ -146,7 +146,6 @@
     async executeAll(operations, options = {}) {
       const { concurrency = this.maxConcurrency, onProgress, onAllComplete } = options
       const results = []
-      const errors = []
       const startTime = Date.now()
 
       // 添加所有操作

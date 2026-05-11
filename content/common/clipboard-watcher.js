@@ -6,7 +6,9 @@
 'use strict'
 ;(function () {
   // 避免重复初始化
-  if (window.ClipboardWatcherInitialized) {return}
+  if (window.ClipboardWatcherInitialized) {
+    return
+  }
   window.ClipboardWatcherInitialized = true
 
   /**
@@ -14,7 +16,9 @@
    * @param {string} text - 剪贴板内容
    */
   async function recordClipboard(text) {
-    if (!text || text.trim().length === 0) {return}
+    if (!text || text.trim().length === 0) {
+      return
+    }
 
     try {
       // 发送到 background 记录
@@ -39,7 +43,7 @@
   /**
    * 监听 copy 事件
    */
-  document.addEventListener('copy', (event) => {
+  document.addEventListener('copy', () => {
     // 延迟读取剪贴板，确保内容已写入
     setTimeout(async () => {
       try {
@@ -63,7 +67,7 @@
   /**
    * 监听 cut 事件
    */
-  document.addEventListener('cut', (event) => {
+  document.addEventListener('cut', () => {
     setTimeout(async () => {
       try {
         if (navigator.clipboard && navigator.clipboard.readText) {

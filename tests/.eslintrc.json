@@ -1,0 +1,18 @@
+{
+  "env": {
+    "browser": true,
+    "es2021": true
+  },
+  "globals": {
+    "REDIRECT_LINKS_CONFIG": "readonly",
+    "RedirectLinksUtils": "readonly",
+    "RedirectLinksTest": "writable",
+    "EventBus": "readonly",
+    "ResourceAccelerator": "readonly",
+    "chrome": "readonly"
+  },
+  "rules": {
+    "no-unused-vars": "off",
+    "no-console": "off"
+  }
+}

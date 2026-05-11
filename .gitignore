@@ -1,6 +1,9 @@
 # Dependencies
 node_modules/
 
+# Build cache (in node_modules/.cache/)
+# .build-cache.json 已移动到 node_modules/.cache/build-cache.json
+
 # Build output
 dist/
 

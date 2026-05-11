@@ -12,8 +12,6 @@
 
 const isExtensionContext = typeof chrome !== 'undefined' && chrome.storage
 
-// 存储的键前缀
-const KEY_PREFIX = '__sb__'
 const STORAGE_CHANGED_EVENT = 'STORAGE_CHANGED'
 const STORAGE_READY_EVENT = 'STORAGE_READY'
 
@@ -146,7 +144,9 @@ export function init() {
  * @returns {Promise<object>}
  */
 export async function get(keys, area = 'local') {
-  if (!isExtensionContext) return null
+  if (!isExtensionContext) {
+    return null
+  }
 
   // 检查缓存
   if (typeof keys === 'string') {
@@ -176,7 +176,9 @@ export async function get(keys, area = 'local') {
  * @returns {Promise<boolean>}
  */
 export async function set(data, area = 'local') {
-  if (!isExtensionContext) return false
+  if (!isExtensionContext) {
+    return false
+  }
 
   try {
     await chrome.storage[area].set(data)
@@ -194,7 +196,9 @@ export async function set(data, area = 'local') {
  * @returns {Promise<boolean>}
  */
 export async function remove(keys, area = 'local') {
-  if (!isExtensionContext) return false
+  if (!isExtensionContext) {
+    return false
+  }
 
   try {
     await chrome.storage[area].remove(keys)
@@ -255,7 +259,7 @@ export function subscribe(callback) {
 export async function reactive(key, defaultValue = null, area = 'local') {
   // 获取初始值
   const result = await get(key, area)
-  let value = result?.[key] ?? defaultValue
+  const value = result?.[key] ?? defaultValue
 
   // 创建响应式对象
   const reactiveObj = {
@@ -269,7 +273,9 @@ export async function reactive(key, defaultValue = null, area = 'local') {
     },
 
     set value(newValue) {
-      if (this._value === newValue) return
+      if (this._value === newValue) {
+        return
+      }
       const oldValue = this._value
       this._value = newValue
       // 异步保存，不等待结果
@@ -282,7 +288,9 @@ export async function reactive(key, defaultValue = null, area = 'local') {
       this._listeners.push(callback)
       return () => {
         const index = this._listeners.indexOf(callback)
-        if (index > -1) this._listeners.splice(index, 1)
+        if (index > -1) {
+          this._listeners.splice(index, 1)
+        }
       }
     },
 

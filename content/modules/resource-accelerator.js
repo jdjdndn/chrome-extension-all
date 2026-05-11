@@ -277,6 +277,23 @@
       nearbyThreshold: 1, // �������صľ�����ֵ����������Ĭ��1��
       processLoaded: false, // �Ѽ�����Դ�Ƿ����´���
     },
+    // viewport 优先处理
+    viewportPriority: {
+      enabled: true,
+      idleTimeout: 100, // 空闲超时 ms
+      maxConcurrentIdle: 1, // 最大并发空闲任务
+      viewportBudget: 800, // 视口处理预算 ms
+      backgroundBudget: 300, // 后台每批预算 ms
+      viewportBatchSize: 5, // 视口批处理大小
+      backgroundBatchSize: 3, // 后台批处理大小
+      backgroundInterval: 1000, // 后台间隔 ms
+      budgetCheckInterval: 5, // 每 N 个资源检测一次预算
+      viewportRootMargin: '100px', // IntersectionObserver 预加载边距
+      viewportTimeout: 100, // viewport 检测超时 ms
+      processedUrlsMaxSize: 1000, // 最大缓存条目
+      processedUrlsTTL: 300000, // 缓存过期时间 ms (5分钟)
+      lowEndMultiplier: 1.5, // 低端设备预算倍数
+    },
   }
 
   // ========== ��־ϵͳ ==========
@@ -328,7 +345,9 @@
    * ���ȴ�����־�־û���������
    */
   function _scheduleErrorLogPersist() {
-    if (_logPersistTimer) {return}
+    if (_logPersistTimer) {
+      return
+    }
     _logPersistTimer = setTimeout(async () => {
       _logPersistTimer = null
       try {
@@ -457,12 +476,432 @@
     _styleChangeObserver: null,
     // ͼƬ���Լ�����
     _imageRetryCount: new Map(),
+    // viewport 优先处理状态
+    processedUrls: new Set(),
+    _viewportObserver: null,
+    _pendingViewportResources: new Set(),
+    _viewportConfig: null,
   }
 
   // ͼƬ��������
   const IMAGE_RETRY_MAX = 3
   const IMAGE_RETRY_DELAY_MS = 500
 
+  // ========== viewport 优先处理函数 ==========
+
+  /**
+   * 初始化 viewport 配置
+   */
+  function _initViewportConfig() {
+    if (state._viewportConfig) {
+      return state._viewportConfig
+    }
+
+    const config = state.config.viewportPriority || {}
+    state._viewportConfig = {
+      idleTimeout: config.idleTimeout || 100,
+      maxConcurrentIdle: config.maxConcurrentIdle || 1,
+      viewportBudget: config.viewportBudget || 800,
+      backgroundBudget: config.backgroundBudget || 300,
+      viewportBatchSize: config.viewportBatchSize || 5,
+      backgroundBatchSize: config.backgroundBatchSize || 3,
+      backgroundInterval: config.backgroundInterval || 1000,
+      budgetCheckInterval: config.budgetCheckInterval || 5,
+      viewportRootMargin: config.viewportRootMargin || '100px',
+      viewportTimeout: config.viewportTimeout || 100,
+      processedUrlsMaxSize: config.processedUrlsMaxSize || 1000,
+      processedUrlsTTL: config.processedUrlsTTL || 300000,
+      lowEndMultiplier: config.lowEndMultiplier || 1.5,
+    }
+
+    // 低端设备调整
+    const isLowEnd =
+      navigator.hardwareConcurrency <= 2 ||
+      navigator.deviceMemory <= 2 ||
+      navigator.connection?.effectiveType === '2g'
+
+    if (isLowEnd) {
+      state._viewportConfig.viewportBudget *= state._viewportConfig.lowEndMultiplier
+      state._viewportConfig.backgroundBatchSize = Math.max(
+        2,
+        Math.floor(state._viewportConfig.backgroundBatchSize / 2)
+      )
+      state._viewportConfig.backgroundInterval = 2000
+    }
+
+    return state._viewportConfig
+  }
+
+  /**
+   * viewport 过滤（IntersectionObserver）
+   */
+  function _filterByViewport(resources) {
+    return new Promise((resolve) => {
+      // DOM 不完整时降级
+      if (!document.body || document.readyState === 'loading') {
+        const config = _initViewportConfig()
+        resolve(resources.slice(0, config.viewportBatchSize))
+        return
+      }
+
+      const visible = []
+      const config = _initViewportConfig()
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              visible.push(entry.target)
+            }
+          })
+        },
+        { rootMargin: config.viewportRootMargin }
+      )
+
+      resources.forEach((r) => observer.observe(r))
+
+      // 超时兜底
+      setTimeout(() => {
+        observer.disconnect()
+        resolve(visible)
+      }, config.viewportTimeout)
+    })
+  }
+
+  /**
+   * 设置 viewport 观察器
+   */
+  function _setupViewportObserver(processFn) {
+    if (state._viewportObserver) {
+      return
+    }
+
+    const config = _initViewportConfig()
+    state._viewportObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && state._pendingViewportResources.has(entry.target)) {
+            state._pendingViewportResources.delete(entry.target)
+            processFn(entry.target).catch((err) => {
+              addLog('warn', 'image', 'viewport_error', { error: err.message })
+            })
+          }
+        })
+      },
+      { rootMargin: config.viewportRootMargin }
+    )
+  }
+
+  /**
+   * 监听资源进入 viewport
+   */
+  function _watchForViewport(resource, processFn) {
+    if (!state._viewportObserver) {
+      _setupViewportObserver(processFn)
+    }
+    state._pendingViewportResources.add(resource)
+    state._viewportObserver.observe(resource)
+  }
+
+  /**
+   * 判断资源类型
+   */
+  function _getResourceType(resource) {
+    if (resource.tagName === 'IMG') {
+      return 'image'
+    }
+    if (resource.tagName === 'SCRIPT') {
+      if (_isAnalyticsScript(resource.src)) {
+        return 'analytics'
+      }
+      return 'core-js'
+    }
+    if (resource.tagName === 'LINK') {
+      if (resource.rel === 'stylesheet') {
+        return 'css'
+      }
+      if (resource.as === 'font') {
+        return 'font'
+      }
+    }
+    return 'other'
+  }
+
+  /**
+   * 判断是否统计/广告脚本
+   */
+  function _isAnalyticsScript(src) {
+    if (!src) {
+      return false
+    }
+    const patterns = [
+      'google-analytics',
+      'googletagmanager',
+      'baidu.com/hm',
+      'cnzz.com',
+      'umeng.com',
+      'jsagent',
+      'analytics',
+      'tracker',
+      'facebook.net/tr',
+      'twitter.com/i/adsct',
+      'hotjar',
+      'segment.com',
+      'mixpanel',
+      'amplitude',
+      'sentry',
+    ]
+    return patterns.some((p) => src.toLowerCase().includes(p))
+  }
+
+  /**
+   * 性能预算处理
+   */
+  async function _batchProcessWithBudget(resources, budgetMs, processFn) {
+    const startTime = performance.now()
+    const config = _initViewportConfig()
+    const results = { processed: 0, skipped: 0, errors: 0 }
+
+    for (let i = 0; i < resources.length; i++) {
+      // 每 N 个资源检测一次预算
+      if (i % config.budgetCheckInterval === 0) {
+        if (performance.now() - startTime > budgetMs) {
+          addLog('warn', 'system', 'budget_timeout', {
+            processed: results.processed,
+            remaining: resources.length - i,
+          })
+          results.skipped = resources.length - i
+          break
+        }
+      }
+
+      // 单资源错误不影响整批
+      try {
+        await processFn(resources[i])
+        results.processed++
+      } catch (err) {
+        results.errors++
+        addLog('warn', 'system', 'process_error', { error: err.message })
+      }
+    }
+
+    return results
+  }
+
+  /**
+   * 后台分批调度
+   */
+  function _scheduleBackgroundBatch(resources, processFn) {
+    const config = _initViewportConfig()
+    let index = 0
+    const batchSize = config.backgroundBatchSize
+
+    const processBatch = async () => {
+      const batch = resources.slice(index, index + batchSize)
+      if (batch.length === 0) {
+        return
+      }
+
+      await _batchProcessWithBudget(batch, config.backgroundBudget, processFn)
+      index += batchSize
+
+      if (index < resources.length) {
+        setTimeout(processBatch, config.backgroundInterval)
+      }
+    }
+
+    // 首次延迟启动
+    setTimeout(processBatch, config.backgroundInterval)
+  }
+
+  /**
+   * 清理已处理URL缓存
+   */
+  function _cleanupProcessedUrls() {
+    const config = _initViewportConfig()
+    if (state.processedUrls.size > config.processedUrlsMaxSize) {
+      // 清空一半
+      const entries = Array.from(state.processedUrls)
+      const keepCount = Math.floor(config.processedUrlsMaxSize / 2)
+      state.processedUrls = new Set(entries.slice(-keepCount))
+      addLog('info', 'system', 'cache_cleanup', { remaining: state.processedUrls.size })
+    }
+  }
+
+  // 定期清理
+  setInterval(_cleanupProcessedUrls, 300000) // 5分钟
+
+  // ========== 批量脚本替换器 ==========
+
+  class BatchScriptReplacer {
+    constructor(config = {}) {
+      this.config = {
+        batchSize: 15,
+        batchDelay: 50,
+        maxConcurrent: 5,
+        priorityOrder: [
+          ['jquery', 'react', 'vue', 'angular', 'backbone'],
+          ['lodash', 'underscore', 'axios', 'moment', 'dayjs'],
+          ['echarts', 'd3', 'chart', 'three', 'gsap'],
+        ],
+        ...config,
+      }
+      this.queue = []
+      this.loading = new Set()
+      this.loaded = new Map()
+      this.stats = { total: 0, replaced: 0, errors: 0, skipped: 0 }
+    }
+
+    collect(scripts, options = {}) {
+      const items = []
+      const { isExcluded, isCDNUrl, matchAdvancedFilter, matchJSLibrary } = options
+
+      for (const script of scripts) {
+        const url = script.src
+        if (!url || script.dataset._raProcessed) {
+          continue
+        }
+
+        if (isExcluded?.(url) || isCDNUrl?.(url)) {
+          script.dataset._raProcessed = '1'
+          this.stats.skipped++
+          continue
+        }
+
+        const filterResult = matchAdvancedFilter?.(url)
+        if (filterResult?.matched) {
+          if (filterResult.action === 'skipAll' || filterResult.action === 'skipReplace') {
+            script.dataset._raProcessed = '1'
+            this.stats.skipped++
+            continue
+          }
+        }
+
+        const match = matchJSLibrary?.(url)
+        if (!match) {
+          continue
+        }
+
+        if (this.loaded.has(match.name)) {
+          script.remove()
+          addLog('info', 'script', 'dedup', { url, reason: 'duplicate: ' + match.name })
+          this.stats.skipped++
+          continue
+        }
+
+        script.dataset._raProcessed = '1'
+        items.push({ script, match, priority: this._getPriority(match.name) })
+        this.stats.total++
+      }
+
+      items.sort((a, b) => a.priority - b.priority)
+      this.queue = items
+      return items.length
+    }
+
+    _getPriority(libName) {
+      const name = libName.toLowerCase()
+      for (let i = 0; i < this.config.priorityOrder.length; i++) {
+        if (this.config.priorityOrder[i].some((p) => name.includes(p))) {
+          return i
+        }
+      }
+      return 99
+    }
+
+    async execute() {
+      const batches = []
+      while (this.queue.length > 0) {
+        batches.push(this.queue.splice(0, this.config.batchSize))
+      }
+
+      for (let i = 0; i < batches.length; i++) {
+        await this._processBatch(batches[i])
+        if (i < batches.length - 1) {
+          await this._delay(this.config.batchDelay)
+        }
+      }
+      return this.stats
+    }
+
+    async _processBatch(batch) {
+      return new Promise((resolve) => {
+        if (batch.length === 0) {
+          resolve()
+          return
+        }
+        let completed = 0
+        const checkComplete = () => {
+          completed++
+          if (completed >= batch.length) {
+            resolve()
+          }
+        }
+        for (const item of batch) {
+          this._replaceScript(item, checkComplete)
+        }
+      })
+    }
+
+    _replaceScript(item, onComplete) {
+      const { script, match } = item
+      const originalSrc = script.src
+
+      const newScript = document.createElement('script')
+      newScript.src = match.cdnUrl
+      newScript.async = false
+      newScript.dataset._replacedFrom = originalSrc
+      newScript.dataset._cdnName = match.cdnName
+
+      const fallbacks = match.fallbackUrls ? [...match.fallbackUrls] : []
+
+      newScript.onload = () => {
+        this.loaded.set(match.name, match.cdnUrl)
+        this.loading.delete(match.cdnUrl)
+        this.stats.replaced++
+        script.remove()
+        addLog('info', 'script', 'replace', {
+          url: originalSrc,
+          cdn: match.cdnUrl,
+          reason: match.name,
+        })
+        console.log(LOG_PREFIX + ' \u2705 ' + match.name + ': ' + match.cdnName)
+        onComplete()
+      }
+
+      newScript.onerror = () => {
+        if (fallbacks.length > 0) {
+          const fallback = fallbacks.shift()
+          newScript.src = fallback.url
+          console.log(LOG_PREFIX + ' \u26a0\ufe0f ' + match.name + ': fallback')
+        } else {
+          this.loading.delete(match.cdnUrl)
+          this.stats.errors++
+          addLog('error', 'script', 'error', {
+            url: originalSrc,
+            cdn: match.cdnUrl,
+            reason: 'all_fallbacks_failed',
+          })
+          console.warn(LOG_PREFIX + ' \u274c ' + match.name + ': keep original')
+          onComplete()
+        }
+      }
+
+      this.loading.add(match.cdnUrl)
+      ;(document.head || document.documentElement).appendChild(newScript)
+    }
+
+    _delay(ms) {
+      return new Promise((r) => setTimeout(r, ms))
+    }
+    reset() {
+      this.queue = []
+      this.loading.clear()
+      this.loaded.clear()
+      this.stats = { total: 0, replaced: 0, errors: 0, skipped: 0 }
+    }
+  }
+
+  let _batchReplacer = null
   // ========== ͳ�Ƴ־û������� + ������==========
 
   let _statsTimer = null
@@ -478,7 +917,9 @@
   }
 
   function _persistStats() {
-    if (_statsTimer) {return}
+    if (_statsTimer) {
+      return
+    }
     _statsTimer = setTimeout(async () => {
       _statsTimer = null
       try {
@@ -541,7 +982,9 @@
       let evictSize = 0
 
       for (const [key, entry] of state._compressCache.entries()) {
-        if (!entry || entry.skip) {continue}
+        if (!entry || entry.skip) {
+          continue
+        }
 
         const accessCount = entry.accessCount || 1
         const age = now - (entry.lastAccess || entry.timestamp || now)
@@ -590,7 +1033,9 @@
   let _networkChangeListener = null
 
   function _initNetworkChangeListener() {
-    if (!navigator.connection) {return}
+    if (!navigator.connection) {
+      return
+    }
 
     _networkChangeListener = () => {
       const oldQuality = state._lastNetworkQuality
@@ -617,7 +1062,9 @@
    * @returns {'fast'|'medium'|'slow'}
    */
   function detectNetworkQuality() {
-    if (!navigator.connection) {return state._lastNetworkQuality || 'medium'}
+    if (!navigator.connection) {
+      return state._lastNetworkQuality || 'medium'
+    }
 
     const effectiveType = navigator.connection.effectiveType
     const downlink = navigator.connection.downlink
@@ -644,19 +1091,29 @@
    * @returns {'high'|'medium'|'low'}
    */
   function detectDeviceTier() {
-    if (_cachedDeviceTier) {return _cachedDeviceTier}
+    if (_cachedDeviceTier) {
+      return _cachedDeviceTier
+    }
 
     let tier = 'medium'
     // ����ʹ�� deviceMemory API
     if (navigator.deviceMemory) {
-      if (navigator.deviceMemory >= 8) {tier = 'high'}
-      else if (navigator.deviceMemory >= 4) {tier = 'medium'}
-      else {tier = 'low'}
+      if (navigator.deviceMemory >= 8) {
+        tier = 'high'
+      } else if (navigator.deviceMemory >= 4) {
+        tier = 'medium'
+      } else {
+        tier = 'low'
+      }
     } else if (navigator.hardwareConcurrency) {
       // ���ˣ�����Ӳ���������ж�
-      if (navigator.hardwareConcurrency >= 8) {tier = 'high'}
-      else if (navigator.hardwareConcurrency >= 4) {tier = 'medium'}
-      else {tier = 'low'}
+      if (navigator.hardwareConcurrency >= 8) {
+        tier = 'high'
+      } else if (navigator.hardwareConcurrency >= 4) {
+        tier = 'medium'
+      } else {
+        tier = 'low'
+      }
     }
 
     _cachedDeviceTier = tier
@@ -739,8 +1196,12 @@
   }
 
   function isExcluded(url) {
-    if (!url || typeof url !== 'string') {return true}
-    if (/^chrome-extension:|^moz-extension:|^about:|^data:|^javascript:/i.test(url)) {return true}
+    if (!url || typeof url !== 'string') {
+      return true
+    }
+    if (/^chrome-extension:|^moz-extension:|^about:|^data:|^javascript:/i.test(url)) {
+      return true
+    }
     return (state.config.excludeUrls || []).some((pattern) => {
       try {
         return new RegExp(pattern.replace(/\*/g, '.*'), 'i').test(url)
@@ -751,7 +1212,9 @@
   }
 
   function isCDNUrl(url) {
-    if (!window.CDNMappings?.CDN_SOURCES) {return false}
+    if (!window.CDNMappings?.CDN_SOURCES) {
+      return false
+    }
     return window.CDNMappings.CDN_SOURCES.some((cdn) => {
       try {
         return url.includes(new URL(cdn.baseUrl).hostname)
@@ -771,8 +1234,12 @@
       const urlObj = new URL(url)
       const pageBase = getBaseDomain(location.hostname)
       const scriptBase = getBaseDomain(urlObj.hostname)
-      if (pageBase === scriptBase) {return false}
-      if (isCDNUrl(url)) {return false}
+      if (pageBase === scriptBase) {
+        return false
+      }
+      if (isCDNUrl(url)) {
+        return false
+      }
       return true
     } catch {
       return false
@@ -786,11 +1253,15 @@
 
     // ��ȷƥ������
     const exact = rules.find((r) => r.domain === hostname)
-    if (exact) {return exact}
+    if (exact) {
+      return exact
+    }
 
     // ͨ���ƥ�� (*.domain.com)
     const wildcard = rules.find((r) => {
-      if (!r.domain.startsWith('*')) {return false}
+      if (!r.domain.startsWith('*')) {
+        return false
+      }
       const suffix = r.domain.slice(1)
       return hostname.endsWith(suffix)
     })
@@ -802,10 +1273,14 @@
     const site = getSiteConfig(location.hostname)
 
     // վ�㼶����ȫ����
-    if (site && site.enabled === false) {return false}
+    if (site && site.enabled === false) {
+      return false
+    }
 
     // վ�㼶���ܿ���
-    if (site && feature in site) {return site[feature]}
+    if (site && feature in site) {
+      return site[feature]
+    }
 
     // ���˵�ȫ������
     return state.config[feature]
@@ -859,8 +1334,12 @@
 
       if (matches) {
         // ��� type �Ƿ�ƥ��
-        if (rule.type === 'include' && !context.isInclude) {continue}
-        if (rule.type === 'exclude' && context.isInclude) {continue}
+        if (rule.type === 'include' && !context.isInclude) {
+          continue
+        }
+        if (rule.type === 'exclude' && context.isInclude) {
+          continue
+        }
 
         return { matched: true, action: rule.action, rule }
       }
@@ -916,19 +1395,7 @@
     return null
   }
 
-  function supportsWebP() {
-    if (state._supportsWebP !== undefined) {return state._supportsWebP}
-    try {
-      const canvas = document.createElement('canvas')
-      canvas.width = 1
-      canvas.height = 1
-      state._supportsWebP = canvas.toDataURL('image/webp').startsWith('data:image/webp')
-    } catch {
-      state._supportsWebP = false
-    }
-    return state._supportsWebP
-  }
-
+  // WebP 支持检测状态
   const IMAGE_FORMAT_PRIORITY = [
     { mime: 'image/avif', test: 'image/avif' },
     { mime: 'image/webp', test: 'image/webp' },
@@ -936,7 +1403,9 @@
   ]
 
   function getSupportedImageFormat() {
-    if (state._imageFormat) {return state._imageFormat}
+    if (state._imageFormat) {
+      return state._imageFormat
+    }
     const canvas = document.createElement('canvas')
     canvas.width = 1
     canvas.height = 1
@@ -959,16 +1428,24 @@
   }
 
   function getWeightPriority(weight) {
-    if (!weight || weight === 'unknown') {return 99}
+    if (!weight || weight === 'unknown') {
+      return 99
+    }
     const w = parseInt(weight)
-    if (w === 400 || weight === 'normal') {return 0}
-    if (w === 700 || weight === 'bold') {return 1}
+    if (w === 400 || weight === 'normal') {
+      return 0
+    }
+    if (w === 700 || weight === 'bold') {
+      return 1
+    }
     return 2
   }
 
   function parseFontWeight(url) {
     const queryMatch = url.match(/wght[@=](\d+)/i)
-    if (queryMatch) {return queryMatch[1]}
+    if (queryMatch) {
+      return queryMatch[1]
+    }
     const nameMatch = url.match(/-(Regular|Bold|Light|Medium|SemiBold|ExtraBold|Thin|Black)/i)
     if (nameMatch) {
       const map = {
@@ -990,7 +1467,9 @@
 
   function matchDeferralRule(url) {
     const deferral = state.config.thirdPartyDeferral
-    if (!deferral?.enabled) {return null}
+    if (!deferral?.enabled) {
+      return null
+    }
 
     // 1. User-defined rules (regex match, highest priority)
     for (const rule of deferral.userRules || []) {
@@ -1020,7 +1499,9 @@
   }
 
   function deferScript(script, strategy) {
-    if (state.cspRestricted) {return}
+    if (state.cspRestricted) {
+      return
+    }
 
     const src = script.src
     script.removeAttribute('src')
@@ -1029,7 +1510,9 @@
     script.dataset._raDeferralTime = Date.now()
 
     const loadFn = () => {
-      if (script.dataset._raLoaded) {return}
+      if (script.dataset._raLoaded) {
+        return
+      }
       script.src = script.dataset._deferredSrc
       script.dataset._raLoaded = 'true'
       console.log(`${LOG_PREFIX} �������ű��ӳټ������: ${src.substring(0, 60)}...`)
@@ -1049,7 +1532,9 @@
     const origOnload = script.onload
     script.onload = () => {
       clearTimeout(forceLoadTimer)
-      if (origOnload) {origOnload.call(script)}
+      if (origOnload) {
+        origOnload.call(script)
+      }
     }
 
     switch (strategy) {
@@ -1077,11 +1562,19 @@
 
   // ========== �������أ��ű����� ==========
 
+  // ========== 批量脚本处理 ==========
+
   async function processScript(script) {
-    if (state.cspRestricted) {return}
-    if (!isSiteEnabled('jsReplace')) {return}
+    if (state.cspRestricted) {
+      return
+    }
+    if (!isSiteEnabled('jsReplace')) {
+      return
+    }
     const url = script.src
-    if (!url || script.dataset._raProcessed) {return}
+    if (!url || script.dataset._raProcessed) {
+      return
+    }
 
     script.dataset._raProcessed = '1'
 
@@ -1090,7 +1583,6 @@
       return
     }
 
-    // �߼����˼��
     const filterResult = matchAdvancedFilter(url)
     if (filterResult.matched) {
       if (filterResult.action === 'skipAll' || filterResult.action === 'skipReplace') {
@@ -1099,18 +1591,16 @@
       }
     }
 
-    // ȥ�ؼ�飺ͬһԭʼURL���ظ��滻
+    // 去重检查
     if (state.config.dedupEnabled && state.dedupSet.has(url)) {
       addLog('info', 'script', 'skip', { url, reason: 'deduplicated' })
       return
     }
 
     const startTime = performance.now()
-
-    // ʹ���첽ƥ�䣨֧�� jsDelivr API ��̬��ѯ��
     const match = await window.CDNMappings?.matchJSLibraryAsync?.(url)
 
-    // CDN �޷��滻 �� ���Ե������ӳ�
+    // 无 CDN 匹配：尝试第三方延迟
     if (!match) {
       if (state.config.thirdPartyDeferral?.enabled && state.config.jsReplace) {
         const deferralRule = matchDeferralRule(url)
@@ -1124,7 +1614,9 @@
             strategy: deferralRule.strategy,
             timestamp: Date.now(),
           })
-          if (state.recentReplacements.length > 50) {state.recentReplacements.shift()}
+          if (state.recentReplacements.length > 50) {
+            state.recentReplacements.shift()
+          }
           _persistStats()
           addLog('info', 'deferral', 'defer', {
             url,
@@ -1139,70 +1631,91 @@
       return
     }
 
-    const originalSrc = script.src
-    script.dataset._originalSrc = originalSrc
+    // 使用 BatchScriptReplacer 处理单个脚本
+    if (!_batchReplacer) {
+      _batchReplacer = new BatchScriptReplacer()
+    }
 
-    // Preload
-    addPreloadHint(match.cdnUrl, 'js')
-
-    const fallbacks = (match.fallbackUrls || []).map((f) => f.url)
-    script.src = match.cdnUrl
-
-    script.onerror = () => {
-      if (fallbacks.length > 0) {
-        script.src = fallbacks.shift()
-      } else {
-        script.src = originalSrc
-        state.stats.jsErrors++
-        addLog('error', 'script', 'error', {
-          url: originalSrc,
+    // 创建临时队列处理单个脚本
+    const item = { script, match, priority: _batchReplacer._getPriority(match.name) }
+    await new Promise((resolve) => {
+      _batchReplacer._replaceScript(item, () => {
+        // 更新统计
+        state.stats.jsReplaced++
+        state.recentReplacements.push({
+          type: 'js',
+          name: match.name,
+          original: script.dataset._replacedFrom || url,
           cdn: match.cdnUrl,
-          reason: 'all_fallbacks_failed',
+          timestamp: Date.now(),
+          isAutoDetected: match.isAutoDetected,
+          isDynamic: match.isDynamic,
         })
-      }
-    }
-
-    state.stats.jsReplaced++
-    state.recentReplacements.push({
-      type: 'js',
-      name: match.name,
-      original: originalSrc,
-      cdn: match.cdnUrl,
-      timestamp: Date.now(),
-      isAutoDetected: match.isAutoDetected,
-      isDynamic: match.isDynamic,
+        if (state.recentReplacements.length > 50) {
+          state.recentReplacements.shift()
+        }
+        _persistStats()
+        if (state.config.dedupEnabled) {
+          state.dedupSet.add(url)
+        }
+        resolve()
+      })
     })
-    if (state.recentReplacements.length > 50) {
-      state.recentReplacements.shift()
-    }
-    _persistStats()
-    if (state.config.dedupEnabled) {state.dedupSet.add(originalSrc)}
-
-    addLog('info', 'script', 'replace', {
-      url: originalSrc,
-      original: originalSrc,
-      cdn: match.cdnUrl,
-      reason: match.name,
-      duration: Math.round(performance.now() - startTime),
-    })
-
-    // Apply priority optimization
-    if (_priorityOptimizer) {
-      _priorityOptimizer.applyPriorityToResource(script, url, 'script')
-    }
-
-    console.log(
-      `${LOG_PREFIX} JS: ${match.name} �� ${match.cdnName}${match.isDynamic ? ' (dynamic)' : ''}`
-    )
   }
 
-  // ========== �������أ���ʽ/���崦�� ==========
+  // 批量处理页面现有脚本
+  async function batchProcessExistingScripts() {
+    if (state.cspRestricted) {
+      return
+    }
+    if (!isSiteEnabled('jsReplace')) {
+      return
+    }
 
+    const allScripts = Array.from(document.querySelectorAll('script[src]'))
+    if (allScripts.length === 0) {
+      return
+    }
+
+    // viewport 优先：只处理统计脚本，核心 JS 跳过
+    const analyticsScripts = allScripts.filter((s) => {
+      const url = s.src
+      if (!url || state.processedUrls.has(url)) {
+        return false
+      }
+      return _isAnalyticsScript(url)
+    })
+
+    if (analyticsScripts.length === 0) {
+      addLog('info', 'script', 'skip', { reason: 'no_analytics_scripts' })
+      return
+    }
+
+    // 统计脚本延迟到后台处理
+    _scheduleBackgroundBatch(analyticsScripts, async (script) => {
+      const url = script.src
+      state.processedUrls.add(url)
+      // 标记已处理
+      script.dataset._raProcessed = '1'
+      addLog('info', 'script', 'analytics_deferred', { url: url.substring(0, 60) })
+    })
+
+    addLog('info', 'script', 'batch_schedule', {
+      analyticsCount: analyticsScripts.length,
+      totalScripts: allScripts.length,
+    })
+  }
   function processLink(link) {
-    if (state.cspRestricted) {return}
-    if (!isSiteEnabled('fontReplace') && !isSiteEnabled('cssReplace')) {return}
+    if (state.cspRestricted) {
+      return
+    }
+    if (!isSiteEnabled('fontReplace') && !isSiteEnabled('cssReplace')) {
+      return
+    }
     const url = link.href
-    if (!url || link.dataset._raProcessed) {return}
+    if (!url || link.dataset._raProcessed) {
+      return
+    }
 
     link.dataset._raProcessed = '1'
 
@@ -1294,7 +1807,9 @@
       state.recentReplacements.shift()
     }
     _persistStats()
-    if (state.config.dedupEnabled) {state.dedupSet.add(originalHref)}
+    if (state.config.dedupEnabled) {
+      state.dedupSet.add(originalHref)
+    }
 
     addLog('info', fontMatch ? 'style' : 'style', 'replace', {
       url: originalHref,
@@ -1325,11 +1840,18 @@
       }
     }
 
-    if (!isSiteEnabled('imageLazyLoad')) {return}
-    if (img.dataset._raProcessed || !img.src || img.dataset.src || img.src.startsWith('data:'))
-      {return}
-    if (img.loading === 'eager' || img.hasAttribute('data-no-lazy')) {return}
-    if (img.complete && img.naturalWidth > 0) {return}
+    if (!isSiteEnabled('imageLazyLoad')) {
+      return
+    }
+    if (img.dataset._raProcessed || !img.src || img.dataset.src || img.src.startsWith('data:')) {
+      return
+    }
+    if (img.loading === 'eager' || img.hasAttribute('data-no-lazy')) {
+      return
+    }
+    if (img.complete && img.naturalWidth > 0) {
+      return
+    }
 
     // �߼����˼��
     const filterResult = matchAdvancedFilter(img.src)
@@ -1342,17 +1864,27 @@
 
     img.dataset._raProcessed = '1'
 
-    // λ�ø�֪���أ����ͼƬλ��
+    // 位置感知加载：判断图片位置
     const positionState = _getResourcePositionPriority(img)
 
-    // far ��������ӳټ��ع۲죬����������
+    // 如果元素不可见（rect全0），跳过本次处理，保持原样
+    // 等待元素可见后会通过 _recheckVisibleLazyImages 再次处理
+    if (positionState.distance === Infinity) {
+      delete img.dataset._raProcessed
+      addLog('info', 'image', 'skip_invisible', { url: img.src, reason: 'element_not_visible' })
+      return
+    }
+
+    // far 区域：加入延迟加载观察，不阻塞渲染
     if (positionState.zone === 'far') {
       if (img.src && !img.dataset.lazySrc) {
         img.dataset.lazySrc = img.src
         // ʹ��͸��ռλͼ���ֲ���
         img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
       }
-      if ('fetchPriority' in img) {img.fetchPriority = 'low'}
+      if ('fetchPriority' in img) {
+        img.fetchPriority = 'low'
+      }
       img.loading = 'lazy'
       img.dataset._raLazyLoad = '1'
       _observeLazyLoad(img)
@@ -1374,7 +1906,9 @@
     // ������ͼƬ���������أ����ӳ�
     if (viewportState.inViewport && viewportState.visible) {
       img.loading = 'eager'
-      if ('fetchPriority' in img) {img.fetchPriority = viewportState.priority}
+      if ('fetchPriority' in img) {
+        img.fetchPriority = viewportState.priority
+      }
 
       if (_priorityOptimizer) {
         _priorityOptimizer.applyPriorityToResource(img, img.src, 'image')
@@ -1405,7 +1939,9 @@
 
     // �ǿ������򲻿ɼ�ͼƬ�������ش���
     img.loading = 'lazy'
-    if ('fetchPriority' in img) {img.fetchPriority = 'low'}
+    if ('fetchPriority' in img) {
+      img.fetchPriority = 'low'
+    }
     img.dataset._raLazyLoad = '1'
 
     if (_priorityOptimizer) {
@@ -1444,17 +1980,27 @@
 
   // ========== ������iframe������ ==========
   function processIframeLazyLoad() {
-    if (!isSiteEnabled('iframeLazyLoad')) {return}
+    if (!isSiteEnabled('iframeLazyLoad')) {
+      return
+    }
     const config = state.config.iframeLazyLoad
 
     const iframes = document.querySelectorAll('iframe[src]')
     iframes.forEach((iframe) => {
       try {
         const url = new URL(iframe.src, location.href)
-        if (url.hostname === location.hostname) {return}
-        if (config.excludePatterns?.some((p) => url.hostname.includes(p))) {return}
-        if (iframe.dataset._raIframeProcessed) {return}
-        if (_isResourceLoaded(iframe, 'iframe')) {return}
+        if (url.hostname === location.hostname) {
+          return
+        }
+        if (config.excludePatterns?.some((p) => url.hostname.includes(p))) {
+          return
+        }
+        if (iframe.dataset._raIframeProcessed) {
+          return
+        }
+        if (_isResourceLoaded(iframe, 'iframe')) {
+          return
+        }
 
         iframe.dataset._raIframeProcessed = '1'
 
@@ -1463,14 +2009,18 @@
 
         if (zone === 'inViewport') {
           // �ӿ��ڣ���������
-          if ('fetchPriority' in iframe) {iframe.fetchPriority = 'high'}
+          if ('fetchPriority' in iframe) {
+            iframe.fetchPriority = 'high'
+          }
           return
         }
 
         // nearby �� far �����ӳټ���
         iframe.dataset.lazySrc = iframe.src
         iframe.loading = 'lazy'
-        if ('fetchPriority' in iframe) {iframe.fetchPriority = zone === 'nearby' ? 'auto' : 'low'}
+        if ('fetchPriority' in iframe) {
+          iframe.fetchPriority = zone === 'nearby' ? 'auto' : 'low'
+        }
 
         // far ����ʹ�� data-src ģʽ������ src ռλ
         if (zone === 'far') {
@@ -1494,7 +2044,9 @@
 
   // ========== ȫվDNS prefetch ==========
   function _addGlobalDnsPrefetch() {
-    if (!isSiteEnabled('dnsPrefetch')) {return}
+    if (!isSiteEnabled('dnsPrefetch')) {
+      return
+    }
     const config = state.config.dnsPrefetch
     const maxDomains = config.maxDomains || 15
     const origins = new Set()
@@ -1502,7 +2054,9 @@
 
     document.querySelectorAll('script[src], link[href], img[src], iframe[src]').forEach((el) => {
       const url = el.src || el.href
-      if (!url) {return}
+      if (!url) {
+        return
+      }
       try {
         const origin = new URL(url, location.href).origin
         if (origin !== location.origin) {
@@ -1513,9 +2067,15 @@
 
     let count = 0
     origins.forEach((origin) => {
-      if (count >= maxDomains) {return}
-      if (head.querySelector(`link[rel="preconnect"][href="${origin}"]`)) {return}
-      if (head.querySelector(`link[rel="dns-prefetch"][href="${origin}"]`)) {return}
+      if (count >= maxDomains) {
+        return
+      }
+      if (head.querySelector(`link[rel="preconnect"][href="${origin}"]`)) {
+        return
+      }
+      if (head.querySelector(`link[rel="dns-prefetch"][href="${origin}"]`)) {
+        return
+      }
 
       const link = document.createElement('link')
       link.rel = 'dns-prefetch'
@@ -1532,17 +2092,27 @@
    * @param {HTMLImageElement} img - ͼƬԪ��
    */
   async function processSVG(img) {
-    if (state.cspRestricted) {return}
-    if (!isSiteEnabled('svgOptimize')) {return}
+    if (state.cspRestricted) {
+      return
+    }
+    if (!isSiteEnabled('svgOptimize')) {
+      return
+    }
 
     const url = img.src
-    if (!url || img.dataset._raSvgProcessed) {return}
+    if (!url || img.dataset._raSvgProcessed) {
+      return
+    }
 
     // �Ѿ��� data URI������
-    if (url.startsWith('data:')) {return}
+    if (url.startsWith('data:')) {
+      return
+    }
 
     // �ж��Ƿ�Ϊ SVG
-    if (!/\.svg(\?|#|$)/i.test(url) && !/\/svg\+xml/i.test(url)) {return}
+    if (!/\.svg(\?|#|$)/i.test(url) && !/\/svg\+xml/i.test(url)) {
+      return
+    }
 
     img.dataset._raSvgProcessed = '1'
 
@@ -1558,7 +2128,9 @@
     // ��������
     if (state._svgCache.has(url)) {
       const cached = state._svgCache.get(url)
-      if (cached) {img.src = cached}
+      if (cached) {
+        img.src = cached
+      }
       return
     }
 
@@ -1577,7 +2149,9 @@
 
     try {
       const response = await fetch(url)
-      if (!response.ok) {return}
+      if (!response.ok) {
+        return
+      }
       const text = await response.text()
       const originalSize = new Blob([text]).size
 
@@ -1678,6 +2252,11 @@
     const rect = element.getBoundingClientRect()
     const viewportHeight = window.innerHeight
 
+    // 防御性检查：元素不可见时返回far，避免误判
+    if (rect.width === 0 || rect.height === 0) {
+      return { zone: 'far', priority: 999, distance: Infinity }
+    }
+
     // ����Ԫ�ؾ����ӿڵľ���
     const distanceToViewport =
       rect.top < 0
@@ -1723,7 +2302,9 @@
       case 'image':
         return element.complete && element.naturalHeight > 0
       case 'iframe':
-        if (element.dataset.loaded === 'true') {return true}
+        if (element.dataset.loaded === 'true') {
+          return true
+        }
         // ����iframe����contentDocument���׳���ȫ����
         try {
           return element.contentDocument !== null
@@ -1744,8 +2325,12 @@
    * �����ӳټ��ع۲���
    */
   function _setupLazyLoadObserver() {
-    if (_lazyLoadObserver) {return}
-    if (typeof IntersectionObserver === 'undefined') {return}
+    if (_lazyLoadObserver) {
+      return
+    }
+    if (typeof IntersectionObserver === 'undefined') {
+      return
+    }
 
     const nearbyThreshold = state.config.positionAwareLoading?.nearbyThreshold || 1
     // ���������ֵΪ 2 ����200%��������Ԥ���ع�����Դ
@@ -1787,7 +2372,9 @@
    * @param {Element} element - DOMԪ��
    */
   function _observeLazyLoad(element) {
-    if (!_lazyLoadObserver) {return}
+    if (!_lazyLoadObserver) {
+      return
+    }
     _lazyLoadObserver.observe(element)
   }
 
@@ -1805,7 +2392,9 @@
    * ��ʼ��λ�ø�֪����
    */
   function _initPositionAwareLoading() {
-    if (!state.config.positionAwareLoading?.enabled) {return}
+    if (!state.config.positionAwareLoading?.enabled) {
+      return
+    }
     _setupLazyLoadObserver()
   }
 
@@ -1818,7 +2407,9 @@
    */
   function _recheckVisibleLazyImages() {
     // throttle����ֹƵ������
-    if (state._recheckThrottleTimer) {return}
+    if (state._recheckThrottleTimer) {
+      return
+    }
     state._recheckThrottleTimer = setTimeout(() => {
       state._recheckThrottleTimer = null
       _doRecheckVisibleLazyImages()
@@ -1829,12 +2420,16 @@
    * ִ�п�����ͼƬ���
    */
   function _doRecheckVisibleLazyImages() {
-    const lazyImages = document.querySelectorAll('img[data-lazy-src]:not([data-lazy-loaded="true"])')
+    const lazyImages = document.querySelectorAll(
+      'img[data-lazy-src]:not([data-lazy-loaded="true"])'
+    )
 
     lazyImages.forEach((img) => {
       // ���Ԫ���Ƿ�ɼ�
       const style = window.getComputedStyle(img)
-      if (style.display === 'none' || style.visibility === 'hidden') {return}
+      if (style.display === 'none' || style.visibility === 'hidden') {
+        return
+      }
 
       // ����Ƿ��ڿ�����
       const rect = img.getBoundingClientRect()
@@ -1842,10 +2437,7 @@
       const viewportWidth = window.innerWidth
 
       const inViewport =
-        rect.bottom > 0 &&
-        rect.top < viewportHeight &&
-        rect.right > 0 &&
-        rect.left < viewportWidth
+        rect.bottom > 0 && rect.top < viewportHeight && rect.right > 0 && rect.left < viewportWidth
 
       if (inViewport && img.dataset.lazySrc) {
         const originalSrc = img.dataset.lazySrc
@@ -1857,7 +2449,9 @@
         _setupImageErrorRetry(img, originalSrc)
         img.dataset.lazyLoaded = 'true'
         img.loading = 'eager'
-        if ('fetchPriority' in img) {img.fetchPriority = 'high'}
+        if ('fetchPriority' in img) {
+          img.fetchPriority = 'high'
+        }
 
         // �������ѹ��������ѹ������
         if (state.config.imageCompress && !img.dataset.compressed) {
@@ -1877,7 +2471,9 @@
    * ͳһ������Ҫ document.body ���ڵĳ�ʼ���߼�
    */
   function _initAfterDOMReady() {
-    if (state._domReadyInitialized) {return}
+    if (state._domReadyInitialized) {
+      return
+    }
 
     const runInit = () => {
       state._domReadyInitialized = true
@@ -1908,8 +2504,12 @@
    * ע�⣺�˺���Ӧͨ�� _initAfterDOMReady ���ã�ȷ�� document.body �Ѵ���
    */
   function _setupStyleChangeObserver() {
-    if (state._styleChangeObserver) {return}
-    if (typeof MutationObserver === 'undefined') {return}
+    if (state._styleChangeObserver) {
+      return
+    }
+    if (typeof MutationObserver === 'undefined') {
+      return
+    }
     // �����Լ�飺��� body �����ڣ���¼����
     if (!document.body) {
       console.warn(`${LOG_PREFIX} _setupStyleChangeObserver called before document.body is ready`)
@@ -1962,7 +2562,9 @@
    * @param {string} src - ԭʼURL
    */
   function _setupImageErrorRetry(img, src) {
-    if (!src || src.startsWith('data:')) {return}
+    if (!src || src.startsWith('data:')) {
+      return
+    }
 
     img.onerror = () => {
       const retryCount = state._imageRetryCount.get(src) || 0
@@ -1978,13 +2580,16 @@
         })
 
         // �ӳ�����
-        setTimeout(() => {
-          if (img.isConnected && !img.complete) {
-            // ���ʱ�����ֹ����
-            const separator = src.includes('?') ? '&' : '?'
-            img.src = `${src}${separator}_retry=${Date.now()}`
-          }
-        }, IMAGE_RETRY_DELAY_MS * (retryCount + 1))
+        setTimeout(
+          () => {
+            if (img.isConnected && !img.complete) {
+              // ���ʱ�����ֹ����
+              const separator = src.includes('?') ? '&' : '?'
+              img.src = `${src}${separator}_retry=${Date.now()}`
+            }
+          },
+          IMAGE_RETRY_DELAY_MS * (retryCount + 1)
+        )
       } else {
         addLog('error', 'image', 'error', {
           url: src,
@@ -2000,12 +2605,16 @@
   // ��ȡͼƬѹ�����ȼ�������λ�ã�
   function _getCompressPriority(img) {
     // �Ѽ�������
-    if (_isResourceLoaded(img, 'image')) {return 999}
+    if (_isResourceLoaded(img, 'image')) {
+      return 999
+    }
 
     const { zone, priority } = _getResourcePositionPriority(img)
 
     // far ����ѹ��
-    if (zone === 'far') {return 999}
+    if (zone === 'far') {
+      return 999
+    }
 
     // inViewport �� nearby ʹ��λ�����ȼ�
     // Сͼ��ͬ������΢�� -1
@@ -2225,7 +2834,9 @@
       const img = new Image()
       img.crossOrigin = 'anonymous'
       img.onload = () => {
-        if (checkAborted()) {return}
+        if (checkAborted()) {
+          return
+        }
         // ʹ��ʵ�ʴ�С�������ȡ���������������ع��㽵��
         const bytes = actualSize || img.naturalWidth * img.naturalHeight * 4
         if (bytes < state.config.imageMinSize) {
@@ -2304,10 +2915,14 @@
   // ========== Preload ��ʾ ==========
 
   function addPreloadHint(cdnUrl, type, fontInfo) {
-    if (state.stats.preloadHints >= state.config.maxPreloadHints) {return}
+    if (state.stats.preloadHints >= state.config.maxPreloadHints) {
+      return
+    }
 
     if (type === 'font') {
-      if (state._fontPreloadedUrls.has(cdnUrl)) {return}
+      if (state._fontPreloadedUrls.has(cdnUrl)) {
+        return
+      }
 
       const weight = fontInfo?.weight || parseFontWeight(cdnUrl)
       state._fontCandidates.push({
@@ -2327,12 +2942,16 @@
   }
 
   function _insertPreloadLink(cdnUrl, type) {
-    if (!cdnUrl || typeof cdnUrl !== 'string' || !cdnUrl.startsWith('http')) {return}
+    if (!cdnUrl || typeof cdnUrl !== 'string' || !cdnUrl.startsWith('http')) {
+      return
+    }
     const head = document.head || document.documentElement
     if (head.querySelector(`link[rel="preload"]`)) {
       const links = head.querySelectorAll('link[rel="preload"]')
       for (const l of links) {
-        if (l.getAttribute('href') === cdnUrl) {return}
+        if (l.getAttribute('href') === cdnUrl) {
+          return
+        }
       }
     }
     const link = document.createElement('link')
@@ -2446,9 +3065,13 @@
   Element.prototype.appendChild = function (node) {
     const result = _appendChild.call(this, node)
     if (node.tagName) {
-      if (node.tagName === 'SCRIPT' && node.src) {processScript(node)}
-      else if (node.tagName === 'LINK' && node.rel === 'stylesheet') {processLink(node)}
-      else if (node.tagName === 'IMG') {processImage(node)}
+      if (node.tagName === 'SCRIPT' && node.src) {
+        processScript(node)
+      } else if (node.tagName === 'LINK' && node.rel === 'stylesheet') {
+        processLink(node)
+      } else if (node.tagName === 'IMG') {
+        processImage(node)
+      }
     }
     return result
   }
@@ -2457,9 +3080,13 @@
   Element.prototype.insertBefore = function (node, ref) {
     const result = _insertBefore.call(this, node, ref)
     if (node.tagName) {
-      if (node.tagName === 'SCRIPT' && node.src) {processScript(node)}
-      else if (node.tagName === 'LINK' && node.rel === 'stylesheet') {processLink(node)}
-      else if (node.tagName === 'IMG') {processImage(node)}
+      if (node.tagName === 'SCRIPT' && node.src) {
+        processScript(node)
+      } else if (node.tagName === 'LINK' && node.rel === 'stylesheet') {
+        processLink(node)
+      } else if (node.tagName === 'IMG') {
+        processImage(node)
+      }
     }
     return result
   }
@@ -2475,16 +3102,24 @@
   // ����ҳ�渺�ض�̬����������С
   function _getBatchSize() {
     const pending = state._mutationBatch.length
-    if (pending > BATCH_THRESHOLDS.HIGH) {return BATCH_SIZES.HIGH} // �߸��أ�������
-    if (pending > BATCH_THRESHOLDS.MEDIUM) {return BATCH_SIZES.MEDIUM} // �и��أ�������
+    if (pending > BATCH_THRESHOLDS.HIGH) {
+      return BATCH_SIZES.HIGH
+    } // �߸��أ�������
+    if (pending > BATCH_THRESHOLDS.MEDIUM) {
+      return BATCH_SIZES.MEDIUM
+    } // �и��أ�������
     return BATCH_SIZES.LOW // �͸��أ�С����
   }
 
   // ����ҳ�渺�ض�̬��������������
   function _getBatchInterval() {
     const pending = state._mutationBatch.length
-    if (pending > INTERVAL_THRESHOLDS.HIGH) {return BATCH_INTERVALS.HIGH} // �߸��أ����촦��
-    if (pending > INTERVAL_THRESHOLDS.MEDIUM) {return BATCH_INTERVALS.MEDIUM} // �и��أ�����
+    if (pending > INTERVAL_THRESHOLDS.HIGH) {
+      return BATCH_INTERVALS.HIGH
+    } // �߸��أ����촦��
+    if (pending > INTERVAL_THRESHOLDS.MEDIUM) {
+      return BATCH_INTERVALS.MEDIUM
+    } // �и��أ�����
     return BATCH_INTERVALS.LOW // �͸��أ���ʡ��Դ
   }
 
@@ -2498,7 +3133,9 @@
     // ����������ռ�������Ҫ����Ľڵ�
     for (const mutation of mutations) {
       for (const node of mutation.addedNodes) {
-        if (!node.tagName) {continue}
+        if (!node.tagName) {
+          continue
+        }
         state._mutationBatch.push(node)
       }
     }
@@ -2514,7 +3151,9 @@
   })
 
   function _processBatch() {
-    if (state._isProcessingBatch || state._mutationBatch.length === 0) {return}
+    if (state._isProcessingBatch || state._mutationBatch.length === 0) {
+      return
+    }
 
     state._isProcessingBatch = true
     // ʹ�ö�̬������С
@@ -2522,11 +3161,18 @@
     const batch = state._mutationBatch.splice(0, batchSize)
 
     batch.forEach((node) => {
-      if (!node.tagName) {return}
-      if (node.tagName === 'SCRIPT' && node.src) {processScript(node)}
-      else if (node.tagName === 'LINK' && node.rel === 'stylesheet') {processLink(node)}
-      else if (node.tagName === 'IMG') {processImage(node)}
-      else if (node.tagName === 'IFRAME') {processIframeLazyLoad()}
+      if (!node.tagName) {
+        return
+      }
+      if (node.tagName === 'SCRIPT' && node.src) {
+        processScript(node)
+      } else if (node.tagName === 'LINK' && node.rel === 'stylesheet') {
+        processLink(node)
+      } else if (node.tagName === 'IMG') {
+        processImage(node)
+      } else if (node.tagName === 'IFRAME') {
+        processIframeLazyLoad()
+      }
 
       if (node.querySelectorAll) {
         node.querySelectorAll('script[src]').forEach(processScript)
@@ -2548,11 +3194,18 @@
   function _processMutations(mutations) {
     for (const mutation of mutations) {
       for (const node of mutation.addedNodes) {
-        if (!node.tagName) {continue}
-        if (node.tagName === 'SCRIPT' && node.src) {processScript(node)}
-        else if (node.tagName === 'LINK' && node.rel === 'stylesheet') {processLink(node)}
-        else if (node.tagName === 'IMG') {processImage(node)}
-        else if (node.tagName === 'IFRAME') {processIframeLazyLoad()}
+        if (!node.tagName) {
+          continue
+        }
+        if (node.tagName === 'SCRIPT' && node.src) {
+          processScript(node)
+        } else if (node.tagName === 'LINK' && node.rel === 'stylesheet') {
+          processLink(node)
+        } else if (node.tagName === 'IMG') {
+          processImage(node)
+        } else if (node.tagName === 'IFRAME') {
+          processIframeLazyLoad()
+        }
 
         if (node.querySelectorAll) {
           node.querySelectorAll('script[src]').forEach(processScript)
@@ -2577,7 +3230,9 @@
     },
 
     detect() {
-      if (!navigator.connection) {return}
+      if (!navigator.connection) {
+        return
+      }
 
       const effectiveType = navigator.connection.effectiveType
       const downlink = navigator.connection.downlink
@@ -2594,7 +3249,9 @@
     },
 
     listen() {
-      if (!navigator.connection) {return}
+      if (!navigator.connection) {
+        return
+      }
 
       this._handleNetworkChange = () => {
         const oldQuality = this.quality
@@ -2635,7 +3292,9 @@
     }
 
     init() {
-      if (!this.config.enabled || !this.sampled) {return}
+      if (!this.config.enabled || !this.sampled) {
+        return
+      }
 
       this.initCoreWebVitals()
       this.initResourceTiming()
@@ -2710,7 +3369,9 @@
     }
 
     initResourceTiming() {
-      if (!this.config.metrics.resourceTiming) {return}
+      if (!this.config.metrics.resourceTiming) {
+        return
+      }
 
       try {
         const resourceObserver = new PerformanceObserver((entryList) => {
@@ -2749,15 +3410,25 @@
     }
 
     getResourceType(url) {
-      if (url.endsWith('.js')) {return 'script'}
-      if (url.endsWith('.css')) {return 'style'}
-      if (url.match(/\.(png|jpg|jpeg|gif|webp|svg)$/)) {return 'image'}
-      if (url.match(/\.(woff|woff2|ttf|otf)$/)) {return 'font'}
+      if (url.endsWith('.js')) {
+        return 'script'
+      }
+      if (url.endsWith('.css')) {
+        return 'style'
+      }
+      if (url.match(/\.(png|jpg|jpeg|gif|webp|svg)$/)) {
+        return 'image'
+      }
+      if (url.match(/\.(woff|woff2|ttf|otf)$/)) {
+        return 'font'
+      }
       return 'other'
     }
 
     initMemoryMonitoring() {
-      if (!this.config.metrics.memoryUsage) {return}
+      if (!this.config.metrics.memoryUsage) {
+        return
+      }
 
       this._memoryTimer = setInterval(() => {
         if (performance.memory) {
@@ -2777,7 +3448,9 @@
     }
 
     async reportMetrics() {
-      if (Object.keys(this.metrics).length === 0) {return}
+      if (Object.keys(this.metrics).length === 0) {
+        return
+      }
 
       const report = {
         timestamp: Date.now(),
@@ -2861,8 +3534,12 @@
     destroy() {
       this.observers.forEach((observer) => observer.disconnect())
       this.observers = []
-      if (this._reportTimer) {clearInterval(this._reportTimer)}
-      if (this._memoryTimer) {clearInterval(this._memoryTimer)}
+      if (this._reportTimer) {
+        clearInterval(this._reportTimer)
+      }
+      if (this._memoryTimer) {
+        clearInterval(this._memoryTimer)
+      }
     }
   }
 
@@ -2877,7 +3554,9 @@
     }
 
     init() {
-      if (!this.config.enabled) {return}
+      if (!this.config.enabled) {
+        return
+      }
 
       this.detectNetworkQuality()
       this.detectPageType()
@@ -2889,13 +3568,17 @@
     }
 
     detectNetworkQuality() {
-      if (!this.config.networkAware.enabled) {return}
+      if (!this.config.networkAware.enabled) {
+        return
+      }
       // ʹ�ù��������ͳһ�����������
       this.networkQuality = detectNetworkQuality()
     }
 
     detectPageType() {
-      if (!this.config.pageTypeAware.enabled) {return}
+      if (!this.config.pageTypeAware.enabled) {
+        return
+      }
 
       const url = location.href
       const hostname = location.hostname
@@ -2960,7 +3643,9 @@
     }
 
     listenNetworkChanges() {
-      if (!navigator.connection) {return}
+      if (!navigator.connection) {
+        return
+      }
 
       this._handleNetworkChange = () => {
         this.detectNetworkQuality()
@@ -2999,22 +3684,36 @@
 
     applyPriorityToResource(element, url, type) {
       // �Ѽ�����Դ����
-      if (_isResourceLoaded(element, type)) {return}
+      if (_isResourceLoaded(element, type)) {
+        return
+      }
 
       // ͼƬ��iframeʹ��λ�����ȼ�
       if (type === 'image' || type === 'iframe') {
         const { zone } = _getResourcePositionPriority(element)
 
         if (zone === 'inViewport') {
-          if ('fetchPriority' in element) {element.fetchPriority = 'high'}
-          if ('loading' in element) {element.loading = 'eager'}
+          if ('fetchPriority' in element) {
+            element.fetchPriority = 'high'
+          }
+          if ('loading' in element) {
+            element.loading = 'eager'
+          }
         } else if (zone === 'nearby') {
-          if ('fetchPriority' in element) {element.fetchPriority = 'auto'}
-          if ('loading' in element) {element.loading = 'lazy'}
+          if ('fetchPriority' in element) {
+            element.fetchPriority = 'auto'
+          }
+          if ('loading' in element) {
+            element.loading = 'lazy'
+          }
         } else {
           // far - ����lazy���ȴ���������
-          if ('fetchPriority' in element) {element.fetchPriority = 'low'}
-          if ('loading' in element) {element.loading = 'lazy'}
+          if ('fetchPriority' in element) {
+            element.fetchPriority = 'low'
+          }
+          if ('loading' in element) {
+            element.loading = 'lazy'
+          }
         }
         return
       }
@@ -3022,7 +3721,9 @@
       // �ű����ؼ�JS�������أ��ǹؼ���λ��
       if (type === 'script') {
         const isCritical = element.type === 'module' || element.closest('head')
-        if (isCritical) {return} // �ؼ�JS����Ԥ
+        if (isCritical) {
+          return
+        } // �ؼ�JS����Ԥ
 
         const { zone } = _getResourcePositionPriority(element)
         if (zone === 'far') {
@@ -3039,26 +3740,34 @@
     }
 
     applyToExistingElements() {
-      if (!this.config.scanExisting?.enabled) {return}
+      if (!this.config.scanExisting?.enabled) {
+        return
+      }
 
       const viewportHeight = window.innerHeight
       let count = 0
       const max = this.config.scanExisting.maxElements || 50
 
       document.querySelectorAll('script[src]').forEach((script) => {
-        if (count >= max) {return}
+        if (count >= max) {
+          return
+        }
         this.applyPriorityToResource(script, script.src, 'script')
         count++
       })
 
       document.querySelectorAll('link[rel="stylesheet"]').forEach((link) => {
-        if (count >= max) {return}
+        if (count >= max) {
+          return
+        }
         this.applyPriorityToResource(link, link.href, 'style')
         count++
       })
 
       document.querySelectorAll('img[src]').forEach((img) => {
-        if (count >= max) {return}
+        if (count >= max) {
+          return
+        }
         const rect = img.getBoundingClientRect()
         const isInViewport = rect.top < viewportHeight
         this.applyPriorityToResource(img, img.src, 'image')
@@ -3099,7 +3808,9 @@
     }
 
     async init() {
-      if (!this.config.enabled) {return}
+      if (!this.config.enabled) {
+        return
+      }
 
       this.initMemoryMonitoring()
       this.initCache()
@@ -3110,7 +3821,9 @@
     }
 
     initMemoryMonitoring() {
-      if (!this.config.monitoring.enabled) {return}
+      if (!this.config.monitoring.enabled) {
+        return
+      }
 
       this._checkTimer = setInterval(() => {
         this.checkMemoryPressure()
@@ -3118,7 +3831,9 @@
     }
 
     checkMemoryPressure() {
-      if (!performance.memory) {return}
+      if (!performance.memory) {
+        return
+      }
 
       const usedMB = performance.memory.usedJSHeapSize / 1024 / 1024
 
@@ -3135,7 +3850,9 @@
 
     applyPressureResponse(pressure) {
       const strategy = this.config.pressureResponse.strategies[pressure]
-      if (!strategy) {return}
+      if (!strategy) {
+        return
+      }
 
       if (strategy.disableImageCompress && typeof state !== 'undefined') {
         state.config.imageCompress = false
@@ -3183,7 +3900,9 @@
     }
 
     async prewarmCache() {
-      if (!this.config.caching.prewarm?.enabled) {return}
+      if (!this.config.caching.prewarm?.enabled) {
+        return
+      }
 
       const types = this.config.caching.prewarm.types || []
       const resources = document.querySelectorAll('link[rel="stylesheet"], script[src], style')
@@ -3220,7 +3939,9 @@
     }
 
     isCacheEntryValid(entry) {
-      if (!entry || !entry.timestamp) {return false}
+      if (!entry || !entry.timestamp) {
+        return false
+      }
       const now = Date.now()
       return now - entry.timestamp < this.config.caching.ttl
     }
@@ -3266,7 +3987,9 @@
       }
 
       for (const [key, value] of entries) {
-        if (evictedSize >= targetSize) {break}
+        if (evictedSize >= targetSize) {
+          break
+        }
         const size = this.estimateSize(value)
         this.cache.delete(key)
         evictedSize += size
@@ -3275,7 +3998,9 @@
     }
 
     async getFromCache(key) {
-      if (!this.config.caching.enabled) {return null}
+      if (!this.config.caching.enabled) {
+        return null
+      }
 
       const entry = this.cache.get(key)
       if (!entry) {
@@ -3296,7 +4021,9 @@
     }
 
     async setCache(key, value) {
-      if (!this.config.caching.enabled) {return}
+      if (!this.config.caching.enabled) {
+        return
+      }
 
       const currentSize = this.getCacheSize()
       const entrySize = this.estimateSize(value)
@@ -3316,7 +4043,9 @@
     }
 
     scheduleSaveCacheData() {
-      if (this._saveTimer) {return}
+      if (this._saveTimer) {
+        return
+      }
       this._saveTimer = setTimeout(() => {
         this._saveTimer = null
         this.saveCacheData()
@@ -3339,8 +4068,12 @@
     }
 
     destroy() {
-      if (this._checkTimer) {clearInterval(this._checkTimer)}
-      if (this._saveTimer) {clearTimeout(this._saveTimer)}
+      if (this._checkTimer) {
+        clearInterval(this._checkTimer)
+      }
+      if (this._saveTimer) {
+        clearTimeout(this._saveTimer)
+      }
       this.saveCacheData()
     }
   }
@@ -3348,7 +4081,9 @@
   let _perfMonitor = null
 
   function _initPerfMonitor() {
-    if (!state.config.perfMonitor?.enabled) {return}
+    if (!state.config.perfMonitor?.enabled) {
+      return
+    }
     _perfMonitor = new PerformanceMonitor(state.config.perfMonitor)
     _perfMonitor.init()
   }
@@ -3356,7 +4091,9 @@
   let _priorityOptimizer = null
 
   function _initPriorityOptimizer() {
-    if (!state.config.priorityOptimizer?.enabled) {return}
+    if (!state.config.priorityOptimizer?.enabled) {
+      return
+    }
     _priorityOptimizer = new PriorityOptimizer(state.config.priorityOptimizer)
     _priorityOptimizer.init()
   }
@@ -3364,7 +4101,9 @@
   let _memoryOptimizer = null
 
   function _initMemoryOptimizer() {
-    if (!state.config.memoryOptimizer?.enabled) {return}
+    if (!state.config.memoryOptimizer?.enabled) {
+      return
+    }
     _memoryOptimizer = new MemoryOptimizer(state.config.memoryOptimizer)
     _memoryOptimizer.init()
   }
@@ -3373,9 +4112,13 @@
   let _lqipStyleInjected = false
 
   function _injectLqipCSS() {
-    if (_lqipStyleInjected) {return}
+    if (_lqipStyleInjected) {
+      return
+    }
     const config = state.config.lqip
-    if (!config?.enabled) {return}
+    if (!config?.enabled) {
+      return
+    }
 
     const style = document.createElement('style')
     style.textContent = `
@@ -3399,9 +4142,13 @@
   let _contentVisibilityInjected = false
 
   function _injectContentVisibilityCSS() {
-    if (_contentVisibilityInjected) {return}
+    if (_contentVisibilityInjected) {
+      return
+    }
     const config = state.config.contentVisibility
-    if (!config?.enabled) {return}
+    if (!config?.enabled) {
+      return
+    }
 
     const includeSelector = config.selectors.join(', ')
     const excludeSelector = config.excludeSelectors.map((s) => `:not(${s})`).join('')
@@ -3419,7 +4166,9 @@
   }
 
   function _triggerLqipTransition(img) {
-    if (!img.dataset.lqip) {return}
+    if (!img.dataset.lqip) {
+      return
+    }
     if (img.complete) {
       img.dataset.lqipLoaded = '1'
     } else {
@@ -3473,7 +4222,7 @@
           state.config.workerCompress.enabled = false
           addLog('warn', 'worker', 'csp_blocked', {
             error: e.message,
-            fallback: 'main_thread'
+            fallback: 'main_thread',
           })
           return
         }
@@ -3502,13 +4251,19 @@
   }
 
   function _initCompressorWorkers() {
-    if (!state.config.workerCompress?.enabled) {return}
-    if (typeof Worker === 'undefined') {return}
+    if (!state.config.workerCompress?.enabled) {
+      return
+    }
+    if (typeof Worker === 'undefined') {
+      return
+    }
 
     const maxWorkers = _getOptimalWorkerCount()
     for (let i = 0; i < maxWorkers; i++) {
       const worker = _createWorker(i)
-      if (worker) {_compressorWorkers.push(worker)}
+      if (worker) {
+        _compressorWorkers.push(worker)
+      }
     }
 
     if (_compressorWorkers.length > 0) {
@@ -3535,7 +4290,9 @@
   function _handleWorkerMessage(e) {
     const { id, success, dataUrl, error, originalSize, compressedSize } = e.data
     const task = _workerPendingTasks.get(id)
-    if (!task) {return}
+    if (!task) {
+      return
+    }
 
     _workerPendingTasks.delete(id)
 
@@ -3554,7 +4311,9 @@
 
   // ��ѯ����Worker
   function _getAvailableWorker() {
-    if (_compressorWorkers.length === 0) {return null}
+    if (_compressorWorkers.length === 0) {
+      return null
+    }
     const worker = _compressorWorkers[_workerLoadIndex % _compressorWorkers.length]
     _workerLoadIndex++
     return worker
@@ -3562,7 +4321,9 @@
 
   // ������ͼƬ
   function _isCorsUrl(url) {
-    if (!url || url.startsWith('data:')) {return false}
+    if (!url || url.startsWith('data:')) {
+      return false
+    }
     try {
       const urlObj = new URL(url, location.href)
       return urlObj.origin !== location.origin
@@ -3573,14 +4334,20 @@
 
   // ���ȼ����д���
   function _processWorkerQueue() {
-    if (_workerTaskQueue.length === 0) {return}
+    if (_workerTaskQueue.length === 0) {
+      return
+    }
     const worker = _getAvailableWorker()
-    if (!worker) {return}
+    if (!worker) {
+      return
+    }
 
     // �����ȼ����򣨸����ȼ��ȴ����
     _workerTaskQueue.sort((a, b) => b.priority - a.priority)
     const task = _workerTaskQueue.shift()
-    if (!task) {return}
+    if (!task) {
+      return
+    }
 
     const { id, src, quality, maxWidth, maxHeight, priority, isCors, resolve, reject } = task
     const timeout = state.config.workerCompress?.timeout || 5000
@@ -3740,7 +4507,10 @@
         // ����ͼƬ����ʧ�ܣ�����ͨ�� background ����
         if (_isCorsUrl(src)) {
           try {
-            const response = await chrome.runtime.sendMessage({ type: 'FETCH_CORS_IMAGE', url: src })
+            const response = await chrome.runtime.sendMessage({
+              type: 'FETCH_CORS_IMAGE',
+              url: src,
+            })
             if (response.success && response.dataUrl) {
               // ʹ�ô�����ص� data URL ���¼���ͼƬ
               const proxyImg = new Image()
@@ -3764,15 +4534,23 @@
                   const ctx = canvas.getContext('2d')
                   ctx.drawImage(proxyImg, 0, 0, w, h)
                   const format = getSupportedImageFormat()
-                  canvas.toBlob((blob) => {
-                    if (blob && blob.size < bytes) {
-                      state.stats.corsProxyCompress = (state.stats.corsProxyCompress || 0) + 1
-                      const blobUrl = URL.createObjectURL(blob)
-                      resolve({ dataUrl: blobUrl, originalSize: bytes, compressedSize: blob.size })
-                    } else {
-                      resolve(null)
-                    }
-                  }, format.mime, quality)
+                  canvas.toBlob(
+                    (blob) => {
+                      if (blob && blob.size < bytes) {
+                        state.stats.corsProxyCompress = (state.stats.corsProxyCompress || 0) + 1
+                        const blobUrl = URL.createObjectURL(blob)
+                        resolve({
+                          dataUrl: blobUrl,
+                          originalSize: bytes,
+                          compressedSize: blob.size,
+                        })
+                      } else {
+                        resolve(null)
+                      }
+                    },
+                    format.mime,
+                    quality
+                  )
                 } catch {
                   resolve(null)
                 }
@@ -3802,7 +4580,9 @@
   }
 
   function _startWorkerPoolMonitor() {
-    if (_workerPoolMonitor) {return}
+    if (_workerPoolMonitor) {
+      return
+    }
 
     let consecutiveBacklog = 0
     let lastActiveTime = Date.now()
@@ -3856,7 +4636,9 @@
     }
 
     init() {
-      if (!this.config.enabled) {return}
+      if (!this.config.enabled) {
+        return
+      }
 
       // ����������������������� PriorityOptimizer
       this.detectNetworkQuality()
@@ -3866,13 +4648,17 @@
     }
 
     detectNetworkQuality() {
-      if (!this.config.networkAdaptive.enabled) {return}
+      if (!this.config.networkAdaptive.enabled) {
+        return
+      }
       // ʹ�ù��������ͳһ�����������
       this.networkQuality = detectNetworkQuality()
     }
 
     listenNetworkChanges() {
-      if (!navigator.connection) {return}
+      if (!navigator.connection) {
+        return
+      }
 
       this._handleNetworkChange = () => {
         this.detectNetworkQuality()
@@ -3882,7 +4668,9 @@
     }
 
     detectImageType(url, element) {
-      if (!this.config.typeDetection.enabled) {return 'photo'}
+      if (!this.config.typeDetection.enabled) {
+        return 'photo'
+      }
 
       const cacheKey = url
       if (this.typeCache.has(cacheKey)) {
@@ -3978,7 +4766,9 @@
   let _adaptiveCompressor = null
 
   function _initAdaptiveCompressor() {
-    if (!state.config.adaptiveCompress?.enabled) {return}
+    if (!state.config.adaptiveCompress?.enabled) {
+      return
+    }
     _adaptiveCompressor = new AdaptiveCompressor(state.config.adaptiveCompress)
     _adaptiveCompressor.init()
   }
@@ -4001,7 +4791,9 @@
     }
 
     init() {
-      if (!this.config.enabled) {return}
+      if (!this.config.enabled) {
+        return
+      }
 
       this.analyzePageStructure()
       this.preloadCriticalResources() // ����
@@ -4013,7 +4805,9 @@
     }
 
     analyzePageStructure() {
-      if (!this.config.pageStructure.enabled) {return}
+      if (!this.config.pageStructure.enabled) {
+        return
+      }
 
       const url = location.href
       for (const [type, rules] of Object.entries(this.config.pageStructure.contentTypes)) {
@@ -4060,7 +4854,9 @@
     }
 
     preloadCriticalResources() {
-      if (!this.criticalResources || this.criticalResources.length === 0) {return}
+      if (!this.criticalResources || this.criticalResources.length === 0) {
+        return
+      }
       this.criticalResources
         .filter((r) => r.type === 'image' && r.priority === 0)
         .slice(0, this.config.priorityScheduling.maxPreloads || 6)
@@ -4068,7 +4864,9 @@
     }
 
     initScrollListener() {
-      if (!this.config.intentPrediction.enabled) {return}
+      if (!this.config.intentPrediction.enabled) {
+        return
+      }
 
       this._scrollTimer = null
       this._scrollHandler = () => {
@@ -4103,14 +4901,20 @@
     }
 
     initMouseListener() {
-      if (!this.config.intentPrediction.mouseMovement.enabled) {return}
+      if (!this.config.intentPrediction.mouseMovement.enabled) {
+        return
+      }
 
       this._mouseHandler = (e) => {
         const target = e.target.closest('a[href], img[src]')
-        if (!target) {return}
+        if (!target) {
+          return
+        }
 
         const url = target.href || target.src
-        if (!url) {return}
+        if (!url) {
+          return
+        }
 
         clearTimeout(this._mouseTimeout)
         this._mouseTimeout = setTimeout(() => {
@@ -4121,7 +4925,9 @@
     }
 
     initDwellTimeTracker() {
-      if (!this.config.intentPrediction.enabled) {return}
+      if (!this.config.intentPrediction.enabled) {
+        return
+      }
 
       this._dwellTimer = setInterval(() => {
         this.dwellTime = Date.now() - this.pageLoadTime
@@ -4170,7 +4976,9 @@
     }
 
     _executePreload(url, reason) {
-      if (this._preloadUrls.has(url)) {return} // ȥ��
+      if (this._preloadUrls.has(url)) {
+        return
+      } // ȥ��
       this._preloadUrls.add(url)
       this.activePreloads++
       const isCritical = reason === 'aboveFold' || reason === 'hover' || reason === 'scroll-predict'
@@ -4191,7 +4999,9 @@
 
       let _done = false
       const finish = () => {
-        if (_done) {return}
+        if (_done) {
+          return
+        }
         _done = true
         this.activePreloads--
         this.processQueue()
@@ -4219,7 +5029,9 @@
       let preloaded = 0
 
       for (const img of images) {
-        if (preloaded >= count) {break}
+        if (preloaded >= count) {
+          break
+        }
 
         const rect = img.getBoundingClientRect()
         if (rect.top > viewportHeight && rect.top < viewportHeight + 500) {
@@ -4234,12 +5046,16 @@
 
     preloadCurrentContentDetails() {
       const article = document.querySelector('article, .article, .post-content, .entry-content')
-      if (!article) {return}
+      if (!article) {
+        return
+      }
 
       let count = 0
       const images = article.querySelectorAll('img[data-src], img[data-lazysrc], img[src]')
       images.forEach((img) => {
-        if (count >= 10) {return}
+        if (count >= 10) {
+          return
+        }
         const url = img.dataset.lazySrc || img.dataset.src || img.src
         if (url && !url.startsWith('data:')) {
           this.schedulePreload(url, 'content-detail', 2)
@@ -4249,7 +5065,9 @@
 
       const links = article.querySelectorAll('a[href]')
       links.forEach((link) => {
-        if (count >= 10) {return}
+        if (count >= 10) {
+          return
+        }
         if (link.hostname === location.hostname) {
           this.schedulePreload(link.href, 'related-link', 3)
           count++
@@ -4273,7 +5091,9 @@
       relatedSections.forEach((section) => {
         const links = section.querySelectorAll('a[href]')
         links.forEach((link) => {
-          if (count >= 10) {return}
+          if (count >= 10) {
+            return
+          }
           if (link.hostname === location.hostname) {
             this.schedulePreload(link.href, 'related-content', 2)
             count++
@@ -4307,7 +5127,9 @@
   let _smartPreloadV2 = null
 
   function _initSmartPreloadV2() {
-    if (!state.config.smartPreloadV2?.enabled) {return}
+    if (!state.config.smartPreloadV2?.enabled) {
+      return
+    }
     _smartPreloadV2 = new SmartPreloadV2(state.config.smartPreloadV2)
     _smartPreloadV2.init()
   }
@@ -4364,7 +5186,9 @@
 
   // ��ȡ URL ��Ӧ�� CDN ��Ϣ
   function _getCDNInfo(url) {
-    if (!window.CDNMappings?.CDN_SOURCES) {return null}
+    if (!window.CDNMappings?.CDN_SOURCES) {
+      return null
+    }
 
     for (const cdn of window.CDNMappings.CDN_SOURCES) {
       try {
@@ -4380,7 +5204,9 @@
   }
 
   function init() {
-    if (state.initialized) {return}
+    if (state.initialized) {
+      return
+    }
     state.initialized = true
 
     // 0. LCP ָ���ռ�����Ҫ��������۲죩
@@ -4465,7 +5291,7 @@
     _observer.observe(document.documentElement, { childList: true, subtree: true })
 
     // 6. ����������Դ
-    document.querySelectorAll('script[src]').forEach(processScript)
+    batchProcessExistingScripts() // 批量处理脚本，替代逐个处理
     document.querySelectorAll('link[rel="stylesheet"]').forEach(processLink)
     document.querySelectorAll('img[src]').forEach(processImage)
     // ��������iframe
@@ -4507,28 +5333,29 @@
     )
 
     // 9. ҳ��ɼ��Ա仯ʱ���¼�������ͼƬ
-    document.addEventListener(
-      'visibilitychange',
-      () => {
-        if (document.visibilityState === 'visible') {
-          // ���¼��������ڴ��� lazySrc ��ͼƬ
-          requestAnimationFrame(() => {
-            _recheckVisibleLazyImages()
-          })
-        }
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        // ���¼��������ڴ��� lazySrc ��ͼƬ
+        requestAnimationFrame(() => {
+          _recheckVisibleLazyImages()
+        })
       }
-    )
+    })
 
     // 10. ���Ԥ����������ԭͼ
     document.addEventListener(
       'click',
       (e) => {
         const img = e.target.closest('img[data--ra-lazy-load="1"], img[data-lazy-src]')
-        if (!img) {return}
+        if (!img) {
+          return
+        }
 
         // ͳһ��� lazySrc �� src
         const originalSrc = img.dataset.lazySrc || img.dataset.src
-        if (!originalSrc || img.dataset.lazyLoaded === 'true') {return}
+        if (!originalSrc || img.dataset.lazyLoaded === 'true') {
+          return
+        }
 
         // ���� lazySrc �����ظ�����
         delete img.dataset.lazySrc
@@ -4537,7 +5364,9 @@
         img.src = originalSrc
         img.dataset.lazyLoaded = 'true'
         img.loading = 'eager'
-        if ('fetchPriority' in img) {img.fetchPriority = 'high'}
+        if ('fetchPriority' in img) {
+          img.fetchPriority = 'high'
+        }
 
         // ���ô�������
         _setupImageErrorRetry(img, originalSrc)
@@ -4611,7 +5440,7 @@
           state.config.workerCompress.enabled = false
           addLog('warn', 'worker', 'csp_restricted', {
             directive: workerSrc[0],
-            fallback: 'main_thread'
+            fallback: 'main_thread',
           })
         }
       }
@@ -4622,19 +5451,27 @@
   }
 
   function _addCDNPreconnect() {
-    if (!window.CDNMappings?.CDN_SOURCES) {return}
+    if (!window.CDNMappings?.CDN_SOURCES) {
+      return
+    }
     const head = document.head || document.documentElement
     const priorityCDNs = ['bootcdn', 'staticfile', 'jsdelivr']
 
     window.CDNMappings.CDN_SOURCES.forEach((cdn) => {
-      if (cdn._disabled) {return}
+      if (cdn._disabled) {
+        return
+      }
       try {
         const origin = new URL(cdn.baseUrl).origin
-        if (document.querySelector(`link[rel="dns-prefetch"][href="${origin}"]`)) {return}
+        if (document.querySelector(`link[rel="dns-prefetch"][href="${origin}"]`)) {
+          return
+        }
         const link = _createElement('link')
         link.rel = priorityCDNs.includes(cdn.id) ? 'preconnect' : 'dns-prefetch'
         link.href = origin
-        if (link.rel === 'preconnect') {link.crossOrigin = 'anonymous'}
+        if (link.rel === 'preconnect') {
+          link.crossOrigin = 'anonymous'
+        }
         head.insertBefore(link, head.firstChild)
       } catch (error) {
         console.warn('[_addCDNPreconnect] ���CDNԤ����ʧ��:', error)
@@ -4727,7 +5564,11 @@
       }
       // CDN 重定向失败回退
       if (message.type === 'CDN_REDIRECT_FALLBACK') {
-        _handleCDNFallback(message.originalUrl, message.failedUrl, message.statusCode || message.error)
+        _handleCDNFallback(
+          message.originalUrl,
+          message.failedUrl,
+          message.statusCode || message.error
+        )
         return true
       }
     })
@@ -4738,7 +5579,9 @@
   function collectPerformanceMetrics() {
     try {
       const navEntries = performance.getEntriesByType('navigation')
-      if (!navEntries.length) {return null}
+      if (!navEntries.length) {
+        return null
+      }
       const nav = navEntries[0]
 
       const resEntries = performance.getEntriesByType('resource')
@@ -4821,7 +5664,9 @@
   const PERFORMANCE_BASELINE_KEY = 'resourceAcceleratorPerformanceBaseline'
 
   function savePerformanceBaseline() {
-    if (!state.performance) {return null}
+    if (!state.performance) {
+      return null
+    }
 
     const baseline = {
       ttfb: state.performance.ttfb,
@@ -4908,7 +5753,9 @@
 
   // ���浱��ͳ������
   function saveDailyStats() {
-    if (!state.performance) {return}
+    if (!state.performance) {
+      return
+    }
 
     const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD
     const dailyData = {
@@ -5047,4 +5894,3 @@
   // ������ʼ����ͬ����
   init()
 })()
-

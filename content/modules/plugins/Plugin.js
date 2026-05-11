@@ -20,7 +20,7 @@ export class Plugin {
       version: '1.0.0',
       description: 'Base plugin class',
       author: 'ResourceAccelerator',
-      dependencies: []
+      dependencies: [],
     }
   }
 
@@ -65,11 +65,12 @@ export class Plugin {
   /**
    * 处理资源（子类可覆盖）
    * @param {Element} element - DOM元素
-   * @param {Object} resourceInfo - 资源信息
    * @returns {Promise<any>} 处理结果
    */
-  async handle(element, resourceInfo) {
-    if (!this.enabled) return null
+  async handle() {
+    if (!this.enabled) {
+      return null
+    }
     // 子类实现具体逻辑
     return null
   }

@@ -118,7 +118,9 @@
      * @returns {string}
      */
     normalize(selector) {
-      if (!selector || typeof selector !== 'string') {return ''}
+      if (!selector || typeof selector !== 'string') {
+        return ''
+      }
 
       // 去除多余空格
       const normalized = selector
@@ -137,7 +139,9 @@
      * @returns {boolean}
      */
     validate(selector) {
-      if (!selector || typeof selector !== 'string') {return false}
+      if (!selector || typeof selector !== 'string') {
+        return false
+      }
 
       try {
         document.querySelector(selector)
@@ -185,7 +189,6 @@
       // 包含关系
       if (a.includes(b) || b.includes(a)) {
         const longer = a.length > b.length ? a : b
-        const shorter = a.length > b.length ? b : a
         return {
           type: 'redundant',
           suggestion: `保留更具体的: ${longer}`,

@@ -23,7 +23,9 @@ let lastLintTime = 0
 // 执行 lint
 const runLint = debounce(() => {
   const now = Date.now()
-  if (now - lastLintTime < 1000) return // 防抖 1秒
+  if (now - lastLintTime < 1000) {
+    return
+  } // 防抖 1秒
   lastLintTime = now
 
   if (lintProcess) {
@@ -85,7 +87,9 @@ process.on('SIGINT', () => {
   console.log('\n[Dev] 正在停止...')
   hotReloadServer.kill()
   vite.kill()
-  if (lintProcess) lintProcess.kill()
+  if (lintProcess) {
+    lintProcess.kill()
+  }
   watchers.forEach((w) => w.close())
   process.exit(0)
 })
@@ -94,7 +98,9 @@ hotReloadServer.on('exit', (code) => {
   if (code !== 0 && code !== null) {
     console.error('[Dev] 热重载服务器异常退出')
     vite.kill()
-    if (lintProcess) lintProcess.kill()
+    if (lintProcess) {
+      lintProcess.kill()
+    }
     watchers.forEach((w) => w.close())
     process.exit(code)
   }
@@ -104,7 +110,9 @@ vite.on('exit', (code) => {
   if (code !== 0 && code !== null) {
     console.error('[Dev] Vite构建异常退出')
     hotReloadServer.kill()
-    if (lintProcess) lintProcess.kill()
+    if (lintProcess) {
+      lintProcess.kill()
+    }
     watchers.forEach((w) => w.close())
     process.exit(code)
   }

@@ -66,7 +66,9 @@ export async function checkAvailable() {
  * 获取关键词数据
  */
 export async function getKeywords(domain) {
-  if (!_isAvailable) return null
+  if (!_isAvailable) {
+    return null
+  }
   try {
     const result = await fetch(`/api/data/keywords/${domain}`)
     return result
@@ -80,7 +82,9 @@ export async function getKeywords(domain) {
  * 保存关键词数据
  */
 export async function saveKeywords(domain, keywords) {
-  if (!_isAvailable) return false
+  if (!_isAvailable) {
+    return false
+  }
   try {
     await fetch(`/api/data/keywords/${domain}`, {
       method: 'POST',
@@ -97,7 +101,9 @@ export async function saveKeywords(domain, keywords) {
  * 获取选择器数据
  */
 export async function getSelectors(domain) {
-  if (!_isAvailable) return null
+  if (!_isAvailable) {
+    return null
+  }
   try {
     const result = await fetch(`/api/data/selectors/${domain}`)
     return result
@@ -111,7 +117,9 @@ export async function getSelectors(domain) {
  * 保存选择器数据
  */
 export async function saveSelectors(domain, selectors) {
-  if (!_isAvailable) return false
+  if (!_isAvailable) {
+    return false
+  }
   try {
     await fetch(`/api/data/selectors/${domain}`, {
       method: 'POST',

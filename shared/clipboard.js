@@ -11,7 +11,9 @@
  * @returns {Promise<boolean>} - 是否成功
  */
 export async function copyToClipboard(text) {
-  if (!text) return false
+  if (!text) {
+    return false
+  }
 
   try {
     // 优先使用现代 Clipboard API

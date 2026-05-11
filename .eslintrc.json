@@ -7,13 +7,47 @@
   "extends": ["eslint:recommended"],
   "globals": {
     "chrome": "readonly",
+    "gc": "readonly",
     "EventBus": "readonly",
-    "clients": "readonly"
+    "clients": "readonly",
+    "LibraryConfig": "readonly",
+    "Services": "readonly",
+    "StorageUtils": "readonly",
+    "DOMUtils": "readonly",
+    "DownloadsSearch": "readonly",
+    "ScriptLoader": "readonly",
+    "AppStore": "readonly",
+    "TabContentSearch": "readonly",
+    "StorageBridge": "readonly",
+    "SearchHistory": "readonly",
+    "MessagingUtils": "readonly",
+    "UnifiedSearch": "readonly",
+    "scheduler": "readonly",
+    "waitForEventBus": "readonly",
+    "handlePickedElement": "readonly",
+    "filterClipboardHistory": "readonly",
+    "clearNotifications": "readonly",
+    "getScriptSwitch": "readonly",
+    "LoggerUtils": "readonly",
+    "SiteBase": "readonly",
+    "ContentBridge": "readonly",
+    "LazyLoader": "readonly",
+    "LazyInitManager": "readonly",
+    "biliSite": "readonly",
+    "DEFAULT_HIDE_SELECTORS": "readonly",
+    "currentSelectors": "readonly",
+    "updateHideElements": "readonly",
+    "NOT_INTERESTED_KEYWORDS": "readonly",
+    "AUTO_FOLLOW_KEYWORDS": "readonly",
+    "__HOT_RELOAD__": "readonly",
+    "setupMessageHandler": "readonly",
+    "SiteScript": "readonly"
   },
   "parserOptions": {
     "ecmaVersion": 2020,
-    "sourceType": "script"
+    "sourceType": "module"
   },
+  "ignorePatterns": ["*.ts", "*.tsx", "node_modules/**", "dist/**", "build/**", "docs/**"],
   "rules": {
     "no-unused-vars": "warn",
     "no-console": ["warn", { "allow": ["warn", "error", "log"] }],
@@ -22,6 +56,9 @@
     "eqeqeq": "warn",
     "curly": "warn",
     "no-case-declarations": "warn",
-    "no-empty": "warn"
+    "no-empty": "warn",
+    "no-useless-escape": "off",
+    "no-inner-declarations": "off",
+    "no-const-assign": "off"
   }
 }

@@ -1,6 +1,6 @@
 /**
  * 缓存管理插件
- * 提供统一的缓存管理接口
+ * 提供统一的缓存管理接口、LRU淘汰、热点标记
  */
 
 import { Plugin } from './Plugin.js'
@@ -12,7 +12,7 @@ export class CachePlugin extends Plugin {
       version: '1.0.0',
       description: '统一缓存管理和淘汰策略',
       author: 'ResourceAccelerator',
-      dependencies: []
+      dependencies: [],
     }
   }
 
@@ -20,12 +20,15 @@ export class CachePlugin extends Plugin {
     return {
       enabled: true,
       maxSize: 50 * 1024 * 1024, // 50MB
-      evictionPolicy: 'weighted-lru', // weighted-lru | lru | lfu | fifo
+      maxEntries: 500,
+      evictionPolicy: 'weighted-lru',
       ttl: 30 * 60 * 1000, // 30分钟
+      hotThreshold: 'dynamic', // 或数字如3
+      protectList: ['favicon.ico', 'logo.png', 'avatar'],
       stats: {
         enabled: true,
-        sampleRate: 0.1
-      }
+        sampleRate: 0.1,
+      },
     }
   }
 
@@ -35,17 +38,18 @@ export class CachePlugin extends Plugin {
       hits: 0,
       misses: 0,
       evictions: 0,
-      writes: 0
+      writes: 0,
     }
 
     this.log('info', 'init', {
       maxSize: this.options.maxSize,
-      evictionPolicy: this.options.evictionPolicy
+      evictionPolicy: this.options.evictionPolicy,
+      hotThreshold: this.options.hotThreshold,
     })
   }
 
   async destroy() {
-    this.caches.forEach(cache => cache.data.clear())
+    this.caches.forEach((cache) => cache.data.clear())
     this.caches.clear()
   }
 
@@ -54,9 +58,12 @@ export class CachePlugin extends Plugin {
    */
   createCache(name, options = {}) {
     const config = {
-      maxSize: options.maxSize || 1000,
+      maxSize: options.maxSize || this.options.maxSize,
+      maxEntries: options.maxEntries || this.options.maxEntries,
       ttl: options.ttl || this.options.ttl,
-      evictionPolicy: options.evictionPolicy || this.options.evictionPolicy
+      evictionPolicy: options.evictionPolicy || this.options.evictionPolicy,
+      hotThreshold: options.hotThreshold || this.options.hotThreshold,
+      protectList: options.protectList || this.options.protectList,
     }
 
     const cache = {
@@ -66,9 +73,10 @@ export class CachePlugin extends Plugin {
         hits: 0,
         misses: 0,
         evictions: 0,
-        writes: 0
+        writes: 0,
+        hotProtected: 0,
       },
-      currentSize: 0
+      currentSize: 0,
     }
 
     this.caches.set(name, cache)
@@ -81,7 +89,9 @@ export class CachePlugin extends Plugin {
    */
   getCache(name) {
     const cache = this.caches.get(name)
-    if (!cache) return null
+    if (!cache) {
+      return null
+    }
 
     return this._createCacheInterface(name, cache)
   }
@@ -95,7 +105,7 @@ export class CachePlugin extends Plugin {
       set: (key, value, size) => this._set(name, cache, key, value, size),
       delete: (key) => this._delete(cache, key),
       clear: () => this._clear(cache),
-      stats: () => this._getStats(cache)
+      stats: () => this._getStats(cache),
     }
   }
 
@@ -138,7 +148,8 @@ export class CachePlugin extends Plugin {
 
     // 检查是否需要淘汰
     while (
-      cache.currentSize + entrySize > cache.config.maxSize &&
+      (cache.currentSize + entrySize > cache.config.maxSize ||
+        cache.data.size >= cache.config.maxEntries) &&
       cache.data.size > 0
     ) {
       this._evict(cache)
@@ -155,7 +166,8 @@ export class CachePlugin extends Plugin {
       size: entrySize,
       timestamp: Date.now(),
       lastAccess: Date.now(),
-      accessCount: 1
+      accessCount: 1,
+      isHot: false,
     })
 
     cache.currentSize += entrySize
@@ -188,6 +200,9 @@ export class CachePlugin extends Plugin {
    * 执行淘汰
    */
   _evict(cache) {
+    // 先更新热点标记
+    this._updateHotMarkers(cache)
+
     const policy = cache.config.evictionPolicy
     let evictKey = null
 
@@ -215,8 +230,62 @@ export class CachePlugin extends Plugin {
       cache.stats.evictions++
       this.globalStats.evictions++
 
-      this.emit('cache:evicted', { key: evictKey, policy })
+      this.emit('cache:evicted', {
+        key: evictKey,
+        policy,
+        size: entry?.size,
+        wasHot: entry?.isHot,
+      })
     }
+  }
+
+  /**
+   * 更新热点标记
+   */
+  _updateHotMarkers(cache) {
+    const threshold = cache.config.hotThreshold
+
+    // 动态热点判定
+    if (threshold === 'dynamic') {
+      // 计算平均访问次数
+      let totalAccess = 0
+      let count = 0
+
+      for (const entry of cache.data.values()) {
+        totalAccess += entry.accessCount || 1
+        count++
+      }
+
+      const avgAccess = count > 0 ? totalAccess / count : 1
+      const hotThreshold = avgAccess * 2
+
+      // 标记热点
+      for (const entry of cache.data.values()) {
+        entry.isHot = (entry.accessCount || 1) >= hotThreshold
+      }
+    } else {
+      // 静态阈值
+      const hotThreshold = typeof threshold === 'number' ? threshold : 3
+
+      for (const entry of cache.data.values()) {
+        entry.isHot = (entry.accessCount || 1) >= hotThreshold
+      }
+    }
+  }
+
+  /**
+   * 检查是否受保护
+   */
+  _isProtected(key, cache) {
+    const protectList = cache.config.protectList || []
+
+    for (const pattern of protectList) {
+      if (key.includes(pattern)) {
+        return true
+      }
+    }
+
+    return false
   }
 
   /**
@@ -228,6 +297,12 @@ export class CachePlugin extends Plugin {
     let evictKey = null
 
     for (const [key, entry] of cache.data.entries()) {
+      // 跳过热点和保护列表
+      if (entry.isHot || this._isProtected(key, cache)) {
+        cache.stats.hotProtected++
+        continue
+      }
+
       const accessCount = entry.accessCount || 1
       const age = now - (entry.lastAccess || entry.timestamp || now)
       const ageScore = Math.max(0, 1 - age / 3600000)
@@ -246,6 +321,11 @@ export class CachePlugin extends Plugin {
       }
     }
 
+    // 如果所有条目都被保护，使用普通LRU
+    if (!evictKey) {
+      return this._lruEvict(cache)
+    }
+
     return evictKey
   }
 
@@ -257,6 +337,11 @@ export class CachePlugin extends Plugin {
     let evictKey = null
 
     for (const [key, entry] of cache.data.entries()) {
+      // 跳过热点和保护列表
+      if (entry.isHot || this._isProtected(key, cache)) {
+        continue
+      }
+
       if (!oldest || entry.lastAccess < oldest.lastAccess) {
         oldest = entry
         evictKey = key
@@ -274,6 +359,11 @@ export class CachePlugin extends Plugin {
     let evictKey = null
 
     for (const [key, entry] of cache.data.entries()) {
+      // 跳过热点和保护列表
+      if (entry.isHot || this._isProtected(key, cache)) {
+        continue
+      }
+
       const count = entry.accessCount || 1
       if (count < minCount) {
         minCount = count
@@ -292,6 +382,11 @@ export class CachePlugin extends Plugin {
     let evictKey = null
 
     for (const [key, entry] of cache.data.entries()) {
+      // 跳过热点和保护列表
+      if (entry.isHot || this._isProtected(key, cache)) {
+        continue
+      }
+
       if (!oldest || entry.timestamp < oldest.timestamp) {
         oldest = entry
         evictKey = key
@@ -320,11 +415,21 @@ export class CachePlugin extends Plugin {
    */
   _getStats(cache) {
     const total = cache.stats.hits + cache.stats.misses
+
+    // 计算热点数量
+    let hotCount = 0
+    for (const entry of cache.data.values()) {
+      if (entry.isHot) {
+        hotCount++
+      }
+    }
+
     return {
       ...cache.stats,
       size: cache.currentSize,
       entries: cache.data.size,
-      hitRate: total > 0 ? cache.stats.hits / total : 0
+      hitRate: total > 0 ? cache.stats.hits / total : 0,
+      hotEntries: hotCount,
     }
   }
 
@@ -336,7 +441,7 @@ export class CachePlugin extends Plugin {
     return {
       ...this.globalStats,
       caches: this.caches.size,
-      hitRate: total > 0 ? this.globalStats.hits / total : 0
+      hitRate: total > 0 ? this.globalStats.hits / total : 0,
     }
   }
 }

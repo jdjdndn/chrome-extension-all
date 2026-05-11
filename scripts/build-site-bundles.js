@@ -3,10 +3,12 @@
  * 站点脚本打包工具
  * 使用 esbuild 将入口文件打包为自包含 bundle
  * 支持依赖解析、tree shaking、source map
+ * 支持增量构建，仅重新构建变化的文件
  *
  * 使用: node scripts/build-site-bundles.js
  * 或:   npm run bundle
  * 监听: npm run watch (自动重建)
+ * 清理: npm run clean:cache
  */
 
 const esbuild = require('esbuild')
@@ -14,6 +16,18 @@ const path = require('path')
 const fs = require('fs')
 
 const root = path.resolve(__dirname, '..')
+
+// 增量构建模块
+let incrementalBuild = null
+let getStats = null
+
+try {
+  const incrementalModule = require('./incremental-build.js')
+  incrementalBuild = incrementalModule.incrementalBuild
+  getStats = incrementalModule.getStats
+} catch (err) {
+  console.warn('[Build] 增量构建模块加载失败，使用全量构建')
+}
 
 // ========== 打包配置 ==========
 const BUNDLES = [
@@ -128,23 +142,54 @@ function createBuildOptions(bundle) {
 async function buildAll() {
   console.log('\n📦 开始打包...\n')
 
-  for (const bundle of BUNDLES) {
-    try {
-      const startTime = Date.now()
-      await esbuild.build(createBuildOptions(bundle))
-      const duration = Date.now() - startTime
-
-      const outPath = path.join(root, bundle.outfile)
-      const size = fs.existsSync(outPath)
-        ? `(${(fs.statSync(outPath).size / 1024).toFixed(1)} KB)`
-        : ''
-      console.log(`✓ ${bundle.name}: ${bundle.outfile} ${size} ${duration}ms`)
-    } catch (err) {
-      console.error(`✗ ${bundle.name}: ${err.message}`)
-    }
+  // 构建函数
+  const buildFn = async (bundle) => {
+    await esbuild.build(createBuildOptions(bundle))
   }
 
-  console.log('\n✅ 打包完成')
+  // 尝试使用增量构建
+  if (incrementalBuild) {
+    const results = await incrementalBuild(BUNDLES, buildFn)
+
+    // 输出详情
+    if (results.rebuilt.length > 0) {
+      console.log(`\n✓ 已构建: ${results.rebuilt.join(', ')}`)
+    }
+    if (results.skipped.length > 0) {
+      console.log(`○ 已跳过: ${results.skipped.join(', ')}`)
+    }
+    if (results.errors.length > 0) {
+      console.log(`\n✗ 错误:`)
+      results.errors.forEach((e) => console.log(`  - ${e.bundle}: ${e.error}`))
+    }
+
+    console.log(`\n✅ 打包完成 (${results.duration}ms)`)
+
+    // 显示统计
+    if (getStats) {
+      const stats = getStats()
+      console.log(`   缓存命中率: ${stats.hitRate}`)
+    }
+  } else {
+    // 降级到全量构建
+    for (const bundle of BUNDLES) {
+      try {
+        const startTime = Date.now()
+        await esbuild.build(createBuildOptions(bundle))
+        const duration = Date.now() - startTime
+
+        const outPath = path.join(root, bundle.outfile)
+        const size = fs.existsSync(outPath)
+          ? `(${(fs.statSync(outPath).size / 1024).toFixed(1)} KB)`
+          : ''
+        console.log(`✓ ${bundle.name}: ${bundle.outfile} ${size} ${duration}ms`)
+      } catch (err) {
+        console.error(`✗ ${bundle.name}: ${err.message}`)
+      }
+    }
+
+    console.log('\n✅ 打包完成')
+  }
 }
 
 // ========== Watch 模式 ==========

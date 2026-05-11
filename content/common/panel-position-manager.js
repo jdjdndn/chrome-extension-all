@@ -101,7 +101,9 @@ if (!window.PanelPositionManager) {
         this.loadFromStorage()
 
         window.addEventListener('resize', () => {
-          if (this._resizeTimer) clearTimeout(this._resizeTimer)
+          if (this._resizeTimer) {
+            clearTimeout(this._resizeTimer)
+          }
           this._resizeTimer = setTimeout(() => this.scheduleCalculate(), 200)
         })
 
@@ -115,7 +117,9 @@ if (!window.PanelPositionManager) {
 
       // 启动遮挡检测定时器
       startOcclusionCheck() {
-        if (this._occlusionCheckTimer) return
+        if (this._occlusionCheckTimer) {
+          return
+        }
 
         this._occlusionCheckTimer = setInterval(() => {
           this.checkAndAdjustOcclusions()
@@ -132,7 +136,9 @@ if (!window.PanelPositionManager) {
 
       // 检测并调整遮挡
       checkAndAdjustOcclusions() {
-        if (!this.isPositionReady || this.isCalculating) return
+        if (!this.isPositionReady || this.isCalculating) {
+          return
+        }
 
         const report = this.checkAllOcclusions()
         this._lastOcclusionReport = report
@@ -158,7 +164,9 @@ if (!window.PanelPositionManager) {
       },
 
       doCalculate() {
-        if (this.isCalculating) return
+        if (this.isCalculating) {
+          return
+        }
         this.isCalculating = true
 
         try {
@@ -503,8 +511,12 @@ if (!window.PanelPositionManager) {
         for (const c of sorted) {
           const isHidden = this.isComponentHidden(c, hasH)
           if (isHidden) {
-            if (c.iconEl) c.iconEl.style.display = 'none'
-            if (c.panelEl) c.panelEl.style.display = 'none'
+            if (c.iconEl) {
+              c.iconEl.style.display = 'none'
+            }
+            if (c.panelEl) {
+              c.panelEl.style.display = 'none'
+            }
             c._fixedPosition = null
           }
         }
@@ -583,7 +595,9 @@ if (!window.PanelPositionManager) {
             const pos1 = panelPositions.get(panel1.id)
             const pos2 = panelPositions.get(panel2.id)
 
-            if (!pos1 || !pos2) continue
+            if (!pos1 || !pos2) {
+              continue
+            }
 
             const overlap = this.checkRectOverlap(
               { right: pos1.right, top: pos1.top, width: pos1.width, height: pos1.height },
@@ -652,7 +666,9 @@ if (!window.PanelPositionManager) {
         const { panelGap, minPanelHeight, panelHeightRatios } = this.config
         const panelCount = expandedPanels.length
 
-        if (panelCount === 0) return []
+        if (panelCount === 0) {
+          return []
+        }
 
         // 计算间隙总和
         const gapTotal = panelGap * (panelCount - 1)
@@ -679,7 +695,9 @@ if (!window.PanelPositionManager) {
 
       // 检测元素是否可忽略
       isIgnorableElement(el, excludeElements = []) {
-        if (!el) return true
+        if (!el) {
+          return true
+        }
 
         // 忽略指定标签
         if (this.config.ignoredTags.includes(el.tagName)) {
@@ -817,7 +835,9 @@ if (!window.PanelPositionManager) {
       // 检测单个组件是否遮挡页面内容
       checkComponentOcclusion(componentId) {
         const c = this.components.find((c) => c.id === componentId)
-        if (!c) return { hasOcclusion: false, reason: 'component not found' }
+        if (!c) {
+          return { hasOcclusion: false, reason: 'component not found' }
+        }
 
         const results = {
           id: componentId,
@@ -997,15 +1017,21 @@ if (!window.PanelPositionManager) {
 
       // 判断元素是否为重要元素
       isImportantElement(el) {
-        if (!el || !el.tagName) return false
+        if (!el || !el.tagName) {
+          return false
+        }
 
         const tag = el.tagName
 
         // 交互元素
-        if (this.importantContentTags.critical.includes(tag)) return true
+        if (this.importantContentTags.critical.includes(tag)) {
+          return true
+        }
 
         // 媒体和标题
-        if (this.importantContentTags.high.includes(tag)) return true
+        if (this.importantContentTags.high.includes(tag)) {
+          return true
+        }
 
         // 带有文本内容的元素
         if (el.innerText && el.innerText.trim().length > 0) {
@@ -1021,19 +1047,29 @@ if (!window.PanelPositionManager) {
 
       // 获取元素重要性等级
       getElementImportance(el) {
-        if (!el || !el.tagName) return 'low'
+        if (!el || !el.tagName) {
+          return 'low'
+        }
 
         const tag = el.tagName
 
-        if (this.importantContentTags.critical.includes(tag)) return 'critical'
-        if (this.importantContentTags.high.includes(tag)) return 'high'
-        if (this.importantContentTags.medium.includes(tag)) return 'medium'
+        if (this.importantContentTags.critical.includes(tag)) {
+          return 'critical'
+        }
+        if (this.importantContentTags.high.includes(tag)) {
+          return 'high'
+        }
+        if (this.importantContentTags.medium.includes(tag)) {
+          return 'medium'
+        }
         return 'low'
       },
 
       // 获取元素预览文本
       getElementPreview(el, maxLength = 50) {
-        if (!el) return ''
+        if (!el) {
+          return ''
+        }
 
         // 对于图片，返回 alt 或 src
         if (el.tagName === 'IMG') {
@@ -1048,7 +1084,9 @@ if (!window.PanelPositionManager) {
         // 对于链接，返回链接文本或 href
         if (el.tagName === 'A') {
           const text = el.innerText?.trim()
-          if (text) return text.substring(0, maxLength)
+          if (text) {
+            return text.substring(0, maxLength)
+          }
           return el.href?.substring(0, maxLength) || '[链接]'
         }
 
@@ -1077,8 +1115,12 @@ if (!window.PanelPositionManager) {
 
           if (occlusion.hasOcclusion) {
             results.totalOcclusions++
-            if (occlusion.severity === 'critical') results.criticalCount++
-            if (occlusion.severity === 'high') results.highCount++
+            if (occlusion.severity === 'critical') {
+              results.criticalCount++
+            }
+            if (occlusion.severity === 'high') {
+              results.highCount++
+            }
           }
         }
 
@@ -1088,10 +1130,14 @@ if (!window.PanelPositionManager) {
       // 智能避让建议（找到遮挡最少的备选位置）
       suggestAvoidancePosition(componentId, maxAttempts = 10) {
         const c = this.components.find((c) => c.id === componentId)
-        if (!c || !c.panelEl) return null
+        if (!c || !c.panelEl) {
+          return null
+        }
 
         const currentBounds = this.getElementBounds(c.panelEl)
-        if (!currentBounds) return null
+        if (!currentBounds) {
+          return null
+        }
 
         const { width, height, right, top } = currentBounds
         const vw = window.innerWidth
@@ -1167,7 +1213,9 @@ if (!window.PanelPositionManager) {
           // 先按严重程度排序
           const severityOrder = { critical: 0, high: 1, medium: 2, low: 3, none: 4 }
           const severityDiff = severityOrder[a.severity] - severityOrder[b.severity]
-          if (severityDiff !== 0) return severityDiff
+          if (severityDiff !== 0) {
+            return severityDiff
+          }
           // 再按重叠比例排序
           return a.overlapRatio - b.overlapRatio
         })
@@ -1229,8 +1277,12 @@ if (!window.PanelPositionManager) {
         const ourElements = new Set()
         if (!includeOurComponents) {
           for (const c of this.components) {
-            if (c.iconEl) ourElements.add(c.iconEl)
-            if (c.panelEl) ourElements.add(c.panelEl)
+            if (c.iconEl) {
+              ourElements.add(c.iconEl)
+            }
+            if (c.panelEl) {
+              ourElements.add(c.panelEl)
+            }
           }
         }
 
@@ -1239,29 +1291,38 @@ if (!window.PanelPositionManager) {
 
         for (const el of allElements) {
           // 跳过我们自己管理的组件
-          if (!includeOurComponents && ourElements.has(el)) continue
+          if (!includeOurComponents && ourElements.has(el)) {
+            continue
+          }
 
           const style = window.getComputedStyle(el)
           const position = style.position
 
           // 只检测 fixed 和 absolute 定位的元素
-          if (position !== 'fixed' && position !== 'absolute') continue
+          if (position !== 'fixed' && position !== 'absolute') {
+            continue
+          }
 
           // 检查 z-index
           const zIndex = parseInt(style.zIndex) || 0
-          if (zIndex < minZIndex && zIndex !== 0) continue
+          if (zIndex < minZIndex && zIndex !== 0) {
+            continue
+          }
 
           // 获取元素尺寸
           const rect = el.getBoundingClientRect()
-          if (rect.width * rect.height < minArea) continue
+          if (rect.width * rect.height < minArea) {
+            continue
+          }
 
           // 跳过隐藏元素
           if (
             style.display === 'none' ||
             style.visibility === 'hidden' ||
             parseFloat(style.opacity) === 0
-          )
+          ) {
             continue
+          }
 
           // 检测该元素是否遮挡了页面内容
           const occlusion = this.checkElementOcclusion(el, ourElements)
@@ -1285,8 +1346,12 @@ if (!window.PanelPositionManager) {
           results.summary.total++
           if (occlusion.hasOcclusion) {
             results.summary.occluding++
-            if (occlusion.severity === 'critical') results.summary.critical++
-            if (occlusion.severity === 'high') results.summary.high++
+            if (occlusion.severity === 'critical') {
+              results.summary.critical++
+            }
+            if (occlusion.severity === 'high') {
+              results.summary.high++
+            }
           }
         }
 
@@ -1345,19 +1410,25 @@ if (!window.PanelPositionManager) {
 
         for (const el of allElements) {
           // 跳过排除元素
-          if (excludeElements.some((ex) => ex && (el === ex || el.contains(ex) || ex.contains(el))))
+          if (
+            excludeElements.some((ex) => ex && (el === ex || el.contains(ex) || ex.contains(el)))
+          ) {
             continue
+          }
 
           const style = window.getComputedStyle(el)
-          if (style.position !== 'fixed' && style.position !== 'absolute') continue
+          if (style.position !== 'fixed' && style.position !== 'absolute') {
+            continue
+          }
 
           // 跳过隐藏元素
           if (
             style.display === 'none' ||
             style.visibility === 'hidden' ||
             parseFloat(style.opacity) === 0
-          )
+          ) {
             continue
+          }
 
           const elRect = el.getBoundingClientRect()
 
@@ -1419,7 +1490,9 @@ if (!window.PanelPositionManager) {
                 [c.iconEl, c.panelEl]
               )
               componentResult.icon = occlusion
-              if (occlusion.hasOcclusion) componentResult.isOccluded = true
+              if (occlusion.hasOcclusion) {
+                componentResult.isOccluded = true
+              }
             }
           }
 
@@ -1437,13 +1510,17 @@ if (!window.PanelPositionManager) {
                 [c.iconEl, c.panelEl]
               )
               componentResult.panel = occlusion
-              if (occlusion.hasOcclusion) componentResult.isOccluded = true
+              if (occlusion.hasOcclusion) {
+                componentResult.isOccluded = true
+              }
             }
           }
 
           results.components.push(componentResult)
           results.summary.total++
-          if (componentResult.isOccluded) results.summary.occluded++
+          if (componentResult.isOccluded) {
+            results.summary.occluded++
+          }
         }
 
         return results
@@ -1452,10 +1529,14 @@ if (!window.PanelPositionManager) {
       // 寻找不被其他元素遮挡的位置
       findUnoccludedPosition(componentId, preferredRight, preferredTop) {
         const c = this.components.find((c) => c.id === componentId)
-        if (!c || !c.panelEl) return null
+        if (!c || !c.panelEl) {
+          return null
+        }
 
         const currentBounds = this.getElementBounds(c.panelEl)
-        if (!currentBounds) return null
+        if (!currentBounds) {
+          return null
+        }
 
         const { width, height } = currentBounds
         const vw = window.innerWidth
@@ -1616,7 +1697,9 @@ if (!window.PanelPositionManager) {
               bestPosition = { right, top, overlapRatio }
             }
 
-            if (attempts >= maxSearchAttempts) break
+            if (attempts >= maxSearchAttempts) {
+              break
+            }
           }
         }
 
@@ -1774,7 +1857,9 @@ if (!window.PanelPositionManager) {
         // 额外检查：遍历顶部区域的所有固定元素
         const topElements = document.elementsFromPoint(100, 20)
         for (const el of topElements) {
-          if (el === document.documentElement || el === document.body) continue
+          if (el === document.documentElement || el === document.body) {
+            continue
+          }
 
           const style = window.getComputedStyle(el)
           if (style.position === 'fixed' || style.position === 'sticky') {
@@ -1838,13 +1923,17 @@ if (!window.PanelPositionManager) {
 
         // 递归查找可能的主体元素
         const findCandidates = (el, depth) => {
-          if (depth > 3) return // 限制递归深度
+          if (depth > 3) {
+            return
+          } // 限制递归深度
 
           const children = el.children
           for (const child of children) {
             const style = window.getComputedStyle(child)
             // 跳过隐藏元素
-            if (style.display === 'none' || style.visibility === 'hidden') continue
+            if (style.display === 'none' || style.visibility === 'hidden') {
+              continue
+            }
 
             const rect = child.getBoundingClientRect()
             const width = rect.width
@@ -1952,7 +2041,9 @@ if (!window.PanelPositionManager) {
 
       // 记录元素的位置和尺寸信息到 data 属性，用于碰撞检测
       recordElementBounds(el, type, id, bounds) {
-        if (!el) return
+        if (!el) {
+          return
+        }
         el.dataset.ycType = type // 'icon' | 'panel'
         el.dataset.ycId = id // 组件 ID
         el.dataset.ycRight = bounds.right // right 位置
@@ -1964,7 +2055,9 @@ if (!window.PanelPositionManager) {
 
       // 清除元素的位置信息
       clearElementBounds(el) {
-        if (!el) return
+        if (!el) {
+          return
+        }
         delete el.dataset.ycType
         delete el.dataset.ycId
         delete el.dataset.ycRight
@@ -1976,7 +2069,9 @@ if (!window.PanelPositionManager) {
 
       // 从元素获取位置信息（供碰撞检测使用）
       getElementBounds(el) {
-        if (!el || !el.dataset.ycType) return null
+        if (!el || !el.dataset.ycType) {
+          return null
+        }
         return {
           type: el.dataset.ycType,
           id: el.dataset.ycId,
@@ -1992,7 +2087,9 @@ if (!window.PanelPositionManager) {
       checkElementsCollision(el1, el2) {
         const bounds1 = this.getElementBounds(el1)
         const bounds2 = this.getElementBounds(el2)
-        if (!bounds1 || !bounds2) return { hasCollision: false }
+        if (!bounds1 || !bounds2) {
+          return { hasCollision: false }
+        }
 
         return this.checkRectOverlap(
           { right: bounds1.right, top: bounds1.top, width: bounds1.width, height: bounds1.height },
@@ -2045,7 +2142,9 @@ if (!window.PanelPositionManager) {
 
         const visibleCount = this.components.filter((c) => this.isComponentVisible(c)).length
 
-        if (visibleCount <= 1) return iconGapMin
+        if (visibleCount <= 1) {
+          return iconGapMin
+        }
 
         const availableSpace = vh - edgeMargin * 2 - visibleCount * iconHeight
         const gapCount = visibleCount - 1
@@ -2110,7 +2209,9 @@ if (!window.PanelPositionManager) {
 
       unregister(id) {
         const idx = this.components.findIndex((c) => c.id === id)
-        if (idx === -1) return
+        if (idx === -1) {
+          return
+        }
         this.components.splice(idx, 1)
 
         this.positionsFixed = false
@@ -2125,7 +2226,9 @@ if (!window.PanelPositionManager) {
 
       expandPanel(id) {
         const c = this.components.find((c) => c.id === id)
-        if (!c) return
+        if (!c) {
+          return
+        }
 
         this.collapsedStates[id] = false
         c.isVisible = true
@@ -2143,7 +2246,9 @@ if (!window.PanelPositionManager) {
 
       collapsePanel(id) {
         const c = this.components.find((c) => c.id === id)
-        if (!c) return
+        if (!c) {
+          return
+        }
 
         this.collapsedStates[id] = true
         c.isVisible = false
@@ -2191,7 +2296,9 @@ if (!window.PanelPositionManager) {
           }
         } else {
           this.collapsedStates[id] = true
-          if (c) c.isVisible = false
+          if (c) {
+            c.isVisible = false
+          }
         }
 
         this.saveToStorage()
@@ -2305,8 +2412,12 @@ if (!window.PanelPositionManager) {
       },
 
       destroy() {
-        if (this._resizeTimer) clearTimeout(this._resizeTimer)
-        if (this.pendingCalculate) clearTimeout(this.pendingCalculate)
+        if (this._resizeTimer) {
+          clearTimeout(this._resizeTimer)
+        }
+        if (this.pendingCalculate) {
+          clearTimeout(this.pendingCalculate)
+        }
         this.components = []
       },
 
@@ -2364,10 +2475,14 @@ if (!window.PanelPositionManager) {
 
           for (const el of elements) {
             // 跳过隐藏元素
-            if (this.isHiddenElement(el)) continue
+            if (this.isHiddenElement(el)) {
+              continue
+            }
 
             // 跳过我们自己的组件
-            if (el.closest('[id^="yc-"]')) continue
+            if (el.closest('[id^="yc-"]')) {
+              continue
+            }
 
             const rect = el.getBoundingClientRect()
 
@@ -2617,7 +2732,9 @@ if (!window.PanelPositionManager) {
           // 先按严重程度排序
           const severityOrder = { none: 0, low: 1, medium: 2, high: 3, critical: 4 }
           const severityDiff = severityOrder[a.severity] - severityOrder[b.severity]
-          if (severityDiff !== 0) return severityDiff
+          if (severityDiff !== 0) {
+            return severityDiff
+          }
           // 再按重叠比例排序
           return a.overlapRatio - b.overlapRatio
         })
@@ -2657,13 +2774,19 @@ if (!window.PanelPositionManager) {
        */
       adjustPositionsForOcclusions(report) {
         for (const compReport of report.components) {
-          if (!compReport.hasOcclusion) continue
+          if (!compReport.hasOcclusion) {
+            continue
+          }
 
           const c = this.components.find((c) => c.id === compReport.id)
-          if (!c) continue
+          if (!c) {
+            continue
+          }
 
           // 如果是用户自定义位置，不自动调整
-          if (c.userCustomizedPanel) continue
+          if (c.userCustomizedPanel) {
+            continue
+          }
 
           // 调整icon位置
           if (compReport.icon && compReport.icon.hasOcclusion) {
@@ -2772,8 +2895,12 @@ if (!window.PanelPositionManager) {
         let count = 0
 
         elements.forEach((el) => {
-          if (this.isHiddenElement(el)) return
-          if (el.closest('[id^="yc-"]')) return
+          if (this.isHiddenElement(el)) {
+            return
+          }
+          if (el.closest('[id^="yc-"]')) {
+            return
+          }
 
           el.style.outline = '2px dashed red'
           el.style.outlineOffset = '2px'

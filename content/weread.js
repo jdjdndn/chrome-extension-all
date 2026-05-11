@@ -54,7 +54,9 @@ function injectStyles() {
 }
 
 function autoScroll() {
-  if (!settings.open) return
+  if (!settings.open) {
+    return
+  }
 
   const scrollStep = settings.step
   const currentScrollY = window.scrollY
@@ -76,7 +78,9 @@ function autoScroll() {
 }
 
 function startAutoScroll() {
-  if (intervalId) return
+  if (intervalId) {
+    return
+  }
   settings.open = true
   intervalId = setInterval(autoScroll, settings.interval)
   updateButtonState()

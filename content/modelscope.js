@@ -55,7 +55,9 @@ import { createScriptGuard } from './utils/script-guard.js'
    * @param {string} text - 要复制的文本
    */
   async function copyToClipboard(text) {
-    if (!text || text === lastCopiedText) return
+    if (!text || text === lastCopiedText) {
+      return
+    }
 
     try {
       // 优先使用 navigator.clipboard（需要安全上下文）

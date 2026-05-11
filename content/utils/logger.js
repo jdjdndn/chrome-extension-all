@@ -15,7 +15,7 @@ const LOG_LEVELS = {
 }
 
 // 默认配置
-let config = {
+const config = {
   level: LOG_LEVELS.INFO,
   enabledModules: new Set(),
   disabledModules: new Set(),
@@ -56,11 +56,17 @@ export function disableModule(module) {
  */
 function shouldLog(level, module) {
   // 级别过滤
-  if (level < config.level) return false
+  if (level < config.level) {
+    return false
+  }
 
   // 模块过滤
-  if (config.disabledModules.has(module)) return false
-  if (config.enabledModules.size > 0 && !config.enabledModules.has(module)) return false
+  if (config.disabledModules.has(module)) {
+    return false
+  }
+  if (config.enabledModules.size > 0 && !config.enabledModules.has(module)) {
+    return false
+  }
 
   return true
 }
@@ -117,6 +123,8 @@ export default LoggerUtils
 // 避免重复初始化
 if (typeof window !== 'undefined' && !window.LoggerUtils) {
   window.LoggerUtils = LoggerUtils
-  if (window.ScriptLoader) ScriptLoader.markReady('LoggerUtils')
+  if (window.ScriptLoader) {
+    ScriptLoader.markReady('LoggerUtils')
+  }
   console.log('[Logger] 日志模块已加载')
 }

@@ -72,7 +72,9 @@ function createSearchUI() {
 
   button.onclick = performSearch
   input.onkeypress = (e) => {
-    if (e.key === 'Enter') performSearch()
+    if (e.key === 'Enter') {
+      performSearch()
+    }
   }
 
   container.appendChild(input)
@@ -89,7 +91,9 @@ function performSearch() {
     el.classList.remove('kuake-highlight')
   })
 
-  if (!keyword) return
+  if (!keyword) {
+    return
+  }
 
   // 搜索文件名
   const fileElements = document.querySelectorAll('.filename-text, [class*="filename"]')

@@ -15,7 +15,9 @@ function handleClick(event) {
   const elements = [...document.elementsFromPoint(event.clientX, event.clientY)]
   const link = elements.find((el) => el.tagName === 'A')
 
-  if (!link) return
+  if (!link) {
+    return
+  }
 
   // event.preventDefault();
   // event.stopPropagation();

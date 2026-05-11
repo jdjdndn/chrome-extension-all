@@ -135,7 +135,6 @@ let _domainBlockedData = {
 }
 
 // 设置加载状态
-let _settingsLoaded = false
 let _settingsLoadPromise = null
 
 // 合并并去重数组
@@ -303,16 +302,6 @@ function getBlockedResponseDomainsForDomain(domain) {
   return []
 }
 
-// Set blocked domains for a specific domain (synchronous helper)
-function setBlockedDomainsForDomain(domain, domains) {
-  _domainBlockedData.blockedDomains[domain] = domains
-}
-
-// Set blocked response domains for a specific domain (synchronous helper)
-function setBlockedResponseDomainsForDomain(domain, domains) {
-  _domainBlockedData.blockedResponseDomains[domain] = domains
-}
-
 // Get all blocked domains across all domains (for backward compatibility)
 function getAllBlockedDomains() {
   const allDomains = new Set()
@@ -367,10 +356,16 @@ async function initialize() {
   // Load settings (await to ensure data is ready)
   _settingsLoadPromise = loadSettings()
   await _settingsLoadPromise
-  _settingsLoaded = true
 
   // Listen for extension events
   setupEventListeners()
+
+  // 注册 JS 重定向规则（Service Worker 唤醒后重新注册）
+  if (typeof self.registerJSRedirectRules === 'function') {
+    self.registerJSRedirectRules().catch((e) => {
+      console.error('[Background] JS 重定向规则注册失败:', e)
+    })
+  }
 
   // 处理浏览器启动时已存在的标签页
   // 延迟执行，确保 service worker 完全就绪
@@ -585,16 +580,6 @@ function registerMessageTemplates() {
   })
 
   console.log('[Background] 消息模板已注册')
-}
-
-// Ensure settings are loaded before accessing
-async function ensureSettingsLoaded() {
-  if (_settingsLoaded) {
-    return
-  }
-  if (_settingsLoadPromise) {
-    await _settingsLoadPromise
-  }
 }
 
 // Load settings from storage
@@ -899,55 +884,6 @@ async function removeBlockedResponseDomain(domain) {
   return false
 }
 
-// Check if domain should be blocked based on current page
-function shouldBlockRequest(domain, url) {
-  // Get the current active tab to determine the source domain
-  return new Promise((resolve) => {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0] && tabs[0].url) {
-        const currentUrl = new URL(tabs[0].url)
-        const currentDomain = currentUrl.hostname
-
-        // Check if the request is being made from a blocked domain
-        const isFromBlockedDomain = extensionState.blockedDomains.some((blockedDomain) => {
-          return currentDomain.includes(blockedDomain) || blockedDomain.includes(currentDomain)
-        })
-
-        // Check if the request is to a blocked domain
-        const isToBlockedDomain = extensionState.blockedDomains.some((blockedDomain) => {
-          return url.includes(blockedDomain) || url.includes(`.${blockedDomain}`)
-        })
-
-        resolve(isFromBlockedDomain || isToBlockedDomain)
-      } else {
-        resolve(false)
-      }
-    })
-  })
-}
-
-// Intercept API requests to block responses from specific domains
-async function interceptAPIRequest(url, tabUrl) {
-  // Check if domain should be blocked
-  const shouldBlock = extensionState.blockedDomains.some((domain) => {
-    return (
-      url.includes(domain) ||
-      url.includes(`.${domain}`) ||
-      tabUrl.includes(domain) ||
-      tabUrl.includes(`.${domain}`)
-    )
-  })
-
-  if (shouldBlock) {
-    if (extensionState.isDebugMode) {
-      console.log(`API request blocked: ${url}`)
-    }
-    return { blocked: true, error: 'API request blocked by extension' }
-  }
-
-  return { blocked: false }
-}
-
 // Add domain script mapping entry
 function addDomainScriptEntry(domain, scriptFiles) {
   if (!extensionState.domainScriptMap[domain]) {
@@ -994,54 +930,6 @@ function removeDomainScriptEntry(domain) {
     return true
   }
   return false
-}
-
-// Get scripts to inject for current domain
-function getScriptsForDomain(domain) {
-  // Use includes for flexible domain matching (subdomains)
-  // e.g., "www.douyin.com" matches "douyin.com"
-  // "douyin.com" matches "douyin.com"
-  // But only return the first match to avoid duplicates
-  for (const [key, scripts] of Object.entries(extensionState.domainScriptMap)) {
-    // Check if domain matches key (supports subdomain matching)
-    if (domain.includes(key) || key.includes(domain)) {
-      return scripts
-    }
-  }
-  return []
-}
-
-// Inject scripts for matching domain
-async function injectScriptsForTab(tabId, tabUrl) {
-  try {
-    // 检查 URL 是否允许注入（跳过特殊页面）
-    if (!tabUrl || (!tabUrl.startsWith('http://') && !tabUrl.startsWith('https://'))) {
-      return
-    }
-
-    const currentDomain = new URL(tabUrl).hostname
-    const scriptsToInject = getScriptsForDomain(currentDomain)
-    console.log('Scripts to inject for domain:', currentDomain, scriptsToInject)
-
-    if (scriptsToInject.length > 0) {
-      if (extensionState.isDebugMode) {
-        console.log(`Injecting scripts for domain: ${currentDomain}`, scriptsToInject)
-      }
-      // Inject each script file individually
-      for (const scriptFile of scriptsToInject) {
-        try {
-          await chrome.scripting.executeScript({
-            target: { tabId },
-            files: [scriptFile],
-          })
-        } catch (error) {
-          console.error(`Error injecting script ${scriptFile}:`, error)
-        }
-      }
-    }
-  } catch (error) {
-    console.error('Error injecting scripts:', error)
-  }
 }
 
 // 标记需要延迟注入的 tab（扩展安装/更新时调用）
@@ -2427,9 +2315,6 @@ const CDN_REDIRECT_DOMAINS = [
   'cdn.jsdelivr.net',
 ]
 
-// CDN 白名单规则ID范围 (ID 900-999)
-const CDN_ALLOWLIST_RULE_IDS_START = 900
-
 /**
  * CDN域名统一管理器
  * 自动从重定向规则提取域名，实现广告拦截与CDN重定向联动
@@ -2507,7 +2392,9 @@ const CDNRegistry = {
    */
   isCDNUrl(url) {
     const hostname = this._extractDomain(url)
-    if (!hostname) {return false}
+    if (!hostname) {
+      return false
+    }
     return this.getAllDomains().some(
       (domain) => hostname === domain || hostname.endsWith('.' + domain)
     )
@@ -2539,12 +2426,27 @@ async function updateCDNAllowlistRules() {
       action: { type: 'allow' },
       condition: {
         urlFilter: `||${domain}`,
-        resourceTypes: ['main_frame', 'sub_frame', 'stylesheet', 'script', 'image', 'font', 'xmlhttprequest', 'media', 'other'],
+        resourceTypes: [
+          'main_frame',
+          'sub_frame',
+          'stylesheet',
+          'script',
+          'image',
+          'font',
+          'xmlhttprequest',
+          'media',
+          'other',
+        ],
       },
     }))
 
     await chrome.declarativeNetRequest.updateDynamicRules({ addRules: rules })
-    console.log('[Background] CDN 白名单规则已注册:', rules.length, '条，域名:', allCDNDomains.join(', '))
+    console.log(
+      '[Background] CDN 白名单规则已注册:',
+      rules.length,
+      '条，域名:',
+      allCDNDomains.join(', ')
+    )
   } catch (error) {
     console.error('[Background] CDN 白名单规则注册失败:', error)
   }
@@ -2694,12 +2596,12 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
     const favicon = tab.favIconUrl || ''
 
     // 保存到 storage
-    saveToNewtab(url, title, favicon, tab.id)
+    saveToNewtab(url, title, favicon)
   }
 })
 
 // 保存到新标签页
-function saveToNewtab(url, title, favicon, tabId) {
+function saveToNewtab(url, title, favicon) {
   chrome.storage.local.get(['quickLinks'], (result) => {
     const links = result.quickLinks || []
 
@@ -2897,10 +2799,7 @@ if (chrome.declarativeNetRequest?.onRuleMatchedDebug) {
     // 记录 CDN 重定向规则 (3000-3099)
     if (info.rule.id >= 3000 && info.rule.id < 3100) {
       // 从规则推断重定向后的 URL
-      const redirectUrl = CDNRedirectFallback.getRedirectUrl(
-        info.request.url,
-        info.rule.id
-      )
+      const redirectUrl = CDNRedirectFallback.getRedirectUrl(info.request.url, info.rule.id)
       if (redirectUrl) {
         CDNRedirectFallback.recordUrlMapping(info.request.url, redirectUrl)
       }
@@ -2916,7 +2815,9 @@ const CDNRedirectFallback = {
   // 根据规则ID和正则推断重定向后的URL
   getRedirectUrl(originalUrl, ruleId) {
     const rule = CDN_REDIRECT_RULES.find((r) => r.id === ruleId)
-    if (!rule) {return null}
+    if (!rule) {
+      return null
+    }
 
     try {
       const regex = new RegExp(rule.regex)

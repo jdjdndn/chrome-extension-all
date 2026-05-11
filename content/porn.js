@@ -57,7 +57,9 @@ function getMessagingUtils() {
 // 使用 DOMUtils.findOneInViewport 替代本地实现
 function findOne(selector) {
   const utils = getDOMUtils()
-  if (!utils) return null
+  if (!utils) {
+    return null
+  }
   return utils.findOneInViewport(selector, { checkVisibility: true, checkDimensions: true })
 }
 
@@ -95,10 +97,14 @@ function cleanup() {
 // ========== 存储 ==========
 async function loadDomainHideSettings() {
   const domUtils = getDOMUtils()
-  if (!domUtils) return
+  if (!domUtils) {
+    return
+  }
 
   const domain = domUtils.getCurrentDomain()
-  if (!domain) return
+  if (!domain) {
+    return
+  }
 
   // 尝试从本地服务器加载选择器
   let serverSelectors = []
@@ -159,11 +165,15 @@ async function loadDomainHideSettings() {
 // ========== 初始化 ==========
 async function registerBlockedDomains() {
   const messagingUtils = getMessagingUtils()
-  if (!messagingUtils) return
+  if (!messagingUtils) {
+    return
+  }
 
   try {
     const result = await messagingUtils.registerBlockedDomains('pornhub.com', BLOCKED_DOMAINS)
-    if (result?.success) console.log('[Pornhub脚本] 已向 background 注册 blockedDomains')
+    if (result?.success) {
+      console.log('[Pornhub脚本] 已向 background 注册 blockedDomains')
+    }
   } catch (error) {
     console.warn('[Pornhub脚本] 注册域名失败:', error)
   }
@@ -172,10 +182,14 @@ async function registerBlockedDomains() {
 // ========== 链接点击处理 ==========
 function handleLinkClick(event) {
   const link = event.target.closest('a')
-  if (!link || !link.href) return
+  if (!link || !link.href) {
+    return
+  }
 
   // 只处理 target="_blank" 的链接
-  if (link.target !== '_blank') return
+  if (link.target !== '_blank') {
+    return
+  }
 
   // 阻止其他监听器
   event.preventDefault()

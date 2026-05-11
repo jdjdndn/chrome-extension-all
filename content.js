@@ -26,7 +26,9 @@
    * 注册 L2 核心层初始化回调
    */
   function registerL2InitCallbacks() {
-    if (!window.LazyInitManager) {return}
+    if (!window.LazyInitManager) {
+      return
+    }
 
     // Store 初始化
     LazyInitManager.registerInitCallback(
@@ -58,7 +60,9 @@
    * 注册 L4 功能层初始化回调
    */
   function registerL4InitCallbacks() {
-    if (!window.LazyInitManager) {return}
+    if (!window.LazyInitManager) {
+      return
+    }
 
     // 隐藏元素功能初始化
     LazyInitManager.registerInitCallback(
@@ -84,7 +88,9 @@
       return
     }
     // Check if already injected to avoid duplicate injection
-    if (window._injectScriptInjected) {return}
+    if (window._injectScriptInjected) {
+      return
+    }
     window._injectScriptInjected = true
 
     const script = document.createElement('script')
@@ -139,7 +145,9 @@
   const PRINT_THROTTLE_DELAY = 3000
 
   function throttledPrintUrls() {
-    if (printTimer || !settings.debugMode) {return}
+    if (printTimer || !settings.debugMode) {
+      return
+    }
 
     printTimer = setTimeout(() => {
       if (collectedUrls.size > 0) {
@@ -190,7 +198,9 @@
    * Apply hide elements by creating/updating style tag
    */
   function applyHideElementsStyle(selectors) {
-    if (!isDOMUtilsReady()) {return}
+    if (!isDOMUtilsReady()) {
+      return
+    }
 
     if (!selectors || selectors.length === 0) {
       DOMUtils.removeStyle(HIDE_ELEMENTS_STYLE_ID)
@@ -210,7 +220,9 @@
     hideElementsState.enabled = enabled
     hideElementsState.selectors = selectors
 
-    if (!isDOMUtilsReady()) {return}
+    if (!isDOMUtilsReady()) {
+      return
+    }
 
     if (enabled && selectors && selectors.length > 0) {
       applyHideElementsStyle(selectors)
@@ -336,7 +348,7 @@
       return { success: true, activated: true }
     },
 
-    DEVTOOLS_ACTIVATE: async (message) => {
+    DEVTOOLS_ACTIVATE: async () => {
       console.log('[Content] 收到 DevTools 激活消息')
 
       if (window.LazyInitManager) {

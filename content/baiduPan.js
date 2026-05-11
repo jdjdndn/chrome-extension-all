@@ -16,7 +16,9 @@ let lastExecutionTime = 0
 const DELAY = 500
 
 function autoSubmitPassword() {
-  if (lastExecutionTime + DELAY > Date.now()) return
+  if (lastExecutionTime + DELAY > Date.now()) {
+    return
+  }
   lastExecutionTime = Date.now()
 
   const accessCode = document.getElementById('accessCode')

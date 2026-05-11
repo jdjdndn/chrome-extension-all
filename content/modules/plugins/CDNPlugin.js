@@ -12,7 +12,7 @@ export class CDNPlugin extends Plugin {
       version: '1.0.0',
       description: 'CDN URL替换和健康检查',
       author: 'ResourceAccelerator',
-      dependencies: []
+      dependencies: [],
     }
   }
 
@@ -22,9 +22,9 @@ export class CDNPlugin extends Plugin {
       healthCheck: {
         enabled: true,
         interval: 60000, // 1分钟
-        timeout: 5000
+        timeout: 5000,
       },
-      fallback: true // 回退到原始URL
+      fallback: true, // 回退到原始URL
     }
   }
 
@@ -43,7 +43,7 @@ export class CDNPlugin extends Plugin {
 
     this.log('info', 'init', {
       cdns: this.cdnMappings.size,
-      healthCheck: this.options.healthCheck?.enabled
+      healthCheck: this.options.healthCheck?.enabled,
     })
   }
 
@@ -58,11 +58,12 @@ export class CDNPlugin extends Plugin {
   /**
    * 替换URL为CDN URL
    * @param {string} url - 原始URL
-   * @param {string} type - 资源类型 (js|css|font|image)
    * @returns {string|null} CDN URL或null
    */
-  replace(url, type) {
-    if (!this.enabled || !url) return null
+  replace(url) {
+    if (!this.enabled || !url) {
+      return null
+    }
 
     // 查找匹配的CDN映射
     for (const [cdnId, mapping] of this.cdnMappings.entries()) {
@@ -90,9 +91,11 @@ export class CDNPlugin extends Plugin {
    * 检查URL是否匹配模式
    */
   _matchesPattern(url, patterns) {
-    if (!patterns || !Array.isArray(patterns)) return false
+    if (!patterns || !Array.isArray(patterns)) {
+      return false
+    }
 
-    return patterns.some(pattern => {
+    return patterns.some((pattern) => {
       if (typeof pattern === 'string') {
         return url.includes(pattern)
       }
@@ -117,10 +120,7 @@ export class CDNPlugin extends Plugin {
 
       // 替换路径
       if (mapping.pathReplace) {
-        urlObj.pathname = urlObj.pathname.replace(
-          mapping.pathReplace.from,
-          mapping.pathReplace.to
-        )
+        urlObj.pathname = urlObj.pathname.replace(mapping.pathReplace.from, mapping.pathReplace.to)
       }
 
       return urlObj.toString()
@@ -135,30 +135,21 @@ export class CDNPlugin extends Plugin {
   async _loadCDNConfig() {
     // 示例CDN配置
     const cdnConfig = {
-      'cdnjs': {
+      cdnjs: {
         host: 'cdnjs.cloudflare.com',
-        patterns: [
-          'cdnjs.cloudflare.com',
-          'ajax.googleapis.com'
-        ],
-        priority: 1
+        patterns: ['cdnjs.cloudflare.com', 'ajax.googleapis.com'],
+        priority: 1,
       },
-      'unpkg': {
+      unpkg: {
         host: 'unpkg.com',
-        patterns: [
-          'unpkg.com',
-          /npm\.jsdelivr\.net/
-        ],
-        priority: 2
+        patterns: ['unpkg.com', /npm\.jsdelivr\.net/],
+        priority: 2,
       },
-      'jsdelivr': {
+      jsdelivr: {
         host: 'cdn.jsdelivr.net',
-        patterns: [
-          'cdn.jsdelivr.net',
-          'fastly.jsdelivr.net'
-        ],
-        priority: 1
-      }
+        patterns: ['cdn.jsdelivr.net', 'fastly.jsdelivr.net'],
+        priority: 1,
+      },
     }
 
     for (const [id, config] of Object.entries(cdnConfig)) {
@@ -186,15 +177,12 @@ export class CDNPlugin extends Plugin {
 
         // 发送探测请求
         const controller = new AbortController()
-        const timeoutId = setTimeout(
-          () => controller.abort(),
-          this.options.healthCheck.timeout
-        )
+        const timeoutId = setTimeout(() => controller.abort(), this.options.healthCheck.timeout)
 
-        const response = await fetch(`https://${mapping.host}/`, {
+        await fetch(`https://${mapping.host}/`, {
           method: 'HEAD',
           mode: 'no-cors',
-          signal: controller.signal
+          signal: controller.signal,
         })
 
         clearTimeout(timeoutId)
@@ -204,7 +192,7 @@ export class CDNPlugin extends Plugin {
         this.cdnHealth.set(cdnId, {
           healthy: true,
           rtt,
-          lastCheck: Date.now()
+          lastCheck: Date.now(),
         })
 
         this.emit('cdn:health', { cdnId, healthy: true, rtt })
@@ -212,7 +200,7 @@ export class CDNPlugin extends Plugin {
         this.cdnHealth.set(cdnId, {
           healthy: false,
           error: error.message,
-          lastCheck: Date.now()
+          lastCheck: Date.now(),
         })
 
         this.emit('cdn:health', { cdnId, healthy: false })

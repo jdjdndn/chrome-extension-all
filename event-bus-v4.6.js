@@ -355,7 +355,7 @@
 
       // 检查断路器状态
       const openBreakers = Object.entries(CircuitBreaker.getAllStates())
-        .filter(([_, b]) => b.state === 'open');
+        .filter(([, b]) => b.state === 'open');
       if (openBreakers.length > 0) {
         issues.push(`Open circuit breakers: ${openBreakers.length}`);
       }
@@ -505,7 +505,12 @@
         const result = callback(msg, sender);
         console.log('[EventBus Transport] 处理结果:', result);
         if (result instanceof Promise) {
-          result.then(sendResponse);
+          result
+            .then(sendResponse)
+            .catch((err) => {
+              console.error('[EventBus Transport] 处理错误:', err);
+              sendResponse({ __eventbus__: true, error: err.message });
+            });
           return true;
         }
         if (result !== undefined) { sendResponse(result); return true; }
@@ -834,7 +839,7 @@
         activeHandlers: State.handlers.size,
         activeSubscriptions: State.subscriptions.size,
         circuitBreakerIssues: Object.entries(CircuitBreaker.getAllStates())
-          .filter(([_, b]) => b.state !== 'closed').length,
+          .filter(([, b]) => b.state !== 'closed').length,
         recommendations: this._generateRecommendations(stats, health)
       };
     },

@@ -93,7 +93,9 @@
             return
           }
           // 已禁用时不处理
-          if (!this._isAvailable) {return}
+          if (!this._isAvailable) {
+            return
+          }
           console.error('[SelectorWorker] Worker error:', e)
           // 尝试重建 Worker
           this._handleWorkerError(e)
@@ -110,7 +112,7 @@
      * 处理 Worker 错误并尝试降级
      * @private
      */
-    _handleWorkerError(e) {
+    _handleWorkerError() {
       // 如果 Worker 崩溃，尝试重建
       if (this.worker && this.pendingTasks.size > 0) {
         console.log('[SelectorWorker] 尝试重建 Worker...')
@@ -118,7 +120,7 @@
         if (newWorker) {
           this.worker = newWorker
           // 重新发送待处理任务
-          for (const [taskId, task] of this.pendingTasks) {
+          for (const [, task] of this.pendingTasks) {
             this.worker.postMessage(task.message)
           }
         }
@@ -137,7 +139,9 @@
      * @private
      */
     _fallbackGenerateSelector(element) {
-      if (!element || !element.tagName) {return null}
+      if (!element || !element.tagName) {
+        return null
+      }
 
       const tag = element.tagName.toLowerCase()
       const id = element.id
@@ -147,7 +151,10 @@
       }
 
       if (element.className && typeof element.className === 'string') {
-        const classes = element.className.trim().split(' ').filter(c => c && !/^(css-|styled-|sc-|js-|_)/.test(c))
+        const classes = element.className
+          .trim()
+          .split(' ')
+          .filter((c) => c && !/^(css-|styled-|sc-|js-|_)/.test(c))
         if (classes.length > 0) {
           return { selector: tag + '.' + CSS.escape(classes[0]), strategy: 'class', score: 85 }
         }
@@ -210,7 +217,9 @@
     generateMergedSelector(elements) {
       // 降级：Worker 不可用时返回第一个元素的选择器
       if (!this.isAvailable()) {
-        if (!elements || elements.length === 0) {return Promise.resolve(null)}
+        if (!elements || elements.length === 0) {
+          return Promise.resolve(null)
+        }
         return Promise.resolve(this._fallbackGenerateSelector(elements[0]))
       }
 
@@ -257,7 +266,9 @@
      * 提取元素数据（用于传递给 Worker）
      */
     _extractElementData(element) {
-      if (!element || !element.tagName) {return null}
+      if (!element || !element.tagName) {
+        return null
+      }
 
       const tag = element.tagName.toLowerCase()
       const id = element.id || null
@@ -331,7 +342,7 @@
         this.worker = null
       }
       // 拒绝所有 pending 任务
-      for (const [_, task] of this.pendingTasks) {
+      for (const [, task] of this.pendingTasks) {
         if (task.reject) {
           task.reject(new Error('Worker destroyed'))
         }

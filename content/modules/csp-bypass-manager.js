@@ -18,7 +18,7 @@ class CSPBypassManager {
       total: 0,
       success: 0,
       failed: 0,
-      byStrategy: { dnr: 0, background: 0, scripting: 0 }
+      byStrategy: { dnr: 0, background: 0, scripting: 0 },
     }
   }
 
@@ -72,14 +72,14 @@ class CSPBypassManager {
       success: false,
       reason: 'All strategies failed',
       url,
-      type
+      type,
     }
   }
 
   /**
    * 策略1：declarativeNetRequest（已在网络层拦截）
    */
-  async _useDNR(url, type, options) {
+  async _useDNR() {
     // DNR在background.js中配置，这里检查是否生效
     // 通过检测请求头或实际加载判断
 
@@ -88,7 +88,7 @@ class CSPBypassManager {
     return {
       success: true,
       source: 'dnr',
-      message: 'DNR rule should handle this in network layer'
+      message: 'DNR rule should handle this in network layer',
     }
   }
 
@@ -105,7 +105,7 @@ class CSPBypassManager {
         {
           type: 'CSP_BYPASS_FETCH',
           url,
-          resourceType: type
+          resourceType: type,
         },
         (response) => {
           clearTimeout(timeout)
@@ -121,7 +121,7 @@ class CSPBypassManager {
             resolve({
               success: true,
               source: 'background',
-              size: response.code?.length || 0
+              size: response.code?.length || 0,
             })
           } else {
             reject(new Error(response?.error || 'Fetch failed'))
@@ -134,7 +134,7 @@ class CSPBypassManager {
   /**
    * 策略3：chrome.scripting.executeScript
    */
-  async _useScripting(url, type, options) {
+  async _useScripting(url, type) {
     if (!chrome.scripting) {
       throw new Error('chrome.scripting not available')
     }
@@ -153,7 +153,7 @@ class CSPBypassManager {
           type: 'CSP_BYPASS_SCRIPTING',
           url,
           code,
-          resourceType: type
+          resourceType: type,
         },
         (response) => {
           if (chrome.runtime.lastError) {
@@ -165,7 +165,7 @@ class CSPBypassManager {
             resolve({
               success: true,
               source: 'scripting',
-              size: code.length
+              size: code.length,
             })
           } else {
             reject(new Error(response?.error || 'Scripting injection failed'))
@@ -229,7 +229,7 @@ class CSPBypassManager {
     for (const resource of resources) {
       results.push({
         url: resource.url,
-        result: await this.loadResource(resource.url, resource.type, resource.options)
+        result: await this.loadResource(resource.url, resource.type, resource.options),
       })
     }
 
@@ -243,9 +243,10 @@ class CSPBypassManager {
     return {
       ...this.stats,
       cacheSize: this.cache.size,
-      successRate: this.stats.total > 0
-        ? (this.stats.success / this.stats.total * 100).toFixed(2) + '%'
-        : '0%'
+      successRate:
+        this.stats.total > 0
+          ? ((this.stats.success / this.stats.total) * 100).toFixed(2) + '%'
+          : '0%',
     }
   }
 

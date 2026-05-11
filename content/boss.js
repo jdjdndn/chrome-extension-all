@@ -43,9 +43,15 @@ function getDiffDays(dateStr) {
 }
 
 function getUpdateClass(diffDays) {
-  if (diffDays > 90) return ''
-  if (diffDays > 30) return 'boss-update-quarter'
-  if (diffDays > 7) return 'boss-update-month'
+  if (diffDays > 90) {
+    return ''
+  }
+  if (diffDays > 30) {
+    return 'boss-update-quarter'
+  }
+  if (diffDays > 7) {
+    return 'boss-update-month'
+  }
   return 'boss-update-week'
 }
 
@@ -80,21 +86,26 @@ function processJobList() {
   const jobCards = document.querySelectorAll('[class*="job-card"], [ka="search-job-item"]')
 
   jobCards.forEach((card) => {
-    if (card.hasAttribute('yc-boss-processed')) return
+    if (card.hasAttribute('yc-boss-processed')) {
+      return
+    }
     card.setAttribute('yc-boss-processed', 'true')
 
     // 尝试获取职位发布时间（需要根据实际页面结构调整）
     const timeElement = card.querySelector('[class*="time"], [class*="date"]')
-    if (!timeElement) return
+    if (!timeElement) {
+      return
+    }
 
-    const timeText = timeElement.textContent
     // 解析时间（这里需要根据实际格式调整）
     // 示例：显示更新标记
 
     const diffDays = getDiffDays(new Date().toISOString()) // 这里需要实际解析
 
     const updateClass = getUpdateClass(diffDays)
-    if (!updateClass) return
+    if (!updateClass) {
+      return
+    }
 
     const badge = document.createElement('span')
     badge.className = `boss-job-update ${updateClass}`

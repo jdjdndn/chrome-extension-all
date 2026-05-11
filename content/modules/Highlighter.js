@@ -94,7 +94,9 @@
     showHover(element) {
       this._removeHover()
 
-      if (!element) {return}
+      if (!element) {
+        return
+      }
 
       const rect = element.getBoundingClientRect()
       const overlay = this._createOverlay(rect, 'hover')
@@ -116,7 +118,9 @@
      * 添加选中高亮
      */
     addSelected(element, pickerUid, index) {
-      if (this.overlays.has(pickerUid)) {return}
+      if (this.overlays.has(pickerUid)) {
+        return
+      }
 
       const rect = element.getBoundingClientRect()
       const overlay = this._createOverlay(rect, 'selected')
@@ -171,11 +175,13 @@
     showPreview(elements) {
       this.clearPreview()
 
-      elements.forEach((element, index) => {
+      elements.forEach((element) => {
         const rect = element.getBoundingClientRect()
         const overlay = this._createOverlay(rect, 'preview')
         this.container.appendChild(overlay)
-        if (!this._previews) {this._previews = []}
+        if (!this._previews) {
+          this._previews = []
+        }
         this._previews.push(overlay)
       })
     }
@@ -225,8 +231,12 @@
       this.clearAll()
       this.clearPreview()
       this.hideHover()
-      if (this.container) {this.container.remove()}
-      if (this.style) {this.style.remove()}
+      if (this.container) {
+        this.container.remove()
+      }
+      if (this.style) {
+        this.style.remove()
+      }
     }
   }
 

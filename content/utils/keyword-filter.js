@@ -33,7 +33,9 @@ export function createKeywordFilter(options = {}) {
      * @returns {boolean}
      */
     match(text) {
-      if (!text || keywords.length === 0) return false
+      if (!text || keywords.length === 0) {
+        return false
+      }
       const normalizedText = normalize(text)
       return keywords.some((keyword) => normalizedText.includes(normalize(keyword)))
     },
@@ -44,7 +46,9 @@ export function createKeywordFilter(options = {}) {
      * @returns {string[]} 匹配的关键词列表
      */
     findMatches(text) {
-      if (!text || keywords.length === 0) return []
+      if (!text || keywords.length === 0) {
+        return []
+      }
       const normalizedText = normalize(text)
       return keywords.filter((keyword) => normalizedText.includes(normalize(keyword)))
     },

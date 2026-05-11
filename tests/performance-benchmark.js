@@ -16,14 +16,16 @@ describe('Performance Benchmarks', () => {
     start(name) {
       this.metrics.set(name, {
         startTime: performance.now(),
-        startMemory: this.getMemoryUsage()
+        startMemory: this.getMemoryUsage(),
       })
     }
 
     // 结束计时
     end(name) {
       const metric = this.metrics.get(name)
-      if (!metric) return null
+      if (!metric) {
+        return null
+      }
 
       const endTime = performance.now()
       const endMemory = this.getMemoryUsage()
@@ -31,7 +33,7 @@ describe('Performance Benchmarks', () => {
       const result = {
         duration: endTime - metric.startTime,
         memoryDelta: endMemory - metric.startMemory,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       }
 
       this.metrics.set(name, result)
@@ -54,14 +56,16 @@ describe('Performance Benchmarks', () => {
     // 对比基准线
     compare(name, currentValue) {
       const baseline = this.baselines.get(name)
-      if (!baseline) return null
+      if (!baseline) {
+        return null
+      }
 
       const change = ((currentValue - baseline) / baseline) * 100
       return {
         baseline,
         current: currentValue,
         change: change.toFixed(2) + '%',
-        improved: change < 0
+        improved: change < 0,
       }
     }
 
@@ -70,14 +74,14 @@ describe('Performance Benchmarks', () => {
       const report = {
         timestamp: Date.now(),
         metrics: {},
-        comparisons: {}
+        comparisons: {},
       }
 
       for (const [name, result] of this.metrics.entries()) {
         if (result.duration !== undefined) {
           report.metrics[name] = {
             duration: result.duration.toFixed(2) + 'ms',
-            memoryDelta: result.memoryDelta
+            memoryDelta: result.memoryDelta,
           }
 
           const comparison = this.compare(name, result.duration)
@@ -142,7 +146,7 @@ describe('Performance Benchmarks', () => {
           timestamp: Date.now(),
           lastAccess: Date.now(),
           accessCount: Math.floor(Math.random() * 10),
-          size: 10000
+          size: 10000,
         })
       }
 
@@ -187,9 +191,9 @@ describe('Performance Benchmarks', () => {
             top: Math.random() * 2000,
             bottom: Math.random() * 2000 + 100,
             left: 0,
-            right: 100
+            right: 100,
           }),
-          isConnected: true
+          isConnected: true,
         })
       }
 
@@ -197,13 +201,10 @@ describe('Performance Benchmarks', () => {
 
       benchmark.start('position-priority')
 
-      elements.forEach(element => {
+      elements.forEach((element) => {
         const rect = element.getBoundingClientRect()
-        const distanceToViewport = rect.top < 0
-          ? -rect.top
-          : rect.top > viewportHeight
-            ? rect.top - viewportHeight
-            : 0
+        const distanceToViewport =
+          rect.top < 0 ? -rect.top : rect.top > viewportHeight ? rect.top - viewportHeight : 0
 
         const nearbyThreshold = viewportHeight * 1
 
@@ -231,9 +232,9 @@ describe('Performance Benchmarks', () => {
         elements.push({
           getBoundingClientRect: () => ({
             top: Math.random() * 2000,
-            bottom: Math.random() * 2000 + 100
+            bottom: Math.random() * 2000 + 100,
           }),
-          isConnected: true
+          isConnected: true,
         })
       }
 
@@ -242,7 +243,7 @@ describe('Performance Benchmarks', () => {
       const POSITION_CACHE_TTL = 100
 
       // 第一次访问（未命中）
-      elements.forEach(element => {
+      elements.forEach((element) => {
         const cached = cache.get(element)
         if (cached && performance.now() - cached.time < POSITION_CACHE_TTL) {
           hits++
@@ -250,13 +251,13 @@ describe('Performance Benchmarks', () => {
           misses++
           cache.set(element, {
             result: { zone: 'test' },
-            time: performance.now()
+            time: performance.now(),
           })
         }
       })
 
       // 第二次访问（命中）
-      elements.forEach(element => {
+      elements.forEach((element) => {
         const cached = cache.get(element)
         if (cached && performance.now() - cached.time < POSITION_CACHE_TTL) {
           hits++
@@ -283,7 +284,7 @@ describe('Performance Benchmarks', () => {
           src: `image${i}.jpg`,
           priority: Math.floor(Math.random() * 20),
           quality: 0.8,
-          maxWidth: 2048
+          maxWidth: 2048,
         })
       }
 
@@ -297,7 +298,8 @@ describe('Performance Benchmarks', () => {
 
     it('预热任务应该在10ms内完成', () => {
       const warmupTasks = []
-      const testPng = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+      const testPng =
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
 
       benchmark.start('worker-warmup')
 
@@ -308,7 +310,7 @@ describe('Performance Benchmarks', () => {
           src: testPng,
           quality: 0.1,
           maxWidth: 1,
-          maxHeight: 1
+          maxHeight: 1,
         })
       }
 
@@ -347,7 +349,7 @@ describe('Performance Benchmarks', () => {
       for (let i = 0; i < 10000; i++) {
         cache.set(`key${i}`, {
           value: 'x'.repeat(1000),
-          timestamp: Date.now()
+          timestamp: Date.now(),
         })
       }
 
@@ -373,17 +375,17 @@ describe('Performance Benchmarks', () => {
         elements.push({
           getBoundingClientRect: () => ({
             top: i * 100,
-            bottom: i * 100 + 50
+            bottom: i * 100 + 50,
           }),
           isConnected: true,
           src: `image${i}.jpg`,
-          dataset: {}
+          dataset: {},
         })
       }
 
       benchmark.start('full-image-processing')
 
-      elements.forEach(element => {
+      elements.forEach((element) => {
         // 1. 检查缓存
         if (cache.has(element.src)) {
           return
@@ -392,11 +394,8 @@ describe('Performance Benchmarks', () => {
         // 2. 计算位置
         const rect = element.getBoundingClientRect()
         const viewportHeight = 800
-        const distanceToViewport = rect.top < 0
-          ? -rect.top
-          : rect.top > viewportHeight
-            ? rect.top - viewportHeight
-            : 0
+        const distanceToViewport =
+          rect.top < 0 ? -rect.top : rect.top > viewportHeight ? rect.top - viewportHeight : 0
 
         // 3. 判断区域
         let zone
@@ -412,7 +411,7 @@ describe('Performance Benchmarks', () => {
         if (zone !== 'far') {
           taskQueue.push({
             src: element.src,
-            priority: zone === 'inViewport' ? 0 : 10
+            priority: zone === 'inViewport' ? 0 : 10,
           })
         }
 
@@ -449,11 +448,15 @@ describe('Performance Benchmarks', () => {
 
     it('应该能生成完整报告', () => {
       benchmark.start('op1')
-      for (let i = 0; i < 100; i++) Math.random()
+      for (let i = 0; i < 100; i++) {
+        Math.random()
+      }
       benchmark.end('op1')
 
       benchmark.start('op2')
-      for (let i = 0; i < 100; i++) Math.random()
+      for (let i = 0; i < 100; i++) {
+        Math.random()
+      }
       benchmark.end('op2')
 
       const report = benchmark.generateReport()

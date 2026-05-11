@@ -215,7 +215,9 @@
        * 保存关键词到本地服务
        */
       async saveKeywordsToServer(keywords) {
-        if (!this.state.localServerAvailable) {return false}
+        if (!this.state.localServerAvailable) {
+          return false
+        }
         try {
           await this.localServerFetch(`/api/data/keywords/${this.domain}`, {
             method: 'POST',
@@ -263,7 +265,9 @@
        * 从本地服务加载选择器（覆盖父类方法）
        */
       async loadFromServer(path) {
-        if (!this.state.localServerAvailable) {return null}
+        if (!this.state.localServerAvailable) {
+          return null
+        }
 
         try {
           const result = await this.localServerFetch(`/api/data/${path}/${this.domain}`)
@@ -283,7 +287,9 @@
        * 保存选择器到本地服务（覆盖父类方法）
        */
       async saveToServer(path, data) {
-        if (!this.state.localServerAvailable) {return false}
+        if (!this.state.localServerAvailable) {
+          return false
+        }
 
         try {
           await this.localServerFetch(`/api/data/${path}/${this.domain}`, {
@@ -422,21 +428,6 @@
       },
     })
   } // runBiliScript 函数结束
-
-  // ========== 启动 ==========
-  async function init() {
-    await biliSite.init()
-
-    console.log(
-      '[Bilibili脚本] 初始化完成，本地服务:',
-      biliSite.state.localServerAvailable ? '已连接' : '未连接'
-    )
-
-    // 标记 content script 已就绪
-    if (window.ContentBridge) {
-      ContentBridge.markReady()
-    }
-  }
 
   // ========== 使用 ScriptLoader 声明依赖（放在文件末尾，确保所有变量已定义）==========
   if (window.ScriptLoader) {

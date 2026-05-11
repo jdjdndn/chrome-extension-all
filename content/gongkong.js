@@ -16,7 +16,9 @@ let lastExecutionTime = 0
 const DELAY = 500
 
 function autoFillInput() {
-  if (lastExecutionTime + DELAY > Date.now()) return
+  if (lastExecutionTime + DELAY > Date.now()) {
+    return
+  }
   lastExecutionTime = Date.now()
 
   // 查找 font 标签后紧跟的 input

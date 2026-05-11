@@ -218,7 +218,9 @@ export function onChanged(callback) {
  * @returns {Promise<object|null>}
  */
 export async function getDomainSettings(settingsKey, domain) {
-  if (!domain) return null
+  if (!domain) {
+    return null
+  }
 
   try {
     const result = await getLocal(settingsKey)
@@ -238,7 +240,9 @@ export async function getDomainSettings(settingsKey, domain) {
  * @returns {Promise<boolean>}
  */
 export async function setDomainSettings(settingsKey, domain, settings) {
-  if (!domain) return false
+  if (!domain) {
+    return false
+  }
 
   try {
     const result = await getLocal(settingsKey)

@@ -32,9 +32,9 @@
      * 生成唯一选择器
      */
     generateSelector(element) {
-    if (!element || !element.tagName) return '';
-    if (element === document.body) return 'body';
-    if (element === document.documentElement) return 'html';
+    if (!element || !element.tagName) {return '';}
+    if (element === document.body) {return 'body';}
+    if (element === document.documentElement) {return 'html';}
 
     // 检查缓存
     if (this.cacheEnabled) {
@@ -67,7 +67,7 @@
 
     // 按策略尝试
     const result = strategies[this.strategy]?.();
-    if (result) return result;
+    if (result) {return result;}
 
     // 回退到默认策略
     return this._tryClassFirst(element) || this._tryIdFirst(element) || this._buildFullPath(element);
@@ -79,7 +79,7 @@
   _tryIdFirst(element) {
     if (this._hasValidId(element)) {
       const sel = '#' + CSS.escape(element.id);
-      if (this._isExactMatch(sel, element)) return sel;
+      if (this._isExactMatch(sel, element)) {return sel;}
     }
     return this._tryClassFirst(element);
   }
@@ -94,15 +94,15 @@
     // 单 class
     for (const cls of classes) {
       const sel = '.' + CSS.escape(cls);
-      if (this._isExactMatch(sel, element)) return sel;
+      if (this._isExactMatch(sel, element)) {return sel;}
       const tagCls = tag + '.' + CSS.escape(cls);
-      if (this._isExactMatch(tagCls, element)) return tagCls;
+      if (this._isExactMatch(tagCls, element)) {return tagCls;}
     }
 
     // 多 class 组合
     if (classes.length >= 2) {
       const sel = tag + '.' + classes.slice(0, 2).map(c => CSS.escape(c)).join('.');
-      if (this._isExactMatch(sel, element)) return sel;
+      if (this._isExactMatch(sel, element)) {return sel;}
     }
 
     return this._tryAttributeFirst(element);
@@ -117,9 +117,9 @@
 
     for (const attr of attrs) {
       const sel = '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]';
-      if (this._isExactMatch(sel, element)) return sel;
+      if (this._isExactMatch(sel, element)) {return sel;}
       const tagAttr = tag + '[' + CSS.escape(attr.name) + '="' + CSS.escape(attr.value) + '"]';
-      if (this._isExactMatch(tagAttr, element)) return tagAttr;
+      if (this._isExactMatch(tagAttr, element)) {return tagAttr;}
     }
 
     return this._buildFullPath(element);
@@ -152,7 +152,7 @@
     // 按长度排序，返回最短的有效选择器
     candidates.sort((a, b) => a.length - b.length);
     for (const sel of candidates) {
-      if (this._isExactMatch(sel, element)) return sel;
+      if (this._isExactMatch(sel, element)) {return sel;}
     }
 
     return this._buildFullPath(element);
@@ -196,27 +196,28 @@
   }
 
   _getValidClasses(element) {
-    if (!element.className || typeof element.className !== 'string') return [];
+    if (!element.className || typeof element.className !== 'string') {return [];}
     return element.className.trim().split(' ').filter(c => {
-      if (!c || /^[0-9]/.test(c)) return false;
-      if (IGNORED_CLASS_PREFIXES.some(prefix => c.startsWith(prefix))) return false;
+      if (!c || /^[0-9]/.test(c)) {return false;}
+      if (IGNORED_CLASS_PREFIXES.some(prefix => c.startsWith(prefix))) {return false;}
       return /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(c);
     });
   }
 
   _getStableAttributes(element) {
-    if (!element.attributes) return [];
+    if (!element.attributes) {return [];}
     const attrs = [];
     for (const attr of element.attributes) {
       if (STABLE_ATTRIBUTES.has(attr.name) && attr.value && attr.value.length < 50 && !/^\d+$/.test(attr.value)) {
         attrs.push({ name: attr.name, value: attr.value });
       }
+    }
     return attrs;
   }
 
   _getNthOfType(element) {
     const parent = element.parentElement;
-    if (!parent) return 0;
+    if (!parent) {return 0;}
     const siblings = Array.from(parent.children).filter(c => c.tagName === element.tagName);
     return siblings.length > 1 ? siblings.indexOf(element) + 1 : 0;
   }
@@ -273,12 +274,12 @@
    * 批量生成选择器（用于合并）
    */
   generateMergedSelector(elements) {
-    if (elements.length === 0) return '';
-    if (elements.length === 1) return this.generateSelector(elements[0]);
+    if (elements.length === 0) {return '';}
+    if (elements.length === 1) {return this.generateSelector(elements[0]);}
 
     // 提取共同特征
     const common = this._findCommonFeatures(elements);
-    if (!common) return null;
+    if (!common) {return null;}
 
     // 生成候选选择器
     const candidates = this._generateMergedCandidates(elements, common);
@@ -302,7 +303,7 @@
 
     // 检查共同标签
     const tags = new Set(elements.map(el => el.tagName.toLowerCase()));
-    if (tags.size === 1) common.tag = [...tags][0];
+    if (tags.size === 1) {common.tag = [...tags][0];}
 
     // 检查共同 class
     const allClasses = elements.map(el => new Set(this._getValidClasses(el)));
@@ -361,10 +362,10 @@
   _isExactMatchForAll(selector, elements) {
     try {
       const found = document.querySelectorAll(selector);
-      if (found.length !== elements.length) return false;
+      if (found.length !== elements.length) {return false;}
       const set = new Set(elements);
       for (const el of found) {
-        if (!set.has(el)) return false;
+        if (!set.has(el)) {return false;}
       }
       return true;
     } catch {

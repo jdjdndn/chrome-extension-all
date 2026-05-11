@@ -30,7 +30,9 @@ let lastExecutionTime = 0
 const DELAY = 500
 
 function fixSaveButton() {
-  if (lastExecutionTime + DELAY > Date.now()) return
+  if (lastExecutionTime + DELAY > Date.now()) {
+    return
+  }
   lastExecutionTime = Date.now()
 
   // 查找保存按钮并确保可见

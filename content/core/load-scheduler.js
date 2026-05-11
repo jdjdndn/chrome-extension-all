@@ -15,14 +15,14 @@
 
   // ========== 配置 ==========
   const CONFIG = {
-    // 空闲任务超时时间（ms）
-    idleTimeout: 500,
+    // 空闲任务超时时间（ms）- 统一 aggressive 策略
+    idleTimeout: 100,
     // 最大并发空闲任务数
-    maxConcurrentIdle: 3,
+    maxConcurrentIdle: 1,
     // 调试模式
     debug: false,
-    // 强制执行阈值（ms）- JS多的页面兜底
-    forceExecuteTimeout: 1000,
+    // 强制执行阈值（ms）
+    forceExecuteTimeout: 300,
   }
 
   // ========== 状态 ==========
@@ -61,7 +61,9 @@
    * 日志输出
    */
   function log(message, level = 'info') {
-    if (!CONFIG.debug && level !== 'error') {return}
+    if (!CONFIG.debug && level !== 'error') {
+      return
+    }
 
     const prefix = '[LoadScheduler]'
     switch (level) {
@@ -72,7 +74,9 @@
         console.warn(prefix, message)
         break
       default:
-        if (CONFIG.debug) {console.log(prefix, message)}
+        if (CONFIG.debug) {
+          console.log(prefix, message)
+        }
     }
   }
 
@@ -121,7 +125,9 @@
    * 启动空闲任务调度
    */
   function startIdleScheduler() {
-    if (state.idleCallbackId !== null) {return}
+    if (state.idleCallbackId !== null) {
+      return
+    }
 
     function scheduleIdle(deadline) {
       // 检查是否有空闲时间
@@ -170,7 +176,9 @@
 
     function onInteraction() {
       state.isIdle = false
-      if (interactionTimer) {clearTimeout(interactionTimer)}
+      if (interactionTimer) {
+        clearTimeout(interactionTimer)
+      }
 
       // 用户交互后 1 秒视为空闲
       interactionTimer = setTimeout(() => {

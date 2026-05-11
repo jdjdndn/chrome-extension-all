@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Hot Reload</title>
+    <link rel="stylesheet" href="hot-reload-panel.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header class="header">
+        <h1>🔥 Hot Reload</h1>
+        <div class="status" id="status">
+          <span class="status-dot disconnected"></span>
+          <span class="status-text">未连接</span>
+        </div>
+      </header>
+
+      <section class="info-section">
+        <div class="info-row">
+          <span class="label">服务器:</span>
+          <span class="value" id="server-url">http://localhost:8765</span>
+        </div>
+        <div class="info-row">
+          <span class="label">上次构建:</span>
+          <span class="value" id="last-build">-</span>
+        </div>
+        <div class="info-row">
+          <span class="label">构建耗时:</span>
+          <span class="value" id="build-duration">-</span>
+        </div>
+      </section>
+
+      <section class="history-section">
+        <h2>构建历史</h2>
+        <div class="history-list" id="history-list">
+          <div class="empty-state">暂无构建记录</div>
+        </div>
+      </section>
+
+      <section class="actions-section">
+        <button class="btn" id="btn-force-reload" disabled>
+          强制重载
+        </button>
+        <button class="btn" id="btn-clear-cache">
+          清除缓存
+        </button>
+        <button class="btn btn-secondary" id="btn-reconnect">
+          重新连接
+        </button>
+      </section>
+    </div>
+
+    <script src="hot-reload-panel.js"></script>
+  </body>
+</html>

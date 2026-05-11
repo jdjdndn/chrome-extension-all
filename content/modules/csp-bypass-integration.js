@@ -12,14 +12,16 @@
   const state = {
     initialized: false,
     blockedScripts: new Set(),
-    retryQueue: []
+    retryQueue: [],
   }
 
   /**
    * Initialize CSP blocked resource handler
    */
   function init() {
-    if (state.initialized) {return}
+    if (state.initialized) {
+      return
+    }
     state.initialized = true
 
     // Monitor resource loading via PerformanceObserver
@@ -30,19 +32,25 @@
           for (const entry of entries) {
             if (entry.initiatorType === 'script' && entry.transferSize === 0) {
               const url = entry.name
-              if (url.startsWith('data:') || url.startsWith('blob:')) {continue}
-              if (state.blockedScripts.has(url)) {continue}
+              if (url.startsWith('data:') || url.startsWith('blob:')) {
+                continue
+              }
+              if (state.blockedScripts.has(url)) {
+                continue
+              }
 
               // CSP blocked: transferSize=0, encodedBodySize=0, decodedBodySize=0
               if (entry.encodedBodySize === 0 && entry.decodedBodySize === 0) {
                 state.blockedScripts.add(url)
-                console.log(`${LOG_PREFIX} [CSPBypass] Detected CSP blocked script: ${url.substring(0, 80)}`)
+                console.log(
+                  `${LOG_PREFIX} [CSPBypass] Detected CSP blocked script: ${url.substring(0, 80)}`
+                )
                 handleCSPBlockedScript(url)
               }
             }
           }
         })
-        observer.observe({ entryTypes: ['resource'], buffered: true })
+        observer.observe({ type: 'resource', buffered: true })
       } catch (e) {
         console.warn(`${LOG_PREFIX} PerformanceObserver for CSP not supported`)
       }
@@ -52,7 +60,12 @@
     window.addEventListener('securitypolicyviolation', (e) => {
       if (e.violatedDirective === 'script-src' || e.violatedDirective === 'script-src-elem') {
         const url = e.blockedURI
-        if (url && !url.startsWith('data:') && !url.startsWith('blob:') && !state.blockedScripts.has(url)) {
+        if (
+          url &&
+          !url.startsWith('data:') &&
+          !url.startsWith('blob:') &&
+          !state.blockedScripts.has(url)
+        ) {
           state.blockedScripts.add(url)
           console.log(`${LOG_PREFIX} [CSPBypass] CSP violation detected: ${url.substring(0, 80)}`)
           handleCSPBlockedScript(url)
@@ -68,7 +81,9 @@
    */
   async function handleCSPBlockedScript(url) {
     const key = `csp_retry_${url}`
-    if (state.retryQueue.includes(key)) {return}
+    if (state.retryQueue.includes(key)) {
+      return
+    }
     state.retryQueue.push(key)
 
     if (state.retryQueue.length > 50) {
@@ -82,7 +97,7 @@
       const response = await chrome.runtime.sendMessage({
         type: 'CSP_BYPASS_FETCH',
         url,
-        resourceType: 'js'
+        resourceType: 'js',
       })
 
       if (!response?.success) {
@@ -96,7 +111,7 @@
         type: 'CSP_BYPASS_SCRIPTING',
         url,
         code: response.code,
-        resourceType: 'js'
+        resourceType: 'js',
       })
 
       if (injectResponse?.success) {
@@ -112,7 +127,7 @@
   // Export
   window.CSPBypassHandler = {
     init,
-    handleCSPBlockedScript
+    handleCSPBlockedScript,
   }
 
   // Auto init

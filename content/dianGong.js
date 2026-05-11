@@ -34,21 +34,29 @@ let lastExecutionTime = 0
 const DELAY = 500
 
 function autoAnswer() {
-  if (lastExecutionTime + DELAY > Date.now()) return
+  if (lastExecutionTime + DELAY > Date.now()) {
+    return
+  }
   lastExecutionTime = Date.now()
 
   const questionBoxList = DOMUtils.findAllInViewport(SELECTORS.questionBox)
 
-  if (questionBoxList.length !== 1) return
+  if (questionBoxList.length !== 1) {
+    return
+  }
 
   const questionBox = questionBoxList[0]
   const iList = [...questionBox.querySelectorAll('i')]
   const hasChoosed = iList.some((it) => hasPseudoElement(it, ':after'))
 
-  if (!hasChoosed) return
+  if (!hasChoosed) {
+    return
+  }
 
   // 如果已经展开，跳过
-  if (questionBox.querySelector(SELECTORS.collapseBtn)) return
+  if (questionBox.querySelector(SELECTORS.collapseBtn)) {
+    return
+  }
 
   // 点击展开按钮
   const expandBtn = questionBox.querySelector(SELECTORS.expandBtn)
@@ -59,7 +67,9 @@ function autoAnswer() {
 
   // 自动下一题
   setTimeout(() => {
-    if (!questionBox.querySelector(SELECTORS.correctIcon)) return
+    if (!questionBox.querySelector(SELECTORS.correctIcon)) {
+      return
+    }
 
     const nextBtn = document.querySelector(SELECTORS.nextBtn)
     if (nextBtn) {

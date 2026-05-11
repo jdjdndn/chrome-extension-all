@@ -12,6 +12,9 @@ import {
 import { build as esbuildBuild } from 'esbuild'
 import { execSync } from 'child_process'
 
+// 增量构建模块
+import { incrementalBuild, clearCache, getStats } from './scripts/incremental-build.js'
+
 // ========== Environment Variables Auto-Injection ==========
 // 支持从命令行参数或环境变量注入配置
 // 用法: HOT_RELOAD=true npm run build
@@ -210,11 +213,14 @@ function copyAllToDist(dist) {
 }
 
 async function buildContentScripts(dist) {
-  for (const bundle of CONTENT_BUNDLES) {
+  // 构建函数
+  const buildFn = async (bundle) => {
     const entry = resolve(bundle.entry)
-    if (!existsSync(entry)) continue
+    if (!existsSync(entry)) return
+
     const outfile = resolve(dist, bundle.outfile)
     mkdirSync(resolve(outfile, '..'), { recursive: true })
+
     await esbuildBuild({
       entryPoints: [entry],
       bundle: true,
@@ -226,6 +232,22 @@ async function buildContentScripts(dist) {
       define: { 'process.env.NODE_ENV': '"production"' },
     })
   }
+
+  // 准备 bundle 配置（调整路径）
+  const bundles = CONTENT_BUNDLES.map((b) => ({
+    ...b,
+    outfile: resolve(dist, b.outfile),
+  }))
+
+  // 使用增量构建
+  const results = await incrementalBuild(bundles, buildFn)
+
+  // 输出统计
+  if (ENV_CONFIG.DEBUG) {
+    console.log('[Build] 增量构建统计:', getStats())
+  }
+
+  return results
 }
 
 // ========== Vite Plugin ==========

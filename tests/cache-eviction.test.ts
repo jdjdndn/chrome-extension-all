@@ -2,7 +2,7 @@
  * 加权LRU缓存淘汰策略单元测试
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 describe('Weighted LRU Cache Eviction Strategy', () => {
   // 模拟缓存管理器
@@ -14,7 +14,7 @@ describe('Weighted LRU Cache Eviction Strategy', () => {
       this.stats = {
         hits: 0,
         misses: 0,
-        evictions: 0
+        evictions: 0,
       }
     }
 
@@ -51,7 +51,7 @@ describe('Weighted LRU Cache Eviction Strategy', () => {
         size,
         timestamp: Date.now(),
         lastAccess: Date.now(),
-        accessCount: 1
+        accessCount: 1,
       })
       this.currentSize += size
     }
@@ -102,7 +102,7 @@ describe('Weighted LRU Cache Eviction Strategy', () => {
         ...this.stats,
         size: this.currentSize,
         entries: this.cache.size,
-        hitRate: total > 0 ? this.stats.hits / total : 0
+        hitRate: total > 0 ? this.stats.hits / total : 0,
       }
     }
   }
@@ -253,32 +253,68 @@ describe('Weighted LRU Cache Eviction Strategy', () => {
     })
 
     it('应该优先淘汰旧的项', () => {
-      cache.set('old', 'value1', 100)
+      // 手动设置时间戳模拟旧数据
+      const now = Date.now()
+      cache.cache.set('old', {
+        value: 'value1',
+        size: 100,
+        timestamp: now - 7200000, // 2小时前
+        lastAccess: now - 7200000,
+        accessCount: 1,
+      })
+      cache.currentSize = 100
 
-      vi.advanceTimersByTime(7200000) // 2小时后
+      cache.cache.set('new', {
+        value: 'value2',
+        size: 100,
+        timestamp: now,
+        lastAccess: now,
+        accessCount: 1,
+      })
+      cache.currentSize = 200
 
-      cache.set('new', 'value2', 100)
-
-      // 添加新项直到需要淘汰
-      for (let i = 0; i < 10; i++) {
+      // 添加新项触发淘汰（需要超过1000）
+      for (let i = 0; i < 9; i++) {
         cache.set(`item${i}`, `value${i}`, 100)
       }
 
-      // 新数据应该还在
+      // 旧数据应该被淘汰
+      expect(cache.get('old')).toBeNull()
       expect(cache.get('new')).toBe('value2')
     })
 
     it('应该优先淘汰大文件', () => {
-      cache.set('small', 'value1', 100)
-      cache.set('large', 'value2', 600000) // 大文件
+      const now = Date.now()
+      // 使用更大的缓存以容纳大文件测试
+      const largeCache = new CacheManager(1000000) // 1MB
+
+      // 手动设置数据
+      largeCache.cache.set('small', {
+        value: 'value1',
+        size: 1000,
+        timestamp: now,
+        lastAccess: now,
+        accessCount: 1,
+      })
+      largeCache.currentSize = 1000
+
+      largeCache.cache.set('large', {
+        value: 'value2',
+        size: 600000, // 大文件 > 500KB
+        timestamp: now,
+        lastAccess: now,
+        accessCount: 1,
+      })
+      largeCache.currentSize = 601000
 
       // 添加新项触发淘汰
-      for (let i = 0; i < 5; i++) {
-        cache.set(`new${i}`, `value${i}`, 100)
+      for (let i = 0; i < 400; i++) {
+        largeCache.set(`new${i}`, `value${i}`, 1000)
       }
 
-      // 小文件应该还在
-      expect(cache.get('small')).toBe('value1')
+      // 大文件应该被淘汰（分数更低）
+      expect(largeCache.get('large')).toBeNull()
+      expect(largeCache.get('small')).toBe('value1')
     })
   })
 
@@ -317,10 +353,3 @@ describe('Weighted LRU Cache Eviction Strategy', () => {
     })
   })
 })
-
-// 辅助函数：确保 afterEach 定义
-function afterEach(fn) {
-  if (typeof afterEach === 'function') {
-    afterEach(fn)
-  }
-}

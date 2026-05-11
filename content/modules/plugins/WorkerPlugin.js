@@ -12,7 +12,7 @@ export class WorkerPlugin extends Plugin {
       version: '1.0.0',
       description: 'Worker池管理和任务调度',
       author: 'ResourceAccelerator',
-      dependencies: []
+      dependencies: [],
     }
   }
 
@@ -24,19 +24,28 @@ export class WorkerPlugin extends Plugin {
       healthCheck: {
         enabled: true,
         interval: 10000,
-        maxErrors: 3
+        maxErrors: 3,
       },
-      warmup: true
+      heartbeat: {
+        enabled: true,
+        interval: 2000,
+        timeout: 3000,
+        maxRetryCount: 2,
+      },
+      warmup: true,
     }
   }
 
   async init() {
     this.workers = []
     this.taskQueue = []
+    this.backupQueue = new Map() // 任务备份队列
     this.taskCallbacks = new Map()
     this.taskId = 0
     this.workerStates = new Map()
     this.healthCheckTimer = null
+    this.heartbeatTimer = null
+    this.heartbeatPending = new Map() // 待响应的心跳
 
     // 创建Worker池
     this._initWorkerPool()
@@ -46,6 +55,11 @@ export class WorkerPlugin extends Plugin {
       this._startHealthCheck()
     }
 
+    // 启动心跳检测
+    if (this.options.heartbeat?.enabled) {
+      this._startHeartbeat()
+    }
+
     // 预热Worker
     if (this.options.warmup) {
       this._warmupWorkers()
@@ -53,7 +67,8 @@ export class WorkerPlugin extends Plugin {
 
     this.log('info', 'init', {
       workers: this.workers.length,
-      warmup: this.options.warmup
+      warmup: this.options.warmup,
+      heartbeat: this.options.heartbeat?.enabled,
     })
   }
 
@@ -63,12 +78,19 @@ export class WorkerPlugin extends Plugin {
       clearInterval(this.healthCheckTimer)
     }
 
+    // 停止心跳检测
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer)
+    }
+
     // 终止所有Worker
-    this.workers.forEach(w => w.terminate())
+    this.workers.forEach((w) => w.terminate())
     this.workers = []
     this.taskQueue = []
+    this.backupQueue.clear()
     this.taskCallbacks.clear()
     this.workerStates.clear()
+    this.heartbeatPending.clear()
 
     this.log('info', 'destroy')
   }
@@ -83,7 +105,8 @@ export class WorkerPlugin extends Plugin {
         this.workerStates.set(worker, {
           status: 'idle',
           errorCount: 0,
-          taskCount: 0
+          taskCount: 0,
+          heartbeatFailures: 0,
         })
       }
     }
@@ -105,18 +128,29 @@ export class WorkerPlugin extends Plugin {
   }
 
   _handleWorkerMessage(worker, e) {
-    const { id, success, dataUrl, error, originalSize, compressedSize } = e.data
+    const { id, success, dataUrl, error, originalSize, compressedSize, type } = e.data
+
+    // 处理心跳响应
+    if (type === 'pong') {
+      this._handleHeartbeatResponse(worker)
+      return
+    }
+
     const callback = this.taskCallbacks.get(id)
 
-    if (!callback) return
+    if (!callback) {
+      return
+    }
 
     this.taskCallbacks.delete(id)
+    this.backupQueue.delete(id) // 任务完成，删除备份
 
     // 更新Worker状态
     const state = this.workerStates.get(worker)
     if (state) {
       state.status = 'idle'
       state.taskCount++
+      state.heartbeatFailures = 0 // 重置心跳失败计数
     }
 
     if (success) {
@@ -145,7 +179,12 @@ export class WorkerPlugin extends Plugin {
 
   _restartWorker(index) {
     const worker = this.workers[index]
-    if (!worker) return
+    if (!worker) {
+      return
+    }
+
+    const startTime = Date.now()
+    const pendingTasks = this._getPendingTasksForWorker(worker)
 
     worker.terminate()
     this.workerStates.delete(worker)
@@ -156,11 +195,49 @@ export class WorkerPlugin extends Plugin {
       this.workerStates.set(newWorker, {
         status: 'idle',
         errorCount: 0,
-        taskCount: 0
+        taskCount: 0,
+        heartbeatFailures: 0,
       })
 
-      this.emit('worker:restarted', { index })
-      this.log('info', 'worker_restarted', { index })
+      // 恢复备份任务
+      this._recoverTasks(pendingTasks)
+
+      const recoveryTime = Date.now() - startTime
+      this.emit('worker:restarted', { index, recoveryTime, pendingTasks: pendingTasks.length })
+
+      this.log('info', 'worker_restarted', {
+        index,
+        recoveryTime,
+        recoveredTasks: pendingTasks.length,
+      })
+    }
+  }
+
+  _getPendingTasksForWorker(worker) {
+    // 获取当前Worker正在处理的任务（从backupQueue）
+    const pendingTasks = []
+    for (const [id, task] of this.backupQueue.entries()) {
+      // backupQueue中存储的是所有待处理任务的备份
+      if (!this.taskCallbacks.has(id)) {
+        continue
+      }
+      pendingTasks.push({ id, ...task })
+    }
+    return pendingTasks
+  }
+
+  _recoverTasks(tasks) {
+    // 按优先级重放任务
+    tasks.sort((a, b) => (a.priority || 0) - (b.priority || 0))
+
+    for (const task of tasks) {
+      const worker = this._getIdleWorker()
+      if (worker) {
+        this._sendTaskToWorker(worker, task)
+      } else {
+        // 无可用Worker，重新加入队列
+        this.taskQueue.push(task)
+      }
     }
   }
 
@@ -168,7 +245,9 @@ export class WorkerPlugin extends Plugin {
     this.healthCheckTimer = setInterval(() => {
       this.workers.forEach((worker, index) => {
         const state = this.workerStates.get(worker)
-        if (!state) return
+        if (!state) {
+          return
+        }
 
         // 检查错误计数
         if (state.errorCount >= this.options.healthCheck.maxErrors) {
@@ -178,8 +257,74 @@ export class WorkerPlugin extends Plugin {
     }, this.options.healthCheck.interval)
   }
 
+  /**
+   * 启动心跳检测
+   */
+  _startHeartbeat() {
+    const { interval = 2000, timeout = 3000, maxRetryCount = 2 } = this.options.heartbeat
+
+    this.heartbeatTimer = setInterval(() => {
+      this.workers.forEach((worker, index) => {
+        const state = this.workerStates.get(worker)
+        if (!state || state.status === 'busy') {
+          return
+        }
+
+        // 发送ping
+        const pingId = `ping-${index}-${Date.now()}`
+        this.heartbeatPending.set(pingId, {
+          worker,
+          index,
+          timestamp: Date.now(),
+          timeout,
+        })
+
+        worker.postMessage({ type: 'ping', id: pingId })
+
+        // 设置超时检测
+        setTimeout(() => {
+          const pending = this.heartbeatPending.get(pingId)
+          if (pending) {
+            this.heartbeatPending.delete(pingId)
+            state.heartbeatFailures = (state.heartbeatFailures || 0) + 1
+
+            this.log('warn', 'heartbeat_timeout', {
+              index,
+              failures: state.heartbeatFailures,
+            })
+
+            // 超过最大重试次数，重启Worker
+            if (state.heartbeatFailures >= maxRetryCount) {
+              this.log('error', 'heartbeat_failed', { index, failures: state.heartbeatFailures })
+              this._restartWorker(index)
+            }
+          }
+        }, timeout)
+      })
+    }, interval)
+  }
+
+  /**
+   * 处理心跳响应
+   */
+  _handleHeartbeatResponse(worker) {
+    const state = this.workerStates.get(worker)
+    if (state) {
+      state.heartbeatFailures = 0
+    }
+
+    // 清理对应的心跳pending
+    for (const [pingId, pending] of this.heartbeatPending.entries()) {
+      if (pending.worker === worker) {
+        this.heartbeatPending.delete(pingId)
+        break
+      }
+    }
+  }
+
   _warmupWorkers() {
-    const testPng = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+    const testPng =
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
 
     this.workers.forEach((worker, i) => {
       const id = `warmup-${i}-${Date.now()}`
@@ -188,7 +333,7 @@ export class WorkerPlugin extends Plugin {
         src: testPng,
         quality: 0.1,
         maxWidth: 1,
-        maxHeight: 1
+        maxHeight: 1,
       })
     })
 
@@ -196,13 +341,17 @@ export class WorkerPlugin extends Plugin {
   }
 
   _processNextTask(worker) {
-    if (this.taskQueue.length === 0) return
+    if (this.taskQueue.length === 0) {
+      return
+    }
 
     // 优先级排序
     this.taskQueue.sort((a, b) => a.priority - b.priority)
     const task = this.taskQueue.shift()
 
-    if (!task) return
+    if (!task) {
+      return
+    }
 
     this._sendTaskToWorker(worker, task)
   }
@@ -238,8 +387,18 @@ export class WorkerPlugin extends Plugin {
         priority: options.priority || 0,
         isCors,
         resolve,
-        reject
+        reject,
       }
+
+      // 保存任务备份（入队时即保存）
+      this.backupQueue.set(task.id, {
+        src: task.src,
+        quality: task.quality,
+        maxWidth: task.maxWidth,
+        maxHeight: task.maxHeight,
+        priority: task.priority,
+        isCors: task.isCors,
+      })
 
       if (!worker) {
         // 加入队列
@@ -250,6 +409,7 @@ export class WorkerPlugin extends Plugin {
       // 设置超时
       const timer = setTimeout(() => {
         this.taskCallbacks.delete(task.id)
+        this.backupQueue.delete(task.id)
         reject(new Error('Worker timeout'))
       }, this.options.timeout)
 
@@ -262,7 +422,7 @@ export class WorkerPlugin extends Plugin {
         reject: (error) => {
           clearTimeout(timer)
           reject(error)
-        }
+        },
       })
 
       this._sendTaskToWorker(worker, task)
@@ -279,7 +439,9 @@ export class WorkerPlugin extends Plugin {
   }
 
   _isCorsUrl(url) {
-    if (!url || url.startsWith('data:')) return false
+    if (!url || url.startsWith('data:')) {
+      return false
+    }
 
     try {
       const urlObj = new URL(url, location.href)
@@ -298,13 +460,18 @@ export class WorkerPlugin extends Plugin {
       idle: 0,
       busy: 0,
       error: 0,
-      queueLength: this.taskQueue.length
+      queueLength: this.taskQueue.length,
+      backupQueueLength: this.backupQueue.size,
     }
 
-    this.workerStates.forEach(state => {
-      if (state.status === 'idle') stats.idle++
-      else if (state.status === 'busy') stats.busy++
-      else if (state.status === 'error') stats.error++
+    this.workerStates.forEach((state) => {
+      if (state.status === 'idle') {
+        stats.idle++
+      } else if (state.status === 'busy') {
+        stats.busy++
+      } else if (state.status === 'error') {
+        stats.error++
+      }
     })
 
     return stats

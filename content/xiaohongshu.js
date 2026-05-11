@@ -44,9 +44,13 @@ function injectStyles() {
 
 function createControlButtons() {
   const videoContainer = document.querySelector('[class*="video-container"], [class*="player"]')
-  if (!videoContainer) return
+  if (!videoContainer) {
+    return
+  }
 
-  if (document.querySelector('.yc-xhs-btn')) return
+  if (document.querySelector('.yc-xhs-btn')) {
+    return
+  }
 
   const prevBtn = document.createElement('div')
   prevBtn.className = 'yc-xhs-btn'
@@ -89,7 +93,9 @@ function toggleAutoPlay() {
 }
 
 function checkAutoPlay() {
-  if (!currentAutoPlay) return
+  if (!currentAutoPlay) {
+    return
+  }
 
   const video = document.querySelector('video')
   if (video && video.ended) {
@@ -101,7 +107,9 @@ let lastExecutionTime = 0
 const DELAY = 500
 
 function mainLoop() {
-  if (lastExecutionTime + DELAY > Date.now()) return
+  if (lastExecutionTime + DELAY > Date.now()) {
+    return
+  }
   lastExecutionTime = Date.now()
 
   createControlButtons()

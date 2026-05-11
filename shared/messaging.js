@@ -55,7 +55,9 @@ export async function sendToContentScript(message, tabId = null) {
 
     if (!targetTabId) {
       const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
-      if (!tabs[0]?.id) return null
+      if (!tabs[0]?.id) {
+        return null
+      }
       targetTabId = tabs[0].id
     }
 
@@ -75,7 +77,9 @@ export async function sendToContentScript(message, tabId = null) {
  * @returns {Promise<void>}
  */
 export async function broadcastToAllTabs(message) {
-  if (!isExtensionContextValid()) return
+  if (!isExtensionContextValid()) {
+    return
+  }
 
   try {
     const tabs = await chrome.tabs.query({})

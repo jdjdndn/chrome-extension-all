@@ -69,7 +69,10 @@
         "content/devtools/*.js",
         "content/workers/*.js",
         "shared/*.js",
-        "content/core/load-sampler.js"
+        "content/core/load-sampler.js",
+        "devtools/hot-reload-panel.html",
+        "devtools/hot-reload-panel.js",
+        "devtools/hot-reload-panel.css"
       ],
       "matches": ["<all_urls>"]
     }

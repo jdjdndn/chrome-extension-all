@@ -228,7 +228,9 @@ if (window.KeyboardPaginationLoaded) {
       for (const selector of selectors) {
         try {
           // 跳过 :has() 选择器（兼容性）
-          if (selector.includes(':has(')) {continue}
+          if (selector.includes(':has(')) {
+            continue
+          }
 
           const elements = document.querySelectorAll(selector)
           for (const el of elements) {
@@ -298,7 +300,9 @@ if (window.KeyboardPaginationLoaded) {
       for (const selector of containerSelectors) {
         try {
           const container = document.querySelector(selector)
-          if (!container) {continue}
+          if (!container) {
+            continue
+          }
 
           const links = container.querySelectorAll('a, button')
           const validLinks = Array.from(links).filter(
@@ -330,16 +334,24 @@ if (window.KeyboardPaginationLoaded) {
       }
     }
 
-    isValidButton(el, type) {
-      if (!el) {return false}
+    isValidButton(el) {
+      if (!el) {
+        return false
+      }
 
       // 检查是否可见
       const rect = el.getBoundingClientRect()
-      if (rect.width === 0 || rect.height === 0) {return false}
+      if (rect.width === 0 || rect.height === 0) {
+        return false
+      }
 
       // 检查是否禁用
-      if (el.disabled || el.getAttribute('aria-disabled') === 'true') {return false}
-      if (el.classList.contains('disabled') || el.classList.contains('is-disabled')) {return false}
+      if (el.disabled || el.getAttribute('aria-disabled') === 'true') {
+        return false
+      }
+      if (el.classList.contains('disabled') || el.classList.contains('is-disabled')) {
+        return false
+      }
 
       // 检查是否有 href 或 onclick
       const hasHref = el.tagName === 'A' && el.href && !el.href.includes('#')
@@ -356,7 +368,9 @@ if (window.KeyboardPaginationLoaded) {
 
       // 检查文本
       for (const pattern of patterns) {
-        if (text.includes(pattern.toLowerCase())) {return true}
+        if (text.includes(pattern.toLowerCase())) {
+          return true
+        }
       }
 
       // 检查箭头图标
@@ -364,13 +378,15 @@ if (window.KeyboardPaginationLoaded) {
       if (
         type === 'prev' &&
         (html.includes('arrow-left') || html.includes('chevron-left') || html.includes('«'))
-      )
-        {return true}
+      ) {
+        return true
+      }
       if (
         type === 'next' &&
         (html.includes('arrow-right') || html.includes('chevron-right') || html.includes('»'))
-      )
-        {return true}
+      ) {
+        return true
+      }
 
       return false
     }
@@ -386,11 +402,17 @@ if (window.KeyboardPaginationLoaded) {
     bindEvents() {
       document.addEventListener('keydown', (e) => {
         // 忽略输入框中的按键
-        if (this.isInputFocused()) {return}
+        if (this.isInputFocused()) {
+          return
+        }
 
         // 检查修饰键
-        if (this.config.requireAlt && !e.altKey) {return}
-        if (this.config.requireCtrl && !e.ctrlKey) {return}
+        if (this.config.requireAlt && !e.altKey) {
+          return
+        }
+        if (this.config.requireCtrl && !e.ctrlKey) {
+          return
+        }
 
         const key = e.key
 
@@ -431,19 +453,27 @@ if (window.KeyboardPaginationLoaded) {
 
     isInputFocused() {
       const active = document.activeElement
-      if (!active) {return false}
+      if (!active) {
+        return false
+      }
 
       // 1. 输入框检测
       const inputTypes = ['INPUT', 'TEXTAREA', 'SELECT']
-      if (inputTypes.includes(active.tagName)) {return true}
+      if (inputTypes.includes(active.tagName)) {
+        return true
+      }
 
       // 2. 可编辑元素检测
-      if (active.isContentEditable) {return true}
+      if (active.isContentEditable) {
+        return true
+      }
 
       // 3. 代码编辑器检测
       const editors = ['.CodeMirror', '.ace_editor', '.monaco-editor', '[contenteditable="true"]']
       for (const selector of editors) {
-        if (active.closest(selector)) {return true}
+        if (active.closest(selector)) {
+          return true
+        }
       }
 
       // 4. 视频播放器控件检测（避免干扰视频进度条等控件）
@@ -541,7 +571,9 @@ if (window.KeyboardPaginationLoaded) {
     }
 
     createHint() {
-      if (document.getElementById('yc-pagination-hint')) {return}
+      if (document.getElementById('yc-pagination-hint')) {
+        return
+      }
 
       const hint = document.createElement('div')
       hint.id = 'yc-pagination-hint'
@@ -553,13 +585,19 @@ if (window.KeyboardPaginationLoaded) {
     }
 
     showHint(text) {
-      if (!this.config.showHint) {return}
+      if (!this.config.showHint) {
+        return
+      }
 
       const hint = document.getElementById('yc-pagination-hint')
-      if (!hint) {return}
+      if (!hint) {
+        return
+      }
 
       const textEl = hint.querySelector('.yc-hint-text')
-      if (textEl) {textEl.textContent = text}
+      if (textEl) {
+        textEl.textContent = text
+      }
 
       hint.classList.remove('yc-hidden')
 
@@ -604,7 +642,9 @@ if (window.KeyboardPaginationLoaded) {
     }
 
     injectStyles() {
-      if (document.getElementById('yc-pagination-styles')) {return}
+      if (document.getElementById('yc-pagination-styles')) {
+        return
+      }
 
       const style = document.createElement('style')
       style.id = 'yc-pagination-styles'
@@ -732,7 +772,9 @@ if (window.KeyboardPaginationLoaded) {
     }
 
     createIndicator() {
-      if (document.querySelector('.yc-pagination-indicator')) {return}
+      if (document.querySelector('.yc-pagination-indicator')) {
+        return
+      }
 
       const indicator = document.createElement('div')
       indicator.className = 'yc-pagination-indicator'
