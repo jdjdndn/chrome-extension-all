@@ -2141,11 +2141,14 @@ async function loadAISites() {
   const siteSelector = document.getElementById('aiSiteSelector')
 
   try {
+    console.log('[AI Aggregator] 请求 AI 网站列表...')
     const response = await chrome.runtime.sendMessage({
       type: 'AIAGGREGATOR_GET_SITES',
     })
+    console.log('[AI Aggregator] 收到响应:', response)
 
-    if (response.success && response.sites) {
+    if (response && response.success && response.sites) {
+      console.log('[AI Aggregator] 网站列表:', response.sites)
       siteSelector.innerHTML = response.sites
         .map(
           (site) => `
@@ -2185,9 +2188,13 @@ async function loadAISites() {
         // 初始状态
         item.classList.add('selected')
       })
+    } else {
+      console.error('[AI Aggregator] 响应格式错误:', response)
+      siteSelector.innerHTML = '<span style="color:red">加载失败，请刷新页面重试</span>'
     }
   } catch (error) {
     console.error('[AI Aggregator] 加载网站列表失败:', error)
+    siteSelector.innerHTML = `<span style="color:red">加载失败: ${error.message}</span>`
   }
 }
 
@@ -2272,7 +2279,9 @@ function getSiteName(siteId) {
 // 更新响应卡片
 function updateResponseCard(siteId, data) {
   const card = document.querySelector(`.ai-response-card[data-site-id="${siteId}"]`)
-  if (!card) {return}
+  if (!card) {
+    return
+  }
 
   const indicator = card.querySelector('.ai-status-indicator')
   const statusText = card.querySelector('.ai-status-text')

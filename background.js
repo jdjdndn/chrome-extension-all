@@ -2933,8 +2933,10 @@ const aiAggregatorState = {
 
 // 加载配置
 async function getAIAggregatorConfig() {
+  console.log('[AI Aggregator] getAIAggregatorConfig 被调用')
   try {
     const result = await chrome.storage.local.get(['ai_aggregator_settings'])
+    console.log('[AI Aggregator] storage 结果:', result)
     if (result.ai_aggregator_settings?.sites) {
       return result.ai_aggregator_settings
     }
@@ -3228,6 +3230,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   // 处理 AIAGGREGATOR_ 前缀的消息（来自 newtab）
   if (message.type.startsWith('AIAGGREGATOR_')) {
+    console.log('[AI Aggregator] 收到消息:', message.type, message)
     handleAggregatorMessage(message, sender, sendResponse)
     return true
   }
