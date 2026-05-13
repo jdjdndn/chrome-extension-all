@@ -717,6 +717,18 @@ function setupEventListeners() {
       return false
     }
 
+    // 如果是 AI 聚合器消息，让 AI 聚合器处理器处理
+    if (message?.type?.startsWith('AIAGGREGATOR_')) {
+      console.log('[Background] 这是 AI Aggregator 消息，跳过')
+      return false
+    }
+
+    // 如果是 AIA_ 前缀消息，让 AI 聚合器处理器处理
+    if (message?.type?.startsWith('AIA_')) {
+      console.log('[Background] 这是 AIA 注入脚本消息，跳过')
+      return false
+    }
+
     console.log('[Background] 非 EventBus 消息，交给 handleMessage 处理')
     // 非 EventBus 消息，使用原有的 handleMessage
     handleMessage(message, sender, sendResponse)
