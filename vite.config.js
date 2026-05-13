@@ -149,7 +149,7 @@ const FILE_MAPPINGS = [
   { src: 'eventbus-devtools.js', dest: 'devtools/eventbus-devtools.js' },
 ]
 
-const STATIC_DIRS = ['icons', 'devtools', 'shared', 'src']
+const STATIC_DIRS = ['icons', 'devtools', 'shared', 'src', 'styles']
 const SKIP_CONTENT_DIRS = ['entries', 'utils']
 
 // ========== Hot Reload Notification ==========
