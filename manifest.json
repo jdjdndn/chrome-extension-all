@@ -66,6 +66,7 @@
         "content/core/*.js",
         "content/base/*.js",
         "content/modules/*.js",
+        "content/modules/ai-aggregator/*.js",
         "content/devtools/*.js",
         "content/workers/*.js",
         "shared/*.js",

@@ -1038,6 +1038,7 @@
         color: #fff;
       }
     </style>
+    <link rel="stylesheet" href="styles/ai-aggregator.css">
   </head>
   <body>
     <!-- 设置按钮 -->
@@ -1175,6 +1176,10 @@
         <button class="tab-btn" data-tab="learn">
           <span>📚</span>
           <span>学习资源</span>
+        </button>
+        <button class="tab-btn" data-tab="ai-aggregator">
+          <span>🤖</span>
+          <span>AI聚合</span>
         </button>
       </div>
 
@@ -1379,6 +1384,33 @@
             <span>📖</span>
             <span>从书签导入</span>
           </button>
+        </div>
+      </div>
+
+      <!-- AI 聚合问答 Tab -->
+      <div class="tab-content" id="tab-ai-aggregator">
+        <div class="ai-aggregator-section">
+          <!-- 问题输入 -->
+          <div class="ai-question-input">
+            <textarea id="aiQuestionInput" rows="3" placeholder="输入你的问题，同时向多个 AI 提问..."></textarea>
+            <button id="aiSendBtn" class="ai-send-btn">发送</button>
+          </div>
+
+          <!-- AI 网站选择 -->
+          <div class="ai-site-selector" id="aiSiteSelector">
+            <!-- 由 JS 动态生成 -->
+          </div>
+
+          <!-- 回复展示区域 -->
+          <div class="ai-response-grid" id="aiResponseGrid">
+            <!-- 由 JS 动态生成 -->
+          </div>
+
+          <!-- 状态栏 -->
+          <div style="margin-top: 16px; font-size: 12px; color: #666; display: flex; justify-content: space-between;">
+            <span id="aiAggregatorStatus">选择 AI 并输入问题开始</span>
+            <span id="aiAggregatorStats"></span>
+          </div>
         </div>
       </div>
     </div>

@@ -1,0 +1,263 @@
+/* styles/ai-aggregator.css */
+/* AI 聚合问答样式 */
+
+.ai-aggregator-section {
+  margin-bottom: 20px;
+}
+
+.ai-question-input {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.ai-question-input textarea {
+  flex: 1;
+  padding: 12px 16px;
+  font-size: 14px;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  resize: none;
+  outline: none;
+  transition: all 0.3s ease;
+  font-family: inherit;
+}
+
+.ai-question-input textarea:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+}
+
+.ai-send-btn {
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.ai-send-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.ai-send-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.ai-site-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.ai-site-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ai-site-item:hover {
+  background: #e9ecef;
+}
+
+.ai-site-item.selected {
+  background: #667eea;
+  color: white;
+  border-color: #667eea;
+}
+
+.ai-site-item input {
+  display: none;
+}
+
+.ai-site-config-btn {
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.ai-response-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.ai-response-card {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  max-height: 500px;
+}
+
+.ai-response-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.ai-response-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.ai-status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.ai-status-indicator.loading {
+  background: #ffc107;
+  animation: pulse 1.5s infinite;
+}
+
+.ai-status-indicator.responding {
+  background: #17a2b8;
+  animation: pulse 1s infinite;
+}
+
+.ai-status-indicator.completed {
+  background: #28a745;
+}
+
+.ai-status-indicator.error {
+  background: #dc3545;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.ai-status-text {
+  font-size: 12px;
+  color: #666;
+}
+
+.ai-response-body {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.ai-response-body.waiting {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #999;
+}
+
+.ai-response-body.error {
+  color: #dc3545;
+}
+
+.ai-response-actions {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid #e0e0e0;
+  background: #f8f9fa;
+}
+
+.ai-action-btn {
+  padding: 6px 12px;
+  background: #e9ecef;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ai-action-btn:hover {
+  background: #dee2e6;
+}
+
+.ai-config-panel {
+  position: absolute;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  min-width: 200px;
+}
+
+.ai-config-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.ai-config-item:last-child {
+  border-bottom: none;
+}
+
+.ai-config-label {
+  font-size: 13px;
+  color: #333;
+}
+
+.ai-config-toggle {
+  width: 36px;
+  height: 20px;
+  background: #ccc;
+  border-radius: 10px;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.ai-config-toggle.active {
+  background: #667eea;
+}
+
+.ai-config-toggle::after {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  background: white;
+  border-radius: 50%;
+  top: 2px;
+  left: 2px;
+  transition: left 0.2s ease;
+}
+
+.ai-config-toggle.active::after {
+  left: 18px;
+}
