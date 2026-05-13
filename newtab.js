@@ -2096,3 +2096,334 @@ document.getElementById('importBookmarkBtn').addEventListener('click', importFro
     true
   )
 })()
+
+// ========== AI 聚合问答逻辑 ==========
+const aiAggregator = {
+  selectedSites: new Set(),
+  responses: new Map(), // siteId -> { status, content }
+  isRunning: false,
+  startTime: null,
+}
+
+// 初始化 AI 聚合
+function initAIAggregator() {
+  const siteSelector = document.getElementById('aiSiteSelector')
+  const sendBtn = document.getElementById('aiSendBtn')
+  const questionInput = document.getElementById('aiQuestionInput')
+
+  // 加载 AI 网站列表
+  loadAISites()
+
+  // 发送按钮点击
+  sendBtn.addEventListener('click', () => {
+    const question = questionInput.value.trim()
+    if (!question) {
+      alert('请输入问题')
+      return
+    }
+    if (aiAggregator.selectedSites.size === 0) {
+      alert('请选择至少一个 AI')
+      return
+    }
+    sendQuestionToAIs(question)
+  })
+
+  // 快捷键: Ctrl+Enter 发送
+  questionInput.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.key === 'Enter') {
+      sendBtn.click()
+    }
+  })
+}
+
+// 加载 AI 网站列表
+async function loadAISites() {
+  const siteSelector = document.getElementById('aiSiteSelector')
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: 'AIAGGREGATOR_GET_SITES',
+    })
+
+    if (response.success && response.sites) {
+      siteSelector.innerHTML = response.sites
+        .map(
+          (site) => `
+        <label class="ai-site-item" data-site-id="${site.id}">
+          <input type="checkbox" checked>
+          <span>${site.name}</span>
+          ${site.options && Object.keys(site.options).length > 0 ? '<button class="ai-site-config-btn" title="配置">⚙️</button>' : ''}
+        </label>
+      `
+        )
+        .join('')
+
+      // 默认全选
+      response.sites.forEach((site) => aiAggregator.selectedSites.add(site.id))
+
+      // 绑定选择事件
+      siteSelector.querySelectorAll('.ai-site-item').forEach((item) => {
+        item.addEventListener('click', (e) => {
+          if (e.target.classList.contains('ai-site-config-btn')) {
+            e.stopPropagation()
+            showSiteConfig(item.dataset.siteId)
+            return
+          }
+
+          const checkbox = item.querySelector('input')
+          const siteId = item.dataset.siteId
+
+          if (checkbox.checked) {
+            aiAggregator.selectedSites.add(siteId)
+            item.classList.add('selected')
+          } else {
+            aiAggregator.selectedSites.delete(siteId)
+            item.classList.remove('selected')
+          }
+        })
+
+        // 初始状态
+        item.classList.add('selected')
+      })
+    }
+  } catch (error) {
+    console.error('[AI Aggregator] 加载网站列表失败:', error)
+  }
+}
+
+// 发送问题到多个 AI
+async function sendQuestionToAIs(question) {
+  const sendBtn = document.getElementById('aiSendBtn')
+  const questionInput = document.getElementById('aiQuestionInput')
+  const statusEl = document.getElementById('aiAggregatorStatus')
+
+  // 禁用输入
+  sendBtn.disabled = true
+  questionInput.disabled = true
+  aiAggregator.isRunning = true
+  aiAggregator.startTime = Date.now()
+
+  // 初始化响应卡片
+  initResponseCards()
+
+  // 发送到 background
+  try {
+    await chrome.runtime.sendMessage({
+      type: 'AIAGGREGATOR_START',
+      question: question,
+      selectedSites: Array.from(aiAggregator.selectedSites),
+      aggregatorTabId: (await chrome.tabs.getCurrent()).id,
+    })
+
+    statusEl.textContent = '正在发送问题...'
+  } catch (error) {
+    console.error('[AI Aggregator] 发送失败:', error)
+    statusEl.textContent = '发送失败: ' + error.message
+    resetAggregator()
+  }
+}
+
+// 初始化响应卡片
+function initResponseCards() {
+  const grid = document.getElementById('aiResponseGrid')
+
+  grid.innerHTML = Array.from(aiAggregator.selectedSites)
+    .map(
+      (siteId) => `
+    <div class="ai-response-card" data-site-id="${siteId}">
+      <div class="ai-response-header">
+        <div class="ai-response-title">
+          <span class="ai-status-indicator loading"></span>
+          <span class="ai-site-name">${getSiteName(siteId)}</span>
+        </div>
+        <span class="ai-status-text">等待中...</span>
+      </div>
+      <div class="ai-response-body waiting">
+        <span>等待回复...</span>
+      </div>
+      <div class="ai-response-actions" style="display: none;">
+        <button class="ai-action-btn" data-action="copy">📋 复制</button>
+        <button class="ai-action-btn" data-action="open">🔗 打开原页</button>
+      </div>
+    </div>
+  `
+    )
+    .join('')
+
+  // 初始化响应状态
+  aiAggregator.responses.clear()
+  aiAggregator.selectedSites.forEach((siteId) => {
+    aiAggregator.responses.set(siteId, { status: 'pending', content: '' })
+  })
+}
+
+// 获取网站名称
+function getSiteName(siteId) {
+  const names = {
+    doubao: '豆包',
+    tongyi: '通义千问',
+    kimi: 'Kimi',
+    yiyan: '文心一言',
+    chatglm: '智谱清言',
+  }
+  return names[siteId] || siteId
+}
+
+// 更新响应卡片
+function updateResponseCard(siteId, data) {
+  const card = document.querySelector(`.ai-response-card[data-site-id="${siteId}"]`)
+  if (!card) {return}
+
+  const indicator = card.querySelector('.ai-status-indicator')
+  const statusText = card.querySelector('.ai-status-text')
+  const body = card.querySelector('.ai-response-body')
+  const actions = card.querySelector('.ai-response-actions')
+
+  // 更新状态
+  if (data.status) {
+    indicator.className = 'ai-status-indicator ' + data.status
+    const statusLabels = {
+      loading: '加载中...',
+      sending: '发送中...',
+      responding: '回答中...',
+      completed: '已完成',
+      error: '失败',
+    }
+    statusText.textContent = statusLabels[data.status] || data.status
+  }
+
+  // 更新内容
+  if (data.content) {
+    body.classList.remove('waiting', 'error')
+    body.innerHTML = formatAIResponse(data.content)
+    body.scrollTop = body.scrollHeight
+
+    // 保存内容
+    const response = aiAggregator.responses.get(siteId)
+    if (response) {
+      response.content = data.content
+    }
+  }
+
+  // 显示操作按钮
+  if (data.isComplete) {
+    actions.style.display = 'flex'
+    indicator.className = 'ai-status-indicator completed'
+    statusText.textContent = '已完成'
+
+    // 更新统计
+    updateAggregatorStats()
+  }
+
+  // 错误处理
+  if (data.error) {
+    body.classList.remove('waiting')
+    body.classList.add('error')
+    body.innerHTML = `<span>❌ ${data.message || data.error}</span>`
+    indicator.className = 'ai-status-indicator error'
+    statusText.textContent = '失败'
+  }
+}
+
+// 格式化 AI 回复（简单的 Markdown 支持）
+function formatAIResponse(content) {
+  return content
+    .replace(/\n/g, '<br>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(
+      /`(.+?)`/g,
+      '<code style="background:#f0f0f0;padding:2px 4px;border-radius:3px;">$1</code>'
+    )
+}
+
+// 更新统计信息
+function updateAggregatorStats() {
+  const statsEl = document.getElementById('aiAggregatorStats')
+  const statusEl = document.getElementById('aiAggregatorStatus')
+
+  let completed = 0
+  const total = aiAggregator.responses.size
+
+  aiAggregator.responses.forEach((response) => {
+    if (response.status === 'completed' || response.content) {
+      completed++
+    }
+  })
+
+  statsEl.textContent = `${completed}/${total} 已完成`
+
+  if (completed === total) {
+    const elapsed = Math.round((Date.now() - aiAggregator.startTime) / 1000)
+    statusEl.textContent = `全部完成，用时 ${elapsed} 秒`
+    resetAggregator()
+  }
+}
+
+// 重置聚合器状态
+function resetAggregator() {
+  aiAggregator.isRunning = false
+
+  const sendBtn = document.getElementById('aiSendBtn')
+  const questionInput = document.getElementById('aiQuestionInput')
+
+  sendBtn.disabled = false
+  questionInput.disabled = false
+}
+
+// 显示网站配置
+function showSiteConfig(siteId) {
+  // TODO: 实现配置面板
+  alert(`配置功能开发中: ${siteId}`)
+}
+
+// 监听来自 Background 的消息
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === 'AIAGGREGATOR_RESPONSE') {
+    updateResponseCard(message.siteId, {
+      content: message.content,
+      isComplete: message.isComplete,
+    })
+    sendResponse({ success: true })
+    return true
+  }
+
+  if (message.type === 'AIAGGREGATOR_STATUS_CHANGE') {
+    updateResponseCard(message.siteId, { status: message.status })
+    sendResponse({ success: true })
+    return true
+  }
+
+  if (message.type === 'AIAGGREGATOR_ERROR') {
+    updateResponseCard(message.siteId, {
+      status: 'error',
+      error: message.error,
+      message: message.message,
+    })
+    sendResponse({ success: true })
+    return true
+  }
+
+  return false
+})
+
+// 绑定操作按钮事件
+document.addEventListener('click', (e) => {
+  if (e.target.dataset.action === 'copy') {
+    const card = e.target.closest('.ai-response-card')
+    const siteId = card.dataset.siteId
+    const response = aiAggregator.responses.get(siteId)
+    if (response && response.content) {
+      navigator.clipboard.writeText(response.content)
+      e.target.textContent = '✅ 已复制'
+      setTimeout(() => (e.target.textContent = '📋 复制'), 1500)
+    }
+  }
+
+  if (e.target.dataset.action === 'open') {
+    // TODO: 打开原始 AI 对话页面
+  }
+})
+
+// 初始化
+initAIAggregator()
