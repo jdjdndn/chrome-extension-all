@@ -3013,66 +3013,6 @@ async function getAIAggregatorConfig() {
   }
 }
 
-// 注册 AI 聚合问答消息处理器
-function registerAIAggregatorHandlers() {
-  // 获取 AI 网站列表
-  EventBus.on('AIAGGREGATOR_GET_SITES', async () => {
-    const config = await getAIAggregatorConfig()
-    return { success: true, sites: config.sites.filter((s) => s.enabled) }
-  })
-
-  // 更新 AI 网站配置
-  EventBus.on('AIAGGREGATOR_UPDATE_SITE', async (data) => {
-    const { siteId, updates } = data
-    const config = await getAIAggregatorConfig()
-    const index = config.sites.findIndex((s) => s.id === siteId)
-    if (index !== -1) {
-      config.sites[index] = { ...config.sites[index], ...updates }
-      await chrome.storage.local.set({ ai_aggregator_settings: config })
-      return { success: true }
-    }
-    return { success: false, error: 'Site not found' }
-  })
-
-  // 开始聚合问答
-  EventBus.on('AIAGGREGATOR_START', async (data) => {
-    const { question, selectedSites, aggregatorTabId } = data
-    aiAggregatorState.currentQuestion = question
-    aiAggregatorState.aggregatorTabId = aggregatorTabId
-
-    const config = await getAIAggregatorConfig()
-    const sites = config.sites.filter((s) => selectedSites.includes(s.id))
-
-    console.log('[AI Aggregator] 开始聚合问答:', question, '选择:', selectedSites)
-
-    // 批量创建标签页
-    const maxConcurrent = config.maxConcurrent || 3
-    for (let i = 0; i < sites.length; i += maxConcurrent) {
-      const batch = sites.slice(i, i + maxConcurrent)
-      await Promise.all(batch.map((site) => createAndInjectAITab(site, question)))
-    }
-
-    return { success: true }
-  })
-
-  // 停止聚合问答
-  EventBus.on('AIAGGREGATOR_STOP', async () => {
-    // 关闭所有 AI 标签页
-    for (const [siteId, tabInfo] of aiAggregatorState.activeTabs) {
-      if (tabInfo.tabId) {
-        try {
-          await chrome.tabs.remove(tabInfo.tabId)
-        } catch (e) {}
-      }
-    }
-    aiAggregatorState.activeTabs.clear()
-    aiAggregatorState.currentQuestion = null
-    return { success: true }
-  })
-
-  console.log('[AI Aggregator] 消息处理器已注册')
-}
-
 // 创建并注入 AI 标签页
 async function createAndInjectAITab(site, question) {
   try {
@@ -3298,6 +3238,4 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   return false
 })
-
-// 注册处理器
-registerAIAggregatorHandlers()
+console.log('[AI Aggregator] 消息处理器已注册')
