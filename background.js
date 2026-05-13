@@ -3157,69 +3157,91 @@ function notifyAggregatorTab(type, data) {
   }
 }
 
-// 处理来自聚合页面的消息
-async function handleAggregatorMessage(message, sender, sendResponse) {
-  try {
-    switch (message.type) {
-      case 'AIAGGREGATOR_GET_SITES': {
-        const config = await getAIAggregatorConfig()
+// 处理来自聚合页面的消息（不使用 async，避免消息通道关闭）
+function handleAggregatorMessage(message, sender, sendResponse) {
+  console.log('[AI Aggregator] handleAggregatorMessage:', message.type)
+
+  if (message.type === 'AIAGGREGATOR_GET_SITES') {
+    getAIAggregatorConfig()
+      .then((config) => {
+        console.log(
+          '[AI Aggregator] 返回网站列表:',
+          config.sites.filter((s) => s.enabled)
+        )
         sendResponse({ success: true, sites: config.sites.filter((s) => s.enabled) })
-        break
-      }
-      case 'AIAGGREGATOR_UPDATE_SITE': {
-        const { siteId, updates } = message
-        const config = await getAIAggregatorConfig()
+      })
+      .catch((error) => {
+        console.error('[AI Aggregator] 获取配置失败:', error)
+        sendResponse({ success: false, error: error.message })
+      })
+    return true // 保持消息通道开放
+  }
+
+  if (message.type === 'AIAGGREGATOR_UPDATE_SITE') {
+    const { siteId, updates } = message
+    getAIAggregatorConfig()
+      .then((config) => {
         const index = config.sites.findIndex((s) => s.id === siteId)
         if (index !== -1) {
           config.sites[index] = { ...config.sites[index], ...updates }
-          await chrome.storage.local.set({ ai_aggregator_settings: config })
-          sendResponse({ success: true })
-        } else {
-          sendResponse({ success: false, error: 'Site not found' })
+          return chrome.storage.local.set({ ai_aggregator_settings: config })
         }
-        break
-      }
-      case 'AIAGGREGATOR_START': {
-        const { question, selectedSites, aggregatorTabId } = message
-        aiAggregatorState.currentQuestion = question
-        aiAggregatorState.aggregatorTabId = aggregatorTabId
+        throw new Error('Site not found')
+      })
+      .then(() => sendResponse({ success: true }))
+      .catch((error) => sendResponse({ success: false, error: error.message }))
+    return true
+  }
 
-        const config = await getAIAggregatorConfig()
+  if (message.type === 'AIAGGREGATOR_START') {
+    const { question, selectedSites, aggregatorTabId } = message
+    aiAggregatorState.currentQuestion = question
+    aiAggregatorState.aggregatorTabId = aggregatorTabId
+
+    getAIAggregatorConfig()
+      .then((config) => {
         const sites = config.sites.filter((s) => selectedSites.includes(s.id))
-
         console.log('[AI Aggregator] 开始聚合问答:', question, '选择:', selectedSites)
 
         // 批量创建标签页
         const maxConcurrent = config.maxConcurrent || 3
+        const batches = []
         for (let i = 0; i < sites.length; i += maxConcurrent) {
-          const batch = sites.slice(i, i + maxConcurrent)
-          await Promise.all(batch.map((site) => createAndInjectAITab(site, question)))
+          batches.push(sites.slice(i, i + maxConcurrent))
         }
 
-        sendResponse({ success: true })
-        break
-      }
-      case 'AIAGGREGATOR_STOP': {
-        // 关闭所有 AI 标签页
-        for (const [siteId, tabInfo] of aiAggregatorState.activeTabs) {
-          if (tabInfo.tabId) {
-            try {
-              await chrome.tabs.remove(tabInfo.tabId)
-            } catch (e) {}
-          }
-        }
-        aiAggregatorState.activeTabs.clear()
-        aiAggregatorState.currentQuestion = null
-        sendResponse({ success: true })
-        break
-      }
-      default:
-        sendResponse({ success: false, error: 'Unknown message type' })
-    }
-  } catch (error) {
-    console.error('[AI Aggregator] 处理消息失败:', error)
-    sendResponse({ success: false, error: error.message })
+        return batches.reduce((promise, batch) => {
+          return promise.then(() =>
+            Promise.all(batch.map((site) => createAndInjectAITab(site, question)))
+          )
+        }, Promise.resolve())
+      })
+      .then(() => sendResponse({ success: true }))
+      .catch((error) => {
+        console.error('[AI Aggregator] 启动失败:', error)
+        sendResponse({ success: false, error: error.message })
+      })
+    return true
   }
+
+  if (message.type === 'AIAGGREGATOR_STOP') {
+    // 关闭所有 AI 标签页
+    const closePromises = []
+    for (const [siteId, tabInfo] of aiAggregatorState.activeTabs) {
+      if (tabInfo.tabId) {
+        closePromises.push(chrome.tabs.remove(tabInfo.tabId).catch(() => {}))
+      }
+    }
+    Promise.all(closePromises).then(() => {
+      aiAggregatorState.activeTabs.clear()
+      aiAggregatorState.currentQuestion = null
+      sendResponse({ success: true })
+    })
+    return true
+  }
+
+  sendResponse({ success: false, error: 'Unknown message type' })
+  return false
 }
 
 // 监听来自注入脚本和聚合页面的消息
