@@ -85,6 +85,25 @@ Background Service Worker
         "responseContainer": "[class*='message'], [class*='chat']",
         "loginIndicator": "[class*='avatar'], [class*='user']"
       },
+      // AI 特有配置
+      "options": {
+        "deepThink": {
+          "label": "深度思考",
+          "type": "boolean",
+          "default": false,
+          "selector": "[class*='deep-think'] input, [class*='reasoning'] input"
+        },
+        "model": {
+          "label": "模型选择",
+          "type": "select",
+          "default": "default",
+          "selector": "[class*='model-select']",
+          "options": [
+            { "value": "default", "label": "默认" },
+            { "value": "pro", "label": "Pro" }
+          ]
+        }
+      },
       "notes": "选择器需实际调试确认，当前为通用模式"
     },
     {
@@ -97,13 +116,138 @@ Background Service Worker
         "sendButton": "button[class*='send']",
         "responseContainer": "[class*='message'], [class*='response']",
         "loginIndicator": "[class*='avatar'], [class*='user']"
+      },
+      "options": {
+        "deepThink": {
+          "label": "深度思考",
+          "type": "boolean",
+          "default": false,
+          "selector": "[class*='thinking'] input"
+        },
+        "webSearch": {
+          "label": "联网搜索",
+          "type": "boolean",
+          "default": false,
+          "selector": "[class*='web-search'] input"
+        }
+      }
+    },
+    {
+      "id": "kimi",
+      "name": "Kimi",
+      "url": "https://kimi.moonshot.cn/",
+      "enabled": true,
+      "selectors": {
+        "input": "textarea, [contenteditable='true']",
+        "sendButton": "button[class*='send']",
+        "responseContainer": "[class*='message'], [class*='chat']",
+        "loginIndicator": "[class*='avatar'], [class*='user']"
+      },
+      "options": {
+        "deepThink": {
+          "label": "长思考",
+          "type": "boolean",
+          "default": false,
+          "selector": "[class*='thinking'] input"
+        },
+        "searchMode": {
+          "label": "搜索模式",
+          "type": "select",
+          "default": "auto",
+          "selector": "[class*='search-mode']",
+          "options": [
+            { "value": "auto", "label": "自动" },
+            { "value": "deep", "label": "深度搜索" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "yiyan",
+      "name": "文心一言",
+      "url": "https://yiyan.baidu.com/",
+      "enabled": true,
+      "selectors": {
+        "input": "textarea, [contenteditable='true']",
+        "sendButton": "button[class*='send']",
+        "responseContainer": "[class*='message'], [class*='response']",
+        "loginIndicator": "[class*='avatar'], [class*='user']"
+      },
+      "options": {
+        "model": {
+          "label": "模型",
+          "type": "select",
+          "default": "ernie-4.0",
+          "selector": "[class*='model-selector']",
+          "options": [
+            { "value": "ernie-4.0", "label": "文心大模型 4.0" },
+            { "value": "ernie-3.5", "label": "文心大模型 3.5" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "chatglm",
+      "name": "智谱清言",
+      "url": "https://chatglm.cn/",
+      "enabled": true,
+      "selectors": {
+        "input": "textarea, [contenteditable='true']",
+        "sendButton": "button[class*='send']",
+        "responseContainer": "[class*='message'], [class*='chat']",
+        "loginIndicator": "[class*='avatar'], [class*='user']"
+      },
+      "options": {
+        "deepThink": {
+          "label": "深度思考",
+          "type": "boolean",
+          "default": false,
+          "selector": "[class*='thinking'] input"
+        }
       }
     }
-    // 其他 AI 网站选择器需实际调试确认
   ],
-  "maxConcurrent": 3,  // 最大并发标签页数
-  "autoCloseTabs": true  // 完成后自动关闭 AI 标签页
+  "maxConcurrent": 3,
+  "autoCloseTabs": true
 }
+```
+
+### AI 特有配置处理
+
+在发送问题前，注入脚本会先应用该 AI 的特有配置：
+
+```javascript
+// 应用 AI 特有配置
+async function applySiteOptions(site) {
+  const options = site.options || {}
+
+  for (const [key, option] of Object.entries(options)) {
+    const element = document.querySelector(option.selector)
+    if (!element) continue
+
+    if (option.type === 'boolean' && option.default !== element.checked) {
+      element.click() // 切换开关状态
+    } else if (option.type === 'select') {
+      element.value = option.default
+      element.dispatchEvent(new Event('change', { bubbles: true }))
+    }
+  }
+}
+```
+
+### 配置 UI 展示
+
+在聚合页面的 AI 选择区域，点击 ⚙️ 可展开该 AI 的特有配置：
+
+```
+[✓豆包 ⚙️]  [✓通义 ⚙️]  [✓Kimi ⚙️]  [✓文心 ⚙️]
+
+点击 ⚙️ 后展开：
+┌─────────────────┐
+│ 豆包配置        │
+│ ☐ 深度思考      │
+│ 模型: [默认 ▼]  │
+└─────────────────┘
 ```
 
 ### 适配逻辑
