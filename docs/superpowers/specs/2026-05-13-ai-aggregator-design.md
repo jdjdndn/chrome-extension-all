@@ -80,26 +80,29 @@ Background Service Worker
       "url": "https://www.doubao.com/chat/",
       "enabled": true,
       "selectors": {
-        "input": "textarea",
-        "sendButton": "[aria-label='发送']",
-        "responseContainer": ".chat-message",
-        "loginIndicator": ".user-avatar"
-      }
+        "input": "textarea, [contenteditable='true']",
+        "sendButton": "button[type='submit'], [aria-label*='发送']",
+        "responseContainer": "[class*='message'], [class*='chat']",
+        "loginIndicator": "[class*='avatar'], [class*='user']"
+      },
+      "notes": "选择器需实际调试确认，当前为通用模式"
     },
     {
       "id": "tongyi",
       "name": "通义千问",
-      "url": "https://tongyi.aliyun.com/",
+      "url": "https://tongyi.aliyun.com/qianwen/",
       "enabled": true,
       "selectors": {
-        "input": "textarea",
-        "sendButton": ".send-btn",
-        "responseContainer": ".response-content",
-        "loginIndicator": ".user-info"
+        "input": "textarea, [contenteditable='true']",
+        "sendButton": "button[class*='send']",
+        "responseContainer": "[class*='message'], [class*='response']",
+        "loginIndicator": "[class*='avatar'], [class*='user']"
       }
     }
-    // ... 其他 AI
-  ]
+    // 其他 AI 网站选择器需实际调试确认
+  ],
+  "maxConcurrent": 3,  // 最大并发标签页数
+  "autoCloseTabs": true  // 完成后自动关闭 AI 标签页
 }
 ```
 
@@ -201,6 +204,31 @@ const CONFIG = {
 
 - 用户刷新聚合页面时，保留已收到的回复（存 localStorage）
 - 用户关闭聚合页面时，各 AI 标签页自动关闭
+
+### 并发控制
+
+为避免同时打开过多标签页影响性能：
+
+1. 最大并发数默认为 3，用户可配置
+2. 超过并发数的请求排队等待
+3. 标签页加载完成后，按顺序注入脚本
+4. 全部回答完成后，自动关闭各 AI 标签页（可配置关闭/保留）
+
+```javascript
+// 并发队列示例
+async function processQueue(sites, question) {
+  const maxConcurrent = config.maxConcurrent || 3
+  const results = []
+
+  for (let i = 0; i < sites.length; i += maxConcurrent) {
+    const batch = sites.slice(i, i + maxConcurrent)
+    const batchResults = await Promise.all(batch.map((site) => sendToAI(site, question)))
+    results.push(...batchResults)
+  }
+
+  return results
+}
+```
 
 ## 文件结构
 
