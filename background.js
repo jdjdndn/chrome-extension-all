@@ -2921,3 +2921,282 @@ if (typeof self !== 'undefined' && typeof self.importScripts === 'function') {
 // 暴露CDNRegistry到全局，供其他模块使用
 self.CDNRegistry = CDNRegistry
 console.log('[Background] CDNRegistry 已暴露到全局')
+
+// ========== AI 聚合问答消息路由 ==========
+// AI 聚合问答状态管理
+const aiAggregatorState = {
+  activeTabs: new Map(), // siteId -> { tabId, status }
+  aggregatorTabId: null,
+  currentQuestion: null,
+  config: null,
+}
+
+// 加载配置
+async function getAIAggregatorConfig() {
+  try {
+    const result = await chrome.storage.local.get(['ai_aggregator_settings'])
+    if (result.ai_aggregator_settings?.sites) {
+      return result.ai_aggregator_settings
+    }
+    // 返回默认配置
+    return {
+      sites: [
+        {
+          id: 'doubao',
+          name: '豆包',
+          url: 'https://www.doubao.com/chat/',
+          enabled: true,
+          selectors: {
+            input: "textarea, [contenteditable='true']",
+            sendButton: "button[type='submit'], [aria-label*='发送']",
+            responseContainer: "[class*='message'], [class*='chat']",
+            loginIndicator: "[class*='avatar'], [class*='user']",
+          },
+        },
+        {
+          id: 'tongyi',
+          name: '通义千问',
+          url: 'https://tongyi.aliyun.com/qianwen/',
+          enabled: true,
+          selectors: {
+            input: "textarea, [contenteditable='true']",
+            sendButton: "button[class*='send']",
+            responseContainer: "[class*='message'], [class*='response']",
+            loginIndicator: "[class*='avatar'], [class*='user']",
+          },
+        },
+        {
+          id: 'kimi',
+          name: 'Kimi',
+          url: 'https://kimi.moonshot.cn/',
+          enabled: true,
+          selectors: {
+            input: "textarea, [contenteditable='true']",
+            sendButton: "button[class*='send']",
+            responseContainer: "[class*='message'], [class*='chat']",
+            loginIndicator: "[class*='avatar'], [class*='user']",
+          },
+        },
+        {
+          id: 'yiyan',
+          name: '文心一言',
+          url: 'https://yiyan.baidu.com/',
+          enabled: true,
+          selectors: {
+            input: "textarea, [contenteditable='true']",
+            sendButton: "button[class*='send']",
+            responseContainer: "[class*='message'], [class*='response']",
+            loginIndicator: "[class*='avatar'], [class*='user']",
+          },
+        },
+        {
+          id: 'chatglm',
+          name: '智谱清言',
+          url: 'https://chatglm.cn/',
+          enabled: true,
+          selectors: {
+            input: "textarea, [contenteditable='true']",
+            sendButton: "button[class*='send']",
+            responseContainer: "[class*='message'], [class*='chat']",
+            loginIndicator: "[class*='avatar'], [class*='user']",
+          },
+        },
+      ],
+      maxConcurrent: 3,
+      autoCloseTabs: true,
+    }
+  } catch (error) {
+    console.error('[AI Aggregator] 加载配置失败:', error)
+    return { sites: [], maxConcurrent: 3, autoCloseTabs: true }
+  }
+}
+
+// 注册 AI 聚合问答消息处理器
+function registerAIAggregatorHandlers() {
+  // 获取 AI 网站列表
+  EventBus.on('AIAGGREGATOR_GET_SITES', async () => {
+    const config = await getAIAggregatorConfig()
+    return { success: true, sites: config.sites.filter((s) => s.enabled) }
+  })
+
+  // 更新 AI 网站配置
+  EventBus.on('AIAGGREGATOR_UPDATE_SITE', async (data) => {
+    const { siteId, updates } = data
+    const config = await getAIAggregatorConfig()
+    const index = config.sites.findIndex((s) => s.id === siteId)
+    if (index !== -1) {
+      config.sites[index] = { ...config.sites[index], ...updates }
+      await chrome.storage.local.set({ ai_aggregator_settings: config })
+      return { success: true }
+    }
+    return { success: false, error: 'Site not found' }
+  })
+
+  // 开始聚合问答
+  EventBus.on('AIAGGREGATOR_START', async (data) => {
+    const { question, selectedSites, aggregatorTabId } = data
+    aiAggregatorState.currentQuestion = question
+    aiAggregatorState.aggregatorTabId = aggregatorTabId
+
+    const config = await getAIAggregatorConfig()
+    const sites = config.sites.filter((s) => selectedSites.includes(s.id))
+
+    console.log('[AI Aggregator] 开始聚合问答:', question, '选择:', selectedSites)
+
+    // 批量创建标签页
+    const maxConcurrent = config.maxConcurrent || 3
+    for (let i = 0; i < sites.length; i += maxConcurrent) {
+      const batch = sites.slice(i, i + maxConcurrent)
+      await Promise.all(batch.map((site) => createAndInjectAITab(site, question)))
+    }
+
+    return { success: true }
+  })
+
+  // 停止聚合问答
+  EventBus.on('AIAGGREGATOR_STOP', async () => {
+    // 关闭所有 AI 标签页
+    for (const [siteId, tabInfo] of aiAggregatorState.activeTabs) {
+      if (tabInfo.tabId) {
+        try {
+          await chrome.tabs.remove(tabInfo.tabId)
+        } catch (e) {}
+      }
+    }
+    aiAggregatorState.activeTabs.clear()
+    aiAggregatorState.currentQuestion = null
+    return { success: true }
+  })
+
+  console.log('[AI Aggregator] 消息处理器已注册')
+}
+
+// 创建并注入 AI 标签页
+async function createAndInjectAITab(site, question) {
+  try {
+    // 创建标签页
+    const tab = await chrome.tabs.create({
+      url: site.url,
+      active: false,
+    })
+
+    aiAggregatorState.activeTabs.set(site.id, {
+      tabId: tab.id,
+      status: 'loading',
+      site: site,
+    })
+
+    // 通知聚合页面状态变化
+    notifyAggregatorTab('AIAGGREGATOR_STATUS_CHANGE', {
+      siteId: site.id,
+      status: 'loading',
+    })
+
+    // 等待页面加载
+    await new Promise((resolve) => {
+      const listener = (tabId, changeInfo) => {
+        if (tabId === tab.id && changeInfo.status === 'complete') {
+          chrome.tabs.onUpdated.removeListener(listener)
+          resolve()
+        }
+      }
+      chrome.tabs.onUpdated.addListener(listener)
+      // 超时处理
+      setTimeout(resolve, 15000)
+    })
+
+    // 注入脚本
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ['content/modules/ai-aggregator/injector.js'],
+    })
+
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ['content/modules/ai-aggregator/response-watcher.js'],
+    })
+
+    // 发送问题
+    await chrome.tabs.sendMessage(tab.id, {
+      type: 'AIA_EXECUTE_SEND',
+      config: site,
+      question: question,
+    })
+
+    // 启动回复监听
+    await chrome.tabs.sendMessage(tab.id, {
+      type: 'AIA_START_WATCHING',
+      config: site,
+    })
+
+    aiAggregatorState.activeTabs.get(site.id).status = 'sending'
+    notifyAggregatorTab('AIAGGREGATOR_STATUS_CHANGE', {
+      siteId: site.id,
+      status: 'sending',
+    })
+  } catch (error) {
+    console.error(`[AI Aggregator] 创建标签页失败: ${site.name}`, error)
+    notifyAggregatorTab('AIAGGREGATOR_ERROR', {
+      siteId: site.id,
+      error: error.message,
+    })
+  }
+}
+
+// 通知聚合页面
+function notifyAggregatorTab(type, data) {
+  if (aiAggregatorState.aggregatorTabId) {
+    chrome.tabs
+      .sendMessage(aiAggregatorState.aggregatorTabId, {
+        type,
+        ...data,
+      })
+      .catch(() => {})
+  }
+}
+
+// 监听来自注入脚本的消息
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (!message.type || !message.type.startsWith('AIA_')) {
+    return false
+  }
+
+  // 处理注入脚本的响应
+  if (message.type === 'AIA_INJECT_RESPONSE') {
+    const { siteId, content, isComplete } = message
+    const tabInfo = aiAggregatorState.activeTabs.get(siteId)
+
+    if (tabInfo) {
+      tabInfo.status = isComplete ? 'completed' : 'responding'
+      notifyAggregatorTab('AIAGGREGATOR_RESPONSE', {
+        siteId,
+        content,
+        isComplete,
+      })
+    }
+    sendResponse({ success: true })
+    return true
+  }
+
+  // 处理错误
+  if (message.type === 'AIA_INJECT_ERROR') {
+    const { siteId, error, message: errorMsg } = message
+    const tabInfo = aiAggregatorState.activeTabs.get(siteId)
+
+    if (tabInfo) {
+      tabInfo.status = 'error'
+      notifyAggregatorTab('AIAGGREGATOR_ERROR', {
+        siteId,
+        error,
+        message: errorMsg,
+      })
+    }
+    sendResponse({ success: true })
+    return true
+  }
+
+  return false
+})
+
+// 注册处理器
+registerAIAggregatorHandlers()
