@@ -712,20 +712,49 @@ function setupEventListeners() {
     // 如果是 EventBus 消息，让 EventBus 处理器处理
     if (message && message.__eventbus__) {
       console.log('[Background] 这是 EventBus 消息，跳过')
-      // EventBus 已经在 Transport.onMessage 中注册了监听器
-      // 这里只需要返回 false，让其他监听器有机会处理
       return false
     }
 
-    // 如果是 AI 聚合器消息，让 AI 聚合器处理器处理
+    // 如果是 AI 聚合器消息，直接处理
     if (message?.type?.startsWith('AIAGGREGATOR_')) {
-      console.log('[Background] 这是 AI Aggregator 消息，跳过')
+      console.log('[Background] 处理 AI Aggregator 消息:', message.type)
+
+      if (message.type === 'AIAGGREGATOR_GET_SITES') {
+        getAIAggregatorConfig()
+          .then((config) => {
+            console.log(
+              '[Background] AI 网站列表:',
+              config.sites.filter((s) => s.enabled)
+            )
+            sendResponse({ success: true, sites: config.sites.filter((s) => s.enabled) })
+          })
+          .catch((error) => {
+            console.error('[Background] 获取配置失败:', error)
+            sendResponse({ success: false, error: error.message })
+          })
+        return true
+      }
+
+      if (message.type === 'AIAGGREGATOR_START') {
+        const { question, selectedSites, aggregatorTabId } = message
+        aiAggregatorState.currentQuestion = question
+        aiAggregatorState.aggregatorTabId = aggregatorTabId
+        createAndInjectAITabs(selectedSites, question)
+        sendResponse({ success: true })
+        return true
+      }
+
+      if (message.type === 'AIAGGREGATOR_STOP') {
+        closeAllAITabs()
+        sendResponse({ success: true })
+        return true
+      }
+
       return false
     }
 
-    // 如果是 AIA_ 前缀消息，让 AI 聚合器处理器处理
+    // 如果是 AIA_ 前缀消息，让后面的监听器处理
     if (message?.type?.startsWith('AIA_')) {
-      console.log('[Background] 这是 AIA 注入脚本消息，跳过')
       return false
     }
 
@@ -3025,6 +3054,31 @@ async function getAIAggregatorConfig() {
   }
 }
 
+// 批量创建并注入 AI 标签页
+async function createAndInjectAITabs(selectedSites, question) {
+  const config = await getAIAggregatorConfig()
+  const sites = config.sites.filter((s) => selectedSites.includes(s.id))
+  const maxConcurrent = config.maxConcurrent || 3
+
+  for (let i = 0; i < sites.length; i += maxConcurrent) {
+    const batch = sites.slice(i, i + maxConcurrent)
+    await Promise.all(batch.map((site) => createAndInjectAITab(site, question)))
+  }
+}
+
+// 关闭所有 AI 标签页
+async function closeAllAITabs() {
+  for (const [siteId, tabInfo] of aiAggregatorState.activeTabs) {
+    if (tabInfo.tabId) {
+      try {
+        await chrome.tabs.remove(tabInfo.tabId)
+      } catch (e) {}
+    }
+  }
+  aiAggregatorState.activeTabs.clear()
+  aiAggregatorState.currentQuestion = null
+}
+
 // 创建并注入 AI 标签页
 async function createAndInjectAITab(site, question) {
   try {
@@ -3109,108 +3163,9 @@ function notifyAggregatorTab(type, data) {
   }
 }
 
-// 处理来自聚合页面的消息（不使用 async，避免消息通道关闭）
-function handleAggregatorMessage(message, sender, sendResponse) {
-  console.log('[AI Aggregator] handleAggregatorMessage:', message.type)
-
-  if (message.type === 'AIAGGREGATOR_GET_SITES') {
-    getAIAggregatorConfig()
-      .then((config) => {
-        console.log(
-          '[AI Aggregator] 返回网站列表:',
-          config.sites.filter((s) => s.enabled)
-        )
-        sendResponse({ success: true, sites: config.sites.filter((s) => s.enabled) })
-      })
-      .catch((error) => {
-        console.error('[AI Aggregator] 获取配置失败:', error)
-        sendResponse({ success: false, error: error.message })
-      })
-    return true // 保持消息通道开放
-  }
-
-  if (message.type === 'AIAGGREGATOR_UPDATE_SITE') {
-    const { siteId, updates } = message
-    getAIAggregatorConfig()
-      .then((config) => {
-        const index = config.sites.findIndex((s) => s.id === siteId)
-        if (index !== -1) {
-          config.sites[index] = { ...config.sites[index], ...updates }
-          return chrome.storage.local.set({ ai_aggregator_settings: config })
-        }
-        throw new Error('Site not found')
-      })
-      .then(() => sendResponse({ success: true }))
-      .catch((error) => sendResponse({ success: false, error: error.message }))
-    return true
-  }
-
-  if (message.type === 'AIAGGREGATOR_START') {
-    const { question, selectedSites, aggregatorTabId } = message
-    aiAggregatorState.currentQuestion = question
-    aiAggregatorState.aggregatorTabId = aggregatorTabId
-
-    getAIAggregatorConfig()
-      .then((config) => {
-        const sites = config.sites.filter((s) => selectedSites.includes(s.id))
-        console.log('[AI Aggregator] 开始聚合问答:', question, '选择:', selectedSites)
-
-        // 批量创建标签页
-        const maxConcurrent = config.maxConcurrent || 3
-        const batches = []
-        for (let i = 0; i < sites.length; i += maxConcurrent) {
-          batches.push(sites.slice(i, i + maxConcurrent))
-        }
-
-        return batches.reduce((promise, batch) => {
-          return promise.then(() =>
-            Promise.all(batch.map((site) => createAndInjectAITab(site, question)))
-          )
-        }, Promise.resolve())
-      })
-      .then(() => sendResponse({ success: true }))
-      .catch((error) => {
-        console.error('[AI Aggregator] 启动失败:', error)
-        sendResponse({ success: false, error: error.message })
-      })
-    return true
-  }
-
-  if (message.type === 'AIAGGREGATOR_STOP') {
-    // 关闭所有 AI 标签页
-    const closePromises = []
-    for (const [siteId, tabInfo] of aiAggregatorState.activeTabs) {
-      if (tabInfo.tabId) {
-        closePromises.push(chrome.tabs.remove(tabInfo.tabId).catch(() => {}))
-      }
-    }
-    Promise.all(closePromises).then(() => {
-      aiAggregatorState.activeTabs.clear()
-      aiAggregatorState.currentQuestion = null
-      sendResponse({ success: true })
-    })
-    return true
-  }
-
-  sendResponse({ success: false, error: 'Unknown message type' })
-  return false
-}
-
-// 监听来自注入脚本和聚合页面的消息
+// 监听来自注入脚本的消息（AIA_ 前缀）
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (!message.type) {
-    return false
-  }
-
-  // 处理 AIAGGREGATOR_ 前缀的消息（来自 newtab）
-  if (message.type.startsWith('AIAGGREGATOR_')) {
-    console.log('[AI Aggregator] 收到消息:', message.type, message)
-    handleAggregatorMessage(message, sender, sendResponse)
-    return true
-  }
-
-  // 处理 AIA_ 前缀的消息（来自注入脚本）
-  if (!message.type.startsWith('AIA_')) {
+  if (!message.type || !message.type.startsWith('AIA_')) {
     return false
   }
 
@@ -3250,4 +3205,3 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   return false
 })
-console.log('[AI Aggregator] 消息处理器已注册')
