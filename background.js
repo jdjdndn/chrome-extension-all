@@ -3155,9 +3155,85 @@ function notifyAggregatorTab(type, data) {
   }
 }
 
-// 监听来自注入脚本的消息
+// 处理来自聚合页面的消息
+async function handleAggregatorMessage(message, sender, sendResponse) {
+  try {
+    switch (message.type) {
+      case 'AIAGGREGATOR_GET_SITES': {
+        const config = await getAIAggregatorConfig()
+        sendResponse({ success: true, sites: config.sites.filter((s) => s.enabled) })
+        break
+      }
+      case 'AIAGGREGATOR_UPDATE_SITE': {
+        const { siteId, updates } = message
+        const config = await getAIAggregatorConfig()
+        const index = config.sites.findIndex((s) => s.id === siteId)
+        if (index !== -1) {
+          config.sites[index] = { ...config.sites[index], ...updates }
+          await chrome.storage.local.set({ ai_aggregator_settings: config })
+          sendResponse({ success: true })
+        } else {
+          sendResponse({ success: false, error: 'Site not found' })
+        }
+        break
+      }
+      case 'AIAGGREGATOR_START': {
+        const { question, selectedSites, aggregatorTabId } = message
+        aiAggregatorState.currentQuestion = question
+        aiAggregatorState.aggregatorTabId = aggregatorTabId
+
+        const config = await getAIAggregatorConfig()
+        const sites = config.sites.filter((s) => selectedSites.includes(s.id))
+
+        console.log('[AI Aggregator] 开始聚合问答:', question, '选择:', selectedSites)
+
+        // 批量创建标签页
+        const maxConcurrent = config.maxConcurrent || 3
+        for (let i = 0; i < sites.length; i += maxConcurrent) {
+          const batch = sites.slice(i, i + maxConcurrent)
+          await Promise.all(batch.map((site) => createAndInjectAITab(site, question)))
+        }
+
+        sendResponse({ success: true })
+        break
+      }
+      case 'AIAGGREGATOR_STOP': {
+        // 关闭所有 AI 标签页
+        for (const [siteId, tabInfo] of aiAggregatorState.activeTabs) {
+          if (tabInfo.tabId) {
+            try {
+              await chrome.tabs.remove(tabInfo.tabId)
+            } catch (e) {}
+          }
+        }
+        aiAggregatorState.activeTabs.clear()
+        aiAggregatorState.currentQuestion = null
+        sendResponse({ success: true })
+        break
+      }
+      default:
+        sendResponse({ success: false, error: 'Unknown message type' })
+    }
+  } catch (error) {
+    console.error('[AI Aggregator] 处理消息失败:', error)
+    sendResponse({ success: false, error: error.message })
+  }
+}
+
+// 监听来自注入脚本和聚合页面的消息
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (!message.type || !message.type.startsWith('AIA_')) {
+  if (!message.type) {
+    return false
+  }
+
+  // 处理 AIAGGREGATOR_ 前缀的消息（来自 newtab）
+  if (message.type.startsWith('AIAGGREGATOR_')) {
+    handleAggregatorMessage(message, sender, sendResponse)
+    return true
+  }
+
+  // 处理 AIA_ 前缀的消息（来自注入脚本）
+  if (!message.type.startsWith('AIA_')) {
     return false
   }
 
