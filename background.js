@@ -715,46 +715,8 @@ function setupEventListeners() {
       return false
     }
 
-    // 如果是 AI 聚合器消息，直接处理
-    if (message?.type?.startsWith('AIAGGREGATOR_')) {
-      console.log('[Background] 处理 AI Aggregator 消息:', message.type)
-
-      if (message.type === 'AIAGGREGATOR_GET_SITES') {
-        getAIAggregatorConfig()
-          .then((config) => {
-            console.log(
-              '[Background] AI 网站列表:',
-              config.sites.filter((s) => s.enabled)
-            )
-            sendResponse({ success: true, sites: config.sites.filter((s) => s.enabled) })
-          })
-          .catch((error) => {
-            console.error('[Background] 获取配置失败:', error)
-            sendResponse({ success: false, error: error.message })
-          })
-        return true
-      }
-
-      if (message.type === 'AIAGGREGATOR_START') {
-        const { question, selectedSites, aggregatorTabId } = message
-        aiAggregatorState.currentQuestion = question
-        aiAggregatorState.aggregatorTabId = aggregatorTabId
-        createAndInjectAITabs(selectedSites, question)
-        sendResponse({ success: true })
-        return true
-      }
-
-      if (message.type === 'AIAGGREGATOR_STOP') {
-        closeAllAITabs()
-        sendResponse({ success: true })
-        return true
-      }
-
-      return false
-    }
-
-    // 如果是 AIA_ 前缀消息，让后面的监听器处理
-    if (message?.type?.startsWith('AIA_')) {
+    // AI 聚合器和注入脚本消息（AIA_ 和 AIAGGREGATOR_ 前缀）已在全局监听器中处理
+    if (message?.type?.startsWith('AIAGGREGATOR_') || message?.type?.startsWith('AIA_')) {
       return false
     }
 
@@ -3163,9 +3125,50 @@ function notifyAggregatorTab(type, data) {
   }
 }
 
-// 监听来自注入脚本的消息（AIA_ 前缀）
+// 监听来自注入脚本和聚合页面的消息（AIA_ 和 AIAGGREGATOR_ 前缀）
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (!message.type || !message.type.startsWith('AIA_')) {
+  if (!message.type) {
+    return false
+  }
+
+  // 处理 AIAGGREGATOR_ 消息（来自聚合页面）
+  if (message.type.startsWith('AIAGGREGATOR_')) {
+    console.log('[Background] 收到 AI Aggregator 消息:', message.type)
+
+    if (message.type === 'AIAGGREGATOR_GET_SITES') {
+      getAIAggregatorConfig()
+        .then((config) => {
+          const enabledSites = config.sites.filter((s) => s.enabled)
+          console.log('[Background] 返回启用的网站:', enabledSites.length, '个')
+          sendResponse({ success: true, sites: enabledSites })
+        })
+        .catch((error) => {
+          console.error('[Background] 获取配置失败:', error)
+          sendResponse({ success: false, error: error.message })
+        })
+      return true
+    }
+
+    if (message.type === 'AIAGGREGATOR_START') {
+      const { question, selectedSites, aggregatorTabId } = message
+      aiAggregatorState.currentQuestion = question
+      aiAggregatorState.aggregatorTabId = aggregatorTabId
+      createAndInjectAITabs(selectedSites, question)
+      sendResponse({ success: true })
+      return true
+    }
+
+    if (message.type === 'AIAGGREGATOR_STOP') {
+      closeAllAITabs()
+      sendResponse({ success: true })
+      return true
+    }
+
+    return false
+  }
+
+  // 处理 AIA_ 消息（来自注入脚本）
+  if (!message.type.startsWith('AIA_')) {
     return false
   }
 
