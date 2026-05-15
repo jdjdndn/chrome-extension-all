@@ -19,6 +19,12 @@
     OptimizationAdvisor: 'content/modules/OptimizationAdvisor.js',
     // 资源加速器模块
     CDNMappings: 'shared/cdn-mappings.js',
+    JSReplacer: 'content/modules/js-replacer.js',
+    FontReplacer: 'content/modules/font-replacer.js',
+    CSSAccelerator: 'content/modules/css-accelerator.js',
+    ImageOptimizer: 'content/modules/image-optimizer.js',
+    ResourcePreloader: 'content/modules/resource-preloader.js',
+    ResourceDeduplicator: 'content/modules/resource-deduplicator.js',
     ResourceAccelerator: 'content/modules/resource-accelerator.js',
   }
 
@@ -82,9 +88,7 @@
      * 初始化所有模块
      */
     async init() {
-      if (this.initialized) {
-        return
-      }
+      if (this.initialized) {return}
 
       try {
         await this.loader.loadAll()
@@ -111,13 +115,13 @@
 
         if (window.DOMWatcher) {
           this.modules.domWatcher = new window.DOMWatcher({
-            onElementAdded: () => {
+            onElementAdded: (element) => {
               // 处理新元素添加
             },
-            onElementRemoved: () => {
+            onElementRemoved: (element) => {
               // 处理元素移除
             },
-            onAttributeChanged: () => {
+            onAttributeChanged: (element, attr, oldVal, newVal) => {
               // 处理属性变化
             },
           })
@@ -131,10 +135,10 @@
           this.modules.incrementalUpdater = new window.IncrementalUpdater({
             batchSize: 10,
             frameDelay: 1,
-            onUpdate: () => {
+            onUpdate: (batch) => {
               // 批量更新完成
             },
-            onComplete: () => {
+            onComplete: (stats) => {
               // 所有更新完成
             },
           })

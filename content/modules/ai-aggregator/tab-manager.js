@@ -21,13 +21,70 @@ class TabManager {
   }
 
   /**
-   * 创建 AI 网站标签页
+   * 从 URL 提取基础路径用于匹配
+   * 例如: https://kimi.moonshot.cn/chat/xxx -> https://kimi.moonshot.cn
+   */
+  getBaseUrl(url) {
+    try {
+      const urlObj = new URL(url)
+      return urlObj.origin
+    } catch {
+      return url
+    }
+  }
+
+  /**
+   * 通过 URL 查找已打开的标签页
+   */
+  async findTabByUrl(site) {
+    const baseUrl = this.getBaseUrl(site.url)
+    const tabs = await chrome.tabs.query({ url: `${baseUrl}/*` })
+
+    if (tabs && tabs.length > 0) {
+      // 优先返回非 discarded 的标签页
+      const activeTab = tabs.find((tab) => !tab.discarded)
+      return activeTab || tabs[0]
+    }
+    return null
+  }
+
+  /**
+   * 创建 AI 网站标签页（复用已存在的标签页）
    */
   async createAITab(site) {
     try {
+      // 1. 先检查内存记录
+      const existingTab = this.activeTabs.get(site.id)
+      if (existingTab && existingTab.tabId) {
+        try {
+          const tab = await chrome.tabs.get(existingTab.tabId)
+          if (tab && !tab.discarded) {
+            console.log(
+              `[Tab Manager] 复用内存中的标签页: ${site.name} (tabId: ${existingTab.tabId})`
+            )
+            return existingTab.tabId
+          }
+        } catch (e) {
+          this.activeTabs.delete(site.id)
+        }
+      }
+
+      // 2. 通过 URL 查找已打开的标签页
+      const foundTab = await this.findTabByUrl(site)
+      if (foundTab) {
+        console.log(`[Tab Manager] 复用已打开的标签页: ${site.name} (tabId: ${foundTab.id})`)
+        this.activeTabs.set(site.id, {
+          tabId: foundTab.id,
+          status: 'existing',
+          site: site,
+        })
+        return foundTab.id
+      }
+
+      // 3. 创建新标签页
       const tab = await chrome.tabs.create({
         url: site.url,
-        active: false, // 后台打开
+        active: false,
       })
 
       this.activeTabs.set(site.id, {

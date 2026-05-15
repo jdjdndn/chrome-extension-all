@@ -30,7 +30,7 @@
         const observer = new PerformanceObserver((list) => {
           const entries = list.getEntries()
           for (const entry of entries) {
-            if (entry.initiatorType === 'script' && entry.transferSize === 0) {
+            if (entry.initiatorType === 'script') {
               const url = entry.name
               if (url.startsWith('data:') || url.startsWith('blob:')) {
                 continue
@@ -39,8 +39,32 @@
                 continue
               }
 
-              // CSP blocked: transferSize=0, encodedBodySize=0, decodedBodySize=0
+              // 排除缓存命中：transferSize=0 但有内容
+              if (entry.transferSize === 0 && entry.encodedBodySize > 0) {
+                continue
+              }
+
+              // 排除有效的跨域资源（有 Timing-Allow-Origin）
+              if (entry.transferSize > 0 || entry.encodedBodySize > 0) {
+                continue
+              }
+
+              // 只处理真正的 CSP 阻止：transferSize=0, encodedBodySize=0, decodedBodySize=0
+              // 且 responseStatus 为 0（网络层阻止）或 200（CSP 阻止但 HTTP 正常）
               if (entry.encodedBodySize === 0 && entry.decodedBodySize === 0) {
+                // 进一步验证：必须是同源或有明确的阻止标记
+                try {
+                  const urlObj = new URL(url, location.href)
+                  const isSameOrigin = urlObj.origin === location.origin
+                  // 只有同源才通过 PerformanceObserver 处理
+                  // 跨域 CSP 阻止由 securitypolicyviolation 事件处理
+                  if (!isSameOrigin) {
+                    continue
+                  }
+                } catch {
+                  continue
+                }
+
                 state.blockedScripts.add(url)
                 console.log(
                   `${LOG_PREFIX} [CSPBypass] Detected CSP blocked script: ${url.substring(0, 80)}`

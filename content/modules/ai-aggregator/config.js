@@ -8,7 +8,7 @@ const DEFAULT_AI_SITES = [
   {
     id: 'doubao',
     name: '豆包',
-    url: 'https://www.doubao.com/chat/',
+    url: 'https://www.doubao.com/chat/38425842255897346',
     enabled: true,
     selectors: {
       input: "textarea, [contenteditable='true']",
@@ -28,12 +28,13 @@ const DEFAULT_AI_SITES = [
   {
     id: 'tongyi',
     name: '通义千问',
-    url: 'https://tongyi.aliyun.com/qianwen/',
+    url: 'https://www.qianwen.com/',
     enabled: true,
     selectors: {
-      input: "textarea, [contenteditable='true']",
-      sendButton: "button[class*='send']",
-      responseContainer: "[class*='message'], [class*='response']",
+      input: "textarea, input[type='text'], input:not([type]), [contenteditable='true']",
+      sendButton:
+        "button[aria-label='发送消息'], button[aria-label*='发送'], button[class*='send'], button[type='submit'], [class*='sendBtn']",
+      responseContainer: "[class*='collapseSection-'], [class*='response'], [class*='answer']",
       loginIndicator: "[class*='avatar'], [class*='user']",
     },
     options: {
@@ -59,7 +60,7 @@ const DEFAULT_AI_SITES = [
     selectors: {
       input: "textarea, [contenteditable='true']",
       sendButton: "button[class*='send']",
-      responseContainer: "[class*='message'], [class*='chat']",
+      responseContainer: ".chat-content-item-assistant, [class*='chat-content-item-assistant']",
       loginIndicator: "[class*='avatar'], [class*='user']",
     },
     options: {
@@ -74,7 +75,7 @@ const DEFAULT_AI_SITES = [
   {
     id: 'yiyan',
     name: '文心一言',
-    url: 'https://yiyan.baidu.com/',
+    url: 'https://chat.baidu.com/search/15130762097409791033?enter_type=sidebar_dialog',
     enabled: true,
     selectors: {
       input: "textarea, [contenteditable='true']",

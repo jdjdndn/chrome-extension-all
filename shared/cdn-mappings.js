@@ -19,10 +19,9 @@
     },
     {
       id: 'baomitu',
-      name: '360前端(证书异常，降级)',
+      name: '360前端',
       baseUrl: 'https://cdn.baomitu.com/ajax/libs/',
       format: 'bootcdn',
-      _disabled: true, // SSL证书过期 ERR_CERT_DATE_INVALID
     },
     {
       id: 'staticfile',
@@ -55,6 +54,25 @@
       baseUrl: 'https://unpkg.com/',
       format: 'npm',
     },
+    // 字体镜像
+    {
+      id: 'fontMirror',
+      name: 'Font Mirror',
+      baseUrl: 'https://fonts.font.im/',
+      format: 'font',
+    },
+    {
+      id: 'loli',
+      name: 'LoliNet',
+      baseUrl: 'https://fonts.loli.net/',
+      format: 'font',
+    },
+    {
+      id: 'fontsGoogle',
+      name: 'Google Fonts(国内代理)',
+      baseUrl: 'https://fonts.googleapis.cnpmjs.org/',
+      format: 'font',
+    },
   ]
 
   const CDN_BY_ID = {}
@@ -62,14 +80,10 @@
 
   // ========== 版本提取工具 ==========
   function extractVersion(url, patterns) {
-    if (!url) {
-      return null
-    }
+    if (!url) {return null}
     for (const pattern of patterns) {
       const match = url.match(pattern)
-      if (match && match[1]) {
-        return match[1]
-      }
+      if (match && match[1]) {return match[1]}
     }
     return null
   }
@@ -89,23 +103,11 @@
 
   /**
    * 构建CDN URL
-   * 支持 fileByFormat 为不同 CDN 格式指定不同文件路径
-   * 支持 packageByFormat 为不同 CDN 格式指定不同包名
    */
   function buildCDNUrl(cdn, libConfig, version, file) {
     const ver = version || libConfig.defaultVersion
-
-    // 支持不同 CDN 格式的包名映射（如 lodash.js 在七牛云上）
-    let pkg = libConfig.package || libConfig.name
-    if (libConfig.packageByFormat && libConfig.packageByFormat[cdn.format]) {
-      pkg = libConfig.packageByFormat[cdn.format]
-    }
-
-    // 支持不同 CDN 格式的文件路径映射
-    let f = file || libConfig.file
-    if (libConfig.fileByFormat && libConfig.fileByFormat[cdn.format]) {
-      f = libConfig.fileByFormat[cdn.format]
-    }
+    const pkg = libConfig.package || libConfig.name
+    const f = file || libConfig.file
 
     if (cdn.format === 'bootcdn') {
       return cdn.baseUrl + pkg + '/' + ver + '/' + f
@@ -124,11 +126,6 @@
       versionPatterns: [/jquery[\/-](\d+\.\d+\.\d+)/i, /jquery[\/-](\d+\.\d+)/i],
       package: 'jquery',
       file: 'jquery.min.js',
-      // npm 格式 CDN 需要 dist/ 前缀
-      fileByFormat: {
-        npm: 'dist/jquery.min.js',
-        bootcdn: 'jquery.min.js',
-      },
       defaultVersion: '3.7.1',
       global: '$',
       cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr'],
@@ -168,11 +165,6 @@
       versionPatterns: [/vue[\/@](\d+\.\d+\.\d+)/i],
       package: 'vue',
       file: 'dist/vue.global.prod.min.js',
-      // unpkg 上没有压缩版，用 .js 版本
-      fileByFormat: {
-        npm: 'dist/vue.global.js',
-        bootcdn: 'vue.global.prod.min.js',
-      },
       defaultVersion: '3.4.21',
       global: 'Vue',
       cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr'],
@@ -182,10 +174,6 @@
       versionPatterns: [/lodash[\/-](\d+\.\d+\.\d+)/i, /lodash\.js\/(\d+\.\d+\.\d+)/i],
       package: 'lodash',
       file: 'lodash.min.js',
-      // 七牛云等 bootcdn 格式 CDN 的包名是 lodash.js
-      packageByFormat: {
-        bootcdn: 'lodash.js',
-      },
       defaultVersion: '4.17.21',
       global: '_',
       cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr'],
@@ -303,12 +291,7 @@
       cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr'],
     },
     swiper: {
-      // 更精确的模式：避免匹配 swiper2、swiper3 等
-      patterns: [
-        /swiper(?:\.bundle)?(?:\.min)?\.js$/i, // 必须以 .js 结尾
-        /swiper\/([\d.]+)\/swiper/i,
-        /swiper-bundle(?:\.min)?\.js$/i,
-      ],
+      patterns: [/swiper(?:\.bundle)?(?:\.min)?\.js/i, /swiper\/([\d.]+)\/swiper/i],
       versionPatterns: [/swiper[\/@](\d+\.\d+\.\d+)/i],
       package: 'swiper',
       file: 'swiper-bundle.min.js',
@@ -348,86 +331,6 @@
       package: 'zenscroll',
       file: 'zenscroll-min.js',
       defaultVersion: '4.0.2',
-      cdnOrder: ['jsdelivr', 'unpkg'],
-    },
-    // ========== v4 新增库 ==========
-    alpine: {
-      patterns: [/alpine(?:\.min)?\.js/i, /alpinejs[\/@]([\d.]+)\/dist\/alpine/i],
-      versionPatterns: [/alpinejs[\/@](\d+\.\d+\.\d+)/i],
-      package: 'alpinejs',
-      file: 'dist/cdn.min.js',
-      defaultVersion: '3.14.3',
-      global: 'Alpine',
-      cdnOrder: ['jsdelivr', 'cdnjs', 'unpkg'],
-    },
-    htmx: {
-      patterns: [/htmx(?:\.min)?\.js/i, /htmx[\/@]([\d.]+)\/dist\/htmx/i],
-      versionPatterns: [/htmx[\/@](\d+\.\d+\.\d+)/i],
-      package: 'htmx.org',
-      file: 'dist/htmx.min.js',
-      defaultVersion: '2.0.4',
-      global: 'htmx',
-      cdnOrder: ['jsdelivr', 'cdnjs', 'unpkg'],
-    },
-    lottie: {
-      patterns: [/lottie(?:\.min)?\.js/i, /lottie-web[\/@]([\d.]+)\/build\/player\/lottie/i],
-      versionPatterns: [/lottie-web[\/@](\d+\.\d+\.\d+)/i],
-      package: 'lottie-web',
-      file: 'build/player/lottie.min.js',
-      defaultVersion: '5.12.2',
-      global: 'lottie',
-      cdnOrder: ['jsdelivr', 'cdnjs', 'unpkg'],
-    },
-    splide: {
-      patterns: [/splide(?:\.min)?\.js/i, /@splidejs[\/]splide[\/@]([\d.]+)\/dist\/js\/splide/i],
-      versionPatterns: [/splide[\/@](\d+\.\d+\.\d+)/i],
-      package: '@splidejs/splide',
-      file: 'dist/js/splide.min.js',
-      defaultVersion: '4.1.6',
-      cdnOrder: ['jsdelivr', 'unpkg'],
-    },
-    noUiSlider: {
-      patterns: [/nouislider(?:\.min)?\.js/i, /nouislider[\/@]([\d.]+)\/dist\/nouislider/i],
-      versionPatterns: [/nouislider[\/@](\d+\.\d+\.\d+)/i],
-      package: 'nouislider',
-      file: 'dist/nouislider.min.js',
-      defaultVersion: '15.7.1',
-      cdnOrder: ['jsdelivr', 'cdnjs', 'unpkg'],
-    },
-    flatpickr: {
-      patterns: [/flatpickr(?:\.min)?\.js/i, /flatpickr[\/@]([\d.]+)\/dist\/flatpickr/i],
-      versionPatterns: [/flatpickr[\/@](\d+\.\d+\.\d+)/i],
-      package: 'flatpickr',
-      file: 'dist/flatpickr.min.js',
-      defaultVersion: '4.6.13',
-      cdnOrder: ['jsdelivr', 'cdnjs', 'unpkg'],
-    },
-    tomSelect: {
-      patterns: [
-        /tom-select(?:\.complete)?(?:\.min)?\.js/i,
-        /tom-select[\/@]([\d.]+)\/dist\/js\/tom-select\.complete/i,
-      ],
-      versionPatterns: [/tom-select[\/@](\d+\.\d+\.\d+)/i],
-      package: 'tom-select',
-      file: 'dist/js/tom-select.complete.min.js',
-      defaultVersion: '2.3.1',
-      cdnOrder: ['jsdelivr', 'unpkg'],
-    },
-    sortable: {
-      patterns: [/sortable(?:\.min)?\.js/i, /sortablejs[\/@]([\d.]+)\/Sortable\.min/i],
-      versionPatterns: [/sortablejs[\/@](\d+\.\d+\.\d+)/i, /Sortable@([\d.]+)/i],
-      package: 'sortablejs',
-      file: 'Sortable.min.js',
-      defaultVersion: '1.15.3',
-      global: 'Sortable',
-      cdnOrder: ['jsdelivr', 'cdnjs', 'unpkg'],
-    },
-    stimulus: {
-      patterns: [/stimulus(?:\.min)?\.js/i, /@hotwired[\/]stimulus[\/@]([\d.]+)\/dist\/stimulus/i],
-      versionPatterns: [/stimulus[\/@](\d+\.\d+\.\d+)/i],
-      package: '@hotwired/stimulus',
-      file: 'dist/stimulus.umd.js',
-      defaultVersion: '3.2.2',
       cdnOrder: ['jsdelivr', 'unpkg'],
     },
   }
@@ -543,26 +446,6 @@
       defaultVersion: '2.3.4',
       cdnOrder: ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr'],
     },
-    // ========== v4 新增 CSS 库 ==========
-    picoCss: {
-      patterns: [/pico(?:\.min)?\.css/i, /@picocss[\/]pico[\/@]([\d.]+)\/css\/pico/i],
-      versionPatterns: [/pico[\/@](\d+\.\d+\.\d+)/i],
-      package: '@picocss/pico',
-      file: 'css/pico.min.css',
-      defaultVersion: '2.0.6',
-      cdnOrder: ['jsdelivr', 'unpkg'],
-    },
-    openProps: {
-      patterns: [
-        /open-props(?:\.min)?\.css/i,
-        /open-props[\/@]([\d.]+)\/open-props(?:\.min)?\.css/i,
-      ],
-      versionPatterns: [/open-props[\/@](\d+\.\d+\.\d+)/i],
-      package: 'open-props',
-      file: 'open-props.min.css',
-      defaultVersion: '1.7.7',
-      cdnOrder: ['jsdelivr', 'unpkg'],
-    },
   }
 
   // ========== 字体映射 ==========
@@ -609,275 +492,117 @@
     },
   }
 
-  // ========== 智能 URL 解析（自动识别 npm 包）==========
+  // ========== CDN 健康探测 ==========
 
-  // 通用 npm 包名提取模式
-  const GENERIC_PACKAGE_PATTERNS = [
-    // @scope/package@version/file.js 或 @scope/package@version.js
-    /\/(@[a-z0-9-]+\/[a-z0-9-]+)@([a-z0-9._-]+)\/?.*\.js$/i,
-    // @scope/package/file.js (无版本，从路径提取)
-    /\/(@[a-z0-9-]+\/[a-z0-9-]+)\/(?:v?[\d.]+|latest)\/.*\.js$/i,
-    // package@version/file.js
-    /\/([a-z][a-z0-9._-]*)@([a-z0-9._-]+)\/?.*\.js$/i,
-    // package/version/file.js
-    /\/([a-z][a-z0-9._-]*)\/(v?[\d.]+)\/.*\.js$/i,
-    // package-version.min.js (简单模式)
-    /\/([a-z][a-z0-9._-]*)[-.]?([\d.]+)?(?:\.min)?\.js$/i,
-  ]
+  const CDNHealthProbe = {
+    // 缓存: { cdnId: { healthy, latency, timestamp } }
+    _cache: {},
+    TTL: 5 * 60 * 1000, // 5分钟
+    TIMEOUT: 3000, // 3秒超时
+    _pending: {}, // 防止重复探测
 
-  /**
-   * 从 URL 中智能提取包名和版本
-   * 返回 { packageName, version } 或 null
-   */
-  function extractPackageInfo(url) {
-    if (!url || typeof url !== 'string') {
-      return null
-    }
+    /**
+     * 探测单个CDN可用性
+     */
+    async probe(cdnId) {
+      const now = Date.now()
+      const cached = this._cache[cdnId]
 
-    try {
-      const urlObj = new URL(url)
-      const pathname = urlObj.pathname
-
-      for (const pattern of GENERIC_PACKAGE_PATTERNS) {
-        const match = pathname.match(pattern)
-        if (match) {
-          const packageName = match[1]
-          let version = match[2] || null
-
-          // 清理版本号
-          if (version) {
-            version = version.replace(/^v/i, '')
-            // 只保留有效版本格式
-            if (!/^\d+\.\d+/.test(version)) {
-              version = null
-            }
-          }
-
-          // 跳过已知的非包名模式
-          if (skipPackage(packageName)) {
-            continue
-          }
-
-          return { packageName, version }
-        }
-      }
-    } catch {}
-
-    return null
-  }
-
-  /**
-   * 判断是否应跳过的包名（静态资源、非JS库等）
-   */
-  function skipPackage(name) {
-    if (!name) {
-      return true
-    }
-    const lower = name.toLowerCase()
-    // 跳过常见非包名路径
-    const skipList = [
-      'static',
-      'assets',
-      'public',
-      'lib',
-      'vendor',
-      'dist',
-      'build',
-      'js',
-      'scripts',
-      'bundle',
-      'app',
-      'main',
-      'index',
-      'common',
-      'utils',
-      'helpers',
-      'components',
-      'modules',
-      'plugins',
-      'css',
-      'style',
-      'styles',
-      'images',
-      'img',
-      'fonts',
-    ]
-    return skipList.includes(lower) || /^\d/.test(lower)
-  }
-
-  /**
-   * 智能匹配：根据提取的包信息构建 CDN URL
-   */
-  function smartMatchJSLibrary(url) {
-    const info = extractPackageInfo(url)
-    if (!info) {
-      return null
-    }
-
-    const { packageName, version } = info
-    const fallbackVersion = version || 'latest'
-
-    // 构建 jsDelivr URL (npm 格式)
-    const jsdelivrUrl = `https://cdn.jsdelivr.net/npm/${packageName}@${fallbackVersion}/${packageName}.min.js`
-
-    // 构建备选 CDN URLs
-    const fallbackUrls = [
-      {
-        url: `https://unpkg.com/${packageName}@${fallbackVersion}/${packageName}.min.js`,
-        cdnId: 'unpkg',
-      },
-      {
-        url: `https://cdnjs.cloudflare.com/ajax/libs/${packageName}/${fallbackVersion}/${packageName}.min.js`,
-        cdnId: 'cdnjs',
-      },
-    ]
-
-    return {
-      name: packageName,
-      originalUrl: url,
-      cdnUrl: jsdelivrUrl,
-      version: fallbackVersion,
-      cdnName: 'jsDelivr (auto)',
-      cdnId: 'jsdelivr',
-      fallbackUrls,
-      type: 'js',
-      isAutoDetected: true,
-    }
-  }
-
-  // ========== jsDelivr API 动态查询 ==========
-
-  const _jsdelivrCache = new Map() // packageName -> { exists, version, file, timestamp }
-  const JSDELIVR_CACHE_TTL = 30 * 60 * 1000 // 30分钟缓存
-  const JSDELIVR_RATE_LIMIT = 100 // 100ms 间隔
-  let _lastJsdelivrQuery = 0
-
-  /**
-   * 通过 jsDelivr API 查询 npm 包信息
-   * 返回 { packageName, version, file } 或 null
-   */
-  async function queryJsdelivrAPI(packageName) {
-    if (!packageName) {
-      return null
-    }
-
-    // 检查缓存
-    const cached = _jsdelivrCache.get(packageName)
-    if (cached && Date.now() - cached.timestamp < JSDELIVR_CACHE_TTL) {
-      return cached.exists ? cached : null
-    }
-
-    // 速率限制
-    const now = Date.now()
-    const waitTime = JSDELIVR_RATE_LIMIT - (now - _lastJsdelivrQuery)
-    if (waitTime > 0) {
-      await new Promise((resolve) => setTimeout(resolve, waitTime))
-    }
-    _lastJsdelivrQuery = Date.now()
-
-    try {
-      // 查询包的最新版本
-      const response = await fetch(
-        `https://data.jsdelivr.com/v1/packages/npm/${encodeURIComponent(packageName)}/flat`,
-        { signal: AbortSignal.timeout(3000) }
-      )
-
-      if (!response.ok) {
-        _jsdelivrCache.set(packageName, { exists: false, timestamp: Date.now() })
-        return null
+      // 缓存有效
+      if (cached && now - cached.timestamp < this.TTL) {
+        return cached
       }
 
-      const data = await response.json()
-      if (!data || !data.files || data.files.length === 0) {
-        _jsdelivrCache.set(packageName, { exists: false, timestamp: Date.now() })
-        return null
+      // 防止并发重复探测
+      if (this._pending[cdnId]) {
+        return this._pending[cdnId]
       }
 
-      // 查找常见的入口文件
-      const commonFiles = [
-        `${packageName}.min.js`,
-        `${packageName}.js`,
-        `dist/${packageName}.min.js`,
-        `dist/${packageName}.js`,
-        `dist/${packageName}.umd.min.js`,
-        `dist/${packageName}.umd.js`,
-        `build/${packageName}.min.js`,
-        `lib/${packageName}.min.js`,
-        `index.min.js`,
-        `index.js`,
-      ]
-
-      let foundFile = null
-      for (const file of commonFiles) {
-        if (data.files.some((f) => f.name === file)) {
-          foundFile = file
-          break
-        }
+      const cdn = CDN_BY_ID[cdnId]
+      if (!cdn || cdn.format === 'font') {
+        return { healthy: true, latency: 0, timestamp: now }
       }
 
-      if (!foundFile) {
-        _jsdelivrCache.set(packageName, { exists: false, timestamp: Date.now() })
-        return null
+      const probePromise = this._doProbe(cdnId, cdn)
+      this._pending[cdnId] = probePromise
+
+      try {
+        const result = await probePromise
+        this._cache[cdnId] = result
+        return result
+      } finally {
+        delete this._pending[cdnId]
       }
+    },
 
-      const version = data.version || 'latest'
-      const result = {
-        exists: true,
-        packageName,
-        version,
-        file: foundFile,
-        timestamp: Date.now(),
+    async _doProbe(cdnId, cdn) {
+      const start = performance.now()
+      try {
+        const controller = new AbortController()
+        const timer = setTimeout(() => controller.abort(), this.TIMEOUT)
+
+        await fetch(cdn.baseUrl, {
+          method: 'HEAD',
+          mode: 'no-cors',
+          signal: controller.signal,
+        })
+
+        clearTimeout(timer)
+        const latency = Math.round(performance.now() - start)
+
+        console.log(`[CDNProbe] ${cdn.name} ✓ ${latency}ms`)
+        return { healthy: true, latency, timestamp: Date.now() }
+      } catch (e) {
+        const latency = Math.round(performance.now() - start)
+        console.warn(`[CDNProbe] ${cdn.name} ✗ ${latency}ms`)
+        return { healthy: false, latency: Infinity, timestamp: Date.now() }
       }
+    },
 
-      _jsdelivrCache.set(packageName, result)
-      return result
-    } catch {
-      _jsdelivrCache.set(packageName, { exists: false, timestamp: Date.now() })
-      return null
-    }
-  }
+    /**
+     * 批量探测一组CDN
+     */
+    async probeAll(cdnIds) {
+      await Promise.allSettled(cdnIds.map((id) => this.probe(id)))
+    },
 
-  /**
-   * 通过 jsDelivr API 动态匹配 JS 库
-   */
-  async function dynamicMatchJSLibrary(url) {
-    const info = extractPackageInfo(url)
-    if (!info) {
-      return null
-    }
+    /**
+     * 获取健康的CDN列表(按延迟排序)
+     */
+    getHealthy(cdnIds) {
+      const now = Date.now()
+      return cdnIds
+        .map((id) => {
+          const cached = this._cache[id]
+          if (!cached || now - cached.timestamp >= this.TTL) {return null}
+          return { id, ...cached }
+        })
+        .filter(Boolean)
+        .filter((c) => c.healthy)
+        .sort((a, b) => a.latency - b.latency)
+    },
 
-    const pkgInfo = await queryJsdelivrAPI(info.packageName)
-    if (!pkgInfo) {
-      return null
-    }
+    /**
+     * 标记CDN不可用(资源加载失败时调用)
+     */
+    markUnhealthy(cdnId) {
+      this._cache[cdnId] = { healthy: false, latency: Infinity, timestamp: Date.now() }
+      const cdn = CDN_BY_ID[cdnId]
+      if (cdn) {console.warn(`[CDNProbe] ${cdn.name} 标记不可用`)}
+    },
 
-    const version = info.version || pkgInfo.version
-    const jsdelivrUrl = `https://cdn.jsdelivr.net/npm/${pkgInfo.packageName}@${version}/${pkgInfo.file}`
-
-    return {
-      name: pkgInfo.packageName,
-      originalUrl: url,
-      cdnUrl: jsdelivrUrl,
-      version,
-      cdnName: 'jsDelivr (dynamic)',
-      cdnId: 'jsdelivr',
-      fallbackUrls: [
-        {
-          url: `https://unpkg.com/${pkgInfo.packageName}@${version}/${pkgInfo.file}`,
-          cdnId: 'unpkg',
-        },
-      ],
-      type: 'js',
-      isDynamic: true,
-    }
+    /**
+     * 清除缓存
+     */
+    clear() {
+      this._cache = {}
+    },
   }
 
   // ========== 匹配方法 ==========
 
   function matchFromMap(url, map, type) {
-    if (!url || typeof url !== 'string') {
-      return null
-    }
+    if (!url || typeof url !== 'string') {return null}
 
     for (const [name, config] of Object.entries(map)) {
       for (const pattern of config.patterns) {
@@ -893,25 +618,10 @@
             }
           }
 
-          // 提取版本：优先从匹配的 pattern 中提取，再用 versionPatterns
-          let version = null
-          const match = url.match(pattern)
-          if (match && match[1]) {
-            version = match[1] // 从 pattern 捕获组提取
-          }
-          if (!version && config.versionPatterns) {
-            version = extractVersion(url, config.versionPatterns)
-          }
-
-          // 关键修复：配置了版本提取规则但无法提取版本时，跳过替换
-          // 避免：jquery.min.js 无版本号 → 强制使用 3.7.1 → API 不兼容
-          if (
-            (config.versionPatterns && config.versionPatterns.length > 0 && !version) ||
-            (pattern.source.includes('\\d') && !version)
-          ) {
-            // 跳过此库，保留原始 URL
-            continue
-          }
+          // 提取版本
+          const version = config.versionPatterns
+            ? extractVersion(url, config.versionPatterns)
+            : null
 
           // 按CDN降级链尝试(考虑健康状态)
           const cdnOrder = config.cdnOrder || ['jsdelivr', 'unpkg']
@@ -936,66 +646,50 @@
   }
 
   /**
-   * 按CDN降级链构建URL + 备选URL
+   * 按CDN降级链构建URL(健康探测 + 备选URL)
    * 返回 { url, cdnId, fallbackUrls }
    */
   function tryCDNChain(cdnOrder, config, version) {
-    // 过滤不健康CDN，全部不健康时降级为原始顺序
-    const healthyOrder = getHealthyCDNOrder(cdnOrder)
-    const effectiveOrder = healthyOrder.length > 0 ? healthyOrder : cdnOrder
+    const healthy = CDNHealthProbe.getHealthy(cdnOrder)
+    const healthyIds = healthy.map((h) => h.id)
+    // 合并：健康CDN优先，未知状态其次，不健康放最后
+    const ordered = [...new Set([...healthyIds, ...cdnOrder])]
+    const fallbackUrls = []
+    let primary = null
 
-    const urls = []
-
-    for (const cdnId of effectiveOrder) {
+    for (const cdnId of ordered) {
       const cdn = CDN_BY_ID[cdnId]
-      if (!cdn || cdn._disabled) {
-        continue
-      }
+      if (!cdn) {continue}
       const url = buildCDNUrl(cdn, config, version, config.file)
-      if (url) {
-        urls.push({ url, cdnId })
+      if (!url) {continue}
+
+      const cached = CDNHealthProbe._cache[cdnId]
+      const isHealthy = !cached || cached.healthy
+
+      if (!primary && isHealthy) {
+        primary = { url, cdnId }
+      } else if (primary) {
+        fallbackUrls.push({ url, cdnId })
       }
     }
 
-    if (urls.length === 0) {
-      return null
+    if (primary) {
+      primary.fallbackUrls = fallbackUrls
+      return primary
     }
 
-    const [primary, ...fallbacks] = urls
-    primary.fallbackUrls = fallbacks
-    return primary
+    // 全部不可用时回退到第一个
+    for (const cdnId of cdnOrder) {
+      const cdn = CDN_BY_ID[cdnId]
+      if (!cdn) {continue}
+      const url = buildCDNUrl(cdn, config, version, config.file)
+      if (url) {return { url, cdnId, fallbackUrls: [] }}
+    }
+    return null
   }
 
   function matchJSLibrary(url) {
-    // 优先使用硬编码映射
-    const hardcoded = matchFromMap(url, JS_CDN_MAP, 'js')
-    if (hardcoded) {
-      return hardcoded
-    }
-
-    // 硬编码匹配失败，尝试智能 URL 解析
-    return smartMatchJSLibrary(url)
-  }
-
-  /**
-   * 异步匹配 JS 库（包含 jsDelivr API 查询）
-   * 用于需要完整功能的场景
-   */
-  async function matchJSLibraryAsync(url) {
-    // 优先使用硬编码映射
-    const hardcoded = matchFromMap(url, JS_CDN_MAP, 'js')
-    if (hardcoded) {
-      return hardcoded
-    }
-
-    // 尝试智能 URL 解析（同步）
-    const smart = smartMatchJSLibrary(url)
-    if (smart) {
-      return smart
-    }
-
-    // 最后尝试 jsDelivr API 动态查询（异步）
-    return await dynamicMatchJSLibrary(url)
+    return matchFromMap(url, JS_CDN_MAP, 'js')
   }
 
   function matchCSS(url) {
@@ -1006,90 +700,6 @@
     return matchFromMap(url, FONT_CDN_MAP, 'font')
   }
 
-  // ========== CDN健康探测 ==========
-
-  const _cdnHealth = {}
-  const HEALTH_KEY = 'cdnHealthCache'
-  const HEALTH_TTL = 5 * 60 * 1000 // 5分钟缓存
-
-  async function probeCDN(cdn) {
-    const start = performance.now()
-    try {
-      await fetch(cdn.baseUrl, {
-        method: 'HEAD',
-        mode: 'no-cors',
-        signal: AbortSignal.timeout(3000),
-      })
-      return { healthy: true, rtt: Math.round(performance.now() - start) }
-    } catch {
-      return { healthy: false, rtt: Infinity }
-    }
-  }
-
-  async function probeAllCDNs(options = {}) {
-    // 读取缓存
-    try {
-      const cached = await chrome.storage.local.get(HEALTH_KEY)
-      if (cached[HEALTH_KEY]?.timestamp > Date.now() - HEALTH_TTL) {
-        Object.assign(_cdnHealth, cached[HEALTH_KEY].data || {})
-        return
-      }
-    } catch {}
-
-    const enabledCDNs = CDN_SOURCES.filter((c) => !c._disabled)
-    const priorityIds = options.priorityIds || []
-
-    // 将 CDN 按优先级排序：priorityIds 中的排在前面
-    const sortedCDNs = enabledCDNs.sort((a, b) => {
-      const aIdx = priorityIds.indexOf(a.id)
-      const bIdx = priorityIds.indexOf(b.id)
-      // 优先级列表中的 CDN 排在前面，按列表顺序排序；不在列表中的保持原顺序
-      if (aIdx !== -1 && bIdx !== -1) {
-        return aIdx - bIdx
-      }
-      if (aIdx !== -1) {
-        return -1
-      }
-      if (bIdx !== -1) {
-        return 1
-      }
-      return 0
-    })
-
-    // 按顺序串行探测优先 CDN，并行探测其余 CDN
-    const priorityCDNs = sortedCDNs.filter((c) => priorityIds.includes(c.id))
-    const otherCDNs = sortedCDNs.filter((c) => !priorityIds.includes(c.id))
-
-    // 先探测优先 CDN（串行，确保优先级生效）
-    for (const cdn of priorityCDNs) {
-      _cdnHealth[cdn.id] = await probeCDN(cdn)
-      _cdnHealth[cdn.id].lastProbe = Date.now()
-    }
-
-    // 并行探测其余 CDN
-    const otherProbes = otherCDNs.map(async (cdn) => {
-      _cdnHealth[cdn.id] = await probeCDN(cdn)
-      _cdnHealth[cdn.id].lastProbe = Date.now()
-    })
-    await Promise.allSettled(otherProbes)
-
-    // 缓存结果
-    try {
-      await chrome.storage.local.set({ [HEALTH_KEY]: { data: _cdnHealth, timestamp: Date.now() } })
-    } catch {}
-  }
-
-  function getCDNHealth() {
-    return { ..._cdnHealth }
-  }
-
-  function getHealthyCDNOrder(cdnOrder) {
-    return cdnOrder.filter((id) => {
-      const health = _cdnHealth[id]
-      return !health || (health.healthy && health.rtt < 500)
-    })
-  }
-
   // ========== 导出 ==========
   window.CDNMappings = {
     JS_CDN_MAP,
@@ -1097,17 +707,10 @@
     FONT_CDN_MAP,
     CDN_SOURCES,
     CDN_BY_ID,
+    CDNHealthProbe,
     extractVersion,
-    extractPackageInfo,
     matchJSLibrary,
-    matchJSLibraryAsync,
     matchCSS,
     matchFont,
-    probeAllCDNs,
-    getCDNHealth,
-    getHealthyCDNOrder,
-    // 测试/调试用
-    _jsdelivrCache,
-    queryJsdelivrAPI,
   }
 })()

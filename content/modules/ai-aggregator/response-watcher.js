@@ -73,6 +73,16 @@
      * 提取回复内容
      */
     extractContent(container) {
+      // Kimi 特殊处理：直接获取 assistant 回复内容
+      if (this.siteId === 'kimi') {
+        // 优先查找所有 assistant 消息，取最后一个
+        const assistantMessages = document.querySelectorAll('.chat-content-item-assistant')
+        if (assistantMessages.length > 0) {
+          const lastMessage = assistantMessages[assistantMessages.length - 1]
+          return (lastMessage.textContent || lastMessage.innerText || '').trim()
+        }
+      }
+
       // 尝试获取最新的 AI 回复（通常是最后一个消息块）
       const messageBlocks = container.querySelectorAll(
         '[class*="message"], [class*="response"], [class*="chat"]'
