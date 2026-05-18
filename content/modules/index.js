@@ -6,7 +6,9 @@
   'use strict'
 
   // 检查依赖
+  // 注意：加载顺序很重要，UnifiedDOMWatcher 必须在资源加速器模块之前加载
   const dependencies = {
+    // 核心模块
     SelectorEngine: 'content/modules/SelectorEngine.js',
     Highlighter: 'content/modules/Highlighter.js',
     VirtualList: 'content/modules/VirtualList.js',
@@ -17,6 +19,8 @@
     IncrementalUpdater: 'content/modules/IncrementalUpdater.js',
     SelectorPathVisualizer: 'content/modules/SelectorPathVisualizer.js',
     OptimizationAdvisor: 'content/modules/OptimizationAdvisor.js',
+    // 统一 DOM 监听器（必须在资源加速器模块之前加载）
+    UnifiedDOMWatcher: 'content/modules/unified-dom-watcher.js',
     // 资源加速器模块
     CDNMappings: 'shared/cdn-mappings.js',
     JSReplacer: 'content/modules/js-replacer.js',

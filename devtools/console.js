@@ -204,9 +204,60 @@ async function sendMessage(type, data = {}) {
 // 立即建立连接
 connectToBackground()
 
-const outputEl = document.getElementById('console-output')
-const notificationEl = document.getElementById('change-notification')
-const notificationTextEl = document.getElementById('notification-text')
+// DOM 元素引用（在 safeInit 中初始化）
+let outputEl
+let notificationEl
+let notificationTextEl
+let mockListContent
+let mockEditor
+let mockFilterInput
+let mockClearBtn
+let mockRefreshBtn
+let currentDomainText
+let filterCurrentDomainCheckbox
+let autoScrollCheckbox
+let maxDisplayCountInput
+let excludePatternInput
+let addExcludeBtn
+let clearExcludeBtn
+let excludePatternsList
+let mockTypeTabs
+
+// 批量元素选择 DOM 元素引用
+let startPickerBtn
+let clearSelectionBtn
+let hideSelectedBtn
+let showSelectedBtn
+let batchPickerStatus
+let batchSelectedInfo
+let batchSelectedCount
+let batchSelectedList
+let batchMergedSelectorSection
+let batchMergedSelector
+let copyMergedSelectorBtn
+let applyHideBtn
+
+// EventBus 监控 DOM 元素引用
+let eventbusMessageList
+let eventbusFilter
+let eventbusDirectionFilter
+let eventbusClearBtn
+let eventbusPauseBtn
+let eventbusMonitorCheckbox
+
+// Bookmarks DOM 元素引用
+let bookmarksList
+let bookmarksSearchInput
+let bookmarksCount
+let bookmarksRefreshBtn
+let bookmarksViewModeSelect
+
+// History DOM 元素引用
+let historyList
+let historySearchInput
+let historyCount
+let historyRefreshBtn
+let historyTimeFilter
 
 // 字符串截断限制（字符数）
 const TRUNCATE_LIMIT = 200
@@ -265,63 +316,139 @@ function fallbackCopy(text, resolve, reject) {
   }
 }
 
-// 标签页切换
-document.querySelectorAll('.sidebar-tab').forEach((tab) => {
-  tab.addEventListener('click', (e) => {
-    e.preventDefault()
+// ========== 安全的初始化函数 ==========
+// 确保 DOM 完全加载后再执行初始化
+function safeInit() {
+  console.log('[DevTools] safeInit 被调用，当前 readyState:', document.readyState)
 
-    // 更新标签页激活状态
-    document.querySelectorAll('.sidebar-tab').forEach((t) => t.classList.remove('active'))
-    tab.classList.add('active')
+  // 检查 DOM 是否就绪
+  if (document.readyState !== 'complete' && document.readyState !== 'interactive') {
+    console.log('[DevTools] DOM 未就绪，等待...')
+    setTimeout(safeInit, 50)
+    return
+  }
 
-    // 更新内容可见性
-    const tabId = tab.dataset.tab
-    document.querySelectorAll('.tab-content').forEach((content) => {
-      content.classList.remove('active')
-    })
-    const targetContent = document.getElementById(`tab-${tabId}`)
-    if (targetContent) {
-      targetContent.classList.add('active')
+  // ========== 初始化所有 DOM 元素引用 ==========
+  outputEl = document.getElementById('console-output')
+  notificationEl = document.getElementById('change-notification')
+  notificationTextEl = document.getElementById('notification-text')
 
-      // Auto-load data when tab becomes active
-      if (tabId === 'bookmarks') {
-        loadBookmarks()
-      }
-      if (tabId === 'history') {
-        loadHistory()
-      }
-      if (tabId === 'resources') {
-        initResourcesTab()
+  // Mock 相关 DOM 元素
+  mockListContent = document.getElementById('mock-list-content')
+  mockEditor = document.getElementById('mock-editor')
+  mockFilterInput = document.getElementById('mock-filter-input')
+  mockClearBtn = document.getElementById('mock-clear-btn')
+  mockRefreshBtn = document.getElementById('mock-refresh-btn')
+  currentDomainText = document.getElementById('current-domain-text')
+  filterCurrentDomainCheckbox = document.getElementById('filter-current-domain')
+  autoScrollCheckbox = document.getElementById('auto-scroll')
+  maxDisplayCountInput = document.getElementById('max-display-count')
+  excludePatternInput = document.getElementById('exclude-pattern-input')
+  addExcludeBtn = document.getElementById('add-exclude-btn')
+  clearExcludeBtn = document.getElementById('clear-exclude-btn')
+  excludePatternsList = document.getElementById('exclude-patterns-list')
+  mockTypeTabs = document.getElementById('mock-type-tabs')
+
+  // 批量元素选择 DOM 元素
+  startPickerBtn = document.getElementById('start-picker-btn')
+  clearSelectionBtn = document.getElementById('clear-selection-btn')
+  hideSelectedBtn = document.getElementById('hide-selected-btn')
+  showSelectedBtn = document.getElementById('show-selected-btn')
+  batchPickerStatus = document.getElementById('batch-picker-status')
+  batchSelectedInfo = document.getElementById('batch-selected-info')
+  batchSelectedCount = document.getElementById('batch-selected-count')
+  batchSelectedList = document.getElementById('batch-selected-list')
+  batchMergedSelectorSection = document.getElementById('batch-merged-selector-section')
+  batchMergedSelector = document.getElementById('batch-merged-selector')
+  copyMergedSelectorBtn = document.getElementById('copy-merged-selector-btn')
+  applyHideBtn = document.getElementById('apply-hide-btn')
+
+  // EventBus 监控 DOM 元素
+  eventbusMessageList = document.getElementById('eventbus-message-list')
+  eventbusFilter = document.getElementById('eventbus-filter')
+  eventbusDirectionFilter = document.getElementById('eventbus-direction-filter')
+  eventbusClearBtn = document.getElementById('eventbus-clear-btn')
+  eventbusPauseBtn = document.getElementById('eventbus-pause-btn')
+  eventbusMonitorCheckbox = document.getElementById('eventbus-monitor-enabled')
+
+  // 加载存储数据
+  loadAllStorageData().catch((err) => {
+    if (!isContextInvalidatedError(err)) {
+      console.error('Failed to load storage data:', err)
+    }
+  })
+
+  // 存储变更监听
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    const changedKeys = Object.keys(changes)
+    showNotification(`${areaName} 存储已更新: ${changedKeys.join(', ')}`)
+
+    // Reload the changed area
+    setTimeout(async () => {
+      await loadStorageArea(areaName)
+      renderAll()
+    }, 100)
+
+    // Check if blocked domains changed and update mock exclude patterns
+    if (areaName === 'sync' && changes.cy_settings) {
+      const newSettings = changes.cy_settings.newValue
+      if (newSettings && newSettings.domainBlockedData) {
+        // Reload blocked domains to exclude patterns
+        loadBlockedDomainsToExclude()
       }
     }
   })
-})
 
-// ========== Info 子标签页切换 ==========
-document.querySelectorAll('.info-sub-tab').forEach((tab) => {
-  tab.addEventListener('click', (e) => {
-    e.preventDefault()
+  // 初始化批量选择功能
+  initBatchPicker()
 
-    // 更新子标签页激活状态
-    document.querySelectorAll('.info-sub-tab').forEach((t) => t.classList.remove('active'))
-    tab.classList.add('active')
+  // 初始化资源嗅探
+  initResourcesTab()
 
-    // 更新内容可见性
-    const subtabId = tab.dataset.subtab
-    document.querySelectorAll('.info-sub-content').forEach((content) => {
-      content.classList.remove('active')
+  // ========== EventBus 事件绑定 ==========
+  // 清空消息
+  if (eventbusClearBtn) {
+    eventbusClearBtn.addEventListener('click', () => {
+      eventbusMessages = []
+      eventbusStats = { sent: 0, received: 0, failed: 0, latencies: [] }
+      renderEventBusMessages()
+      updateEventBusStats()
     })
-    const targetSubContent = document.getElementById(`info-${subtabId}`)
-    if (targetSubContent) {
-      targetSubContent.classList.add('active')
-    }
+  }
 
-    // 如果切换到元素标签页
-    if (subtabId === 'element') {
-      // 元素标签页初始化
-    }
-  })
-})
+  // 暂停/恢复
+  if (eventbusPauseBtn) {
+    eventbusPauseBtn.addEventListener('click', () => {
+      eventbusMonitorPaused = !eventbusMonitorPaused
+      eventbusPauseBtn.textContent = eventbusMonitorPaused ? '▶️ 恢复' : '⏸️ 暂停'
+    })
+  }
+
+  // 启用/禁用监控
+  if (eventbusMonitorCheckbox) {
+    eventbusMonitorCheckbox.addEventListener('change', (e) => {
+      eventbusMonitorEnabled = e.target.checked
+      if (eventbusMonitorEnabled) {
+        EventBus?.enableDevToolsMonitor()
+      } else {
+        EventBus?.disableDevToolsMonitor()
+      }
+    })
+  }
+
+  // 过滤器事件
+  if (eventbusFilter) {
+    eventbusFilter.addEventListener('input', renderEventBusMessages)
+  }
+  if (eventbusDirectionFilter) {
+    eventbusDirectionFilter.addEventListener('change', renderEventBusMessages)
+  }
+
+  // 初始化EventBus监控
+  setTimeout(initEventBusMonitor, 500)
+
+  console.log('[DevTools] 所有功能初始化完成')
+}
 
 // 获取当前域名
 async function getCurrentDomain() {
@@ -333,18 +460,7 @@ async function getCurrentDomain() {
 }
 
 // ========== 批量元素选择功能 ==========
-const startPickerBtn = document.getElementById('start-picker-btn')
-const clearSelectionBtn = document.getElementById('clear-selection-btn')
-const hideSelectedBtn = document.getElementById('hide-selected-btn')
-const showSelectedBtn = document.getElementById('show-selected-btn')
-const batchPickerStatus = document.getElementById('batch-picker-status')
-const batchSelectedInfo = document.getElementById('batch-selected-info')
-const batchSelectedCount = document.getElementById('batch-selected-count')
-const batchSelectedList = document.getElementById('batch-selected-list')
-const batchMergedSelectorSection = document.getElementById('batch-merged-selector-section')
-const batchMergedSelector = document.getElementById('batch-merged-selector')
-const copyMergedSelectorBtn = document.getElementById('copy-merged-selector-btn')
-const applyHideBtn = document.getElementById('apply-hide-btn')
+// DOM 元素引用在 safeInit 中初始化
 
 // 批量选择状态
 const batchPickerState = {
@@ -357,9 +473,11 @@ const batchPickerState = {
 
 // 注入元素拾取器脚本
 async function injectElementPicker() {
+  console.log('[DevTools] injectElementPicker 开始执行')
   // 使用 inspectedWindow.eval 注入脚本
   // 这种方式直接在页面世界中运行，可以与后续的命令通信
   const scriptUrl = chrome.runtime.getURL('content/element-picker-inject.js')
+  console.log('[DevTools] 脚本 URL:', scriptUrl)
 
   const code = `
     (function() {
@@ -390,11 +508,31 @@ async function injectElementPicker() {
 
   return new Promise((resolve) => {
     chrome.devtools.inspectedWindow.eval(code, (result, error) => {
+      console.log('[DevTools] eval 结果:', result, '错误:', error)
       if (error) {
         console.error('[BatchPicker] 注入脚本失败:', error)
         resolve(false)
       } else {
+        console.log('[DevTools] 注入脚本成功，返回值:', result)
         resolve(true)
+      }
+    })
+  })
+}
+
+// 验证元素拾取器脚本是否真正注入成功
+async function verifyPickerInjected() {
+  const code = `
+    (function() {
+      return !!(window.ElementPickerInject && typeof window.ElementPickerInject.start === 'function');
+    })()
+  `
+  return new Promise((resolve) => {
+    chrome.devtools.inspectedWindow.eval(code, (result, error) => {
+      if (error) {
+        resolve(false)
+      } else {
+        resolve(!!result)
       }
     })
   })
@@ -1490,12 +1628,17 @@ async function batchShowElements(selectors) {
 
 // 初始化批量选择功能
 async function initBatchPicker() {
+  console.log('[DevTools] initBatchPicker 开始执行')
+  console.log('[DevTools] startPickerBtn 元素:', startPickerBtn)
+
   // 确保 Port 连接已建立
   if (!backgroundPort) {
+    console.log('[DevTools] backgroundPort 未连接，尝试连接...')
     connectToBackground()
     // 等待连接建立
     await new Promise((resolve) => setTimeout(resolve, 100))
   }
+  console.log('[DevTools] backgroundPort 状态:', !!backgroundPort)
 
   // 设置消息监听器，将页面中的 element-picker-message 事件转发到 background
   setupPickerMessageListener()
@@ -1505,29 +1648,60 @@ async function initBatchPicker() {
 
   // 开始/停止选择按钮
   if (startPickerBtn) {
+    console.log('[DevTools] 为 startPickerBtn 添加点击事件监听器')
     startPickerBtn.addEventListener('click', async () => {
+      console.log('[DevTools] startPickerBtn 被点击, isActive:', batchPickerState.isActive)
       if (batchPickerState.isActive) {
         // 立即更新本地状态
         batchPickerState.isActive = false
         updatePickerStatus()
+        startPickerBtn.disabled = false
         await sendPickerCommand('STOP')
       } else {
-        const injected = await injectElementPicker()
-        if (injected) {
-          // 等待脚本加载
-          await new Promise((resolve) => setTimeout(resolve, 200))
-          // 立即更新本地状态
-          batchPickerState.isActive = true
-          updatePickerStatus()
-          // 立即显示选中元素区域
-          if (batchSelectedInfo) {
-            batchSelectedInfo.style.display = 'block'
+        // 显示加载状态
+        const originalText = startPickerBtn.textContent
+        startPickerBtn.disabled = true
+        startPickerBtn.textContent = '⏳ 注入中...'
+        console.log('[DevTools] 准备注入元素拾取器...')
+
+        try {
+          console.log('[DevTools] 调用 injectElementPicker()')
+          const injected = await injectElementPicker()
+          console.log('[DevTools] injectElementPicker 结果:', injected)
+          if (injected) {
+            // 等待脚本加载
+            await new Promise((resolve) => setTimeout(resolve, 300))
+            // 验证脚本是否真正加载成功
+            const verified = await verifyPickerInjected()
+            if (!verified) {
+              showNotification('元素拾取器注入失败，可能被页面 CSP 拦截。请检查控制台错误。', 'error')
+              startPickerBtn.textContent = originalText
+              startPickerBtn.disabled = false
+              return
+            }
+            // 立即更新本地状态
+            batchPickerState.isActive = true
+            updatePickerStatus()
+            startPickerBtn.textContent = '⏹️ 停止选择'
+            startPickerBtn.disabled = false
+            // 立即显示选中元素区域
+            if (batchSelectedInfo) {
+              batchSelectedInfo.style.display = 'block'
+            }
+            if (batchMergedSelectorSection) {
+              batchMergedSelectorSection.style.display = 'block'
+            }
+            updateSelectedElementsUI()
+            await sendPickerCommand('START')
+          } else {
+            showNotification('元素拾取器注入失败，请检查控制台错误。', 'error')
+            startPickerBtn.textContent = originalText
+            startPickerBtn.disabled = false
           }
-          if (batchMergedSelectorSection) {
-            batchMergedSelectorSection.style.display = 'block'
-          }
-          updateSelectedElementsUI()
-          await sendPickerCommand('START')
+        } catch (e) {
+          showNotification('元素拾取器注入异常: ' + e.message, 'error')
+          startPickerBtn.textContent = originalText
+          startPickerBtn.disabled = false
         }
       }
     })
@@ -1652,9 +1826,6 @@ async function initBatchPicker() {
     })
   }
 }
-
-// 启动批量选择功能
-initBatchPicker()
 
 // HTML转义
 function escapeHtml(text) {
@@ -2562,7 +2733,8 @@ function renderStorageItem(key, value, sectionId) {
 }
 
 // Toggle expand/collapse using event delegation
-outputEl.addEventListener('click', (e) => {
+if (outputEl) {
+  outputEl.addEventListener('click', (e) => {
   // Handle JSON tree toggle clicks directly
   if (e.target.classList.contains('json-tree-toggle')) {
     const treeItem = e.target.closest('.json-tree-item')
@@ -2656,7 +2828,8 @@ outputEl.addEventListener('click', (e) => {
     }
     return
   }
-})
+  })
+}
 
 // JSON Syntax Highlighting
 function syntaxHighlight(json) {
@@ -2838,42 +3011,16 @@ async function loadAllStorageData() {
 }
 
 // Show notification
-function showNotification(message) {
+function showNotification(message, type = 'info') {
   notificationTextEl.textContent = message
   notificationEl.classList.add('show')
+  notificationEl.style.borderColor = type === 'error' ? '#ef4444' : ''
 
   setTimeout(() => {
     notificationEl.classList.remove('show')
-  }, 2000)
+    notificationEl.style.borderColor = ''
+  }, type === 'error' ? 4000 : 2000)
 }
-
-// Initial load
-loadAllStorageData().catch((err) => {
-  if (!isContextInvalidatedError(err)) {
-    console.error('Failed to load storage data:', err)
-  }
-})
-
-// Listen for storage changes
-chrome.storage.onChanged.addListener((changes, areaName) => {
-  const changedKeys = Object.keys(changes)
-  showNotification(`${areaName} 存储已更新: ${changedKeys.join(', ')}`)
-
-  // Reload the changed area
-  setTimeout(async () => {
-    await loadStorageArea(areaName)
-    renderAll()
-  }, 100)
-
-  // Check if blocked domains changed and update mock exclude patterns
-  if (areaName === 'sync' && changes.cy_settings) {
-    const newSettings = changes.cy_settings.newValue
-    if (newSettings && newSettings.domainBlockedData) {
-      // Reload blocked domains to exclude patterns
-      loadBlockedDomainsToExclude()
-    }
-  }
-})
 
 // ============================================
 // Mock 标签页功能
@@ -2894,20 +3041,7 @@ let capturedResources = []
 let currentResourceFilter = 'all'
 
 // Mock DOM元素
-const mockListContent = document.getElementById('mock-list-content')
-const mockEditor = document.getElementById('mock-editor')
-const mockFilterInput = document.getElementById('mock-filter-input')
-const mockClearBtn = document.getElementById('mock-clear-btn')
-const mockRefreshBtn = document.getElementById('mock-refresh-btn')
-const currentDomainText = document.getElementById('current-domain-text')
-const filterCurrentDomainCheckbox = document.getElementById('filter-current-domain')
-const autoScrollCheckbox = document.getElementById('auto-scroll')
-const maxDisplayCountInput = document.getElementById('max-display-count')
-const excludePatternInput = document.getElementById('exclude-pattern-input')
-const addExcludeBtn = document.getElementById('add-exclude-btn')
-const clearExcludeBtn = document.getElementById('clear-exclude-btn')
-const excludePatternsList = document.getElementById('exclude-patterns-list')
-const mockTypeTabs = document.getElementById('mock-type-tabs')
+// Mock DOM 元素引用在 safeInit 中初始化
 
 // 根据资源类型获取图标类名
 function getTypeIconClass(type) {
@@ -4675,14 +4809,17 @@ function updateDomainDisplay() {
 }
 
 // Filter input handler
-mockFilterInput.addEventListener('input', (e) => {
-  const value = e.target.value
-  chrome.storage.session.set({ mockFilterValue: value })
-  renderMockList(value)
-})
+if (mockFilterInput) {
+  mockFilterInput.addEventListener('input', (e) => {
+    const value = e.target.value
+    chrome.storage.session.set({ mockFilterValue: value })
+    renderMockList(value)
+  })
+}
 
 // Clear button handler
-mockClearBtn.addEventListener('click', () => {
+if (mockClearBtn) {
+  mockClearBtn.addEventListener('click', () => {
   // 清空页面上下文中的所有 mock 数据
   const code = `
     (function() {
@@ -4712,12 +4849,15 @@ mockClearBtn.addEventListener('click', () => {
   renderMockList()
   renderEmptyEditor()
   showNotification('已清空请求列表和所有 Mock 规则')
-})
+  })
+}
 
 // Refresh button handler - reload the inspected page
-mockRefreshBtn.addEventListener('click', () => {
-  chrome.devtools.inspectedWindow.reload()
-})
+if (mockRefreshBtn) {
+  mockRefreshBtn.addEventListener('click', () => {
+    chrome.devtools.inspectedWindow.reload()
+  })
+}
 
 // Max display count input handler
 if (maxDisplayCountInput) {
@@ -4781,22 +4921,10 @@ if (mockTypeTabs) {
   })
 }
 
-// Initialize mock functionality
-loadMockFilterSettings().catch((err) => {
-  // Ignore context invalidated errors during initialization
-  if (!isContextInvalidatedError(err)) {
-    console.error('Failed to load mock filter settings:', err)
-  }
-})
-initNetworkMonitoring()
-
 // ============================================
 // Bookmarks Tab Functionality
 // ============================================
-const bookmarksList = document.getElementById('bookmarks-list')
-const bookmarksSearchInput = document.getElementById('bookmarks-search-input')
-const bookmarksCount = document.getElementById('bookmarks-count')
-const bookmarksRefreshBtn = document.getElementById('bookmarks-refresh-btn')
+// DOM 元素引用在 safeInit 中初始化
 
 let allBookmarks = []
 let bookmarkTreeRoot = null
@@ -5089,7 +5217,7 @@ if (bookmarksRefreshBtn) {
   bookmarksRefreshBtn.addEventListener('click', loadBookmarks)
 }
 
-const bookmarksViewModeSelect = document.getElementById('bookmarks-view-mode')
+bookmarksViewModeSelect = document.getElementById('bookmarks-view-mode')
 if (bookmarksViewModeSelect) {
   bookmarksViewModeSelect.addEventListener('change', (e) => {
     bookmarksViewMode = e.target.value
@@ -5845,11 +5973,11 @@ window.loadBookmarks = async function () {
 // ============================================
 // History Tab Functionality
 // ============================================
-const historyList = document.getElementById('history-list')
-const historySearchInput = document.getElementById('history-search-input')
+historyList = document.getElementById('history-list')
+historySearchInput = document.getElementById('history-search-input')
 const historyTimeRange = document.getElementById('history-time-range')
-const historyCount = document.getElementById('history-count')
-const historyRefreshBtn = document.getElementById('history-refresh-btn')
+historyCount = document.getElementById('history-count')
+historyRefreshBtn = document.getElementById('history-refresh-btn')
 const historyClearBtn = document.getElementById('history-clear-btn')
 
 let allHistory = []
@@ -6068,13 +6196,7 @@ let eventbusMessages = []
 let eventbusMonitorEnabled = true
 let eventbusMonitorPaused = false
 let eventbusStats = { sent: 0, received: 0, failed: 0, latencies: [] }
-
-const eventbusMessageList = document.getElementById('eventbus-message-list')
-const eventbusFilter = document.getElementById('eventbus-filter')
-const eventbusDirectionFilter = document.getElementById('eventbus-direction-filter')
-const eventbusClearBtn = document.getElementById('eventbus-clear-btn')
-const eventbusPauseBtn = document.getElementById('eventbus-pause-btn')
-const eventbusMonitorCheckbox = document.getElementById('eventbus-monitor-enabled')
+// DOM 元素引用在 safeInit 中初始化
 
 // 初始化EventBus监控
 function initEventBusMonitor() {
@@ -6213,43 +6335,6 @@ function updateEventBusStats() {
   }
 }
 
-// 清空消息
-if (eventbusClearBtn) {
-  eventbusClearBtn.addEventListener('click', () => {
-    eventbusMessages = []
-    eventbusStats = { sent: 0, received: 0, failed: 0, latencies: [] }
-    renderEventBusMessages()
-    updateEventBusStats()
-  })
-}
-
-// 暂停/恢复
-if (eventbusPauseBtn) {
-  eventbusPauseBtn.addEventListener('click', () => {
-    eventbusMonitorPaused = !eventbusMonitorPaused
-    eventbusPauseBtn.textContent = eventbusMonitorPaused ? '▶️ 恢复' : '⏸️ 暂停'
-  })
-}
-
-// 启用/禁用监控
-if (eventbusMonitorCheckbox) {
-  eventbusMonitorCheckbox.addEventListener('change', (e) => {
-    eventbusMonitorEnabled = e.target.checked
-    if (eventbusMonitorEnabled) {
-      EventBus?.enableDevToolsMonitor()
-    } else {
-      EventBus?.disableDevToolsMonitor()
-    }
-  })
-}
-
-// 过滤器事件
-if (eventbusFilter) {
-  eventbusFilter.addEventListener('input', renderEventBusMessages)
-}
-if (eventbusDirectionFilter) {
-  eventbusDirectionFilter.addEventListener('change', renderEventBusMessages)
-}
-
-// 初始化
-setTimeout(initEventBusMonitor, 500)
+// ========== 启动安全初始化 ==========
+// 确保所有函数定义后再执行
+safeInit()

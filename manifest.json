@@ -42,7 +42,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content/core/load-scheduler.js", "content/core-bundle.js"],
+      "js": ["content/critical-bundle.js"],
       "css": ["styles.css"],
       "run_at": "document_start"
     }
@@ -58,6 +58,7 @@
       "resources": [
         "inject.js",
         "content.js",
+        "content/core-bundle.js",
         "background-csp-bypass.js",
         "content/*.js",
         "content/bundled/*.js",
@@ -73,10 +74,17 @@
         "content/core/load-sampler.js",
         "devtools/hot-reload-panel.html",
         "devtools/hot-reload-panel.js",
-        "devtools/hot-reload-panel.css"
+        "devtools/hot-reload-panel.css",
+        "popup/*.js",
+        "popup/modules/*.js",
+        "newtab.js",
+        "styles/*.css"
       ],
       "matches": ["<all_urls>"]
     }
   ],
-  "devtools_page": "devtools/devtools.html"
+  "devtools_page": "devtools/devtools.html",
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; style-src 'self' 'unsafe-inline';"
+  }
 }

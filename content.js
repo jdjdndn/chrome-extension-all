@@ -13,6 +13,33 @@
   }
   window._contentScriptLoaded = true
 
+  // ========== Early Hide Style Injection (document_start) ==========
+  // 在 document_start 阶段立即注入隐藏元素 CSS，消除闪烁
+  // 不依赖 DOMUtils，直接使用 window.location.hostname 获取域名
+  ;(function injectEarlyHideStyle() {
+    const EARLY_HIDE_STYLE_ID = 'ext-early-hide-style'
+    const DOMAIN_DEFAULT_HIDE_SELECTORS_EARLY = {
+      '4hu.tv': ['.kkm-content'],
+      'www.4hu.tv': ['.kkm-content'],
+    }
+
+    const domain = window.location.hostname
+    const selectors = DOMAIN_DEFAULT_HIDE_SELECTORS_EARLY[domain]
+    if (!selectors || selectors.length === 0) {return}
+
+    const css = selectors
+      .filter((s) => s && s.trim())
+      .map((selector) => `${selector} { display: none !important; }`)
+      .join('\n')
+
+    if (!css) {return}
+
+    const style = document.createElement('style')
+    style.id = EARLY_HIDE_STYLE_ID
+    style.textContent = css
+    ;(document.head || document.documentElement).appendChild(style)
+  })()
+
   // ========== 懒初始化支持 ==========
   // 使用 LazyInitManager 进行分层懒初始化
   // L1: 基础层 - 立即初始化（EventBus、Logger、Storage）
@@ -116,14 +143,12 @@
 
   /**
    * Get default hide selectors for current domain
+   * 使用 window.location.hostname 作为主路径，DOMUtils 作为降级
    */
   function getDomainDefaultHideSelectors() {
-    // 安全检查 DOMUtils 是否可用
-    if (typeof DOMUtils === 'undefined' || !DOMUtils.getCurrentDomain) {
-      console.warn('[Content] DOMUtils 未加载，无法获取域名')
-      return []
-    }
-    const domain = DOMUtils.getCurrentDomain()
+    const domain =
+      (typeof DOMUtils !== 'undefined' && DOMUtils.getCurrentDomain && DOMUtils.getCurrentDomain()) ||
+      window.location.hostname
     return DOMAIN_DEFAULT_HIDE_SELECTORS[domain] || []
   }
 
@@ -196,18 +221,38 @@
 
   /**
    * Apply hide elements by creating/updating style tag
+   * 优先使用 DOMUtils，降级时直接操作 DOM
    */
   function applyHideElementsStyle(selectors) {
-    if (!isDOMUtilsReady()) {
-      return
-    }
-
     if (!selectors || selectors.length === 0) {
-      DOMUtils.removeStyle(HIDE_ELEMENTS_STYLE_ID)
+      if (isDOMUtilsReady()) {
+        DOMUtils.removeStyle(HIDE_ELEMENTS_STYLE_ID)
+      } else {
+        const existing = document.getElementById(HIDE_ELEMENTS_STYLE_ID)
+        if (existing) {existing.remove()}
+      }
       return
     }
 
-    DOMUtils.applyHideStyle(HIDE_ELEMENTS_STYLE_ID, selectors)
+    const css = selectors
+      .filter((s) => s && s.trim())
+      .map((selector) => `${selector} { display: none !important; }`)
+      .join('\n')
+
+    if (isDOMUtilsReady()) {
+      DOMUtils.applyHideStyle(HIDE_ELEMENTS_STYLE_ID, selectors)
+    } else {
+      // 降级：直接操作 DOM
+      let style = document.getElementById(HIDE_ELEMENTS_STYLE_ID)
+      if (style) {
+        style.textContent = css
+      } else {
+        style = document.createElement('style')
+        style.id = HIDE_ELEMENTS_STYLE_ID
+        style.textContent = css
+        ;(document.head || document.documentElement).appendChild(style)
+      }
+    }
     console.log(`[隐藏元素] 已应用隐藏规则，共 ${selectors.length} 个选择器`)
   }
 
@@ -220,19 +265,21 @@
     hideElementsState.enabled = enabled
     hideElementsState.selectors = selectors
 
-    if (!isDOMUtilsReady()) {
-      return
-    }
-
     if (enabled && selectors && selectors.length > 0) {
       applyHideElementsStyle(selectors)
     } else {
-      DOMUtils.removeStyle(HIDE_ELEMENTS_STYLE_ID)
+      if (isDOMUtilsReady()) {
+        DOMUtils.removeStyle(HIDE_ELEMENTS_STYLE_ID)
+      } else {
+        const existing = document.getElementById(HIDE_ELEMENTS_STYLE_ID)
+        if (existing) {existing.remove()}
+      }
       console.log('[隐藏元素] 已移除隐藏规则')
     }
 
     // Save to storage
-    const domain = DOMUtils.getCurrentDomain()
+    const domain =
+      (isDOMUtilsReady() && DOMUtils.getCurrentDomain()) || window.location.hostname
     if (domain) {
       window.StorageUtils?.setDomainSettings('hideElementsSettings', domain, { enabled, selectors })
     }

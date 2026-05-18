@@ -33,6 +33,7 @@ console.log('[Build] Environment config:', ENV_CONFIG)
 
 // ========== Content script bundles (from build-site-bundles.js) ==========
 const CONTENT_BUNDLES = [
+  { name: 'critical', entry: 'content/entries/critical.js', outfile: 'content/critical-bundle.js' },
   { name: 'core', entry: 'content/entries/core.js', outfile: 'content/core-bundle.js' },
   { name: 'common', entry: 'content/entries/common.js', outfile: 'content/common-bundle.js' },
   { name: 'bili', entry: 'content/entries/bili.js', outfile: 'content/bundled/bili.bundle.js' },
@@ -269,6 +270,25 @@ function chromeExtensionPlugin() {
       // watch 模式下重新扫描静态文件
       STATIC_FILES = scanStaticFiles()
 
+      // 关键：添加要监听的所有源文件，让 Vite watch 保持运行
+      const watchPatterns = [
+        'content/**/*.js',
+        'content/**/*.ts',
+        'popup/**/*.js',
+        'popup/**/*.html',
+        'styles/**/*.css',
+        'shared/**/*.js',
+        '*.html',
+        '*.js',
+        'manifest.json',
+      ]
+
+      for (const pattern of watchPatterns) {
+        const fullPattern = resolve(pattern)
+        // 使用 glob 匹配或简单模式
+        this.addWatchFile(fullPattern)
+      }
+
       for (const f of STATIC_FILES) {
         if (existsSync(f)) this.addWatchFile(resolve(f))
       }
@@ -345,10 +365,10 @@ function chromeExtensionPlugin() {
       if (existsSync(dummy)) unlinkSync(dummy)
     },
 
-    async closeBundle() {
-      // 构建完成后通知热重载服务器
+    closeBundle() {
+      // 构建完成后通知热重载服务器（非阻塞，不影响 Vite watch 模式）
       if (ENV_CONFIG.HOT_RELOAD) {
-        await notifyHotReloadServer()
+        notifyHotReloadServer().catch(() => {})
       }
     },
   }
@@ -357,10 +377,13 @@ function chromeExtensionPlugin() {
 export default defineConfig({
   build: {
     outDir: 'dist',
-    emptyOutDir: true,
+    emptyOutDir: false,
     target: 'chrome100',
     minify: false,
     sourcemap: false,
+    watch: {
+      include: ['content/**/*', 'popup/**/*', 'styles/**/*', 'shared/**/*'],
+    },
     rollupOptions: {
       input: { dummy: DUMMY_ID },
       output: {

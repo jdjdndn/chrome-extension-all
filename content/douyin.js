@@ -56,10 +56,10 @@
   logger.debug(' DEFAULT_HIDE_SELECTORS 已定义，数量:', DEFAULT_HIDE_SELECTORS.length)
 
   const BLOCKED_DOMAINS = [
-    'mcs.zijieapi.com/list',
-    'vc-gate-edge.ndcpp.com/sdk/get_peer',
-    'security.zijieapi.com/api/metrics/emit',
-    'tnc0-aliec2.zijieapi.com/get_domains',
+    // 'mcs.zijieapi.com/list',
+    // 'vc-gate-edge.ndcpp.com/sdk/get_peer',
+    // 'security.zijieapi.com/api/metrics/emit',
+    // 'tnc0-aliec2.zijieapi.com/get_domains',
   ]
 
   const NOT_INTERESTED_KEYWORDS = [

@@ -25,6 +25,7 @@
 
       // 内部状态
       this._observer = null
+      this._unsubscribe = null
       this._originalCreateElement = null
       this._processedScripts = new WeakSet()
 
@@ -61,63 +62,47 @@
     }
 
     /**
-     * 设置MutationObserver监听动态script插入
+     * 设置 MutationObserver 监听动态 script 插入
+     * 使用 UnifiedDOMWatcher 统一管理
      */
     _setupMutationObserver() {
-      this._observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-          mutation.addedNodes.forEach((node) => {
-            if (node.tagName === 'SCRIPT' && node.src) {
-              this.processScript(node)
-            }
-          })
-        })
-      })
+      // 检查 UnifiedDOMWatcher 是否可用
+      if (!window.UnifiedDOMWatcher) {
+        console.warn(`${LOG_PREFIX} UnifiedDOMWatcher 未加载，跳过监听`)
+        return
+      }
 
-      this._observer.observe(document.documentElement, {
-        childList: true,
-        subtree: true,
-      })
+      // 使用 UnifiedDOMWatcher 订阅，NORMAL 优先级
+      this._unsubscribe = window.UnifiedDOMWatcher.subscribe(
+        (mutations) => {
+          mutations.forEach((mutation) => {
+            mutation.addedNodes.forEach((node) => {
+              if (node.tagName === 'SCRIPT' && node.src) {
+                this.processScript(node)
+              }
+            })
+          })
+        },
+        {
+          priority: window.UnifiedDOMWatcher.Priority.NORMAL,
+          name: 'JSReplacer',
+          filter: (mutation) => mutation.type === 'childList' && mutation.addedNodes.length > 0,
+        }
+      )
     }
 
     /**
      * 拦截document.createElement('script')
+     * 注意：不拦截 script.src，避免触发安全检测
+     * 只在元素被插入到 DOM 时通过 MutationObserver 处理
      */
     _interceptCreateElement() {
       this._originalCreateElement = document.createElement.bind(document)
 
       document.createElement = (tagName, options) => {
         const element = this._originalCreateElement(tagName, options)
-
-        if (tagName.toLowerCase() === 'script') {
-          this._interceptScriptSrc(element)
-        }
-
         return element
       }
-    }
-
-    /**
-     * 拦截script元素的src属性设置
-     */
-    _interceptScriptSrc(script) {
-      let _src = ''
-      const self = this
-
-      Object.defineProperty(script, 'src', {
-        get() {
-          return _src
-        },
-        set(value) {
-          _src = value
-          if (value && self.enabled) {
-            // 延迟处理，确保属性设置完成
-            setTimeout(() => self.processScript(script), 0)
-          }
-        },
-        configurable: true,
-        enumerable: true,
-      })
     }
 
     /**
@@ -269,13 +254,19 @@
      * 销毁模块
      */
     destroy() {
-      // 停止MutationObserver
+      // 取消 UnifiedDOMWatcher 订阅
+      if (this._unsubscribe) {
+        this._unsubscribe()
+        this._unsubscribe = null
+      }
+
+      // 停止 MutationObserver（兼容旧逻辑）
       if (this._observer) {
         this._observer.disconnect()
         this._observer = null
       }
 
-      // 恢复原始createElement
+      // 恢复原始 createElement
       if (this._originalCreateElement) {
         document.createElement = this._originalCreateElement
         this._originalCreateElement = null
@@ -286,6 +277,37 @@
       this._processedScripts = new WeakSet()
 
       console.log(`${LOG_PREFIX} 模块已销毁`)
+    }
+
+    /**
+     * 尝试从降级状态恢复
+     */
+    async attemptRecovery() {
+      if (!this.stats.degraded) {
+        console.log(`${LOG_PREFIX} 模块未降级，无需恢复`)
+        return false
+      }
+
+      try {
+        // 重新启用
+        this.enabled = true
+
+        // 重新设置监听
+        this._setupMutationObserver()
+        this._interceptCreateElement()
+
+        // 清除降级标记
+        this.stats.degraded = false
+        delete this.stats.degradationReason
+        delete this.stats.degradationTime
+
+        console.log(`${LOG_PREFIX} 从降级状态恢复成功`)
+        return true
+      } catch (error) {
+        console.error(`${LOG_PREFIX} 恢复失败:`, error)
+        this.enabled = false
+        return false
+      }
     }
   }
 

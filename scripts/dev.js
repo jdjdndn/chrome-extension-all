@@ -74,8 +74,10 @@ const hotReloadServer = spawn('node', [resolve(__dirname, 'hot-reload-server.mjs
   env: { ...process.env },
 })
 
-// 启动Vite watch
-const vite = spawn('npx', ['vite', 'build', '--watch'], {
+// 启动 chokidar-cli watch (替代 vite build --watch，解决 Vite 8 watch 退出问题)
+// chokidar 专为文件监听 + 一次性任务设计，避免 nodemon 误判构建退出为崩溃
+// --initial: 启动时立即执行一次构建
+const vite = spawn('chokidar content/**/* popup/**/* styles/**/* shared/**/* *.html *.js manifest.json --ignore dist/** --ignore node_modules/** -c "npm run build" --initial', {
   cwd: rootDir,
   stdio: 'inherit',
   env: { ...process.env, NODE_ENV: 'development' },

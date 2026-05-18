@@ -25,6 +25,7 @@
 
       // 内部状态
       this._observer = null
+      this._unsubscribe = null
       this._processedLinks = new WeakSet()
 
       console.log(`${LOG_PREFIX} 模块初始化完成`)
@@ -57,29 +58,39 @@
     }
 
     /**
-     * 设置MutationObserver监听动态link插入
+     * 设置 MutationObserver 监听动态 link 插入
+     * 使用 UnifiedDOMWatcher 统一管理
      */
     _setupMutationObserver() {
-      this._observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-          mutation.addedNodes.forEach((node) => {
-            // 检查节点本身
-            if (node.tagName === 'LINK' && node.rel === 'stylesheet') {
-              this.processLink(node)
-            }
-            // 检查子节点
-            if (node.querySelectorAll) {
-              const links = node.querySelectorAll('link[rel="stylesheet"]')
-              links.forEach((link) => this.processLink(link))
-            }
-          })
-        })
-      })
+      // 检查 UnifiedDOMWatcher 是否可用
+      if (!window.UnifiedDOMWatcher) {
+        console.warn(`${LOG_PREFIX} UnifiedDOMWatcher 未加载，跳过监听`)
+        return
+      }
 
-      this._observer.observe(document.documentElement, {
-        childList: true,
-        subtree: true,
-      })
+      // 使用 UnifiedDOMWatcher 订阅，NORMAL 优先级
+      this._unsubscribe = window.UnifiedDOMWatcher.subscribe(
+        (mutations) => {
+          mutations.forEach((mutation) => {
+            mutation.addedNodes.forEach((node) => {
+              // 检查节点本身
+              if (node.tagName === 'LINK' && node.rel === 'stylesheet') {
+                this.processLink(node)
+              }
+              // 检查子节点
+              if (node.querySelectorAll) {
+                const links = node.querySelectorAll('link[rel="stylesheet"]')
+                links.forEach((link) => this.processLink(link))
+              }
+            })
+          })
+        },
+        {
+          priority: window.UnifiedDOMWatcher.Priority.NORMAL,
+          name: 'FontReplacer',
+          filter: (mutation) => mutation.type === 'childList' && mutation.addedNodes.length > 0,
+        }
+      )
     }
 
     /**
@@ -231,7 +242,13 @@
      * 销毁模块
      */
     destroy() {
-      // 停止MutationObserver
+      // 取消 UnifiedDOMWatcher 订阅
+      if (this._unsubscribe) {
+        this._unsubscribe()
+        this._unsubscribe = null
+      }
+
+      // 停止 MutationObserver（兼容旧逻辑）
       if (this._observer) {
         this._observer.disconnect()
         this._observer = null
@@ -242,6 +259,36 @@
       this._processedLinks = new WeakSet()
 
       console.log(`${LOG_PREFIX} 模块已销毁`)
+    }
+
+    /**
+     * 尝试从降级状态恢复
+     */
+    async attemptRecovery() {
+      if (!this.stats.degraded) {
+        console.log(`${LOG_PREFIX} 模块未降级，无需恢复`)
+        return false
+      }
+
+      try {
+        // 重新启用
+        this.enabled = true
+
+        // 重新设置监听
+        this._setupMutationObserver()
+
+        // 清除降级标记
+        this.stats.degraded = false
+        delete this.stats.degradationReason
+        delete this.stats.degradationTime
+
+        console.log(`${LOG_PREFIX} 从降级状态恢复成功`)
+        return true
+      } catch (error) {
+        console.error(`${LOG_PREFIX} 恢复失败:`, error)
+        this.enabled = false
+        return false
+      }
     }
   }
 

@@ -129,10 +129,26 @@
   }
 
   /**
+   * 等待 DomainConfig 加载完成
+   */
+  async function waitForDomainConfig(timeout = 2000) {
+    const startTime = Date.now()
+    while (!window.DomainConfig && Date.now() - startTime < timeout) {
+      await new Promise(resolve => setTimeout(resolve, 50))
+    }
+    if (!window.DomainConfig) {
+      throw new Error('DomainConfig 加载超时，请检查 critical-bundle.js 是否正确加载')
+    }
+  }
+
+  /**
    * 主初始化函数
    */
   async function init() {
     console.log(`[Main] 开始初始化，当前域名: ${hostname}, readyState: ${document.readyState}`)
+
+    // 等待 DomainConfig 加载完成（解决竞态条件）
+    await waitForDomainConfig()
 
     // 获取域名配置
     const config = window.DomainConfig.getScriptConfig(hostname)

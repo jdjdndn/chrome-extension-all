@@ -39,6 +39,25 @@
     idleCallbackId: null,
     // MutationObserver 监听器
     observer: null,
+    // 事件监听器引用（用于清理）
+    interactionListeners: [],
+    interactionTimer: null,
+    // 性能监控指标
+    performanceMetrics: {
+      // 模块加载耗时记录 { moduleName: duration }
+      moduleLoadTimes: {},
+      // 空闲任务统计
+      idleTasks: {
+        total: 0,
+        completed: 0,
+        timedOut: 0,
+      },
+      // 关键路径耗时
+      criticalPath: {
+        schedulerInitTime: 0,
+        firstIdleTime: 0,
+      },
+    },
   }
 
   // ========== 工具函数 ==========
@@ -142,7 +161,15 @@
         state.executingIdle.add(task.name)
 
         log(`执行空闲任务: ${task.name}`)
+        const startTime = performance.now()
         safeExecute(task.name, task.callback)
+        const duration = performance.now() - startTime
+        state.performanceMetrics.moduleLoadTimes[task.name] = duration
+        state.performanceMetrics.idleTasks.completed++
+
+        if (CONFIG.debug) {
+          log(`空闲任务 "${task.name}" 执行耗时: ${duration.toFixed(2)}ms`)
+        }
 
         state.executingIdle.delete(task.name)
       }
@@ -172,27 +199,67 @@
   function observePageActivity() {
     // 监听用户交互事件
     const interactionEvents = ['mousedown', 'keydown', 'touchstart', 'scroll']
-    let interactionTimer = null
 
     function onInteraction() {
       state.isIdle = false
-      if (interactionTimer) {
-        clearTimeout(interactionTimer)
+      if (state.interactionTimer) {
+        clearTimeout(state.interactionTimer)
       }
 
       // 用户交互后 1 秒视为空闲
-      interactionTimer = setTimeout(() => {
+      state.interactionTimer = setTimeout(() => {
         state.isIdle = true
         log('页面进入空闲状态')
       }, 1000)
     }
 
+    // 保存监听器引用并添加监听器
     interactionEvents.forEach((event) => {
       document.addEventListener(event, onInteraction, { passive: true })
+      state.interactionListeners.push({ event, listener: onInteraction, target: document })
     })
 
     // 初始状态：空闲
     state.isIdle = true
+  }
+
+  /**
+   * 销毁 LoadScheduler
+   * 清理所有事件监听器、定时器和空闲回调
+   */
+  function destroy() {
+    // 清理空闲回调
+    if (state.idleCallbackId !== null) {
+      if (typeof cancelIdleCallback !== 'undefined') {
+        cancelIdleCallback(state.idleCallbackId)
+      }
+      state.idleCallbackId = null
+    }
+
+    // 清理交互定时器
+    if (state.interactionTimer) {
+      clearTimeout(state.interactionTimer)
+      state.interactionTimer = null
+    }
+
+    // 清理事件监听器
+    state.interactionListeners.forEach(({ event, listener, target }) => {
+      target.removeEventListener(event, listener)
+    })
+    state.interactionListeners = []
+
+    // 清理 MutationObserver
+    if (state.observer) {
+      state.observer.disconnect()
+      state.observer = null
+    }
+
+    // 清空队列
+    state.idleQueue = []
+    state.executingIdle.clear()
+    state.loaded.clear()
+
+    log('LoadScheduler 已销毁')
   }
 
   // ========== 公共 API ==========
@@ -210,7 +277,16 @@
 
     log(`注册关键模块: ${name}`)
     state.loaded.add(name)
+
+    // 性能监控：记录模块加载耗时
+    const startTime = performance.now()
     safeExecute(name, callback)
+    const duration = performance.now() - startTime
+    state.performanceMetrics.moduleLoadTimes[name] = duration
+
+    if (CONFIG.debug) {
+      log(`模块 "${name}" 加载耗时: ${duration.toFixed(2)}ms`)
+    }
   }
 
   /**
@@ -243,6 +319,7 @@
     state.idleQueue.sort((a, b) => b.priority - a.priority)
 
     state.loaded.add(name)
+    state.performanceMetrics.idleTasks.total++
 
     // 启动调度器
     startIdleScheduler()
@@ -296,12 +373,86 @@
   }
 
   /**
+   * 获取性能监控指标
+   */
+  function getPerformanceMetrics() {
+    return {
+      moduleLoadTimes: { ...state.performanceMetrics.moduleLoadTimes },
+      idleTasks: { ...state.performanceMetrics.idleTasks },
+      criticalPath: { ...state.performanceMetrics.criticalPath },
+    }
+  }
+
+  /**
    * 设置调试模式
    * @param {boolean} enabled - 是否启用
    */
   function setDebug(enabled) {
     CONFIG.debug = enabled
     log(`调试模式 ${enabled ? '已启用' : '已禁用'}`)
+  }
+
+  // ========== 自动触发懒加载 ==========
+
+  /**
+   * 加载 core-bundle.js（懒加载核心模块）
+   * 通过动态脚本注入加载非关键模块
+   */
+  function loadCoreBundle() {
+    if (state.loaded.has('core-bundle')) {
+      log('core-bundle 已加载')
+      return Promise.resolve()
+    }
+
+    state.loaded.add('core-bundle')
+
+    return new Promise((resolve) => {
+      // 确保 DOM 可用
+      function inject() {
+        if (!chrome?.runtime?.getURL) {
+          log('非 Chrome 扩展环境，跳过 core-bundle 加载', 'warn')
+          resolve()
+          return
+        }
+
+        const script = document.createElement('script')
+        script.src = chrome.runtime.getURL('content/core-bundle.js')
+        script.onload = () => {
+          log('core-bundle.js 加载完成')
+          script.remove()
+          resolve()
+        }
+        script.onerror = (e) => {
+          log(`core-bundle.js 加载失败: ${e.message || e.type}`, 'error')
+          script.remove()
+          resolve()
+        }
+        ;(document.head || document.documentElement).appendChild(script)
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', inject, { once: true })
+      } else {
+        inject()
+      }
+    })
+  }
+
+  /**
+   * 触发懒加载
+   * 在浏览器空闲时自动加载 core-bundle.js
+   * 由 critical.js 入口调用
+   */
+  function triggerLazyLoad() {
+    if (state.loaded.has('core-bundle')) {
+      log('core-bundle 已在队列中')
+      return
+    }
+
+    log('注册 core-bundle 懒加载任务')
+    registerIdle('core-bundle', loadCoreBundle, {
+      priority: 10,
+    })
   }
 
   // ========== 初始化 ==========
@@ -314,9 +465,13 @@
     registerCritical,
     registerIdle,
     registerDeferred,
+    triggerLazyLoad,
+    loadCoreBundle,
     isLoaded,
     getStats,
+    getPerformanceMetrics,
     setDebug,
+    destroy,
   }
 
   console.log('[LoadScheduler] 加载调度器已初始化')

@@ -226,7 +226,7 @@
       "type": "block"
     },
     "condition": {
-      "urlFilter": "||img.alicdn.com",
+      "urlFilter": "||onkey.csapra.com",
       "resourceTypes": ["xmlhttprequest", "script", "image"]
     }
   },
@@ -237,7 +237,7 @@
       "type": "block"
     },
     "condition": {
-      "urlFilter": "||onkey.csapra.com",
+      "urlFilter": "||monkey.csapra.com",
       "resourceTypes": ["xmlhttprequest", "script", "image"]
     }
   },
@@ -248,7 +248,7 @@
       "type": "block"
     },
     "condition": {
-      "urlFilter": "||monkey.csapra.com",
+      "urlFilter": "||hongniu.ewytek.com",
       "resourceTypes": ["xmlhttprequest", "script", "image"]
     }
   },
@@ -259,7 +259,7 @@
       "type": "block"
     },
     "condition": {
-      "urlFilter": "||hongniu.ewytek.com",
+      "urlFilter": "||hongniu.ewytek.co",
       "resourceTypes": ["xmlhttprequest", "script", "image"]
     }
   },
@@ -270,7 +270,7 @@
       "type": "block"
     },
     "condition": {
-      "urlFilter": "||hongniu.ewytek.co",
+      "urlFilter": "||hongniu.ewytek.cn",
       "resourceTypes": ["xmlhttprequest", "script", "image"]
     }
   },
@@ -281,23 +281,12 @@
       "type": "block"
     },
     "condition": {
-      "urlFilter": "||hongniu.ewytek.cn",
-      "resourceTypes": ["xmlhttprequest", "script", "image"]
-    }
-  },
-  {
-    "id": 27,
-    "priority": 1,
-    "action": {
-      "type": "block"
-    },
-    "condition": {
       "urlFilter": "||mapjgeachilmcbbokkgcbgpbakaaeehi",
       "resourceTypes": ["xmlhttprequest", "script", "image"]
     }
   },
   {
-    "id": 28,
+    "id": 27,
     "priority": 1,
     "action": {
       "type": "block"

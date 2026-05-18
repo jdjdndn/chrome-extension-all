@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "node scripts/dev.js",
-    "watch": "vite build --watch",
+    "watch": "chokidar content/**/* popup/**/* styles/**/* shared/**/* *.html *.js manifest.json --ignore dist/** --ignore node_modules/** -c \"npm run build\" --initial",
     "build": "vite build",
     "sync": "node scripts/watch-and-sync.js --once",
     "bundle": "node scripts/build-site-bundles.js",
@@ -26,10 +26,12 @@
   "devDependencies": {
     "@types/chrome": "^0.1.40",
     "@vitest/coverage-v8": "^4.1.4",
+    "chokidar-cli": "^3.0.0",
     "esbuild": "^0.27.4",
     "eslint": "^8.57.1",
     "jsdom": "^29.0.2",
     "lint-staged": "^17.0.2",
+    "nodemon": "^3.1.14",
     "prettier": "^3.8.3",
     "simple-git-hooks": "^2.13.1",
     "typescript": "^6.0.2",

@@ -1,3 +1,6 @@
+// 标记关键 CSS 已加载
+document.documentElement.classList.add('critical-css-loaded')
+
 // ========== 每日一言 ==========
 const QUOTES = [
   { text: '生活不是等待暴风雨过去，而是学会在雨中跳舞。', author: '维维安·格林' },
@@ -36,9 +39,20 @@ function loadDailyQuote() {
   quoteAuthor.textContent = `—— ${quote.author}`
 }
 
-// 初始化
-loadDailyQuote()
-loadWeather()
+// 初始化 - 延迟加载非关键资源
+// 使用 requestIdleCallback 在浏览器空闲时加载天气和每日一言
+if ('requestIdleCallback' in window) {
+  requestIdleCallback(() => {
+    loadDailyQuote()
+    loadWeather()
+  }, { timeout: 2000 })
+} else {
+  // 降级方案：延迟 1 秒加载
+  setTimeout(() => {
+    loadDailyQuote()
+    loadWeather()
+  }, 1000)
+}
 
 // ========== 天气显示 ==========
 async function loadWeather() {
@@ -50,8 +64,18 @@ async function loadWeather() {
   }
 
   try {
+    // 使用 AbortController 设置超时
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 5000)
+
     // 使用免费的天气API (wttr.in)
-    const response = await fetch('https://wttr.in/?format=j1')
+    const response = await fetch('https://wttr.in/?format=j1', {
+      signal: controller.signal,
+      // 使用 cache: 'force-cache' 优先使用缓存
+      cache: 'default'
+    })
+    clearTimeout(timeoutId)
+
     if (!response.ok) {
       throw new Error('Weather API failed')
     }
@@ -66,7 +90,8 @@ async function loadWeather() {
     const code = parseInt(current.weatherCode)
     iconEl.textContent = getWeatherIcon(code)
   } catch (error) {
-    console.error('加载天气失败:', error)
+    // 静默失败，不影响用户体验
+    console.debug('天气加载失败:', error.message)
     tempEl.textContent = '--°C'
     descEl.textContent = '获取失败'
   }
@@ -138,25 +163,23 @@ function applyColumnsSetting(columns) {
   quickLinks.style.gridTemplateColumns = `repeat(${columns}, 1fr)`
 }
 
-// 设置抽屉逻辑
-const settingsBtn = document.getElementById('settingsBtn')
-const settingsDrawer = document.getElementById('settingsDrawer')
-const settingsCloseBtn = document.getElementById('settingsCloseBtn')
-const drawerOverlay = document.getElementById('drawerOverlay')
+// 变量声明（延迟初始化）
+let settingsBtn, settingsDrawer, settingsCloseBtn, drawerOverlay
+let columnsRange, columnsValue, historyCountRange, historyCountValue
 
 function openSettings() {
-  settingsDrawer.classList.add('open')
-  drawerOverlay.classList.add('open')
+  if (settingsDrawer && drawerOverlay) {
+    settingsDrawer.classList.add('open')
+    drawerOverlay.classList.add('open')
+  }
 }
 
 function closeSettings() {
-  settingsDrawer.classList.remove('open')
-  drawerOverlay.classList.remove('open')
+  if (settingsDrawer && drawerOverlay) {
+    settingsDrawer.classList.remove('open')
+    drawerOverlay.classList.remove('open')
+  }
 }
-
-settingsBtn.addEventListener('click', openSettings)
-settingsCloseBtn.addEventListener('click', closeSettings)
-drawerOverlay.addEventListener('click', closeSettings)
 
 // ESC 关闭抽屉
 document.addEventListener('keydown', (e) => {
@@ -165,34 +188,50 @@ document.addEventListener('keydown', (e) => {
   }
 })
 
-// 列数滑块
-const columnsRange = document.getElementById('columnsRange')
-const columnsValue = document.getElementById('columnsValue')
+// 初始化设置相关 DOM
+function initSettingsDom() {
+  settingsBtn = document.getElementById('settingsBtn')
+  settingsDrawer = document.getElementById('settingsDrawer')
+  settingsCloseBtn = document.getElementById('settingsCloseBtn')
+  drawerOverlay = document.getElementById('drawerOverlay')
 
-columnsRange.addEventListener('input', (e) => {
-  const value = parseInt(e.target.value)
-  columnsValue.textContent = value
-  applyColumnsSetting(value)
+  if (settingsBtn) {settingsBtn.addEventListener('click', openSettings)}
+  if (settingsCloseBtn) {settingsCloseBtn.addEventListener('click', closeSettings)}
+  if (drawerOverlay) {drawerOverlay.addEventListener('click', closeSettings)}
 
-  const settings = getSettings()
-  settings.columns = value
-  saveSettings(settings)
-})
+  // 列数滑块
+  columnsRange = document.getElementById('columnsRange')
+  columnsValue = document.getElementById('columnsValue')
 
-// 历史记录数量滑块
-const historyCountRange = document.getElementById('historyCountRange')
-const historyCountValue = document.getElementById('historyCountValue')
+  if (columnsRange) {
+    columnsRange.addEventListener('input', (e) => {
+      const value = parseInt(e.target.value)
+      if (columnsValue) {columnsValue.textContent = value}
+      applyColumnsSetting(value)
 
-historyCountRange.addEventListener('input', (e) => {
-  const value = parseInt(e.target.value)
-  historyCountValue.textContent = value
+      const settings = getSettings()
+      settings.columns = value
+      saveSettings(settings)
+    })
+  }
 
-  const settings = getSettings()
-  settings.historyCount = value
-  saveSettings(settings)
+  // 历史记录数量滑块
+  historyCountRange = document.getElementById('historyCountRange')
+  historyCountValue = document.getElementById('historyCountValue')
 
-  loadHistory()
-})
+  if (historyCountRange) {
+    historyCountRange.addEventListener('input', (e) => {
+      const value = parseInt(e.target.value)
+      if (historyCountValue) {historyCountValue.textContent = value}
+
+      const settings = getSettings()
+      settings.historyCount = value
+      saveSettings(settings)
+
+      loadHistory()
+    })
+  }
+}
 
 // 初始化设置
 function initSettings() {
@@ -218,8 +257,12 @@ function initSettings() {
   // 应用列数
   applyColumnsSetting(settings.columns)
 
-  // 加载历史记录
-  loadHistory()
+  // 延迟加载历史记录（非首屏关键内容）
+  if ('requestIdleCallback' in window) {
+    requestIdleCallback(() => loadHistory(), { timeout: 1000 })
+  } else {
+    setTimeout(() => loadHistory(), 500)
+  }
 }
 
 // ========== 工具函数 ==========
@@ -884,7 +927,10 @@ function loadQuickLinks() {
 }
 
 // 添加新快捷方式
-document.getElementById('addLinkBtn').addEventListener('click', () => {
+function initAddLinkBtn() {
+  const addBtn = document.getElementById('addLinkBtn')
+  if (!addBtn) {return}
+  addBtn.addEventListener('click', () => {
   const title = prompt('请输入网站名称:')
   if (!title) {
     return
@@ -913,16 +959,24 @@ document.getElementById('addLinkBtn').addEventListener('click', () => {
   quickLinksContainer.insertBefore(linkEl, addBtn)
 
   updateQuickLinksFromDOM()
-})
+  })
+}
 
 // ========== 初始化 ==========
-// 页面加载时加载快捷方式和设置
-initQuickLinks()
-loadQuickLinks()
-initSettings()
+document.addEventListener('DOMContentLoaded', () => {
+  initSettingsDom()
+  initTabSwitching()
+  initAddLinkBtn()
+  initCategoryBtn()
+  initImportBtn()
+  initQuickLinks()
+  loadQuickLinks()
+  initSettings()
 
-// 聚焦搜索框
-searchInput.focus()
+  // 聚焦搜索框
+  const searchInput = document.getElementById('searchInput')
+  if (searchInput) {searchInput.focus()}
+})
 
 // 初始化快捷方式（首次时保存默认图标到 storage）
 function initQuickLinks() {
@@ -1254,26 +1308,30 @@ function formatTime(timestamp) {
 }
 
 // ========== Tab 切换 ==========
-const tabBtns = document.querySelectorAll('.tab-btn')
-const tabContents = document.querySelectorAll('.tab-content')
+let tabBtns, tabContents
 
-tabBtns.forEach((btn) => {
-  btn.addEventListener('click', () => {
-    const tabId = btn.dataset.tab
+function initTabSwitching() {
+  tabBtns = document.querySelectorAll('.tab-btn')
+  tabContents = document.querySelectorAll('.tab-content')
 
-    // 切换按钮状态
-    tabBtns.forEach((b) => b.classList.remove('active'))
-    btn.classList.add('active')
+  tabBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const tabId = btn.dataset.tab
 
-    // 切换内容
-    tabContents.forEach((content) => {
-      content.classList.remove('active')
-      if (content.id === `tab-${tabId}`) {
-        content.classList.add('active')
-      }
+      // 切换按钮状态
+      tabBtns.forEach((b) => b.classList.remove('active'))
+      btn.classList.add('active')
+
+      // 切换内容
+      tabContents.forEach((content) => {
+        content.classList.remove('active')
+        if (content.id === `tab-${tabId}`) {
+          content.classList.add('active')
+        }
+      })
     })
   })
-})
+}
 
 // ========== 学习资源管理 ==========
 const LEARN_RESOURCES_KEY = 'learnResources'
@@ -1644,9 +1702,13 @@ modalOverlay.addEventListener('click', (e) => {
 })
 
 // 添加分类
-document.getElementById('addCategoryBtn').addEventListener('click', () => {
-  showModal('添加分类', '分类名称', '分类图标（emoji）', '', 'add-category')
-})
+function initCategoryBtn() {
+  const addCategoryBtn = document.getElementById('addCategoryBtn')
+  if (!addCategoryBtn) {return}
+  addCategoryBtn.addEventListener('click', () => {
+    showModal('添加分类', '分类名称', '分类图标（emoji）', '', 'add-category')
+  })
+}
 
 // 添加链接
 function showAddLinkModal(categoryId) {
@@ -1726,8 +1788,12 @@ function loadLearnResources() {
   })
 }
 
-// 初始化学习资源
-loadLearnResources()
+// 初始化学习资源 - 延迟加载（非首屏关键内容）
+if ('requestIdleCallback' in window) {
+  requestIdleCallback(() => loadLearnResources(), { timeout: 2000 })
+} else {
+  setTimeout(() => loadLearnResources(), 1000)
+}
 
 // ========== 从书签导入 ==========
 // 递归查找"学习"相关的书签文件夹
@@ -1849,12 +1915,16 @@ function importFromBookmarks() {
 }
 
 // 绑定导入按钮事件
-document.getElementById('importBookmarkBtn').addEventListener('click', importFromBookmarks)
+function initImportBtn() {
+  const importBtn = document.getElementById('importBookmarkBtn')
+  if (!importBtn) {return}
+  importBtn.addEventListener('click', importFromBookmarks)
+}
 
 // ========== 空格点击 ==========
 // Space短按: 点击鼠标位置元素
 // Space长按: 从鼠标位置开始选文本，移动鼠标扩展，松开确认复制
-;(function () {
+(function () {
   let mouseX = 0,
     mouseY = 0
   let spaceHeld = false
@@ -2100,10 +2170,69 @@ document.getElementById('importBookmarkBtn').addEventListener('click', importFro
 // ========== AI 聚合问答逻辑 ==========
 const aiAggregator = {
   selectedSites: new Set(),
-  responses: new Map(), // siteId -> { status, content }
+  responses: new Map(),
   isRunning: false,
   startTime: null,
+  timeoutId: null,
+  aggregatorTabId: null,
+  sites: [],
 }
+
+// 默认 AI 网站配置
+const DEFAULT_AI_SITES = [
+  {
+    id: 'doubao',
+    name: '豆包',
+    url: 'https://www.doubao.com/chat/',
+    enabled: true,
+    selectors: {
+      input: "textarea, [contenteditable='true']",
+      sendButton:
+        "button[type='submit'], button[aria-label*='发送'], button[class*='send'], div[role='button'][class*='send'], svg[class*='send']",
+      responseContainer:
+        "[class*='message'], [class*='chat'], [class*='answer'], pre, .markdown, [class*='response']",
+      loginIndicator: "[class*='avatar'], [class*='user']",
+    },
+  },
+  {
+    id: 'tongyi',
+    name: '通义千问',
+    url: 'https://www.qianwen.com/',
+    enabled: true,
+    selectors: {
+      input: "textarea, input[type='text'], input:not([type]), [contenteditable='true']",
+      sendButton:
+        "button[aria-label='发送消息'], button[aria-label*='发送'], button[class*='send'], button[type='submit'], [class*='sendBtn']",
+      responseContainer: "[class*='collapseSection-'], [class*='response'], [class*='answer']",
+      loginIndicator: "[class*='avatar'], [class*='user']",
+    },
+  },
+  {
+    id: 'kimi',
+    name: 'Kimi',
+    url: 'https://kimi.moonshot.cn/',
+    enabled: true,
+    selectors: {
+      input: "textarea, [contenteditable='true']",
+      sendButton:
+        "button[type='submit'], button[aria-label*='发送'], button[aria-label*='Send'], button[class*='send'], div[role='button'][class*='send']",
+      responseContainer: ".chat-content-item-assistant, [class*='chat-content-item-assistant']",
+      loginIndicator: "[class*='avatar'], [class*='user']",
+    },
+  },
+  {
+    id: 'wenxin',
+    name: '文心一言',
+    url: 'https://chat.baidu.com/search/15130762097409791033?enter_type=sidebar_dialog',
+    enabled: true,
+    selectors: {
+      input: "textarea, [contenteditable='true']",
+      sendButton: "button[class*='send']",
+      responseContainer: "[class*='answer-container']",
+      loginIndicator: "[class*='avatar'], [class*='user']",
+    },
+  },
+]
 
 // 初始化 AI 聚合
 function initAIAggregator() {
@@ -2111,8 +2240,30 @@ function initAIAggregator() {
   const sendBtn = document.getElementById('aiSendBtn')
   const questionInput = document.getElementById('aiQuestionInput')
 
-  // 加载 AI 网站列表
-  loadAISites()
+  // 监听来自注入脚本的消息
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message._aiAggregator) {
+      console.log('[AI Aggregator] 收到消息:', message.type, message.siteId)
+      if (message.type === 'AI_RESPONSE') {
+        updateResponseCard(message.siteId, {
+          content: message.content,
+          isComplete: message.isComplete,
+        })
+      } else if (message.type === 'AI_STATUS') {
+        updateResponseCard(message.siteId, { status: message.status })
+      } else if (message.type === 'AI_ERROR') {
+        updateResponseCard(message.siteId, {
+          status: 'error',
+          error: message.error,
+        })
+      }
+    }
+    return false
+  })
+
+  // 直接使用默认配置，不请求 background
+  aiAggregator.sites = DEFAULT_AI_SITES.filter((s) => s.enabled)
+  renderSiteSelector()
 
   // 发送按钮点击
   sendBtn.addEventListener('click', () => {
@@ -2136,66 +2287,41 @@ function initAIAggregator() {
   })
 }
 
-// 加载 AI 网站列表
-async function loadAISites() {
+// 渲染网站选择器
+function renderSiteSelector() {
   const siteSelector = document.getElementById('aiSiteSelector')
+  siteSelector.innerHTML = aiAggregator.sites
+    .map(
+      (site) => `
+    <label class="ai-site-item selected" data-site-id="${site.id}">
+      <input type="checkbox" checked>
+      <span>${site.name}</span>
+    </label>
+  `
+    )
+    .join('')
 
-  try {
-    console.log('[AI Aggregator] 请求 AI 网站列表...')
-    const response = await chrome.runtime.sendMessage({
-      type: 'AIAGGREGATOR_GET_SITES',
-    })
-    console.log('[AI Aggregator] 收到响应:', response)
+  // 默认全选
+  aiAggregator.sites.forEach((site) => aiAggregator.selectedSites.add(site.id))
 
-    if (response && response.success && response.sites) {
-      console.log('[AI Aggregator] 网站列表:', response.sites)
-      siteSelector.innerHTML = response.sites
-        .map(
-          (site) => `
-        <label class="ai-site-item" data-site-id="${site.id}">
-          <input type="checkbox" checked>
-          <span>${site.name}</span>
-          ${site.options && Object.keys(site.options).length > 0 ? '<button class="ai-site-config-btn" title="配置">⚙️</button>' : ''}
-        </label>
-      `
-        )
-        .join('')
+  // 绑定选择事件
+  siteSelector.querySelectorAll('.ai-site-item').forEach((item) => {
+    item.addEventListener('click', (e) => {
+      e.preventDefault()
+      const checkbox = item.querySelector('input')
+      const siteId = item.dataset.siteId
 
-      // 默认全选
-      response.sites.forEach((site) => aiAggregator.selectedSites.add(site.id))
+      checkbox.checked = !checkbox.checked
 
-      // 绑定选择事件
-      siteSelector.querySelectorAll('.ai-site-item').forEach((item) => {
-        item.addEventListener('click', (e) => {
-          if (e.target.classList.contains('ai-site-config-btn')) {
-            e.stopPropagation()
-            showSiteConfig(item.dataset.siteId)
-            return
-          }
-
-          const checkbox = item.querySelector('input')
-          const siteId = item.dataset.siteId
-
-          if (checkbox.checked) {
-            aiAggregator.selectedSites.add(siteId)
-            item.classList.add('selected')
-          } else {
-            aiAggregator.selectedSites.delete(siteId)
-            item.classList.remove('selected')
-          }
-        })
-
-        // 初始状态
+      if (checkbox.checked) {
+        aiAggregator.selectedSites.add(siteId)
         item.classList.add('selected')
-      })
-    } else {
-      console.error('[AI Aggregator] 响应格式错误:', response)
-      siteSelector.innerHTML = '<span style="color:red">加载失败，请刷新页面重试</span>'
-    }
-  } catch (error) {
-    console.error('[AI Aggregator] 加载网站列表失败:', error)
-    siteSelector.innerHTML = `<span style="color:red">加载失败: ${error.message}</span>`
-  }
+      } else {
+        aiAggregator.selectedSites.delete(siteId)
+        item.classList.remove('selected')
+      }
+    })
+  })
 }
 
 // 发送问题到多个 AI
@@ -2210,23 +2336,408 @@ async function sendQuestionToAIs(question) {
   aiAggregator.isRunning = true
   aiAggregator.startTime = Date.now()
 
+  // 获取当前 newtab 的 tabId（只获取一次）
+  const [currentTab] = await chrome.tabs.query({ active: true, currentWindow: true })
+  aiAggregator.aggregatorTabId = currentTab?.id
+  console.log('[AI Aggregator] 当前 newtab tabId:', aiAggregator.aggregatorTabId)
+
+  // 向 background 注册 aggregatorTabId
+  chrome.runtime.sendMessage({
+    type: 'AIA_REGISTER_AGGREGATOR',
+    tabId: aiAggregator.aggregatorTabId,
+  })
+
   // 初始化响应卡片
   initResponseCards()
 
-  // 发送到 background
-  try {
-    await chrome.runtime.sendMessage({
-      type: 'AIAGGREGATOR_START',
-      question: question,
-      selectedSites: Array.from(aiAggregator.selectedSites),
-      aggregatorTabId: (await chrome.tabs.getCurrent()).id,
-    })
+  statusEl.textContent = '正在发送问题...'
 
-    statusEl.textContent = '正在发送问题...'
+  // 设置超时保护（60秒后自动重置）
+  if (aiAggregator.timeoutId) {
+    clearTimeout(aiAggregator.timeoutId)
+  }
+  aiAggregator.timeoutId = setTimeout(() => {
+    if (aiAggregator.isRunning) {
+      const statusEl = document.getElementById('aiAggregatorStatus')
+      statusEl.textContent = '部分 AI 响应超时，已重置'
+      // 将未完成的标记为超时
+      aiAggregator.responses.forEach((response, siteId) => {
+        if (response.status !== 'completed' && response.status !== 'error') {
+          updateResponseCard(siteId, { status: 'error', error: '响应超时' })
+        }
+      })
+      resetAggregator()
+    }
+  }, 60000)
+
+  // 直接创建标签页并发送问题
+  const selectedSites = aiAggregator.sites.filter((s) => aiAggregator.selectedSites.has(s.id))
+
+  for (const site of selectedSites) {
+    createAITab(site, question)
+  }
+}
+
+// 创建 AI 标签页
+async function createAITab(site, question) {
+  try {
+    // 从 URL 提取域名进行匹配
+    const urlObj = new URL(site.url)
+    const domain = urlObj.hostname
+
+    // 查找该域名的所有标签页
+    const allTabs = await chrome.tabs.query({ url: `*://*.${domain}/*` })
+    console.log('[AI Aggregator] 查找域名:', domain, '找到标签页:', allTabs.length)
+
+    // 过滤掉 discarded（被浏览器休眠）的标签页，优先使用活跃的
+    const activeTabs = allTabs.filter((t) => !t.discarded)
+    const matchedTabs = activeTabs.length > 0 ? activeTabs : allTabs
+
+    let tab
+    if (matchedTabs.length > 0) {
+      // 复用已有标签页
+      tab = matchedTabs[0]
+      console.log('[AI Aggregator] 复用已有标签页:', site.name, tab.id, tab.url)
+    } else {
+      // 创建新标签页
+      tab = await chrome.tabs.create({
+        url: site.url,
+        active: false,
+      })
+      console.log('[AI Aggregator] 创建新标签页:', site.name, tab.id)
+    }
+
+    aiAggregator.responses.set(site.id, { tabId: tab.id, status: 'loading', content: '' })
+    updateResponseCard(site.id, { status: 'loading' })
+
+    // 如果是复用的标签页，直接注入；否则等待加载
+    if (matchedTabs.length > 0) {
+      injectAndSend(tab.id, site, question)
+    } else {
+      // 等待页面加载完成
+      const onUpdated = (tabId, changeInfo) => {
+        if (tabId === tab.id && changeInfo.status === 'complete') {
+          chrome.tabs.onUpdated.removeListener(onUpdated)
+          injectAndSend(tab.id, site, question)
+        }
+      }
+      chrome.tabs.onUpdated.addListener(onUpdated)
+      setTimeout(() => chrome.tabs.onUpdated.removeListener(onUpdated), 15000)
+    }
   } catch (error) {
-    console.error('[AI Aggregator] 发送失败:', error)
-    statusEl.textContent = '发送失败: ' + error.message
-    resetAggregator()
+    console.error(`[AI Aggregator] 创建标签页失败: ${site.name}`, error)
+    updateResponseCard(site.id, { status: 'error', error: error.message })
+  }
+}
+
+// 注入脚本并发送问题
+async function injectAndSend(tabId, site, question) {
+  try {
+    // 注入执行脚本
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: (siteConfig, questionText) => {
+        const waitForElement = (selectors, timeout = 10000) => {
+          return new Promise((resolve, reject) => {
+            const selectorList = selectors.split(',').map((s) => s.trim())
+            for (const selector of selectorList) {
+              const element = document.querySelector(selector)
+              if (element) {
+                resolve(element)
+                return
+              }
+            }
+            const observer = new MutationObserver(() => {
+              for (const selector of selectorList) {
+                const element = document.querySelector(selector)
+                if (element) {
+                  observer.disconnect()
+                  resolve(element)
+                  return
+                }
+              }
+            })
+            observer.observe(document.body, { childList: true, subtree: true })
+            setTimeout(() => {
+              observer.disconnect()
+              reject(new Error(`元素未找到: ${selectors}`))
+            }, timeout)
+          })
+        }
+
+        const sendToAggregator = (type, data) => {
+          console.log('[AI Aggregator] 发送消息:', type, data)
+          chrome.runtime.sendMessage({ _aiAggregator: true, type, ...data })
+        }
+
+        ;(async () => {
+          try {
+            // 等待输入框
+            const input = await waitForElement(siteConfig.selectors.input, 15000)
+            console.log(
+              '[AI Aggregator] 输入框:',
+              input.tagName,
+              'isContentEditable:',
+              input.isContentEditable
+            )
+
+            // 填入问题 - 多种方式尝试
+            input.focus()
+            input.click()
+
+            // 方法1: 原生 setter (React/Vue 受控组件)
+            const fillWithNativeSetter = () => {
+              try {
+                const proto =
+                  input.tagName === 'TEXTAREA'
+                    ? window.HTMLTextAreaElement.prototype
+                    : input.tagName === 'INPUT'
+                      ? window.HTMLInputElement.prototype
+                      : null
+                if (proto) {
+                  const nativeSetter = Object.getOwnPropertyDescriptor(proto, 'value').set
+                  nativeSetter.call(input, questionText)
+                  return true
+                }
+              } catch (e) {
+                console.log('[AI Aggregator] 原生 setter 失败:', e.message)
+              }
+              return false
+            }
+
+            // 方法2: document.execCommand (兼容性更好)
+            const fillWithExecCommand = () => {
+              try {
+                input.focus()
+                document.execCommand('selectAll', false, null)
+                document.execCommand('insertText', false, questionText)
+                return true
+              } catch (e) {
+                console.log('[AI Aggregator] execCommand 失败:', e.message)
+              }
+              return false
+            }
+
+            // 方法3: 直接赋值 + paste 事件
+            const fillWithPaste = () => {
+              try {
+                input.focus()
+                input.select()
+                const pasteEvent = new ClipboardEvent('paste', {
+                  bubbles: true,
+                  cancelable: true,
+                  clipboardData: new DataTransfer(),
+                })
+                pasteEvent.clipboardData.setData('text/plain', questionText)
+                input.dispatchEvent(pasteEvent)
+                return true
+              } catch (e) {
+                console.log('[AI Aggregator] paste 失败:', e.message)
+              }
+              return false
+            }
+
+            // 方法4: contenteditable 特殊处理
+            const fillContentEditable = () => {
+              try {
+                input.focus()
+                // 清空现有内容
+                input.innerHTML = ''
+                // 插入文本节点
+                const textNode = document.createTextNode(questionText)
+                input.appendChild(textNode)
+                // 移动光标到末尾
+                const range = document.createRange()
+                range.selectNodeContents(input)
+                range.collapse(false)
+                const sel = window.getSelection()
+                sel.removeAllRanges()
+                sel.addRange(range)
+                return true
+              } catch (e) {
+                console.log('[AI Aggregator] contenteditable 失败:', e.message)
+              }
+              return false
+            }
+
+            // 按顺序尝试各种方法
+            let filled = false
+            if (input.isContentEditable) {
+              // contenteditable 优先用 innerHTML
+              filled = fillContentEditable()
+              if (!filled) {filled = fillWithExecCommand()}
+            } else if (input.tagName === 'TEXTAREA' || input.tagName === 'INPUT') {
+              // input/textarea 优先用原生 setter
+              filled = fillWithNativeSetter()
+              if (!filled) {filled = fillWithExecCommand()}
+              if (!filled) {filled = fillWithPaste()}
+            } else {
+              // 其他情况尝试所有方法
+              filled = fillWithExecCommand() || fillWithPaste() || fillContentEditable()
+            }
+
+            // 触发各种事件确保框架识别
+            const triggerEvents = () => {
+              // 基础事件
+              input.dispatchEvent(new Event('input', { bubbles: true }))
+              input.dispatchEvent(new Event('change', { bubbles: true }))
+
+              // React 合成事件
+              input.dispatchEvent(
+                new InputEvent('input', {
+                  bubbles: true,
+                  cancelable: true,
+                  inputType: 'insertText',
+                  data: questionText,
+                })
+              )
+
+              // 键盘事件
+              input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true }))
+              input.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }))
+            }
+
+            triggerEvents()
+
+            // 如果第一次没成功，等待后再次尝试
+            await new Promise((r) => setTimeout(r, 200))
+            const currentValue = input.value || input.textContent || input.innerText
+            console.log('[AI Aggregator] 当前值:', currentValue?.substring(0, 50))
+
+            if (!currentValue || currentValue.length < questionText.length / 2) {
+              console.log('[AI Aggregator] 值未设置，尝试备用方法...')
+              if (!filled) {
+                filled = fillWithExecCommand()
+                triggerEvents()
+              }
+            }
+
+            // 等待框架响应
+            await new Promise((r) => setTimeout(r, 300))
+            const finalValue = input.value || input.textContent || input.innerText
+            console.log('[AI Aggregator] 最终值:', finalValue?.substring(0, 50))
+            sendToAggregator('AI_STATUS', { siteId: siteConfig.id, status: 'sending' })
+
+            // 查找发送按钮
+            let sendBtn = null
+            try {
+              sendBtn = await waitForElement(siteConfig.selectors.sendButton, 5000)
+              console.log('[AI Aggregator] 发送按钮:', sendBtn, 'disabled:', sendBtn.disabled)
+            } catch (e) {
+              console.log('[AI Aggregator] 未找到发送按钮，尝试回车发送')
+            }
+
+            // 尝试点击发送按钮
+            if (sendBtn) {
+              // 等待按钮变为可用
+              let retries = 0
+              while (sendBtn.disabled && retries < 30) {
+                await new Promise((r) => setTimeout(r, 300))
+                retries++
+                if (retries % 5 === 0) {
+                  console.log('[AI Aggregator] 等待按钮可用...', retries)
+                }
+              }
+
+              if (!sendBtn.disabled) {
+                sendBtn.click()
+                console.log('[AI Aggregator] 已点击发送按钮')
+              } else {
+                // 按钮仍禁用，尝试强制触发 click 事件
+                console.log('[AI Aggregator] 按钮仍禁用，尝试强制触发')
+                sendBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+              }
+            }
+
+            // 等待一下再发送回车
+            await new Promise((r) => setTimeout(r, 300))
+
+            // 回车发送作为备选（某些 AI 需要回车）
+            input.dispatchEvent(
+              new KeyboardEvent('keydown', {
+                key: 'Enter',
+                code: 'Enter',
+                keyCode: 13,
+                which: 13,
+                bubbles: true,
+                cancelable: true,
+              })
+            )
+            input.dispatchEvent(
+              new KeyboardEvent('keypress', {
+                key: 'Enter',
+                code: 'Enter',
+                keyCode: 13,
+                which: 13,
+                bubbles: true,
+                cancelable: true,
+              })
+            )
+            input.dispatchEvent(
+              new KeyboardEvent('keyup', {
+                key: 'Enter',
+                code: 'Enter',
+                keyCode: 13,
+                which: 13,
+                bubbles: true,
+                cancelable: true,
+              })
+            )
+            console.log('[AI Aggregator] 已发送回车键')
+
+            sendToAggregator('AI_STATUS', { siteId: siteConfig.id, status: 'responding' })
+
+            // 监听回复
+            const container = await waitForElement(siteConfig.selectors.responseContainer, 30000)
+            let lastContent = ''
+
+            // 提取回复内容的函数
+            const extractContent = () => {
+              // Kimi 特殊处理：获取最后一个 assistant 消息
+              if (siteConfig.id === 'kimi') {
+                const assistantMessages = document.querySelectorAll('.chat-content-item-assistant')
+                if (assistantMessages.length > 0) {
+                  const lastMessage = assistantMessages[assistantMessages.length - 1]
+                  return (lastMessage.textContent || '').trim()
+                }
+              }
+              // 文心一言特殊处理：获取最后一个 answer-container
+              if (siteConfig.id === 'wenxin') {
+                const answerContainers = document.querySelectorAll("[class*='answer-container']")
+                if (answerContainers.length > 0) {
+                  const lastAnswer = answerContainers[answerContainers.length - 1]
+                  return (lastAnswer.textContent || '').trim()
+                }
+              }
+              // 其他 AI：直接获取容器内容
+              return (container.textContent || '').trim()
+            }
+
+            // 文心一言需要监听整个文档（新回复可能在新的 answer-container 里）
+            const observeTarget = siteConfig.id === 'wenxin' ? document.body : container
+
+            const observer = new MutationObserver(() => {
+              const content = extractContent()
+              if (content && content !== lastContent && content.length > 10) {
+                lastContent = content
+                sendToAggregator('AI_RESPONSE', {
+                  siteId: siteConfig.id,
+                  content: content,
+                  isComplete: false,
+                })
+              }
+            })
+            observer.observe(observeTarget, { childList: true, subtree: true, characterData: true })
+          } catch (error) {
+            sendToAggregator('AI_ERROR', { siteId: siteConfig.id, error: error.message })
+          }
+        })()
+      },
+      args: [site, question],
+    })
+  } catch (error) {
+    console.error(`[AI Aggregator] 注入脚本失败: ${site.name}`, error)
+    updateResponseCard(site.id, { status: 'error', error: error.message })
   }
 }
 
@@ -2270,7 +2781,7 @@ function getSiteName(siteId) {
     doubao: '豆包',
     tongyi: '通义千问',
     kimi: 'Kimi',
-    yiyan: '文心一言',
+    wenxin: '文心一言',
     chatglm: '智谱清言',
   }
   return names[siteId] || siteId
@@ -2336,26 +2847,32 @@ function updateResponseCard(siteId, data) {
 
 // 格式化 AI 回复（简单的 Markdown 支持）
 function formatAIResponse(content) {
-  return content
-    .replace(/\n/g, '<br>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    .replace(
-      /`(.+?)`/g,
-      '<code style="background:#f0f0f0;padding:2px 4px;border-radius:3px;">$1</code>'
-    )
+  return (
+    content
+      // 删除大量空行：将连续3个及以上换行替换为2个换行
+      .replace(/\n{3,}/g, '\n\n')
+      // 删除每行首尾空白
+      .split('\n')
+      .map((line) => line.trim())
+      .join('\n')
+  )
 }
 
 // 更新统计信息
-function updateAggregatorStats() {
+function updateAggregatorStats() {{failed++}
   const statsEl = document.getElementById('aiAggregatorStats')
   const statusEl = document.getElementById('aiAggregatorStatus')
 
   let completed = 0
+  let failed = 0
   const total = aiAggregator.responses.size
 
   aiAggregator.responses.forEach((response) => {
-    if (response.status === 'completed' || response.content) {
+    if (response.status === 'completed' || response.status === 'error') {
+      completed++
+      if (response.status === 'error') {failed++}
+    } else if (response.content) {
+      // 有内容也算完成
       completed++
     }
   })
@@ -2364,7 +2881,11 @@ function updateAggregatorStats() {
 
   if (completed === total) {
     const elapsed = Math.round((Date.now() - aiAggregator.startTime) / 1000)
-    statusEl.textContent = `全部完成，用时 ${elapsed} 秒`
+    if (failed > 0) {
+      statusEl.textContent = `已完成 (${failed} 个失败)，用时 ${elapsed} 秒`
+    } else {
+      statusEl.textContent = `全部完成，用时 ${elapsed} 秒`
+    }
     resetAggregator()
   }
 }
@@ -2372,6 +2893,12 @@ function updateAggregatorStats() {
 // 重置聚合器状态
 function resetAggregator() {
   aiAggregator.isRunning = false
+
+  // 清除超时定时器
+  if (aiAggregator.timeoutId) {
+    clearTimeout(aiAggregator.timeoutId)
+    aiAggregator.timeoutId = null
+  }
 
   const sendBtn = document.getElementById('aiSendBtn')
   const questionInput = document.getElementById('aiQuestionInput')
@@ -2385,36 +2912,6 @@ function showSiteConfig(siteId) {
   // TODO: 实现配置面板
   alert(`配置功能开发中: ${siteId}`)
 }
-
-// 监听来自 Background 的消息
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === 'AIAGGREGATOR_RESPONSE') {
-    updateResponseCard(message.siteId, {
-      content: message.content,
-      isComplete: message.isComplete,
-    })
-    sendResponse({ success: true })
-    return true
-  }
-
-  if (message.type === 'AIAGGREGATOR_STATUS_CHANGE') {
-    updateResponseCard(message.siteId, { status: message.status })
-    sendResponse({ success: true })
-    return true
-  }
-
-  if (message.type === 'AIAGGREGATOR_ERROR') {
-    updateResponseCard(message.siteId, {
-      status: 'error',
-      error: message.error,
-      message: message.message,
-    })
-    sendResponse({ success: true })
-    return true
-  }
-
-  return false
-})
 
 // 绑定操作按钮事件
 document.addEventListener('click', (e) => {
@@ -2434,5 +2931,11 @@ document.addEventListener('click', (e) => {
   }
 })
 
-// 初始化
-initAIAggregator()
+// 初始化 AI 聚合器 - 延迟加载（非首屏关键功能）
+document.addEventListener('DOMContentLoaded', () => {
+  if ('requestIdleCallback' in window) {
+    requestIdleCallback(() => initAIAggregator(), { timeout: 3000 })
+  } else {
+    setTimeout(() => initAIAggregator(), 1500)
+  }
+})

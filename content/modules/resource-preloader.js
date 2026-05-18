@@ -32,6 +32,7 @@
       }
 
       this._observer = null
+      this._unsubscribe = null
       this._processedUrls = new Set()
 
       console.log(`${LOG_PREFIX} 模块初始化完成`)
@@ -122,47 +123,75 @@
 
     /**
      * 监听动态插入的资源
+     * 使用 UnifiedDOMWatcher 统一管理
+     * 使用 CRITICAL 优先级确保预加载不影响 LCP
      */
     _setupObserver() {
-      this._observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-          mutation.addedNodes.forEach((node) => {
-            if (this.stats.preloaded >= this.maxPreloads) {return}
+      // 检查 UnifiedDOMWatcher 是否可用
+      if (!window.UnifiedDOMWatcher) {
+        console.warn(`${LOG_PREFIX} UnifiedDOMWatcher 未加载，使用独立 MutationObserver`)
 
-            if (node.tagName === 'SCRIPT' && node.src && this.preloadJS) {
-              if (this._isCritical(node.src, 'js')) {
-                this._addPreload(node.src, 'script')
-              }
-            }
-
-            if (node.tagName === 'LINK' && node.rel === 'stylesheet' && this.preloadCSS) {
-              if (this._isCritical(node.href, 'css')) {
-                this._addPreload(node.href, 'style')
-              }
-            }
-
-            // 检查子节点
-            if (node.querySelectorAll) {
-              node.querySelectorAll('script[src]').forEach((script) => {
-                if (this.stats.preloaded >= this.maxPreloads) {return}
-                if (this.preloadJS && this._isCritical(script.src, 'js')) {
-                  this._addPreload(script.src, 'script')
-                }
-              })
-              node.querySelectorAll('link[rel="stylesheet"]').forEach((link) => {
-                if (this.stats.preloaded >= this.maxPreloads) {return}
-                if (this.preloadCSS && this._isCritical(link.href, 'css')) {
-                  this._addPreload(link.href, 'style')
-                }
-              })
-            }
-          })
+        // 降级：使用独立 MutationObserver
+        this._observer = new MutationObserver((mutations) => {
+          this._handleMutations(mutations)
         })
-      })
 
-      this._observer.observe(document.documentElement, {
-        childList: true,
-        subtree: true,
+        this._observer.observe(document.documentElement, {
+          childList: true,
+          subtree: true,
+        })
+        return
+      }
+
+      // 使用 UnifiedDOMWatcher 订阅，CRITICAL 优先级（预加载影响 LCP）
+      this._unsubscribe = window.UnifiedDOMWatcher.subscribe(
+        (mutations) => {
+          this._handleMutations(mutations)
+        },
+        {
+          priority: window.UnifiedDOMWatcher.Priority.CRITICAL,
+          name: 'ResourcePreloader',
+          filter: (mutation) => mutation.type === 'childList' && mutation.addedNodes.length > 0,
+        }
+      )
+    }
+
+    /**
+     * 处理 DOM 变更
+     */
+    _handleMutations(mutations) {
+      mutations.forEach((mutation) => {
+        mutation.addedNodes.forEach((node) => {
+          if (this.stats.preloaded >= this.maxPreloads) {return}
+
+          if (node.tagName === 'SCRIPT' && node.src && this.preloadJS) {
+            if (this._isCritical(node.src, 'js')) {
+              this._addPreload(node.src, 'script')
+            }
+          }
+
+          if (node.tagName === 'LINK' && node.rel === 'stylesheet' && this.preloadCSS) {
+            if (this._isCritical(node.href, 'css')) {
+              this._addPreload(node.href, 'style')
+            }
+          }
+
+          // 检查子节点
+          if (node.querySelectorAll) {
+            node.querySelectorAll('script[src]').forEach((script) => {
+              if (this.stats.preloaded >= this.maxPreloads) {return}
+              if (this.preloadJS && this._isCritical(script.src, 'js')) {
+                this._addPreload(script.src, 'script')
+              }
+            })
+            node.querySelectorAll('link[rel="stylesheet"]').forEach((link) => {
+              if (this.stats.preloaded >= this.maxPreloads) {return}
+              if (this.preloadCSS && this._isCritical(link.href, 'css')) {
+                this._addPreload(link.href, 'style')
+              }
+            })
+          }
+        })
       })
     }
 
@@ -291,10 +320,18 @@
     }
 
     destroy() {
+      // 取消 UnifiedDOMWatcher 订阅
+      if (this._unsubscribe) {
+        this._unsubscribe()
+        this._unsubscribe = null
+      }
+
+      // 停止独立 MutationObserver
       if (this._observer) {
         this._observer.disconnect()
         this._observer = null
       }
+
       this.enabled = false
       this._processedUrls.clear()
       console.log(`${LOG_PREFIX} 模块已销毁`)

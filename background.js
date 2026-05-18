@@ -123,6 +123,116 @@ function pushToDevTools(tabId, message) {
 }
 const SETTINE = 'cy_settings'
 
+// ========== 预解析域名匹配缓存 ==========
+// 在 chrome.tabs.onUpdated 的 loading 阶段执行域名匹配，将结果缓存到内存 Map
+// key: tabId, value: { scripts: string[], timestamp: number }
+// 这样在 complete 阶段注入脚本时，无需再重复解析 URL 和匹配域名
+const _tabScriptCache = new Map()
+// 缓存有效期（ms），超过此时间的缓存视为过期
+const _tabScriptCacheMaxAge = 300000 // 5 分钟
+
+// 域名特定脚本映射（打包后的 bundle）
+const _domainScriptMap = {
+  'bilibili.com': ['content/bundled/bili.bundle.js'],
+  'douyin.com': ['content/bundled/douyin.bundle.js'],
+  '4hu.tv': ['content/bundled/4hu.bundle.js'],
+  'weread.qq.com': ['content/bundled/weread.bundle.js'],
+  'quark.cn': ['content/bundled/quark.bundle.js'],
+  '18comic.vip': ['content/bundled/comic18.bundle.js'],
+  'aliyundrive.com': ['content/bundled/aliyun.bundle.js'],
+  'baidu.com': ['content/bundled/baiduPan.bundle.js'],
+  'zhipin.com': ['content/bundled/boss.bundle.js'],
+  'xiaohongshu.com': ['content/bundled/xiaohongshu.bundle.js'],
+  'wyaqpx.com': ['content/bundled/dianGong.bundle.js'],
+  'ymmfa.com': ['content/bundled/gongkong.bundle.js'],
+  'youtube.com': ['content/bundled/youtube.bundle.js'],
+  'github.com': ['content/bundled/github.bundle.js'],
+  'modelscope.cn': ['content/bundled/modelscope.bundle.js'],
+}
+
+// 所有页面都需要的基础脚本
+const _baseScripts = ['content/core-bundle.js', 'content/common-bundle.js']
+
+/**
+ * 纯同步函数：根据 URL 匹配需要注入的脚本列表
+ * @param {string} tabUrl - 完整的页面 URL
+ * @param {boolean} baseAlreadyInjected - 基础脚本是否已注入
+ * @returns {{ scripts: string[], hostname: string }} 匹配到的脚本列表和域名
+ */
+function matchDomainScripts(tabUrl, baseAlreadyInjected = false) {
+  const scripts = []
+  let hostname = ''
+  try {
+    const url = new URL(tabUrl)
+    hostname = url.hostname
+  } catch {
+    return { scripts, hostname }
+  }
+
+  // 基础脚本：仅在未注入时添加
+  if (!baseAlreadyInjected) {
+    scripts.push(..._baseScripts)
+  }
+
+  // 域名特定脚本：精确匹配或子域名匹配
+  for (const [domain, domainScripts] of Object.entries(_domainScriptMap)) {
+    if (hostname === domain || hostname.endsWith('.' + domain)) {
+      scripts.push(...domainScripts)
+      console.log(`[Background] 域名匹配: ${hostname} -> ${domainScripts.join(', ')}`)
+      break
+    }
+  }
+
+  return { scripts, hostname }
+}
+
+/**
+ * 从缓存中获取匹配结果，如果缓存过期则返回 null
+ * @param {number} tabId
+ * @returns {{ scripts: string[], timestamp: number, hostname: string } | null}
+ */
+function getTabScriptCache(tabId) {
+  const cached = _tabScriptCache.get(tabId)
+  if (!cached) {return null}
+  if (Date.now() - cached.timestamp > _tabScriptCacheMaxAge) {
+    _tabScriptCache.delete(tabId)
+    return null
+  }
+  return cached
+}
+
+/**
+ * 设置缓存
+ * @param {number} tabId
+ * @param {{ scripts: string[], hostname: string }} data
+ */
+function setTabScriptCache(tabId, data) {
+  // 限制缓存大小，避免内存泄漏
+  if (_tabScriptCache.size > 500) {
+    // 清理最旧的条目
+    const now = Date.now()
+    for (const [key, val] of _tabScriptCache) {
+      if (now - val.timestamp > _tabScriptCacheMaxAge) {
+        _tabScriptCache.delete(key)
+      }
+    }
+    // 如果仍然超过限制，删除最早的 100 条
+    if (_tabScriptCache.size > 500) {
+      const entries = [..._tabScriptCache.entries()]
+        .sort((a, b) => a[1].timestamp - b[1].timestamp)
+        .slice(0, 100)
+      for (const [key] of entries) {
+        _tabScriptCache.delete(key)
+      }
+    }
+  }
+
+  _tabScriptCache.set(tabId, {
+    ...data,
+    timestamp: Date.now(),
+  })
+}
+
 // 脚本内部默认配置（各站点脚本可通过 REGISTER_BLOCKED_DOMAINS 注册）
 const _defaultBlockedDomains = {
   // 示例：'douyin.com': ['mcs.zijieapi.com/list']
@@ -675,8 +785,32 @@ function setupEventListeners() {
   })
 
   // Listen for tab updates
+  // 优化：在 loading 阶段提前执行域名匹配，缓存到 _tabScriptCache
+  // 这样 complete 阶段注入脚本时无需再解析 URL，减少注入延迟
   chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-    // 在页面加载完成时注入脚本
+    // loading 阶段：预解析域名匹配（此时 URL 已可用，但页面尚未加载完成）
+    if (changeInfo.status === 'loading' && changeInfo.url) {
+      // 排除特殊页面
+      if (changeInfo.url.startsWith('chrome://') || changeInfo.url.startsWith('about:')) {
+        _tabScriptCache.delete(tabId) // 清理旧缓存
+        return
+      }
+      if (changeInfo.url.startsWith('http')) {
+        // 提前执行域名匹配并缓存结果
+        const matchResult = matchDomainScripts(changeInfo.url)
+        if (matchResult.scripts.length > 0) {
+          setTabScriptCache(tabId, matchResult)
+          console.log(
+            `[Background] loading 预解析: tabId=${tabId}, hostname=${matchResult.hostname}, scripts=${matchResult.scripts.length}`
+          )
+        } else {
+          // 无匹配脚本，清除可能的旧缓存
+          _tabScriptCache.delete(tabId)
+        }
+      }
+    }
+
+    // complete 阶段：使用缓存结果注入脚本
     if (changeInfo.status === 'complete') {
       handleTabUpdate(tabId, tab)
     }
@@ -684,6 +818,9 @@ function setupEventListeners() {
 
   // Listen for tab removal to clean up injection records
   chrome.tabs.onRemoved.addListener(async (tabId) => {
+    // 清理预解析域名匹配缓存，避免内存泄漏
+    _tabScriptCache.delete(tabId)
+
     try {
       const result = await chrome.storage.local.get('injectedTabs')
       const injectedTabs = result.injectedTabs || {}
@@ -715,9 +852,23 @@ function setupEventListeners() {
       return false
     }
 
-    // AI 聚合器和注入脚本消息（AIA_ 和 AIAGGREGATOR_ 前缀）已在全局监听器中处理
-    if (message?.type?.startsWith('AIAGGREGATOR_') || message?.type?.startsWith('AIA_')) {
+    // AI 聚合器消息，转发到注册的 aggregatorTabId
+    if (message && message._aiAggregator) {
+      console.log('[Background] 收到 AI 聚合器消息:', message.type)
+      if (globalThis._aiAggregatorTabId) {
+        chrome.tabs.sendMessage(globalThis._aiAggregatorTabId, message).catch(e => {
+          console.log('[Background] 转发 AI 消息失败:', e)
+        })
+      }
       return false
+    }
+
+    // 注册 AI 聚合器 tab
+    if (message && message.type === 'AIA_REGISTER_AGGREGATOR') {
+      globalThis._aiAggregatorTabId = message.tabId
+      console.log('[Background] 注册 AI 聚合器 tabId:', message.tabId)
+      sendResponse({ success: true })
+      return true
     }
 
     console.log('[Background] 非 EventBus 消息，交给 handleMessage 处理')
@@ -1045,7 +1196,10 @@ async function injectScriptsOnTabActivate(tabId) {
 }
 
 // 完整注入所有脚本（模拟 manifest.json 的 content_scripts 行为）
+// 优化：使用 loading 阶段预解析的域名匹配缓存，并行注入基础脚本
 async function injectAllScriptsForTab(tabId, tabUrl) {
+  const injectStartTime = performance.now()
+
   try {
     // 检查 URL 是否允许注入（跳过特殊页面）
     if (!tabUrl || (!tabUrl.startsWith('http://') && !tabUrl.startsWith('https://'))) {
@@ -1084,45 +1238,28 @@ async function injectAllScriptsForTab(tabId, tabUrl) {
 
     const baseAlreadyInjected = checkResult && checkResult[0]?.result
 
-    const url = new URL(tabUrl)
-    const hostname = url.hostname
+    // 使用 loading 阶段预解析的缓存结果，避免重复解析 URL 和匹配域名
+    let scriptsToInject = []
+    const cachedMatch = getTabScriptCache(tabId)
+    let hostname = ''
 
-    // 打包后的 bundle 脚本（所有页面都需要）
-    const baseScripts = ['content/core-bundle.js', 'content/common-bundle.js']
-
-    // 域名特定脚本映射（使用打包后的 bundle）
-    const domainScripts = {
-      'bilibili.com': ['content/bundled/bili.bundle.js'],
-      'douyin.com': ['content/bundled/douyin.bundle.js'],
-      '4hu.tv': ['content/bundled/4hu.bundle.js'],
-      'weread.qq.com': ['content/bundled/weread.bundle.js'],
-      'quark.cn': ['content/bundled/quark.bundle.js'],
-      '18comic.vip': ['content/bundled/comic18.bundle.js'],
-      'aliyundrive.com': ['content/bundled/aliyun.bundle.js'],
-      'baidu.com': ['content/bundled/baiduPan.bundle.js'],
-      'zhipin.com': ['content/bundled/boss.bundle.js'],
-      'xiaohongshu.com': ['content/bundled/xiaohongshu.bundle.js'],
-      'wyaqpx.com': ['content/bundled/dianGong.bundle.js'],
-      'ymmfa.com': ['content/bundled/gongkong.bundle.js'],
-      'youtube.com': ['content/bundled/youtube.bundle.js'],
-      'github.com': ['content/bundled/github.bundle.js'],
-      'modelscope.cn': ['content/bundled/modelscope.bundle.js'],
-    }
-
-    // 收集需要注入的脚本：基础脚本仅未注入时添加，域名脚本始终尝试注入
-    const scriptsToInject = []
-
-    if (!baseAlreadyInjected) {
-      scriptsToInject.push(...baseScripts)
-    }
-
-    // 域名特定脚本始终尝试注入（各脚本有自己的防重复加载机制）
-    for (const [domain, scripts] of Object.entries(domainScripts)) {
-      if (hostname === domain || hostname.endsWith('.' + domain)) {
-        scriptsToInject.push(...scripts)
-        console.log(`[Background] 为 ${hostname} 添加域名脚本:`, scripts)
-        break
+    if (cachedMatch) {
+      // 缓存命中：直接使用预解析结果
+      hostname = cachedMatch.hostname
+      if (baseAlreadyInjected) {
+        // 基础脚本已注入，只需域名脚本
+        scriptsToInject = cachedMatch.scripts.filter((s) => !s.includes('core-bundle.js') && !s.includes('common-bundle.js'))
+      } else {
+        scriptsToInject = [...cachedMatch.scripts]
       }
+      console.log(`[Background] tabId=${tabId} 命中预解析缓存, 脚本数: ${scriptsToInject.length}`)
+    } else {
+      // 缓存未命中（可能是已存在的标签页首次注入），回退到同步匹配
+      const url = new URL(tabUrl)
+      hostname = url.hostname
+      const matchResult = matchDomainScripts(tabUrl, baseAlreadyInjected)
+      scriptsToInject = matchResult.scripts
+      console.log(`[Background] tabId=${tabId} 缓存未命中，实时匹配, 脚本数: ${scriptsToInject.length}`)
     }
 
     if (scriptsToInject.length === 0) {
@@ -1130,20 +1267,64 @@ async function injectAllScriptsForTab(tabId, tabUrl) {
       return
     }
 
-    // 依次注入所有脚本
-    for (const scriptFile of scriptsToInject) {
-      try {
-        await chrome.scripting.executeScript({
-          target: { tabId },
-          files: [scriptFile],
-        })
-        console.log(`[Background] 已注入脚本: ${scriptFile} 到标签页 ${tabId}`)
-      } catch (error) {
-        console.error(`[Background] 注入脚本失败 ${scriptFile}:`, error)
-      }
+    // 分离基础脚本和域名脚本，基础脚本并行注入以提升速度
+    const baseScriptsToInject = scriptsToInject.filter(
+      (s) => s === 'content/core-bundle.js' || s === 'content/common-bundle.js'
+    )
+    const domainScriptsToInject = scriptsToInject.filter(
+      (s) => s !== 'content/core-bundle.js' && s !== 'content/common-bundle.js'
+    )
+
+    // 并行注入基础脚本（core-bundle.js 和 common-bundle.js 互相独立）
+    if (baseScriptsToInject.length > 0) {
+      const baseStartTime = performance.now()
+      const basePromises = baseScriptsToInject.map((scriptFile) =>
+        chrome.scripting
+          .executeScript({
+            target: { tabId },
+            files: [scriptFile],
+          })
+          .then(() => {
+            console.log(`[Background] 已并行注入基础脚本: ${scriptFile} 到标签页 ${tabId}`)
+          })
+          .catch((error) => {
+            console.error(`[Background] 并行注入基础脚本失败 ${scriptFile}:`, error)
+          })
+      )
+      await Promise.all(basePromises)
+      const baseDuration = (performance.now() - baseStartTime).toFixed(1)
+      console.log(`[Background] 基础脚本并行注入完成, 耗时: ${baseDuration}ms, 脚本数: ${baseScriptsToInject.length}`)
     }
 
-    console.log(`[Background] 标签页 ${tabId} (${hostname}) 脚本注入完成`)
+    // 域名脚本也并行注入（各脚本有自己的防重复加载机制）
+    if (domainScriptsToInject.length > 0) {
+      const domainStartTime = performance.now()
+      const domainPromises = domainScriptsToInject.map((scriptFile) =>
+        chrome.scripting
+          .executeScript({
+            target: { tabId },
+            files: [scriptFile],
+          })
+          .then(() => {
+            console.log(`[Background] 已并行注入域名脚本: ${scriptFile} 到标签页 ${tabId}`)
+          })
+          .catch((error) => {
+            console.error(`[Background] 并行注入域名脚本失败 ${scriptFile}:`, error)
+          })
+      )
+      await Promise.all(domainPromises)
+      const domainDuration = (performance.now() - domainStartTime).toFixed(1)
+      console.log(`[Background] 域名脚本并行注入完成, 耗时: ${domainDuration}ms, 脚本数: ${domainScriptsToInject.length}`)
+    }
+
+    const totalDuration = (performance.now() - injectStartTime).toFixed(1)
+    console.log(
+      `[Background] 标签页 ${tabId} (${hostname}) 脚本注入完成, ` +
+      `总耗时: ${totalDuration}ms, 总脚本数: ${scriptsToInject.length}`
+    )
+
+    // 注入完成，清除缓存（下次导航会重新预解析）
+    _tabScriptCache.delete(tabId)
   } catch (error) {
     console.error('[Background] 注入脚本时出错:', error)
   }
@@ -1247,6 +1428,14 @@ async function handleMessage(message, sender, sendResponse) {
         console.log('[Background] 收到 DevTools 激活请求, tabId:', message.tabId)
         try {
           if (message.tabId) {
+            // 检查是否是扩展内部页面，跳过 chrome-extension:// 不允许注入
+            const tab = await chrome.tabs.get(message.tabId)
+            if (tab.url && tab.url.startsWith('chrome-extension://')) {
+              console.log('[Background] 跳过扩展内部页面注入:', tab.url)
+              sendResponse({ success: true, skipped: true })
+              break
+            }
+
             // 注入 page-helper.js
             await chrome.scripting.executeScript({
               target: { tabId: message.tabId },
@@ -2571,6 +2760,144 @@ self.addEventListener('activate', () => {
 //   console.error('Service worker suspended due to error');
 // });
 
+// ========== Popup 预热机制 ==========
+// 预加载关键数据到内存，加速 Popup 打开速度
+const _popupPreheatCache = {
+  settings: null,           // 设置缓存
+  blockedDomains: null,     // 阻断域名缓存
+  currentTabDomain: null,   // 当前 tab 域名
+  currentTabId: null,       // 当前 tab ID
+  timestamp: 0,             // 缓存时间戳
+}
+
+// 预热有效期（ms）
+const POPUP_PREHEAT_MAX_AGE = 60000 // 1 分钟
+
+/**
+ * 预热 Popup 数据
+ * 在扩展启动时和 tab 切换时调用，提前加载 Popup 需要的数据
+ */
+async function preheatPopupData() {
+  const startTime = performance.now()
+  try {
+    // 并行加载所有需要的数据
+    const [settingsResult, statsResult] = await Promise.all([
+      chrome.storage.sync.get('cy_settings'),
+      chrome.storage.local.get('extensionStats'),
+    ])
+
+    // 缓存设置数据
+    const settings = settingsResult.cy_settings || settingsResult.settings || {}
+    _popupPreheatCache.settings = {
+      enabled: settings.enabled !== false,
+      debugMode: settings.debugMode || false,
+      domainBlockedData: settings.domainBlockedData || { blockedDomains: {}, blockedResponseDomains: {} },
+    }
+
+    // 缓存统计数据
+    _popupPreheatCache.stats = statsResult.extensionStats || {
+      totalBlocked: 0,
+      totalHidden: 0,
+      estimatedBytesSaved: 0,
+      today: { blocked: 0, hidden: 0, bytes: 0 },
+    }
+
+    // 预获取当前活动 tab 的域名
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+      if (tab?.id && tab?.url) {
+        _popupPreheatCache.currentTabId = tab.id
+        const url = new URL(tab.url)
+        _popupPreheatCache.currentTabDomain = url.hostname
+
+        // 预获取该域名的阻断列表
+        const domain = url.hostname
+        const blockedDomains = _popupPreheatCache.settings.domainBlockedData.blockedDomains
+        _popupPreheatCache.blockedDomains = blockedDomains[domain] || []
+
+        // 尝试子域名匹配
+        if (_popupPreheatCache.blockedDomains.length === 0) {
+          for (const [key, domains] of Object.entries(blockedDomains)) {
+            if (domain.includes(key) || key.includes(domain)) {
+              _popupPreheatCache.blockedDomains = domains
+              break
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // tab 查询失败，忽略
+    }
+
+    _popupPreheatCache.timestamp = Date.now()
+    const duration = (performance.now() - startTime).toFixed(1)
+    console.log(`[Background] Popup 预热完成, 耗时: ${duration}ms`)
+  } catch (error) {
+    console.error('[Background] Popup 预热失败:', error)
+  }
+}
+
+/**
+ * 获取预热缓存的数据
+ * Popup 打开时调用，优先返回缓存数据
+ */
+function getPreheatedPopupData() {
+  // 检查缓存是否有效
+  if (Date.now() - _popupPreheatCache.timestamp > POPUP_PREHEAT_MAX_AGE) {
+    return null // 缓存过期，返回 null 让 Popup 重新加载
+  }
+  return _popupPreheatCache
+}
+
+// 监听 Popup 连接，发送预热数据
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name === 'popup-port') {
+    console.log('[Background] Popup 已连接')
+
+    // 立即发送预热数据
+    const preheatedData = getPreheatedPopupData()
+    if (preheatedData) {
+      port.postMessage({
+        type: 'POPUP_PREHEAT_DATA',
+        data: preheatedData,
+      })
+      console.log('[Background] 已发送预热数据给 Popup')
+    }
+
+    // 监听 Popup 消息
+    port.onMessage.addListener(async (message) => {
+      if (message.type === 'REQUEST_PREHEAT_DATA') {
+        // 重新预热并发送
+        await preheatPopupData()
+        port.postMessage({
+          type: 'POPUP_PREHEAT_DATA',
+          data: _popupPreheatCache,
+        })
+      }
+    })
+
+    port.onDisconnect.addListener(() => {
+      console.log('[Background] Popup 已断开')
+    })
+  }
+})
+
+// 扩展启动时预热
+preheatPopupData()
+
+// Tab 切换时预热
+chrome.tabs.onActivated.addListener(async () => {
+  // 延迟预热，避免影响 tab 切换性能
+  setTimeout(preheatPopupData, 100)
+})
+
+// Tab URL 变化时预热
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status === 'complete' && tab.active) {
+    preheatPopupData()
+  }
+})
+
 // Initialize when service worker starts
 console.log('[Background] 脚本开始执行，准备初始化...')
 initialize()
@@ -2924,287 +3251,3 @@ if (typeof self !== 'undefined' && typeof self.importScripts === 'function') {
 // 暴露CDNRegistry到全局，供其他模块使用
 self.CDNRegistry = CDNRegistry
 console.log('[Background] CDNRegistry 已暴露到全局')
-
-// ========== AI 聚合问答消息路由 ==========
-// AI 聚合问答状态管理
-const aiAggregatorState = {
-  activeTabs: new Map(), // siteId -> { tabId, status }
-  aggregatorTabId: null,
-  currentQuestion: null,
-  config: null,
-}
-
-// 加载配置
-async function getAIAggregatorConfig() {
-  console.log('[AI Aggregator] getAIAggregatorConfig 被调用')
-  try {
-    const result = await chrome.storage.local.get(['ai_aggregator_settings'])
-    console.log('[AI Aggregator] storage 结果:', result)
-    if (result.ai_aggregator_settings?.sites) {
-      return result.ai_aggregator_settings
-    }
-    // 返回默认配置
-    return {
-      sites: [
-        {
-          id: 'doubao',
-          name: '豆包',
-          url: 'https://www.doubao.com/chat/',
-          enabled: true,
-          selectors: {
-            input: "textarea, [contenteditable='true']",
-            sendButton: "button[type='submit'], [aria-label*='发送']",
-            responseContainer: "[class*='message'], [class*='chat']",
-            loginIndicator: "[class*='avatar'], [class*='user']",
-          },
-        },
-        {
-          id: 'tongyi',
-          name: '通义千问',
-          url: 'https://tongyi.aliyun.com/qianwen/',
-          enabled: true,
-          selectors: {
-            input: "textarea, [contenteditable='true']",
-            sendButton: "button[class*='send']",
-            responseContainer: "[class*='message'], [class*='response']",
-            loginIndicator: "[class*='avatar'], [class*='user']",
-          },
-        },
-        {
-          id: 'kimi',
-          name: 'Kimi',
-          url: 'https://kimi.moonshot.cn/',
-          enabled: true,
-          selectors: {
-            input: "textarea, [contenteditable='true']",
-            sendButton: "button[class*='send']",
-            responseContainer: "[class*='message'], [class*='chat']",
-            loginIndicator: "[class*='avatar'], [class*='user']",
-          },
-        },
-        {
-          id: 'yiyan',
-          name: '文心一言',
-          url: 'https://yiyan.baidu.com/',
-          enabled: true,
-          selectors: {
-            input: "textarea, [contenteditable='true']",
-            sendButton: "button[class*='send']",
-            responseContainer: "[class*='message'], [class*='response']",
-            loginIndicator: "[class*='avatar'], [class*='user']",
-          },
-        },
-        {
-          id: 'chatglm',
-          name: '智谱清言',
-          url: 'https://chatglm.cn/',
-          enabled: true,
-          selectors: {
-            input: "textarea, [contenteditable='true']",
-            sendButton: "button[class*='send']",
-            responseContainer: "[class*='message'], [class*='chat']",
-            loginIndicator: "[class*='avatar'], [class*='user']",
-          },
-        },
-      ],
-      maxConcurrent: 3,
-      autoCloseTabs: true,
-    }
-  } catch (error) {
-    console.error('[AI Aggregator] 加载配置失败:', error)
-    return { sites: [], maxConcurrent: 3, autoCloseTabs: true }
-  }
-}
-
-// 批量创建并注入 AI 标签页
-async function createAndInjectAITabs(selectedSites, question) {
-  const config = await getAIAggregatorConfig()
-  const sites = config.sites.filter((s) => selectedSites.includes(s.id))
-  const maxConcurrent = config.maxConcurrent || 3
-
-  for (let i = 0; i < sites.length; i += maxConcurrent) {
-    const batch = sites.slice(i, i + maxConcurrent)
-    await Promise.all(batch.map((site) => createAndInjectAITab(site, question)))
-  }
-}
-
-// 关闭所有 AI 标签页
-async function closeAllAITabs() {
-  for (const [siteId, tabInfo] of aiAggregatorState.activeTabs) {
-    if (tabInfo.tabId) {
-      try {
-        await chrome.tabs.remove(tabInfo.tabId)
-      } catch (e) {}
-    }
-  }
-  aiAggregatorState.activeTabs.clear()
-  aiAggregatorState.currentQuestion = null
-}
-
-// 创建并注入 AI 标签页
-async function createAndInjectAITab(site, question) {
-  try {
-    // 创建标签页
-    const tab = await chrome.tabs.create({
-      url: site.url,
-      active: false,
-    })
-
-    aiAggregatorState.activeTabs.set(site.id, {
-      tabId: tab.id,
-      status: 'loading',
-      site: site,
-    })
-
-    // 通知聚合页面状态变化
-    notifyAggregatorTab('AIAGGREGATOR_STATUS_CHANGE', {
-      siteId: site.id,
-      status: 'loading',
-    })
-
-    // 等待页面加载
-    await new Promise((resolve) => {
-      const listener = (tabId, changeInfo) => {
-        if (tabId === tab.id && changeInfo.status === 'complete') {
-          chrome.tabs.onUpdated.removeListener(listener)
-          resolve()
-        }
-      }
-      chrome.tabs.onUpdated.addListener(listener)
-      // 超时处理
-      setTimeout(resolve, 15000)
-    })
-
-    // 注入脚本
-    await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      files: ['content/modules/ai-aggregator/injector.js'],
-    })
-
-    await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      files: ['content/modules/ai-aggregator/response-watcher.js'],
-    })
-
-    // 发送问题
-    await chrome.tabs.sendMessage(tab.id, {
-      type: 'AIA_EXECUTE_SEND',
-      config: site,
-      question: question,
-    })
-
-    // 启动回复监听
-    await chrome.tabs.sendMessage(tab.id, {
-      type: 'AIA_START_WATCHING',
-      config: site,
-    })
-
-    aiAggregatorState.activeTabs.get(site.id).status = 'sending'
-    notifyAggregatorTab('AIAGGREGATOR_STATUS_CHANGE', {
-      siteId: site.id,
-      status: 'sending',
-    })
-  } catch (error) {
-    console.error(`[AI Aggregator] 创建标签页失败: ${site.name}`, error)
-    notifyAggregatorTab('AIAGGREGATOR_ERROR', {
-      siteId: site.id,
-      error: error.message,
-    })
-  }
-}
-
-// 通知聚合页面
-function notifyAggregatorTab(type, data) {
-  if (aiAggregatorState.aggregatorTabId) {
-    chrome.tabs
-      .sendMessage(aiAggregatorState.aggregatorTabId, {
-        type,
-        ...data,
-      })
-      .catch(() => {})
-  }
-}
-
-// 监听来自注入脚本和聚合页面的消息（AIA_ 和 AIAGGREGATOR_ 前缀）
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (!message.type) {
-    return false
-  }
-
-  // 处理 AIAGGREGATOR_ 消息（来自聚合页面）
-  if (message.type.startsWith('AIAGGREGATOR_')) {
-    console.log('[Background] 收到 AI Aggregator 消息:', message.type)
-
-    if (message.type === 'AIAGGREGATOR_GET_SITES') {
-      getAIAggregatorConfig()
-        .then((config) => {
-          const enabledSites = config.sites.filter((s) => s.enabled)
-          console.log('[Background] 返回启用的网站:', enabledSites.length, '个')
-          sendResponse({ success: true, sites: enabledSites })
-        })
-        .catch((error) => {
-          console.error('[Background] 获取配置失败:', error)
-          sendResponse({ success: false, error: error.message })
-        })
-      return true
-    }
-
-    if (message.type === 'AIAGGREGATOR_START') {
-      const { question, selectedSites, aggregatorTabId } = message
-      aiAggregatorState.currentQuestion = question
-      aiAggregatorState.aggregatorTabId = aggregatorTabId
-      createAndInjectAITabs(selectedSites, question)
-      sendResponse({ success: true })
-      return true
-    }
-
-    if (message.type === 'AIAGGREGATOR_STOP') {
-      closeAllAITabs()
-      sendResponse({ success: true })
-      return true
-    }
-
-    return false
-  }
-
-  // 处理 AIA_ 消息（来自注入脚本）
-  if (!message.type.startsWith('AIA_')) {
-    return false
-  }
-
-  // 处理注入脚本的响应
-  if (message.type === 'AIA_INJECT_RESPONSE') {
-    const { siteId, content, isComplete } = message
-    const tabInfo = aiAggregatorState.activeTabs.get(siteId)
-
-    if (tabInfo) {
-      tabInfo.status = isComplete ? 'completed' : 'responding'
-      notifyAggregatorTab('AIAGGREGATOR_RESPONSE', {
-        siteId,
-        content,
-        isComplete,
-      })
-    }
-    sendResponse({ success: true })
-    return true
-  }
-
-  // 处理错误
-  if (message.type === 'AIA_INJECT_ERROR') {
-    const { siteId, error, message: errorMsg } = message
-    const tabInfo = aiAggregatorState.activeTabs.get(siteId)
-
-    if (tabInfo) {
-      tabInfo.status = 'error'
-      notifyAggregatorTab('AIAGGREGATOR_ERROR', {
-        siteId,
-        error,
-        message: errorMsg,
-      })
-    }
-    sendResponse({ success: true })
-    return true
-  }
-
-  return false
-})

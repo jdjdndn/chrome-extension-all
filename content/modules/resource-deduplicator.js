@@ -29,6 +29,7 @@
 
       this._seenUrls = new Map() // normalizedUrl -> first element
       this._observer = null
+      this._unsubscribe = null
 
       console.log(`${LOG_PREFIX} 模块初始化完成`)
     }
@@ -62,33 +63,60 @@
 
     /**
      * 监听动态资源
+     * 使用 UnifiedDOMWatcher 统一管理
      */
     _setupObserver() {
-      this._observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-          mutation.addedNodes.forEach((node) => {
-            if (this.dedupJS && node.tagName === 'SCRIPT' && node.src) {
-              this._checkScript(node)
-            }
-            if (this.dedupCSS && node.tagName === 'LINK' && node.rel === 'stylesheet') {
-              this._checkLink(node)
-            }
+      // 检查 UnifiedDOMWatcher 是否可用
+      if (!window.UnifiedDOMWatcher) {
+        console.warn(`${LOG_PREFIX} UnifiedDOMWatcher 未加载，使用独立 MutationObserver`)
 
-            if (node.querySelectorAll) {
-              if (this.dedupJS) {
-                node.querySelectorAll('script[src]').forEach((s) => this._checkScript(s))
-              }
-              if (this.dedupCSS) {
-                node.querySelectorAll('link[rel="stylesheet"]').forEach((l) => this._checkLink(l))
-              }
-            }
-          })
+        // 降级：使用独立 MutationObserver
+        this._observer = new MutationObserver((mutations) => {
+          this._handleMutations(mutations)
         })
-      })
 
-      this._observer.observe(document.documentElement, {
-        childList: true,
-        subtree: true,
+        this._observer.observe(document.documentElement, {
+          childList: true,
+          subtree: true,
+        })
+        return
+      }
+
+      // 使用 UnifiedDOMWatcher 订阅，HIGH 优先级（去重应尽快执行）
+      this._unsubscribe = window.UnifiedDOMWatcher.subscribe(
+        (mutations) => {
+          this._handleMutations(mutations)
+        },
+        {
+          priority: window.UnifiedDOMWatcher.Priority.HIGH,
+          name: 'ResourceDeduplicator',
+          filter: (mutation) => mutation.type === 'childList' && mutation.addedNodes.length > 0,
+        }
+      )
+    }
+
+    /**
+     * 处理 DOM 变更
+     */
+    _handleMutations(mutations) {
+      mutations.forEach((mutation) => {
+        mutation.addedNodes.forEach((node) => {
+          if (this.dedupJS && node.tagName === 'SCRIPT' && node.src) {
+            this._checkScript(node)
+          }
+          if (this.dedupCSS && node.tagName === 'LINK' && node.rel === 'stylesheet') {
+            this._checkLink(node)
+          }
+
+          if (node.querySelectorAll) {
+            if (this.dedupJS) {
+              node.querySelectorAll('script[src]').forEach((s) => this._checkScript(s))
+            }
+            if (this.dedupCSS) {
+              node.querySelectorAll('link[rel="stylesheet"]').forEach((l) => this._checkLink(l))
+            }
+          }
+        })
       })
     }
 
@@ -225,10 +253,18 @@
     }
 
     destroy() {
+      // 取消 UnifiedDOMWatcher 订阅
+      if (this._unsubscribe) {
+        this._unsubscribe()
+        this._unsubscribe = null
+      }
+
+      // 停止独立 MutationObserver
       if (this._observer) {
         this._observer.disconnect()
         this._observer = null
       }
+
       this.enabled = false
       this._seenUrls.clear()
       console.log(`${LOG_PREFIX} 模块已销毁`)

@@ -31,7 +31,13 @@ try {
 
 // ========== 打包配置 ==========
 const BUNDLES = [
-  // 核心模块（manifest 加载）
+  // 关键模块（manifest 加载，document_start）
+  {
+    name: 'critical',
+    entry: 'content/entries/critical.js',
+    outfile: 'content/critical-bundle.js',
+  },
+  // 核心模块（lazy load）
   {
     name: 'core',
     entry: 'content/entries/core.js',

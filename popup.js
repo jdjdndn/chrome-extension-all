@@ -1543,43 +1543,204 @@ if (confirmBatchAddBtn) {
   })
 }
 
+// ========== 按需加载模块管理器 ==========
+const _moduleCache = {} // 模块缓存
+
+/**
+ * 按需加载模块
+ * @param {string} moduleName - 模块名称
+ * @returns {Promise<object>} 模块导出
+ */
+async function loadModule(moduleName) {
+  if (_moduleCache[moduleName]) {
+    return _moduleCache[moduleName]
+  }
+
+  const startTime = performance.now()
+  try {
+    const module = await import(`./modules/${moduleName}.js`)
+    _moduleCache[moduleName] = module
+    const duration = (performance.now() - startTime).toFixed(1)
+    console.log(`[Popup] 模块 ${moduleName} 加载完成, 耗时: ${duration}ms`)
+    return module
+  } catch (error) {
+    console.error(`[Popup] 模块 ${moduleName} 加载失败:`, error)
+    return null
+  }
+}
+
+// 模块加载状态追踪
+const _moduleLoadState = {
+  domainManager: false,
+  keywordManager: false,
+  hideElementsManager: false,
+  statsPanel: false,
+  clipboardHistory: false,
+  resourceAccelerator: false,
+}
+
 // Load hide elements settings when popup opens
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('[Popup] DOM加载完成，开始统一初始化')
+  const initStartTime = performance.now()
 
-  // 1. 基础初始化（无依赖）
-  loadHideElementsSettings().catch(console.error)
-  checkLocalServerStatus()
+  // 1. 核心功能（立即执行，不等待）
   checkPendingPickedElement()
+  initNavigation()
+  initThemeToggle()
 
-  // 2. 数据加载（可并行）
+  // 2. 使用预热数据（如果有）
+  const preheatedData = await requestPreheatData()
+  if (preheatedData) {
+    console.log('[Popup] 使用预热数据')
+    // 使用预热的设置数据
+    if (preheatedData.settings) {
+      updateStatus(preheatedData.settings.enabled)
+    }
+    // 使用预热的域名数据
+    if (preheatedData.blockedDomains) {
+      renderBlockedDomains(preheatedData.blockedDomains)
+    }
+  }
+
+  // 3. 基础数据加载（并行）
   await Promise.all([
-    loadKeywords().catch(console.error),
-    loadBiliKeywords().catch(console.error),
-    loadBlockedDomains().catch(console.error),
+    loadSettings().catch(console.error),
+    checkLocalServerStatus().catch(console.error),
   ])
 
-  // 3. UI初始化（依赖数据）
-  updateDouyinKeywordsVisibility().catch(console.error)
-  updateBilibiliKeywordsVisibility().catch(console.error)
+  // 4. 按需加载模块（根据当前 tab 域名决定）
+  const domain = await getCurrentDomain()
+  console.log('[Popup] 当前域名:', domain)
 
-  // 4. 核心功能初始化
-  loadSelectorsEditor()
-  initNavigation()
-  initResourceAccelerator()
+  // 并行加载所有需要的模块
+  const modulePromises = []
 
-  // 5. 事件绑定
-  initStatsButtons()
-  initNotificationPanel()
+  // 域名管理模块（page tab 使用）
+  modulePromises.push(
+    loadModule('domain-manager').then(module => {
+      if (module) {
+        module.initDomainManager()
+        module.loadBlockedDomains()
+        _moduleLoadState.domainManager = true
+      }
+    })
+  )
+
+  // 关键词管理模块（根据域名加载）
+  if (isDouyinDomain(domain) || isBilibiliDomain(domain)) {
+    modulePromises.push(
+      loadModule('keyword-manager').then(module => {
+        if (module) {
+          module.initKeywordManager()
+          module.loadKeywords()
+          module.loadBiliKeywords()
+          module.updateDouyinKeywordsVisibility()
+          module.updateBilibiliKeywordsVisibility()
+          _moduleLoadState.keywordManager = true
+        }
+      })
+    )
+  }
+
+  // 隐藏元素管理模块（page tab 使用）
+  modulePromises.push(
+    loadModule('hide-elements-manager').then(module => {
+      if (module) {
+        module.initHideElementsManager()
+        _moduleLoadState.hideElementsManager = true
+      }
+    }).catch(() => {
+      // 如果模块不存在，使用原有函数
+      loadHideElementsSettings().catch(console.error)
+    })
+  )
+
+  // 统计面板模块（stats tab 使用）
+  modulePromises.push(
+    loadModule('stats-panel').then(module => {
+      if (module) {
+        module.initStatsPanel()
+        _moduleLoadState.statsPanel = true
+      }
+    })
+  )
+
+  // 剪贴板历史模块（home tab 使用）
+  modulePromises.push(
+    loadModule('clipboard-history').then(module => {
+      if (module) {
+        module.initClipboardHistory()
+        _moduleLoadState.clipboardHistory = true
+      }
+    })
+  )
+
+  // 资源加速器模块（page tab 使用）
+  modulePromises.push(
+    loadModule('resource-accelerator').then(module => {
+      if (module) {
+        module.initResourceAccelerator()
+        _moduleLoadState.resourceAccelerator = true
+      }
+    })
+  )
+
+  // 等待所有模块加载完成
+  await Promise.all(modulePromises)
+
+  // 5. 其他初始化（不依赖模块）
   initQuickNote()
-  initClipboardHistory()
   initShortcutsHelp()
-  initTemplateButtons()
-  initThemeToggle()
-  initImportExport()
 
-  console.log('[Popup] 初始化完成')
+  const initDuration = (performance.now() - initStartTime).toFixed(1)
+  console.log(`[Popup] 初始化完成, 总耗时: ${initDuration}ms`)
+  console.log('[Popup] 模块加载状态:', _moduleLoadState)
 })
+
+/**
+ * 请求预热数据
+ * 从 background script 获取预加载的数据
+ */
+async function requestPreheatData() {
+  return new Promise((resolve) => {
+    try {
+      const port = chrome.runtime.connect({ name: 'popup-port' })
+      let resolved = false
+
+      // 设置超时
+      const timeout = setTimeout(() => {
+        if (!resolved) {
+          resolved = true
+          port.disconnect()
+          resolve(null)
+        }
+      }, 500) // 500ms 超时
+
+      port.onMessage.addListener((message) => {
+        if (message.type === 'POPUP_PREHEAT_DATA') {
+          clearTimeout(timeout)
+          if (!resolved) {
+            resolved = true
+            port.disconnect()
+            resolve(message.data)
+          }
+        }
+      })
+
+      port.onDisconnect.addListener(() => {
+        clearTimeout(timeout)
+        if (!resolved) {
+          resolved = true
+          resolve(null)
+        }
+      })
+    } catch (error) {
+      console.error('[Popup] 获取预热数据失败:', error)
+      resolve(null)
+    }
+  })
+}
 
 /**
  * 检查是否有待处理的选中元素（popup 重新打开时）
@@ -1903,33 +2064,6 @@ setupPasteFromArray(biliNotInterestedKeywordsTextarea)
 // Load keywords when popup opens
 // ========== 辅助初始化函数 ==========
 
-function initStatsButtons() {
-  const refreshBtn = document.getElementById('refresh-stats')
-  const resetBtn = document.getElementById('reset-stats')
-  const exportCsvBtn = document.getElementById('export-stats-csv')
-
-  if (refreshBtn) {
-    refreshBtn.addEventListener('click', () => {
-      loadStatsData()
-      drawStatsChart()
-    })
-  }
-
-  if (resetBtn) {
-    resetBtn.addEventListener('click', async () => {
-      if (confirm('确定要重置所有统计数据吗？')) {
-        await chrome.storage.local.remove('usageStats')
-        loadStatsData()
-        drawStatsChart()
-      }
-    })
-  }
-
-  if (exportCsvBtn) {
-    exportCsvBtn.addEventListener('click', exportStatsToCSV)
-  }
-}
-
 async function initNotificationPanel() {
   const bellBtn = document.getElementById('notification-bell')
   const panel = document.getElementById('notification-panel')
@@ -2032,32 +2166,12 @@ function initShortcutsHelp() {
   }
 }
 
-function initTemplateButtons() {
-  const templateBtns = document.querySelectorAll('.template-btn')
-  templateBtns.forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const templateKey = btn.dataset.template
-      const template = RULE_TEMPLATES[templateKey]
-      if (!template) {return}
-
-      const result = await chrome.storage.sync.get('settings')
-      const settings = result.settings || {}
-      const blockedDomains = settings.blockedDomains || []
-
-      if (!blockedDomains.includes(template.domain)) {
-        blockedDomains.push(template.domain)
-        settings.blockedDomains = blockedDomains
-        await chrome.storage.sync.set({ settings })
-      }
-
-      const domainRules = (await chrome.storage.local.get(`${template.domain}Rules`)) || {}
-      domainRules[`${template.domain}Rules`] = template.rules
-      await chrome.storage.local.set(domainRules)
-
-      alert(`已应用 ${template.name} 规则模板`)
-      loadBlockedDomains()
-    })
-  })
+function applyTheme(theme) {
+  if (theme === 'dark') {
+    document.body.classList.add('dark-mode')
+  } else {
+    document.body.classList.remove('dark-mode')
+  }
 }
 
 async function initThemeToggle() {
@@ -2074,21 +2188,6 @@ async function initThemeToggle() {
     applyTheme(newTheme)
     await chrome.storage.local.set({ theme: newTheme })
   })
-}
-
-function initImportExport() {
-  const exportBtn = document.getElementById('export-settings-btn')
-  const importBtn = document.getElementById('import-settings-btn')
-  const importInput = document.getElementById('import-file-input')
-
-  if (exportBtn) {
-    exportBtn.addEventListener('click', exportSettings)
-  }
-
-  if (importBtn && importInput) {
-    importBtn.addEventListener('click', () => importInput.click())
-    importInput.addEventListener('change', importSettings)
-  }
 }
 
 // ========== 隐藏选择器编辑器 ==========
@@ -2386,12 +2485,7 @@ function initNavigation() {
     }
 
     // 加载对应数据
-    if (tabName === 'global') {
-      loadGlobalSettings()
-    } else if (tabName === 'stats') {
-      loadStatsData()
-      drawStatsChart()
-    } else if (tabName === 'home') {
+    if (tabName === 'home') {
       loadClipboardHistory()
     } else if (tabName === 'page') {
       loadBlockedDomains()
@@ -2413,189 +2507,6 @@ function initNavigation() {
   showTab('home')
 }
 
-// ========== 统计面板 ==========
-async function loadStatsData() {
-  try {
-    const response = await chrome.runtime.sendMessage({ type: 'GET_STATS' })
-    if (response?.success && response.stats) {
-      renderStats(response.stats)
-    }
-  } catch (error) {
-    console.error('[Stats] 加载统计数据失败:', error)
-  }
-}
-
-function renderStats(stats) {
-  // 今日数据
-  const todayBlocked = document.getElementById('today-blocked')
-  const todayHidden = document.getElementById('today-hidden')
-  const todayBytes = document.getElementById('today-bytes')
-
-  if (todayBlocked) {todayBlocked.textContent = formatNumber(stats.today?.blocked || 0)}
-  if (todayHidden) {todayHidden.textContent = formatNumber(stats.today?.hidden || 0)}
-  if (todayBytes) {todayBytes.textContent = formatBytes(stats.today?.bytes || 0)}
-
-  // 累计数据
-  const totalBlocked = document.getElementById('total-blocked')
-  const totalHidden = document.getElementById('total-hidden')
-  const totalBytes = document.getElementById('total-bytes')
-
-  if (totalBlocked) {totalBlocked.textContent = formatNumber(stats.totalBlocked || 0)}
-  if (totalHidden) {totalHidden.textContent = formatNumber(stats.totalHidden || 0)}
-  if (totalBytes) {totalBytes.textContent = formatBytes(stats.estimatedBytesSaved || 0)}
-
-  // 域名排行
-  renderDomainRanking(stats.domainStats || {})
-}
-
-function renderDomainRanking(domainStats) {
-  const container = document.getElementById('domain-ranking')
-  if (!container) {return}
-
-  const entries = Object.entries(domainStats)
-    .map(([domain, data]) => ({
-      domain,
-      total: (data.blocked || 0) + (data.hidden || 0),
-    }))
-    .filter((e) => e.total > 0)
-    .sort((a, b) => b.total - a.total)
-    .slice(0, 5)
-
-  if (entries.length === 0) {
-    container.innerHTML =
-      '<div style="color: #999; text-align: center; padding: 20px;">暂无数据</div>'
-    return
-  }
-
-  const maxTotal = entries[0].total
-  container.innerHTML = entries
-    .map((e, i) => {
-      const percent = Math.round((e.total / maxTotal) * 100)
-      return `
-      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-        <span style="width: 16px; color: #666; font-size: 11px;">${i + 1}.</span>
-        <div style="flex: 1;">
-          <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
-            <span style="font-size: 11px; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 150px;">${escapeHtml(e.domain)}</span>
-            <span style="font-size: 11px; color: #666;">${e.total}</span>
-          </div>
-          <div style="height: 4px; background: #e9ecef; border-radius: 2px; overflow: hidden;">
-            <div style="height: 100%; width: ${percent}%; background: linear-gradient(90deg, #007bff, #0056b3); border-radius: 2px;"></div>
-          </div>
-        </div>
-      </div>
-    `
-    })
-    .join('')
-}
-
-function formatNumber(num) {
-  if (num >= 1000000) {return (num / 1000000).toFixed(1) + 'M'}
-  if (num >= 1000) {return (num / 1000).toFixed(1) + 'K'}
-  return String(num)
-}
-
-function formatBytes(bytes) {
-  if (bytes >= 1073741824) {return (bytes / 1073741824).toFixed(1) + 'GB'}
-  if (bytes >= 1048576) {return (bytes / 1048576).toFixed(1) + 'MB'}
-  if (bytes >= 1024) {return (bytes / 1024).toFixed(1) + 'KB'}
-  return bytes + 'B'
-}
-
-// 统计面板事件绑定（已在统一初始化中调用 initStatsButtons）
-// 以下代码已废弃，保留函数定义供调用
-
-// ========== 统计图表绘制 ==========
-function drawStatsChart() {
-  const canvas = document.getElementById('stats-chart')
-  if (!canvas) {return}
-
-  const ctx = canvas.getContext('2d')
-  const width = canvas.offsetWidth
-  const height = canvas.offsetHeight
-
-  // 设置canvas实际尺寸
-  canvas.width = width * 2
-  canvas.height = height * 2
-  ctx.scale(2, 2)
-
-  // 清空画布
-  ctx.clearRect(0, 0, width, height)
-
-  // 模拟7天数据（实际应从存储加载）
-  const days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
-  const data = [120, 150, 80, 200, 180, 90, 140] // 示例数据
-
-  const maxVal = Math.max(...data, 1)
-  const padding = 30
-  const chartWidth = width - padding * 2
-  const chartHeight = height - padding * 2
-  const barWidth = chartWidth / days.length - 10
-
-  // 绘制背景网格
-  ctx.strokeStyle = '#e9ecef'
-  ctx.lineWidth = 1
-  for (let i = 0; i <= 4; i++) {
-    const y = padding + (chartHeight / 4) * i
-    ctx.beginPath()
-    ctx.moveTo(padding, y)
-    ctx.lineTo(width - padding, y)
-    ctx.stroke()
-  }
-
-  // 绘制柱状图
-  const gradient = ctx.createLinearGradient(0, height, 0, 0)
-  gradient.addColorStop(0, '#007bff')
-  gradient.addColorStop(1, '#0056b3')
-
-  data.forEach((val, i) => {
-    const barHeight = (val / maxVal) * chartHeight
-    const x = padding + i * (chartWidth / days.length) + 5
-    const y = height - padding - barHeight
-
-    ctx.fillStyle = gradient
-    ctx.fillRect(x, y, barWidth, barHeight)
-
-    // 绘制标签
-    ctx.fillStyle = '#666'
-    ctx.font = '10px sans-serif'
-    ctx.textAlign = 'center'
-    ctx.fillText(days[i], x + barWidth / 2, height - 10)
-  })
-}
-
-// ========== 导出统计CSV ==========
-async function exportStatsToCSV() {
-  try {
-    const response = await chrome.runtime.sendMessage({ type: 'GET_STATS' })
-    if (!response?.stats) {
-      alert('暂无数据可导出')
-      return
-    }
-
-    const stats = response.stats
-    let csv = '日期,拦截请求,隐藏元素,节省流量\n'
-
-    // 添加今日数据
-    const today = new Date().toISOString().split('T')[0]
-    csv += `${today},${stats.today?.blocked || 0},${stats.today?.hidden || 0},${stats.today?.bytes || 0}\n`
-
-    // 添加累计数据
-    csv += `累计,${stats.totalBlocked || 0},${stats.totalHidden || 0},${stats.estimatedBytesSaved || 0}\n`
-
-    // 下载CSV
-    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `extension-stats-${today}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
-  } catch (error) {
-    console.error('[导出CSV] 失败:', error)
-    alert('导出失败: ' + error.message)
-  }
-}
 
 // ========== 通知中心 ==========（已在统一初始化中调用 initNotificationPanel）
 // 以下代码已废弃
@@ -2752,361 +2663,6 @@ async function recordClipboard(text) {
 
 // ========== 快捷键帮助面板 ==========（已在统一初始化中调用 initShortcutsHelp）
 
-// ========== 规则模板库 ==========
-const RULE_TEMPLATES = {
-  ads: {
-    name: '广告拦截',
-    domains: [
-      'googlesyndication.com',
-      'doubleclick.net',
-      'googleadservices.com',
-      'ads.google.com',
-      'pagead2.googlesyndication.com',
-    ],
-  },
-  trackers: {
-    name: '隐私追踪',
-    domains: [
-      'google-analytics.com',
-      'googletagmanager.com',
-      'facebook.net/tr',
-      'connect.facebook.net',
-      'analytics.twitter.com',
-    ],
-  },
-  social: {
-    name: '社交组件',
-    domains: [
-      'platform.twitter.com/widgets',
-      'connect.facebook.net/zh_CN/sdk',
-      'assets.pinterest.com/js/pinit',
-      'platform.linkedin.com/in.js',
-    ],
-  },
-  'video-ads': {
-    name: '视频广告',
-    domains: [
-      'ads.youtube.com',
-      'googleads.g.doubleclick.net',
-      'static.doubleclick.net/instream/ad_status',
-      'pagead2.googlesyndication.com/pagead/ads',
-    ],
-  },
-  // 扩展模板
-  'video-sites': {
-    name: '视频网站',
-    domains: [
-      'api.bilibili.com/x/ad',
-      'api.bilibili.com/x/web-show/res/loc',
-      'awp.taobao.com',
-      'mmstat.com',
-      'atm.youku.com',
-    ],
-  },
-  'social-media': {
-    name: '社交媒体',
-    domains: [
-      'weibo.com/ajax/statuses/hotsearch',
-      'zhihu.com/commercial',
-      'xiaohongshu.com/api/sns/v1/note/',
-      'tieba.baidu.com/tb/tml/ad',
-    ],
-  },
-  shopping: {
-    name: '购物网站',
-    domains: [
-      'alicdn.com',
-      'tanx.com',
-      'mmstat.com',
-      'atm.youku.com',
-      'cm.ipinyou.com',
-      'ad.toutiao.com',
-    ],
-  },
-  'news-sites': {
-    name: '新闻网站',
-    domains: [
-      'cpro.baidu.com',
-      'pos.baidu.com',
-      'eclick.baidu.com',
-      'hm.baidu.com',
-      'tanx.com/m/ad',
-    ],
-  },
-}
-
-// 保存自定义模板
-async function saveCustomTemplate(name, domains) {
-  const result = await chrome.storage.local.get('customTemplates')
-  const customTemplates = result.customTemplates || {}
-  customTemplates[name] = {
-    name,
-    domains,
-    createdAt: Date.now(),
-  }
-  await chrome.storage.local.set({ customTemplates })
-}
-
-// 加载自定义模板
-async function loadCustomTemplates() {
-  const result = await chrome.storage.local.get('customTemplates')
-  return result.customTemplates || {}
-}
-
-// 模板按钮事件（已在统一初始化中调用 initTemplateButtons）
-
-// ========== 暗黑模式 ==========（已在统一初始化中调用 initThemeToggle）
-function applyTheme(theme) {
-  const themeToggle = document.getElementById('theme-toggle')
-  if (theme === 'dark') {
-    document.body.classList.add('dark-mode')
-    if (themeToggle) {themeToggle.textContent = '☀️'}
-  } else {
-    document.body.classList.remove('dark-mode')
-    if (themeToggle) {themeToggle.textContent = '🌙'}
-  }
-}
-
-// ========== 导出/导入设置 ==========（已在统一初始化中调用 initImportExport）
-
-async function exportSettings() {
-  try {
-    // 收集所有设置
-    const syncData = await chrome.storage.sync.get(null)
-    const localData = await chrome.storage.local.get(null)
-
-    // 排除统计数据（太大）
-    delete localData.extensionStats
-
-    const exportData = {
-      version: '1.0.0',
-      exportTime: new Date().toISOString(),
-      sync: syncData,
-      local: localData,
-    }
-
-    // 下载JSON文件
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `chrome-extension-settings-${new Date().toISOString().split('T')[0]}.json`
-    a.click()
-    URL.revokeObjectURL(url)
-
-    // 提示成功
-    alert('设置已导出成功！')
-  } catch (error) {
-    console.error('[导出设置] 失败:', error)
-    alert('导出失败: ' + error.message)
-  }
-}
-
-async function importSettings(event) {
-  const file = event.target.files?.[0]
-  if (!file) {return}
-
-  try {
-    const text = await file.text()
-    const data = JSON.parse(text)
-
-    // 验证格式
-    if (!data.version || !data.sync || !data.local) {
-      throw new Error('无效的设置文件格式')
-    }
-
-    // 确认导入
-    if (!confirm('导入设置将覆盖当前所有设置，确定继续吗？')) {
-      return
-    }
-
-    // 导入sync设置
-    if (Object.keys(data.sync).length > 0) {
-      await chrome.storage.sync.clear()
-      await chrome.storage.sync.set(data.sync)
-    }
-
-    // 导入local设置（保留统计数据）
-    const currentLocal = await chrome.storage.local.get('extensionStats')
-    await chrome.storage.local.clear()
-    await chrome.storage.local.set({ ...data.local, extensionStats: currentLocal.extensionStats })
-
-    alert('设置已导入成功！页面将刷新。')
-    location.reload()
-  } catch (error) {
-    console.error('[导入设置] 失败:', error)
-    alert('导入失败: ' + error.message)
-  } finally {
-    // 清空input，允许重复导入同一文件
-    event.target.value = ''
-  }
-}
-
-// ========== 全局设置 ==========
-let currentKeywordCategory = 'notInterested'
-
-async function loadGlobalSettings() {
-  const domainSelect = document.getElementById('global-domain-select')
-  const keywordsEditor = document.getElementById('global-keywords-editor')
-  const keywordsTextarea = document.getElementById('global-keywords-textarea')
-
-  if (!domainSelect || !keywordsEditor || !keywordsTextarea) {return}
-
-  // 关键词分类切换
-  document.querySelectorAll('.keyword-category-btn').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      document.querySelectorAll('.keyword-category-btn').forEach((b) => {
-        b.classList.remove('active')
-        b.style.background = ''
-        b.style.color = ''
-      })
-      btn.classList.add('active')
-      btn.style.background = '#007bff'
-      btn.style.color = 'white'
-
-      currentKeywordCategory = btn.dataset.category
-      await loadKeywordsForCategory()
-    })
-  })
-
-  domainSelect.addEventListener('change', async () => {
-    const domain = domainSelect.value
-    if (!domain) {
-      keywordsEditor.style.display = 'none'
-      return
-    }
-
-    keywordsEditor.style.display = 'block'
-    await loadKeywordsForCategory()
-  })
-
-  // 导入关键词
-  const importKeywordsBtn = document.getElementById('import-keywords-btn')
-  const keywordsImportFile = document.getElementById('keywords-import-file')
-
-  if (importKeywordsBtn && keywordsImportFile) {
-    importKeywordsBtn.addEventListener('click', () => keywordsImportFile.click())
-    keywordsImportFile.addEventListener('change', async (e) => {
-      const file = e.target.files?.[0]
-      if (!file) {return}
-
-      try {
-        const text = await file.text()
-        let keywords = []
-
-        if (file.name.endsWith('.json')) {
-          const data = JSON.parse(text)
-          keywords = Array.isArray(data) ? data : data.keywords || []
-        } else {
-          keywords = text
-            .split('\n')
-            .map((k) => k.trim())
-            .filter((k) => k)
-        }
-
-        // 合并现有关键词
-        const existingKeywords = keywordsTextarea.value
-          .split('\n')
-          .map((k) => k.trim())
-          .filter((k) => k)
-        const merged = [...new Set([...existingKeywords, ...keywords])]
-        keywordsTextarea.value = merged.join('\n')
-
-        const countEl = document.getElementById('keyword-count')
-        if (countEl) {countEl.textContent = merged.length}
-
-        alert(`成功导入 ${keywords.length} 个关键词`)
-      } catch (error) {
-        alert('导入失败: ' + error.message)
-      }
-      e.target.value = ''
-    })
-  }
-
-  // 导出关键词
-  const exportKeywordsBtn = document.getElementById('export-keywords-btn')
-  if (exportKeywordsBtn) {
-    exportKeywordsBtn.addEventListener('click', () => {
-      const keywords = keywordsTextarea.value
-        .split('\n')
-        .map((k) => k.trim())
-        .filter((k) => k)
-      const data = {
-        category: currentKeywordCategory,
-        domain: domainSelect.value,
-        keywords,
-        exportTime: new Date().toISOString(),
-      }
-
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `keywords-${currentKeywordCategory}-${Date.now()}.json`
-      a.click()
-      URL.revokeObjectURL(url)
-    })
-  }
-
-  // 保存按钮
-  const saveBtn = document.getElementById('global-save-keywords-btn')
-  if (saveBtn) {
-    saveBtn.addEventListener('click', async () => {
-      const domain = domainSelect.value
-      if (!domain) {return}
-
-      const keywords = keywordsTextarea.value
-        .split('\n')
-        .map((k) => k.trim())
-        .filter((k) => k)
-
-      try {
-        // 保存到KeywordManager格式
-        const storageKey = `${domain}Keywords`
-        const existingResult = await chrome.storage.local.get(storageKey)
-        const existingKeywords = existingResult[storageKey] || {}
-
-        existingKeywords[currentKeywordCategory] = keywords
-        await chrome.storage.local.set({ [storageKey]: existingKeywords })
-
-        // 显示成功提示
-        const originalText = saveBtn.textContent
-        saveBtn.textContent = '已保存 ✓'
-        saveBtn.style.background = '#28a745'
-        setTimeout(() => {
-          saveBtn.textContent = originalText
-          saveBtn.style.background = ''
-        }, 1500)
-
-        console.log('[全局设置] 已保存关键词:', domain, currentKeywordCategory, keywords.length)
-      } catch (error) {
-        console.error('[全局设置] 保存关键词失败:', error)
-      }
-    })
-  }
-}
-
-async function loadKeywordsForCategory() {
-  const domainSelect = document.getElementById('global-domain-select')
-  const keywordsTextarea = document.getElementById('global-keywords-textarea')
-  const countEl = document.getElementById('keyword-count')
-
-  const domain = domainSelect?.value
-  if (!domain || !keywordsTextarea) {return}
-
-  try {
-    const storageKey = `${domain}Keywords`
-    const result = await chrome.storage.local.get(storageKey)
-    const allKeywords = result[storageKey] || {}
-    const keywords = allKeywords[currentKeywordCategory] || []
-
-    keywordsTextarea.value = keywords.join('\n')
-    if (countEl) {countEl.textContent = keywords.length}
-  } catch (error) {
-    console.error('[全局设置] 加载关键词失败:', error)
-    keywordsTextarea.value = ''
-  }
-}
 
 // ========== 资源加速器控制 ==========
 async function initResourceAccelerator() {

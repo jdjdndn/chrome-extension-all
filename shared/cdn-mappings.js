@@ -501,6 +501,24 @@
     TIMEOUT: 3000, // 3秒超时
     _pending: {}, // 防止重复探测
 
+    // 探测历史: { cdnId: [{ time, latency, healthy }] }
+    _history: {},
+    // 响应时间历史: { cdnId: [{ time, latency }] }
+    _responseTimes: {},
+    // 健康计数: { cdnId: { healthy: N, unhealthy: N } }
+    _healthCounts: {},
+    // 探测统计
+    _stats: {
+      totalProbes: 0,
+      successfulProbes: 0,
+      failedProbes: 0,
+    },
+    // 历史上限配置
+    _historyLimits: {
+      responseTimes: 20,   // 保留最近20次响应时间
+      healthHistory: 50,   // 保留最近50次健康状态
+    },
+
     /**
      * 探测单个CDN可用性
      */
@@ -529,33 +547,181 @@
       try {
         const result = await probePromise
         this._cache[cdnId] = result
+        this._recordProbeResult(cdnId, result)
         return result
       } finally {
         delete this._pending[cdnId]
       }
     },
 
+    /**
+     * 获取 CDN 探测用的完整 URL
+     * 使用已知存在的热门库文件（避免请求不完整的 baseUrl 导致 404）
+     */
+    _getProbeFile(cdn) {
+      // 根据 CDN 格式选择探测文件
+      const probeLibs = {
+        bootcdn: 'jquery/3.7.1/jquery.min.js',
+        npm: 'jquery@3.7.1/dist/jquery.min.js',
+        font: null, // 字体 CDN 不探测
+      }
+
+      const probePath = probeLibs[cdn.format]
+      if (!probePath) {
+        return null
+      }
+
+      return cdn.baseUrl + probePath
+    },
+
     async _doProbe(cdnId, cdn) {
       const start = performance.now()
+      this._stats.totalProbes++
+
+      const probeFile = this._getProbeFile(cdn)
+      if (!probeFile) {
+        return { healthy: true, latency: 0, timestamp: Date.now() }
+      }
+
+      // 使用 fetch no-cors 探测 — 不执行代码，不产生副作用
+      // no-cors 行为: HTTP 200/404/5xx → opaque response → resolve (✓)
+      //               网络层错误(DNS/连接/CORS重定向) → reject (✗)
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('timeout')), this.TIMEOUT)
+      })
+
       try {
-        const controller = new AbortController()
-        const timer = setTimeout(() => controller.abort(), this.TIMEOUT)
-
-        await fetch(cdn.baseUrl, {
-          method: 'HEAD',
+        const fetchPromise = fetch(probeFile, {
+          method: 'GET',
           mode: 'no-cors',
-          signal: controller.signal,
-        })
+          cache: 'no-store',
+        }).then(() => ({ ok: true }))
 
-        clearTimeout(timer)
+        await Promise.race([fetchPromise, timeoutPromise])
+
         const latency = Math.round(performance.now() - start)
-
+        this._stats.successfulProbes++
         console.log(`[CDNProbe] ${cdn.name} ✓ ${latency}ms`)
         return { healthy: true, latency, timestamp: Date.now() }
       } catch (e) {
         const latency = Math.round(performance.now() - start)
-        console.warn(`[CDNProbe] ${cdn.name} ✗ ${latency}ms`)
+        this._stats.failedProbes++
+        console.warn(
+          `[CDNProbe] ${cdn.name} ✗ ${latency}ms`,
+          `url=${probeFile}`,
+          `[${e?.name || 'Error'}] ${e?.message || 'unknown'}`,
+          e?.cause ? `cause=${e.cause}` : ''
+        )
         return { healthy: false, latency: Infinity, timestamp: Date.now() }
+      }
+    },
+
+    /**
+     * 记录探测结果到历史
+     */
+    _recordProbeResult(cdnId, result) {
+      const now = Date.now()
+
+      // 记录响应时间历史（保留最近N次）
+      if (!this._responseTimes[cdnId]) {
+        this._responseTimes[cdnId] = []
+      }
+      this._responseTimes[cdnId].push({
+        time: now,
+        latency: result.latency,
+      })
+      if (this._responseTimes[cdnId].length > this._historyLimits.responseTimes) {
+        this._responseTimes[cdnId].shift()
+      }
+
+      // 记录健康状态历史（保留最近N次）
+      if (!this._history[cdnId]) {
+        this._history[cdnId] = []
+      }
+      this._history[cdnId].push({
+        time: now,
+        healthy: result.healthy,
+        latency: result.latency,
+      })
+      if (this._history[cdnId].length > this._historyLimits.healthHistory) {
+        this._history[cdnId].shift()
+      }
+
+      // 更新健康计数
+      if (!this._healthCounts[cdnId]) {
+        this._healthCounts[cdnId] = { healthy: 0, unhealthy: 0 }
+      }
+      if (result.healthy) {
+        this._healthCounts[cdnId].healthy++
+        this._healthCounts[cdnId].unhealthy = 0
+      } else {
+        this._healthCounts[cdnId].unhealthy++
+        this._healthCounts[cdnId].healthy = 0
+      }
+    },
+
+    /**
+     * 获取CDN的平均响应时间
+     * @param {string} cdnId
+     * @param {number} lastN - 取最近N次的平均值
+     * @returns {number} 平均响应时间(ms)，无数据返回 Infinity
+     */
+    getAverageResponseTime(cdnId, lastN = 10) {
+      const times = this._responseTimes[cdnId] || []
+      const recent = times.slice(-lastN)
+      if (recent.length === 0) {return Infinity}
+
+      const total = recent.reduce((sum, item) => sum + item.latency, 0)
+      return Math.round(total / recent.length)
+    },
+
+    /**
+     * 获取CDN的健康率
+     * @param {string} cdnId
+     * @param {number} lastN - 取最近N次的健康率
+     * @returns {number} 健康率(0-1)，无数据返回 0
+     */
+    getHealthRate(cdnId, lastN = 20) {
+      const history = this._history[cdnId] || []
+      const recent = history.slice(-lastN)
+      if (recent.length === 0) {return 0}
+
+      const healthyCount = recent.filter((item) => item.healthy).length
+      return healthyCount / recent.length
+    },
+
+    /**
+     * 获取CDN的探测间隔建议
+     * 健康CDN：延长探测间隔
+     * 不健康CDN：缩短探测间隔
+     * @param {string} cdnId
+     * @returns {number} 建议的探测间隔(ms)
+     */
+    getAdaptiveInterval(cdnId) {
+      const cached = this._cache[cdnId]
+      const counts = this._healthCounts[cdnId] || { healthy: 0, unhealthy: 0 }
+
+      // 基础间隔配置
+      const HEALTHY_BASE = 30 * 60 * 1000       // 健康CDN基础间隔：30分钟
+      const UNHEALTHY_BASE = 1 * 60 * 1000      // 不健康CDN基础间隔：1分钟
+      const DEGRADED_INTERVAL = 5 * 60 * 1000   // 未知状态间隔：5分钟
+      const MAX_HEALTHY = 60 * 60 * 1000        // 最大健康间隔：1小时
+      const MIN_UNHEALTHY = 30 * 1000            // 最小不健康间隔：30秒
+
+      if (!cached) {
+        return DEGRADED_INTERVAL
+      }
+
+      if (cached.healthy) {
+        // 健康CDN：根据连续健康次数延长间隔（指数增长）
+        const consecutiveHealthy = counts.healthy
+        const multiplier = Math.min(Math.pow(1.5, Math.floor(consecutiveHealthy / 3)), MAX_HEALTHY / HEALTHY_BASE)
+        return Math.min(HEALTHY_BASE * multiplier, MAX_HEALTHY)
+      } else {
+        // 不健康CDN：根据连续不健康次数缩短间隔（指数衰减）
+        const consecutiveUnhealthy = counts.unhealthy
+        const multiplier = Math.max(Math.pow(0.8, Math.floor(consecutiveUnhealthy / 2)), MIN_UNHEALTHY / UNHEALTHY_BASE)
+        return Math.max(UNHEALTHY_BASE * multiplier, MIN_UNHEALTHY)
       }
     },
 
@@ -587,8 +753,60 @@
      */
     markUnhealthy(cdnId) {
       this._cache[cdnId] = { healthy: false, latency: Infinity, timestamp: Date.now() }
+      this._recordProbeResult(cdnId, { healthy: false, latency: Infinity, timestamp: Date.now() })
       const cdn = CDN_BY_ID[cdnId]
       if (cdn) {console.warn(`[CDNProbe] ${cdn.name} 标记不可用`)}
+    },
+
+    /**
+     * 获取探测统计
+     */
+    getProbeStats() {
+      const stats = {
+        ...this._stats,
+        averageResponseTime: 0,
+        cdnStatus: {},
+        healthDistribution: { healthy: 0, unhealthy: 0, unknown: 0 },
+      }
+
+      let totalLatency = 0
+      let latencyCount = 0
+
+      for (const cdn of CDN_SOURCES) {
+        if (cdn.format === 'font') {continue}
+
+        const cached = this._cache[cdn.id]
+        const avgResponseTime = this.getAverageResponseTime(cdn.id)
+        const healthRate = this.getHealthRate(cdn.id)
+
+        stats.cdnStatus[cdn.id] = {
+          name: cdn.name,
+          healthy: cached?.healthy ?? null,
+          lastProbeTime: cached?.timestamp || null,
+          averageResponseTime: avgResponseTime === Infinity ? null : avgResponseTime,
+          healthRate,
+          probeCount: (this._history[cdn.id] || []).length,
+        }
+
+        if (cached?.healthy === true) {
+          stats.healthDistribution.healthy++
+        } else if (cached?.healthy === false) {
+          stats.healthDistribution.unhealthy++
+        } else {
+          stats.healthDistribution.unknown++
+        }
+
+        if (avgResponseTime !== Infinity) {
+          totalLatency += avgResponseTime
+          latencyCount++
+        }
+      }
+
+      if (latencyCount > 0) {
+        stats.averageResponseTime = Math.round(totalLatency / latencyCount)
+      }
+
+      return stats
     },
 
     /**
@@ -596,6 +814,10 @@
      */
     clear() {
       this._cache = {}
+      this._history = {}
+      this._responseTimes = {}
+      this._healthCounts = {}
+      this._stats = { totalProbes: 0, successfulProbes: 0, failedProbes: 0 }
     },
   }
 
@@ -646,29 +868,65 @@
   }
 
   /**
+   * 计算CDN选择分数
+   * 综合考虑健康状态、响应时间、历史成功率
+   * @param {string} cdnId
+   * @returns {number} 分数(0-100)，越高越优先
+   */
+  function _scoreCDN(cdnId) {
+    const cached = CDNHealthProbe._cache[cdnId]
+    const avgResponseTime = CDNHealthProbe.getAverageResponseTime(cdnId)
+    const healthRate = CDNHealthProbe.getHealthRate(cdnId)
+
+    let score = 0
+
+    // 健康状态权重（0-50分）
+    if (cached?.healthy) {
+      score += 50
+    } else if (!cached) {
+      score += 25 // 未知状态：中等优先级
+    }
+    // 不健康：0分
+
+    // 响应时间权重（0-30分，越快越高）
+    if (avgResponseTime < 100) {
+      score += 30
+    } else if (avgResponseTime < 300) {
+      score += 20
+    } else if (avgResponseTime < 1000) {
+      score += 10
+    }
+    // >= 1000ms 或 Infinity：0分
+
+    // 历史成功率权重（0-20分）
+    score += Math.round(healthRate * 20)
+
+    return score
+  }
+
+  /**
    * 按CDN降级链构建URL(健康探测 + 备选URL)
+   * 使用智能排序算法：健康状态 + 响应时间 + 历史成功率
    * 返回 { url, cdnId, fallbackUrls }
    */
   function tryCDNChain(cdnOrder, config, version) {
-    const healthy = CDNHealthProbe.getHealthy(cdnOrder)
-    const healthyIds = healthy.map((h) => h.id)
-    // 合并：健康CDN优先，未知状态其次，不健康放最后
-    const ordered = [...new Set([...healthyIds, ...cdnOrder])]
+    // 智能排序：按分数降序
+    const scoredCDNs = cdnOrder
+      .map((cdnId) => ({ cdnId, score: _scoreCDN(cdnId) }))
+      .sort((a, b) => b.score - a.score)
+
     const fallbackUrls = []
     let primary = null
 
-    for (const cdnId of ordered) {
+    for (const { cdnId } of scoredCDNs) {
       const cdn = CDN_BY_ID[cdnId]
       if (!cdn) {continue}
       const url = buildCDNUrl(cdn, config, version, config.file)
       if (!url) {continue}
 
-      const cached = CDNHealthProbe._cache[cdnId]
-      const isHealthy = !cached || cached.healthy
-
-      if (!primary && isHealthy) {
+      if (!primary) {
         primary = { url, cdnId }
-      } else if (primary) {
+      } else {
         fallbackUrls.push({ url, cdnId })
       }
     }
