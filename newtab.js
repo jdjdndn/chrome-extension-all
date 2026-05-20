@@ -2080,7 +2080,7 @@ function initImportBtn() {
   document.addEventListener(
     'keydown',
     (e) => {
-      if (e.key !== ' ') {
+      if (e.key !== ' ' && e.key !== 'x' && e.key !== 'X') {
         return
       }
       if (e.ctrlKey || e.metaKey || e.altKey) {
@@ -2093,6 +2093,15 @@ function initImportBtn() {
       e.preventDefault()
       e.stopImmediatePropagation()
 
+      // X 键：右键点击
+      if (e.key === 'x' || e.key === 'X') {
+        if (!spaceHeld) {
+          doRightClick()
+        }
+        return
+      }
+
+      // 空格键
       if (!spaceHeld && !spaceTimer) {
         spaceDownTime = Date.now()
         spaceTimer = setTimeout(() => {
@@ -2467,6 +2476,34 @@ function initImportBtn() {
         )
       }
     }, 10)
+  }
+
+  function doRightClick() {
+    const el = findClickTarget(mouseX, mouseY)
+    if (!el || !el.isConnected) {
+      return
+    }
+
+    // 完整的标准右键事件属性，行为与真实点击完全一致
+    const eventProps = {
+      bubbles: true,
+      cancelable: true,
+      view: window,
+      detail: 1,
+      screenX: mouseX + window.screenX,
+      screenY: mouseY + window.screenY,
+      clientX: mouseX,
+      clientY: mouseY,
+      button: 2,
+      buttons: 2,
+      ctrlKey: false,
+      altKey: false,
+      shiftKey: false,
+      metaKey: false,
+      relatedTarget: null,
+    }
+
+    el.dispatchEvent(new MouseEvent('contextmenu', eventProps))
   }
 
   function startTextSelection() {
