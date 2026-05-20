@@ -227,10 +227,7 @@ if (window.KeyboardPaginationLoaded) {
       const selectors = this.selectors[type]
       for (const selector of selectors) {
         try {
-          // 跳过 :has() 选择器（兼容性）
-          if (selector.includes(':has(')) {
-            continue
-          }
+          // :has() 选择器 Chrome 105+ 已支持，不再跳过
 
           const elements = document.querySelectorAll(selector)
           for (const el of elements) {
@@ -334,7 +331,7 @@ if (window.KeyboardPaginationLoaded) {
       }
     }
 
-    isValidButton(el) {
+    isValidButton(el, type) {
       if (!el) {
         return false
       }
@@ -354,7 +351,7 @@ if (window.KeyboardPaginationLoaded) {
       }
 
       // 检查是否有 href 或 onclick
-      const hasHref = el.tagName === 'A' && el.href && !el.href.includes('#')
+      const hasHref = el.tagName === 'A' && el.href
       const hasOnClick = el.hasAttribute('onclick')
       const isButton = el.tagName === 'BUTTON'
       const hasRole = el.getAttribute('role') === 'button'
@@ -400,7 +397,7 @@ if (window.KeyboardPaginationLoaded) {
     }
 
     bindEvents() {
-      document.addEventListener('keydown', (e) => {
+      this._keydownHandler = (e) => {
         // 忽略输入框中的按键
         if (this.isInputFocused()) {
           return
@@ -416,8 +413,8 @@ if (window.KeyboardPaginationLoaded) {
 
         const key = e.key
 
-        // 如果页面有可见视频，不拦截左右键（让视频播放器处理快进/快退）
-        if ((key === 'ArrowLeft' || key === 'ArrowRight') && this.hasVisibleVideo()) {
+        // 如果焦点在视频元素上，不拦截左右键（让视频播放器处理快进/快退）
+        if ((key === 'ArrowLeft' || key === 'ArrowRight') && this.isVideoFocused()) {
           return
         }
 
@@ -442,13 +439,24 @@ if (window.KeyboardPaginationLoaded) {
           e.preventDefault()
           this.showHelp()
         }
-      })
+      }
+      document.addEventListener('keydown', this._keydownHandler, true)
 
-      // 监听 DOM 变化，重新检测分页按钮
-      const observer = new MutationObserver(() => {
-        this.detectPagination()
+      // 监听 DOM 变化，重新检测分页按钮（防抖避免 SPA 路由切换时频繁触发）
+      let detectTimer = null
+      this._observer = new MutationObserver(() => {
+        clearTimeout(detectTimer)
+        detectTimer = setTimeout(() => this.detectPagination(), 300)
       })
-      observer.observe(document.body, { childList: true, subtree: true })
+      this._observer.observe(document.body, { childList: true, subtree: true })
+
+      // SPA URL 变化时重新检测分页按钮
+      this._popstateHandler = () => {
+        clearTimeout(detectTimer)
+        detectTimer = setTimeout(() => this.detectPagination(), 300)
+      }
+      window.addEventListener('popstate', this._popstateHandler)
+      window.addEventListener('hashchange', this._popstateHandler)
     }
 
     isInputFocused() {
@@ -476,41 +484,18 @@ if (window.KeyboardPaginationLoaded) {
         }
       }
 
-      // 4. 视频播放器控件检测（避免干扰视频进度条等控件）
-      const videoSelectors = [
-        'video', // video 元素
-        'audio', // audio 元素
-        '.bpx-player', // B站播放器
-        '.bilibili-player', // B站旧播放器
-        '.bpx-player-control-wrap', // B站控制栏
-        '.xgplayer', // 西瓜/抖音播放器
-        '.dplayer', // DPlayer
-        '.vjs-player', // Video.js
-        '.jw-player', // JW Player
-        '.plyr', // Plyr
-        '[class*="player"][class*="control"]', // 通用播放器控件
-      ]
-      for (const selector of videoSelectors) {
-        try {
-          if (active.matches?.(selector) || active.closest?.(selector)) {
-            return true
-          }
-        } catch (e) {
-          // 选择器不支持，跳过
-        }
+      // 4. 视频/音频元素检测（只匹配元素本身，不匹配播放器容器避免误判）
+      if (active.matches?.('video, audio') || active.closest?.('video, audio')) {
+        return true
       }
 
       // 5. 进度条/滑块检测（视频进度条、音量条等）
       const sliderSelectors = [
         '[role="slider"]', // ARIA 滑块
         'input[type="range"]', // range 输入
-        '.bpx-player-progress', // B站进度条
-        '.bilibili-player-progress', // B站旧进度条
         '[class*="progress"][class*="bar"]', // 通用进度条
         '[class*="seekbar"]', // 通用 seekbar
         '[class*="timeline"]', // 通用时间线
-        '.xgplayer-progress', // 西瓜播放器进度条
-        '.xgplayer-slider', // 西瓜播放器滑块
       ]
       for (const selector of sliderSelectors) {
         try {
@@ -525,25 +510,21 @@ if (window.KeyboardPaginationLoaded) {
       return false
     }
 
-    // 检测页面是否有可见的视频播放器
-    hasVisibleVideo() {
-      const videos = document.querySelectorAll('video')
-      for (const video of videos) {
-        const rect = video.getBoundingClientRect()
-        // 视频可见且尺寸足够大（排除小视频广告等）
-        if (
-          rect.width > 200 &&
-          rect.height > 150 &&
-          rect.top < window.innerHeight &&
-          rect.bottom > 0
-        ) {
-          return true
-        }
-      }
-      return false
+    // 检测焦点是否在视频元素上（替代旧的 hasVisibleVideo，避免页面有视频就禁用翻页）
+    isVideoFocused() {
+      const active = document.activeElement
+      if (!active) {return false}
+      return !!(active.matches?.('video, audio') || active.closest?.('video, audio'))
     }
 
     clickButton(button, type) {
+      // 检查按钮是否仍在 DOM 中（SPA 路由切换后引用可能失效）
+      if (!document.body.contains(button)) {
+        this.detectPagination()
+        button = type === 'prev' ? this.prevButton : this.nextButton
+        if (!button) {return}
+      }
+
       // 高亮按钮
       this.highlightButton(button)
 
@@ -553,7 +534,9 @@ if (window.KeyboardPaginationLoaded) {
 
       // 延迟点击，让用户看到效果
       setTimeout(() => {
-        button.click()
+        if (document.body.contains(button)) {
+          button.click()
+        }
       }, 100)
     }
 
