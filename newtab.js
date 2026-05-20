@@ -1698,7 +1698,7 @@ function bindLearnEvents() {
   document.querySelectorAll('[data-action="delete-link"]').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.preventDefault()
-      e.stopPropagation()
+      e.stopImmediatePropagation()
       const categoryId = btn.dataset.category
       const index = parseInt(btn.dataset.index)
 
