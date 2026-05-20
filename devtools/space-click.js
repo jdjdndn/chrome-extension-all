@@ -157,8 +157,9 @@
     const inPreview = isInImagePreviewModal(topEl)
 
     // 如果在预览内，优先找可关闭的父遮罩层（解决空格点击非图片区域无法关闭预览的问题）
+    // 传入坐标校验，防止误触发画中画等不相关的层
     if (inPreview) {
-      const mask = findParentMask(topEl)
+      const mask = findParentMask(topEl, x, y)
       if (mask) {
         return mask
       }
@@ -166,7 +167,7 @@
 
     // 图片预览遮罩检测：如果在预览内，找到可关闭的父容器
     if (topEl.tagName === 'IMG' && inPreview) {
-      return findParentMask(topEl) || topEl
+      return findParentMask(topEl, x, y) || topEl
     }
 
     // 遮罩层本身直接返回（不穿透）
@@ -231,8 +232,8 @@
     return false
   }
 
-  /** 查找元素的父遮罩层 */
-  function findParentMask(el) {
+  /** 查找元素的父遮罩层（带坐标校验，防止误触发画中画等层） */
+  function findParentMask(el, x, y) {
     if (!el) {
       return null
     }
@@ -250,28 +251,36 @@
     let current = el.parentElement
 
     for (let i = 0; i < 8 && current && current !== document.body; i++) {
+      let matched = false
+
       if (current.className && patterns.some((p) => p.test(current.className))) {
-        candidates.push({ el: current, priority: 1 })
+        matched = true
       } else if (current.id && patterns.some((p) => p.test(current.id))) {
-        candidates.push({ el: current, priority: 1 })
+        matched = true
       }
 
-      if (current.hasAttribute?.('onclick')) {
-        candidates.push({ el: current, priority: 2 })
-      }
-      if (current.getAttribute('tabindex') === '0') {
-        candidates.push({ el: current, priority: 2 })
-      }
-
+      // 坐标校验：确保 (x, y) 真正在元素边界内
       try {
-        const style = getComputedStyle(current)
-        if (style.cursor === 'pointer') {
-          candidates.push({ el: current, priority: 3 })
+        const rect = current.getBoundingClientRect()
+        if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+          current = current.parentElement
+          continue
         }
-        if (style.position === 'fixed') {
-          const rect = current.getBoundingClientRect()
+
+        const style = getComputedStyle(current)
+        // 高 z-index 优先（> 1000 通常是真正的遮罩层）
+        const zIndex = parseInt(style.zIndex, 10) || 0
+        const isHighZ = zIndex > 1000
+
+        if (style.cursor === 'pointer' || matched || current.hasAttribute?.('onclick')) {
+          const priority = isHighZ ? -1 : matched ? 1 : 2
+          candidates.push({ el: current, priority, zIndex })
+        }
+
+        // fixed 全屏容器 + 高 z-index = 高优先级遮罩
+        if (style.position === 'fixed' && isHighZ) {
           if (rect.width >= window.innerWidth * 0.8 && rect.height >= window.innerHeight * 0.8) {
-            candidates.push({ el: current, priority: 0 })
+            candidates.push({ el: current, priority: -2, zIndex })
           }
         }
       } catch {
@@ -282,7 +291,7 @@
     }
 
     if (candidates.length > 0) {
-      candidates.sort((a, b) => a.priority - b.priority)
+      candidates.sort((a, b) => a.priority - b.priority || b.zIndex - a.zIndex)
       return candidates[0].el
     }
     return null

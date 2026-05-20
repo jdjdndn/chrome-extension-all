@@ -1,6 +1,58 @@
 // 标记关键 CSS 已加载
 document.documentElement.classList.add('critical-css-loaded')
 
+/**
+ * 安全获取 DOM 元素（统一空指针保护）
+ * 优化路径：下次任何 DOM 操作直接使用此函数，无需重复判空
+ * @param {string} id - 元素 ID
+ * @returns {HTMLElement|null} 元素或 null
+ */
+function getEl(id) {
+  return document.getElementById(id)
+}
+
+/**
+ * 安全获取 DOM 元素并返回默认值
+ * @param {string} id - 元素 ID
+ * @param {*} defaultValue - 元素不存在时的默认值
+ * @returns {HTMLElement|*} 元素或默认值
+ */
+function getElSafe(id, defaultValue = null) {
+  return getEl(id) || defaultValue
+}
+
+/**
+ * 安全设置元素文本内容
+ * @param {string} id - 元素 ID
+ * @param {string} text - 文本内容
+ */
+function setText(id, text) {
+  const el = getEl(id)
+  if (el) {el.textContent = text}
+}
+
+/**
+ * 安全获取元素文本内容
+ * @param {string} id - 元素 ID
+ * @param {string} defaultValue - 默认值
+ * @returns {string} 文本内容或默认值
+ */
+function getText(id, defaultValue = '') {
+  const el = getEl(id)
+  return el ? el.textContent : defaultValue
+}
+
+/**
+ * 安全设置元素样式
+ * @param {string} id - 元素 ID
+ * @param {string} prop - CSS 属性名
+ * @param {string} value - CSS 属性值
+ */
+function setStyle(id, prop, value) {
+  const el = getEl(id)
+  if (el && el.style) {el.style[prop] = value}
+}
+
 // ========== 每日一言 ==========
 const QUOTES = [
   { text: '生活不是等待暴风雨过去，而是学会在雨中跳舞。', author: '维维安·格林' },
@@ -24,11 +76,9 @@ const QUOTES = [
 ]
 
 function loadDailyQuote() {
-  const quoteText = document.getElementById('quote-text')
-  const quoteAuthor = document.getElementById('quote-author')
-  if (!quoteText) {
-    return
-  }
+  const quoteText = getEl('quote-text')
+  const quoteAuthor = getEl('quote-author')
+  if (!quoteText) {return}
 
   // 根据日期选择一言（每天固定）
   const today = new Date()
@@ -42,10 +92,13 @@ function loadDailyQuote() {
 // 初始化 - 延迟加载非关键资源
 // 使用 requestIdleCallback 在浏览器空闲时加载天气和每日一言
 if ('requestIdleCallback' in window) {
-  requestIdleCallback(() => {
-    loadDailyQuote()
-    loadWeather()
-  }, { timeout: 2000 })
+  requestIdleCallback(
+    () => {
+      loadDailyQuote()
+      loadWeather()
+    },
+    { timeout: 2000 }
+  )
 } else {
   // 降级方案：延迟 1 秒加载
   setTimeout(() => {
@@ -56,12 +109,10 @@ if ('requestIdleCallback' in window) {
 
 // ========== 天气显示 ==========
 async function loadWeather() {
-  const tempEl = document.getElementById('weather-temp')
-  const descEl = document.getElementById('weather-desc')
-  const iconEl = document.getElementById('weather-icon')
-  if (!tempEl) {
-    return
-  }
+  const tempEl = getEl('weather-temp')
+  const descEl = getEl('weather-desc')
+  const iconEl = getEl('weather-icon')
+  if (!tempEl) {return}
 
   try {
     // 使用 AbortController 设置超时
@@ -72,7 +123,7 @@ async function loadWeather() {
     const response = await fetch('https://wttr.in/?format=j1', {
       signal: controller.signal,
       // 使用 cache: 'force-cache' 优先使用缓存
-      cache: 'default'
+      cache: 'default',
     })
     clearTimeout(timeoutId)
 
@@ -159,8 +210,7 @@ function saveSettings(settings) {
 
 // 应用列数设置
 function applyColumnsSetting(columns) {
-  const quickLinks = document.getElementById('quickLinks')
-  quickLinks.style.gridTemplateColumns = `repeat(${columns}, 1fr)`
+  setStyle('quickLinks', 'gridTemplateColumns', `repeat(${columns}, 1fr)`)
 }
 
 // 变量声明（延迟初始化）
@@ -190,23 +240,25 @@ document.addEventListener('keydown', (e) => {
 
 // 初始化设置相关 DOM
 function initSettingsDom() {
-  settingsBtn = document.getElementById('settingsBtn')
-  settingsDrawer = document.getElementById('settingsDrawer')
-  settingsCloseBtn = document.getElementById('settingsCloseBtn')
-  drawerOverlay = document.getElementById('drawerOverlay')
+  settingsBtn = getEl('settingsBtn')
+  settingsDrawer = getEl('settingsDrawer')
+  settingsCloseBtn = getEl('settingsCloseBtn')
+  drawerOverlay = getEl('drawerOverlay')
 
   if (settingsBtn) {settingsBtn.addEventListener('click', openSettings)}
   if (settingsCloseBtn) {settingsCloseBtn.addEventListener('click', closeSettings)}
   if (drawerOverlay) {drawerOverlay.addEventListener('click', closeSettings)}
 
   // 列数滑块
-  columnsRange = document.getElementById('columnsRange')
-  columnsValue = document.getElementById('columnsValue')
+  columnsRange = getEl('columnsRange')
+  columnsValue = getEl('columnsValue')
 
   if (columnsRange) {
     columnsRange.addEventListener('input', (e) => {
       const value = parseInt(e.target.value)
-      if (columnsValue) {columnsValue.textContent = value}
+      if (columnsValue) {
+        columnsValue.textContent = value
+      }
       applyColumnsSetting(value)
 
       const settings = getSettings()
@@ -216,8 +268,8 @@ function initSettingsDom() {
   }
 
   // 历史记录数量滑块
-  historyCountRange = document.getElementById('historyCountRange')
-  historyCountValue = document.getElementById('historyCountValue')
+  historyCountRange = getEl('historyCountRange')
+  historyCountValue = getEl('historyCountValue')
 
   if (historyCountRange) {
     historyCountRange.addEventListener('input', (e) => {
@@ -244,7 +296,7 @@ function initSettings() {
   historyCountValue.textContent = settings.historyCount
 
   // 设置搜索引擎选择
-  const searchEngineSelect = document.getElementById('searchEngineSelect')
+  const searchEngineSelect = getEl('searchEngineSelect')
   if (searchEngineSelect) {
     searchEngineSelect.value = settings.searchEngine || 'baidu'
     searchEngineSelect.addEventListener('change', (e) => {
@@ -703,7 +755,7 @@ updateTime()
 setInterval(updateTime, 1000)
 
 // ========== 搜索功能 ==========
-const searchInput = document.getElementById('searchInput')
+const searchInput = getEl('searchInput')
 let searchHistoryTimeout = null
 
 searchInput.addEventListener('keypress', (e) => {
@@ -788,7 +840,7 @@ async function searchHistory(query) {
 }
 
 // ========== 快捷方式管理 ==========
-const quickLinksContainer = document.getElementById('quickLinks')
+const quickLinksContainer = getEl('quickLinks')
 const STORAGE_KEY = 'quickLinks'
 
 // 默认快捷方式（始终存在）
@@ -871,11 +923,14 @@ function updateQuickLinksFromDOM() {
 
   document.querySelectorAll('.quick-link').forEach((el) => {
     const url = el.href
-    const title = el.querySelector('.quick-link-title').textContent
+    const titleEl = el.querySelector('.quick-link-title')
+    const title = titleEl ? titleEl.textContent : ''
     const iconEl = el.querySelector('.quick-link-icon')
-    const icon = iconEl.querySelector('span')
-      ? iconEl.querySelector('span').textContent
-      : iconEl.textContent.trim().substring(0, 2)
+    let icon = '🌐'
+    if (iconEl) {
+      const spanEl = iconEl.querySelector('span')
+      icon = spanEl ? spanEl.textContent : iconEl.textContent.trim().substring(0, 2)
+    }
 
     // 只保存非默认的快捷方式，且不重复
     if (!defaultUrls.has(url) && !seenUrls.has(url)) {
@@ -891,10 +946,32 @@ function updateQuickLinksFromDOM() {
   saveQuickLinks(links)
 }
 
+// 全局 addBtn 实例，避免重复查询 DOM
+let addBtnInstance = null
+
+// 创建添加按钮
+function createAddLinkBtn() {
+  if (addBtnInstance) {
+    return addBtnInstance
+  }
+
+  const btn = document.createElement('div')
+  btn.id = 'addLinkBtn'
+  btn.className = 'add-link-btn'
+  btn.role = 'button'
+  btn.tabIndex = 0
+  btn.innerHTML = `
+    <div class="quick-link-icon">➕</div>
+    <div class="quick-link-title">添加</div>
+  `
+  addBtnInstance = btn
+  return btn
+}
+
 // 加载保存的快捷方式
 function loadQuickLinks() {
   getQuickLinks((links) => {
-    const addBtn = document.getElementById('addLinkBtn')
+    const addBtn = createAddLinkBtn()
     quickLinksContainer.innerHTML = ''
 
     // 用于去重的 Set（记录已渲染的 URL）
@@ -928,37 +1005,35 @@ function loadQuickLinks() {
 
 // 添加新快捷方式
 function initAddLinkBtn() {
-  const addBtn = document.getElementById('addLinkBtn')
-  if (!addBtn) {return}
+  const addBtn = createAddLinkBtn()
   addBtn.addEventListener('click', () => {
-  const title = prompt('请输入网站名称:')
-  if (!title) {
-    return
-  }
+    const title = prompt('请输入网站名称:')
+    if (!title) {
+      return
+    }
 
-  const url = prompt('请输入网站URL:')
-  if (!url) {
-    return
-  }
+    const url = prompt('请输入网站URL:')
+    if (!url) {
+      return
+    }
 
-  const iconOptions = ['🌐', '🔗', '📌', '⭐', '🚀', '💡', '🎯', '📱', '💻', '🎨']
-  const icon = iconOptions[Math.floor(Math.random() * iconOptions.length)]
+    const iconOptions = ['🌐', '🔗', '📌', '⭐', '🚀', '💡', '🎯', '📱', '💻', '🎨']
+    const icon = iconOptions[Math.floor(Math.random() * iconOptions.length)]
 
-  // 尝试获取 favicon
-  let favicon = ''
-  try {
-    const urlObj = new URL(url)
-    favicon = `${urlObj.origin}/favicon.ico`
-  } catch (e) {}
+    // 尝试获取 favicon
+    let favicon = ''
+    try {
+      const urlObj = new URL(url)
+      favicon = `${urlObj.origin}/favicon.ico`
+    } catch (e) {}
 
-  const newLink = { title, url, icon, favicon }
-  const linkEl = createQuickLink(newLink)
+    const newLink = { title, url, icon, favicon }
+    const linkEl = createQuickLink(newLink)
 
-  // 插入到添加按钮之前
-  const addBtn = document.getElementById('addLinkBtn')
-  quickLinksContainer.insertBefore(linkEl, addBtn)
+    // 插入到添加按钮之前
+    quickLinksContainer.insertBefore(linkEl, addBtn)
 
-  updateQuickLinksFromDOM()
+    updateQuickLinksFromDOM()
   })
 }
 
@@ -974,8 +1049,10 @@ document.addEventListener('DOMContentLoaded', () => {
   initSettings()
 
   // 聚焦搜索框
-  const searchInput = document.getElementById('searchInput')
-  if (searchInput) {searchInput.focus()}
+  const searchInput = getEl('searchInput')
+  if (searchInput) {
+    searchInput.focus()
+  }
 })
 
 // 初始化快捷方式（首次时保存默认图标到 storage）
@@ -1704,7 +1781,9 @@ modalOverlay.addEventListener('click', (e) => {
 // 添加分类
 function initCategoryBtn() {
   const addCategoryBtn = document.getElementById('addCategoryBtn')
-  if (!addCategoryBtn) {return}
+  if (!addCategoryBtn) {
+    return
+  }
   addCategoryBtn.addEventListener('click', () => {
     showModal('添加分类', '分类名称', '分类图标（emoji）', '', 'add-category')
   })
@@ -1917,7 +1996,9 @@ function importFromBookmarks() {
 // 绑定导入按钮事件
 function initImportBtn() {
   const importBtn = document.getElementById('importBookmarkBtn')
-  if (!importBtn) {return}
+  if (!importBtn) {
+    return
+  }
   importBtn.addEventListener('click', importFromBookmarks)
 }
 
@@ -2055,8 +2136,182 @@ function initImportBtn() {
     }
   }
 
+  function findClickTarget(x, y) {
+    const all = document.elementsFromPoint(x, y)
+    if (all.length === 0) {return null}
+    const topEl = all[0]
+
+    // 检测是否在图片预览模态框内：无论是图片还是遮罩层都适用
+    const inPreview = isInImagePreviewModal(topEl)
+
+    // 如果在预览内，优先找可关闭的父遮罩层（解决空格点击非图片区域无法关闭预览的问题）
+    // 传入坐标校验，防止误触发画中画等不相关的层
+    if (inPreview) {
+      const mask = findParentMask(topEl, x, y)
+      if (mask) {return mask}
+    }
+
+    // 图片预览遮罩检测
+    if (topEl.tagName === 'IMG' && inPreview) {
+      return findParentMask(topEl, x, y) || topEl
+    }
+    // 遮罩层本身直接返回
+    if (isOverlayOrMask(topEl)) {return topEl}
+    if (topEl.tagName === 'VIDEO' || topEl.tagName === 'AUDIO') {return topEl}
+
+    for (const candidate of all) {
+      if (candidate.tagName === 'VIDEO' || candidate.tagName === 'AUDIO') {
+        if (!isInteractiveElement(topEl)) {return candidate}
+        break
+      }
+    }
+    return topEl
+  }
+
+  function isInImagePreviewModal(el) {
+    if (!el) {return false}
+    const patterns = [
+      /modal/i,
+      /dialog/i,
+      /lightbox/i,
+      /preview/i,
+      /gallery/i,
+      /viewer/i,
+      /mask/i,
+      /overlay/i,
+    ]
+    let current = el
+    for (let i = 0; i < 6 && current && current !== document.body; i++) {
+      if (current.className && patterns.some((p) => p.test(current.className))) {return true}
+      if (current.id && patterns.some((p) => p.test(current.id))) {return true}
+      try {
+        const style = getComputedStyle(current)
+        if (style.position === 'fixed') {
+          const rect = current.getBoundingClientRect()
+          if (rect.width >= 200 && rect.height >= 200) {return true}
+        }
+      } catch {
+        /* getComputedStyle 可能失败 */
+      }
+      current = current.parentElement
+    }
+    return false
+  }
+
+  function findParentMask(el, x, y) {
+    if (!el) {return null}
+    const patterns = [
+      /mask/i,
+      /overlay/i,
+      /backdrop/i,
+      /modal/i,
+      /dialog/i,
+      /lightbox/i,
+      /preview/i,
+    ]
+    const candidates = []
+    let current = el.parentElement
+    for (let i = 0; i < 8 && current && current !== document.body; i++) {
+      let matched = false
+      if (current.className && patterns.some((p) => p.test(current.className))) {matched = true}
+      else if (current.id && patterns.some((p) => p.test(current.id))) {matched = true}
+
+      // 坐标校验：确保 (x, y) 真正在元素边界内
+      try {
+        const rect = current.getBoundingClientRect()
+        if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+          current = current.parentElement
+          continue
+        }
+
+        const style = getComputedStyle(current)
+        // 高 z-index 优先（> 1000 通常是真正的遮罩层）
+        const zIndex = parseInt(style.zIndex, 10) || 0
+        const isHighZ = zIndex > 1000
+
+        // cursor: pointer 或有 onclick 或 匹配模式
+        if (style.cursor === 'pointer' || matched || current.hasAttribute?.('onclick')) {
+          const priority = isHighZ ? -1 : matched ? 1 : 2
+          candidates.push({ el: current, priority, zIndex })
+        }
+
+        // fixed 全屏容器 + 高 z-index = 最高优先级遮罩
+        if (style.position === 'fixed' && isHighZ) {
+          if (rect.width >= window.innerWidth * 0.8 && rect.height >= window.innerHeight * 0.8) {
+            candidates.push({ el: current, priority: -2, zIndex })
+          }
+        }
+      } catch {
+        /* getComputedStyle 可能失败 */
+      }
+
+      current = current.parentElement
+    }
+    if (candidates.length > 0) {
+      candidates.sort((a, b) => a.priority - b.priority || b.zIndex - a.zIndex)
+      return candidates[0].el
+    }
+    return null
+  }
+
+  function isOverlayOrMask(el) {
+    if (!el) {return false}
+    const patterns = [
+      /mask/i,
+      /overlay/i,
+      /backdrop/i,
+      /modal/i,
+      /dialog/i,
+      /lightbox/i,
+      /preview/i,
+      /^modal-/i,
+      /^overlay-/i,
+    ]
+    let current = el
+    for (let i = 0; i < 5 && current && current !== document.body; i++) {
+      if (current.className && patterns.some((p) => p.test(current.className))) {return true}
+      if (current.id && patterns.some((p) => p.test(current.id))) {return true}
+      try {
+        const style = getComputedStyle(current)
+        if (style.position === 'fixed' || style.position === 'absolute') {
+          const bg = style.backgroundColor
+          if (bg.includes('rgba(0, 0, 0') || bg.includes('rgba(0,0,0')) {
+            const rect = current.getBoundingClientRect()
+            if (rect.width >= window.innerWidth * 0.5 && rect.height >= window.innerHeight * 0.5)
+              {return true}
+          }
+        }
+      } catch {
+        /* getComputedStyle 可能失败 */
+      }
+      current = current.parentElement
+    }
+    return false
+  }
+
+  function isInteractiveElement(el) {
+    if (!el) {return false}
+    const tags = ['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA', 'LABEL']
+    let current = el
+    for (let i = 0; i < 5 && current && current !== document.body; i++) {
+      if (tags.includes(current.tagName)) {return true}
+      if (current.isContentEditable) {return true}
+      const role = current.getAttribute('role')
+      if (
+        role &&
+        ['button', 'link', 'tab', 'menuitem', 'checkbox', 'radio', 'switch'].includes(role)
+      )
+        {return true}
+      if (current.hasAttribute?.('onclick')) {return true}
+      if (current.hasAttribute?.('tabindex') && current.getAttribute('tabindex') !== '-1')
+        {return true}
+      current = current.parentElement
+    }
+    return false
+  }
+
   function doClick() {
-    const el = document.elementFromPoint(mouseX, mouseY)
+    const el = findClickTarget(mouseX, mouseY)
     if (!el) {
       return
     }
@@ -2565,12 +2820,18 @@ async function injectAndSend(tabId, site, question) {
             if (input.isContentEditable) {
               // contenteditable 优先用 innerHTML
               filled = fillContentEditable()
-              if (!filled) {filled = fillWithExecCommand()}
+              if (!filled) {
+                filled = fillWithExecCommand()
+              }
             } else if (input.tagName === 'TEXTAREA' || input.tagName === 'INPUT') {
               // input/textarea 优先用原生 setter
               filled = fillWithNativeSetter()
-              if (!filled) {filled = fillWithExecCommand()}
-              if (!filled) {filled = fillWithPaste()}
+              if (!filled) {
+                filled = fillWithExecCommand()
+              }
+              if (!filled) {
+                filled = fillWithPaste()
+              }
             } else {
               // 其他情况尝试所有方法
               filled = fillWithExecCommand() || fillWithPaste() || fillContentEditable()
@@ -2859,7 +3120,7 @@ function formatAIResponse(content) {
 }
 
 // 更新统计信息
-function updateAggregatorStats() {{failed++}
+function updateAggregatorStats() {
   const statsEl = document.getElementById('aiAggregatorStats')
   const statusEl = document.getElementById('aiAggregatorStatus')
 
@@ -2870,7 +3131,9 @@ function updateAggregatorStats() {{failed++}
   aiAggregator.responses.forEach((response) => {
     if (response.status === 'completed' || response.status === 'error') {
       completed++
-      if (response.status === 'error') {failed++}
+      if (response.status === 'error') {
+        failed++
+      }
     } else if (response.content) {
       // 有内容也算完成
       completed++
@@ -2927,7 +3190,12 @@ document.addEventListener('click', (e) => {
   }
 
   if (e.target.dataset.action === 'open') {
-    // TODO: 打开原始 AI 对话页面
+    const card = e.target.closest('.ai-response-card')
+    const siteId = card?.dataset.siteId
+    const site = DEFAULT_AI_SITES.find((s) => s.id === siteId)
+    if (site?.url) {
+      window.open(site.url, '_blank')
+    }
   }
 })
 

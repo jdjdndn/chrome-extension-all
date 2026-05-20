@@ -358,8 +358,9 @@ if (window.KeyboardClickLoaded) {
 
       // 如果在预览内（无论是图片还是遮罩层），优先找可关闭的父遮罩层
       // 解决空格点击非图片区域无法关闭预览的问题
+      // 传入坐标校验，防止误触发画中画等不相关的层
       if (inPreview) {
-        const mask = this._findParentMask(topEl)
+        const mask = this._findParentMask(topEl, x, y)
         if (mask) {
           return mask
         }
@@ -367,7 +368,7 @@ if (window.KeyboardClickLoaded) {
 
       if (topEl.tagName === 'IMG' && inPreview) {
         // 尝试找到可点击的遮罩父容器，找不到就返回图片本身
-        return this._findParentMask(topEl) || topEl
+        return this._findParentMask(topEl, x, y) || topEl
       }
 
       // 如果顶层是遮罩/覆盖层，直接返回不穿透
@@ -448,8 +449,8 @@ if (window.KeyboardClickLoaded) {
       return false
     }
 
-    /** 查找元素的父遮罩层（点击可关闭的容器） */
-    _findParentMask(el) {
+    /** 查找元素的父遮罩层（带坐标校验，防止误触发画中画等层） */
+    _findParentMask(el, x, y) {
       if (!el) {
         return null
       }
@@ -469,36 +470,39 @@ if (window.KeyboardClickLoaded) {
       const candidates = []
 
       for (let i = 0; i < 8 && current && current !== document.body; i++) {
+        let matched = false
+
         // 检查 class 和 id
         if (current.className && maskPatterns.some((p) => p.test(current.className))) {
-          candidates.push({ el: current, priority: 1 })
+          matched = true
         } else if (current.id && maskPatterns.some((p) => p.test(current.id))) {
-          candidates.push({ el: current, priority: 1 })
+          matched = true
         }
 
-        // 检查是否有 onclick 处理关闭
-        if (current.hasAttribute?.('onclick')) {
-          candidates.push({ el: current, priority: 2 })
-        }
-
-        // 检查是否为可聚焦的容器
-        if (current.getAttribute('tabindex') === '0') {
-          candidates.push({ el: current, priority: 2 })
-        }
-
-        // 检查 cursor 样式为 pointer（表示可点击）
+        // 坐标校验：确保 (x, y) 真正在元素边界内
         try {
-          const style = getComputedStyle(current)
-          if (style.cursor === 'pointer') {
-            candidates.push({ el: current, priority: 3 })
+          const rect = current.getBoundingClientRect()
+          if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+            current = current.parentElement
+            continue
           }
 
-          // 检查是否为固定定位的全屏遮罩（高度优先）
-          if (style.position === 'fixed') {
-            const rect = current.getBoundingClientRect()
+          const style = getComputedStyle(current)
+          // 高 z-index 优先（> 1000 通常是真正的遮罩层）
+          const zIndex = parseInt(style.zIndex, 10) || 0
+          const isHighZ = zIndex > 1000
+
+          // cursor: pointer 或有 onclick 或 匹配模式
+          if (style.cursor === 'pointer' || matched || current.hasAttribute?.('onclick')) {
+            const priority = isHighZ ? -1 : matched ? 1 : 2
+            candidates.push({ el: current, priority, zIndex })
+          }
+
+          // fixed 全屏容器 + 高 z-index = 最高优先级遮罩
+          if (style.position === 'fixed' && isHighZ) {
             // 接近全屏的固定元素很可能是遮罩容器
             if (rect.width >= window.innerWidth * 0.8 && rect.height >= window.innerHeight * 0.8) {
-              candidates.push({ el: current, priority: 0 }) // 最高优先级
+              candidates.push({ el: current, priority: -2, zIndex })
             }
           }
         } catch {
@@ -510,7 +514,7 @@ if (window.KeyboardClickLoaded) {
 
       // 按优先级排序，返回最高优先级的元素
       if (candidates.length > 0) {
-        candidates.sort((a, b) => a.priority - b.priority)
+        candidates.sort((a, b) => a.priority - b.priority || b.zIndex - a.zIndex)
         return candidates[0].el
       }
 
