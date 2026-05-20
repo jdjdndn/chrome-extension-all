@@ -483,16 +483,27 @@
     }
     e.preventDefault()
     e.stopPropagation()
-    el.dispatchEvent(
-      new MouseEvent('contextmenu', {
-        bubbles: true,
-        cancelable: true,
-        clientX: mouseX,
-        clientY: mouseY,
-        button: 2,
-        buttons: 2,
-      })
-    )
+
+    // 完整的标准右键事件属性，行为与真实点击完全一致
+    const eventProps = {
+      bubbles: true,
+      cancelable: true,
+      view: window,
+      detail: 1,
+      screenX: mouseX + window.screenX,
+      screenY: mouseY + window.screenY,
+      clientX: mouseX,
+      clientY: mouseY,
+      button: 2,
+      buttons: 2,
+      ctrlKey: e.ctrlKey || false,
+      altKey: e.altKey || false,
+      shiftKey: e.shiftKey || false,
+      metaKey: e.metaKey || false,
+      relatedTarget: null,
+    }
+
+    el.dispatchEvent(new MouseEvent('contextmenu', eventProps))
   }
 
   function extendSelection(cx, cy) {
