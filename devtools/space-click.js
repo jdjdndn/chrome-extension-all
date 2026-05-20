@@ -46,7 +46,7 @@
         case ' ':
           // 空格按下时禁用默认事件（防止页面滚动）
           e.preventDefault()
-          e.stopPropagation()
+          e.stopImmediatePropagation()
           if (!spaceHeld && !spaceTimer) {
             spaceDownTime = Date.now()
             // 设置长按定时器，超时后进入选择模式
@@ -387,7 +387,7 @@
       return
     }
     e.preventDefault()
-    e.stopPropagation()
+    e.stopImmediatePropagation()
 
     // 优先使用原生 click() 方法（行为最接近真实点击）
     // 对于某些特殊元素（如 video controls、shadow dom 内部），原生方法更可靠
@@ -482,7 +482,7 @@
       return
     }
     e.preventDefault()
-    e.stopPropagation()
+    e.stopImmediatePropagation()
 
     // 完整的标准右键事件属性，行为与真实点击完全一致
     const eventProps = {
