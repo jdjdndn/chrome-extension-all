@@ -20,7 +20,9 @@
     (e) => {
       mouseX = e.clientX
       mouseY = e.clientY
-      if (spaceHeld) {extendSelection(e.clientX, e.clientY)}
+      if (spaceHeld) {
+        extendSelection(e.clientX, e.clientY)
+      }
     },
     true
   )
@@ -36,8 +38,9 @@
           active.tagName === 'TEXTAREA' ||
           active.tagName === 'SELECT' ||
           active.isContentEditable)
-      )
-        {return}
+      ) {
+        return
+      }
 
       switch (e.key) {
         case ' ':
@@ -55,10 +58,14 @@
           break
         case 'x':
         case 'X':
-          if (!spaceHeld) {doRightClick(e)}
+          if (!spaceHeld) {
+            doRightClick(e)
+          }
           break
         case 'Escape':
-          if (spaceHeld) {cancelSelect()}
+          if (spaceHeld) {
+            cancelSelect()
+          }
           break
       }
     },
@@ -68,7 +75,9 @@
   window.addEventListener(
     'keyup',
     (e) => {
-      if (e.key === ' ') {onSpaceUp(e)}
+      if (e.key === ' ') {
+        onSpaceUp(e)
+      }
     },
     true
   )
@@ -106,7 +115,9 @@
 
   function startTextSelection() {
     const anchor = rangeFromPoint(mouseX, mouseY)
-    if (!anchor) {return} // 鼠标下没有文本，不进入选择模式
+    if (!anchor) {
+      return
+    } // 鼠标下没有文本，不进入选择模式
 
     spaceHeld = true
     selectAnchor = anchor
@@ -119,11 +130,15 @@
   // 递归穿透 shadow root，获取坐标处最深层元素
   function deepElementFromPoint(x, y) {
     let el = document.elementFromPoint(x, y)
-    if (!el) {return null}
+    if (!el) {
+      return null
+    }
     let maxDepth = 20
     while (el && el.shadowRoot && maxDepth-- > 0) {
       const inner = el.shadowRoot.elementFromPoint(x, y)
-      if (!inner || inner === el) {break}
+      if (!inner || inner === el) {
+        break
+      }
       el = inner
     }
     return el
@@ -131,36 +146,214 @@
 
   /** 查找真正的点击目标：优先选择被覆盖层遮挡的媒体元素 */
   function findClickTarget(x, y) {
-    let el = deepElementFromPoint(x, y)
-    if (!el) {return null}
-
-    if (el.tagName === 'VIDEO' || el.tagName === 'AUDIO') {return el}
-
     const all = document.elementsFromPoint(x, y)
+    if (all.length === 0) {
+      return null
+    }
+
+    const topEl = all[0]
+
+    // 检测是否在图片预览模态框内：无论是图片还是遮罩层都适用
+    const inPreview = isInImagePreviewModal(topEl)
+
+    // 如果在预览内，优先找可关闭的父遮罩层（解决空格点击非图片区域无法关闭预览的问题）
+    if (inPreview) {
+      const mask = findParentMask(topEl)
+      if (mask) {
+        return mask
+      }
+    }
+
+    // 图片预览遮罩检测：如果在预览内，找到可关闭的父容器
+    if (topEl.tagName === 'IMG' && inPreview) {
+      return findParentMask(topEl) || topEl
+    }
+
+    // 遮罩层本身直接返回（不穿透）
+    if (isOverlayOrMask(topEl)) {
+      return topEl
+    }
+
+    if (topEl.tagName === 'VIDEO' || topEl.tagName === 'AUDIO') {
+      return topEl
+    }
+
     for (const candidate of all) {
       if (candidate.tagName === 'VIDEO' || candidate.tagName === 'AUDIO') {
-        if (!isInteractiveElement(el)) {
-          el = candidate
+        if (!isInteractiveElement(topEl)) {
+          return candidate
         }
         break
       }
     }
-    return el
+    return deepElementFromPoint(x, y) || topEl
+  }
+
+  /** 判断元素是否在图片预览/模态框内 */
+  function isInImagePreviewModal(el) {
+    if (!el) {
+      return false
+    }
+    const patterns = [
+      /modal/i,
+      /dialog/i,
+      /lightbox/i,
+      /preview/i,
+      /gallery/i,
+      /viewer/i,
+      /mask/i,
+      /overlay/i,
+    ]
+
+    let current = el
+    for (let i = 0; i < 6 && current && current !== document.body; i++) {
+      if (current.className && patterns.some((p) => p.test(current.className))) {
+        return true
+      }
+      if (current.id && patterns.some((p) => p.test(current.id))) {
+        return true
+      }
+
+      try {
+        const style = getComputedStyle(current)
+        if (style.position === 'fixed') {
+          const rect = current.getBoundingClientRect()
+          if (rect.width >= 200 && rect.height >= 200) {
+            return true
+          }
+        }
+      } catch {
+        /* getComputedStyle 可能失败 */
+      }
+
+      current = current.parentElement
+    }
+    return false
+  }
+
+  /** 查找元素的父遮罩层 */
+  function findParentMask(el) {
+    if (!el) {
+      return null
+    }
+
+    const patterns = [
+      /mask/i,
+      /overlay/i,
+      /backdrop/i,
+      /modal/i,
+      /dialog/i,
+      /lightbox/i,
+      /preview/i,
+    ]
+    const candidates = []
+    let current = el.parentElement
+
+    for (let i = 0; i < 8 && current && current !== document.body; i++) {
+      if (current.className && patterns.some((p) => p.test(current.className))) {
+        candidates.push({ el: current, priority: 1 })
+      } else if (current.id && patterns.some((p) => p.test(current.id))) {
+        candidates.push({ el: current, priority: 1 })
+      }
+
+      if (current.hasAttribute?.('onclick')) {
+        candidates.push({ el: current, priority: 2 })
+      }
+      if (current.getAttribute('tabindex') === '0') {
+        candidates.push({ el: current, priority: 2 })
+      }
+
+      try {
+        const style = getComputedStyle(current)
+        if (style.cursor === 'pointer') {
+          candidates.push({ el: current, priority: 3 })
+        }
+        if (style.position === 'fixed') {
+          const rect = current.getBoundingClientRect()
+          if (rect.width >= window.innerWidth * 0.8 && rect.height >= window.innerHeight * 0.8) {
+            candidates.push({ el: current, priority: 0 })
+          }
+        }
+      } catch {
+        /* getComputedStyle 可能失败 */
+      }
+
+      current = current.parentElement
+    }
+
+    if (candidates.length > 0) {
+      candidates.sort((a, b) => a.priority - b.priority)
+      return candidates[0].el
+    }
+    return null
+  }
+
+  /** 判断元素是否为遮罩/覆盖层 */
+  function isOverlayOrMask(el) {
+    if (!el) {
+      return false
+    }
+    const patterns = [
+      /mask/i,
+      /overlay/i,
+      /backdrop/i,
+      /modal/i,
+      /dialog/i,
+      /lightbox/i,
+      /preview/i,
+      /^modal-/i,
+      /^overlay-/i,
+    ]
+
+    let current = el
+    for (let i = 0; i < 5 && current && current !== document.body; i++) {
+      if (current.className && patterns.some((p) => p.test(current.className))) {
+        return true
+      }
+      if (current.id && patterns.some((p) => p.test(current.id))) {
+        return true
+      }
+
+      try {
+        const style = getComputedStyle(current)
+        if (style.position === 'fixed' || style.position === 'absolute') {
+          const bg = style.backgroundColor
+          if (bg.includes('rgba(0, 0, 0') || bg.includes('rgba(0,0,0')) {
+            const rect = current.getBoundingClientRect()
+            if (rect.width >= window.innerWidth * 0.5 && rect.height >= window.innerHeight * 0.5) {
+              return true
+            }
+          }
+        }
+      } catch {
+        /* getComputedStyle 可能失败 */
+      }
+
+      current = current.parentElement
+    }
+    return false
   }
 
   function isInteractiveElement(el) {
     const tags = ['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA', 'LABEL']
-    if (tags.includes(el.tagName)) {return true}
-    if (el.isContentEditable) {return true}
+    if (tags.includes(el.tagName)) {
+      return true
+    }
+    if (el.isContentEditable) {
+      return true
+    }
     const role = el.getAttribute('role')
-    if (['button', 'link', 'tab', 'menuitem', 'checkbox', 'radio', 'switch'].includes(role))
-      {return true}
+    if (['button', 'link', 'tab', 'menuitem', 'checkbox', 'radio', 'switch'].includes(role)) {
+      return true
+    }
     return false
   }
 
   function doClick(e) {
     const el = findClickTarget(mouseX, mouseY)
-    if (!el || !el.isConnected) {return}
+    if (!el || !el.isConnected) {
+      return
+    }
     e.preventDefault()
     e.stopPropagation()
 
@@ -203,7 +396,9 @@
 
   function doRightClick(e) {
     const el = findClickTarget(mouseX, mouseY)
-    if (!el || !el.isConnected) {return}
+    if (!el || !el.isConnected) {
+      return
+    }
     e.preventDefault()
     e.stopPropagation()
     el.dispatchEvent(
@@ -219,9 +414,13 @@
   }
 
   function extendSelection(cx, cy) {
-    if (!selectAnchor) {return}
+    if (!selectAnchor) {
+      return
+    }
     const focus = rangeFromPoint(cx, cy)
-    if (!focus) {return}
+    if (!focus) {
+      return
+    }
     try {
       const range = document.createRange()
       const a = selectAnchor
@@ -240,7 +439,9 @@
   }
 
   function rangeFromPoint(x, y) {
-    if (document.caretRangeFromPoint) {return document.caretRangeFromPoint(x, y)}
+    if (document.caretRangeFromPoint) {
+      return document.caretRangeFromPoint(x, y)
+    }
     if (document.caretPositionFromPoint) {
       const pos = document.caretPositionFromPoint(x, y)
       if (pos) {
