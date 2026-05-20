@@ -389,41 +389,91 @@
     e.preventDefault()
     e.stopPropagation()
 
-    // 使用鼠标实际位置（而非元素中心），确保点击精确位置
-    // 这对于进度条等需要精确点击的场景很重要
-    const clientX = mouseX
-    const clientY = mouseY
+    // 优先使用原生 click() 方法（行为最接近真实点击）
+    // 对于某些特殊元素（如 video controls、shadow dom 内部），原生方法更可靠
+    if (typeof el.click === 'function') {
+      try {
+        el.click()
+        return
+      } catch (_) {
+        // 原生方法失败时回退到合成事件
+      }
+    }
 
-    el.dispatchEvent(
-      new MouseEvent('mousedown', {
-        bubbles: true,
-        cancelable: true,
-        clientX,
-        clientY,
-        button: 0,
-        buttons: 1,
-      })
-    )
-    el.dispatchEvent(
-      new MouseEvent('mouseup', {
-        bubbles: true,
-        cancelable: true,
-        clientX,
-        clientY,
-        button: 0,
-        buttons: 0,
-      })
-    )
-    el.dispatchEvent(
-      new MouseEvent('click', {
-        bubbles: true,
-        cancelable: true,
-        clientX,
-        clientY,
-        button: 0,
-        buttons: 0,
-      })
-    )
+    // 完整的标准鼠标事件属性，行为与真实点击完全一致
+    const eventProps = {
+      bubbles: true,
+      cancelable: true,
+      view: window,
+      detail: 1,
+      screenX: mouseX + window.screenX,
+      screenY: mouseY + window.screenY,
+      clientX: mouseX,
+      clientY: mouseY,
+      button: 0,
+      buttons: 1,
+      ctrlKey: e.ctrlKey || false,
+      altKey: e.altKey || false,
+      shiftKey: e.shiftKey || false,
+      metaKey: e.metaKey || false,
+      relatedTarget: null,
+    }
+
+    // 指针事件（现代网站依赖）
+    if (typeof PointerEvent !== 'undefined') {
+      el.dispatchEvent(
+        new PointerEvent('pointerover', {
+          ...eventProps,
+          pointerId: 1,
+          pointerType: 'mouse',
+          isPrimary: true,
+        })
+      )
+      el.dispatchEvent(
+        new PointerEvent('pointerenter', {
+          ...eventProps,
+          pointerId: 1,
+          pointerType: 'mouse',
+          isPrimary: true,
+        })
+      )
+      el.dispatchEvent(
+        new PointerEvent('pointerdown', {
+          ...eventProps,
+          pointerId: 1,
+          pointerType: 'mouse',
+          isPrimary: true,
+        })
+      )
+    }
+
+    // 标准鼠标事件
+    el.dispatchEvent(new MouseEvent('mouseover', eventProps))
+    el.dispatchEvent(new MouseEvent('mouseenter', eventProps))
+    el.dispatchEvent(new MouseEvent('mousedown', eventProps))
+
+    // 模拟真实点击的时间间隔（避免某些网站的防机器人检测）
+    setTimeout(() => {
+      if (!el.isConnected) {
+        return
+      }
+
+      const upProps = { ...eventProps, buttons: 0 }
+
+      el.dispatchEvent(new MouseEvent('mouseup', upProps))
+      el.dispatchEvent(new MouseEvent('click', upProps))
+
+      if (typeof PointerEvent !== 'undefined') {
+        el.dispatchEvent(
+          new PointerEvent('pointerup', {
+            ...upProps,
+            pointerId: 1,
+            pointerType: 'mouse',
+            isPrimary: true,
+          })
+        )
+      }
+    }, 10)
   }
 
   function doRightClick(e) {

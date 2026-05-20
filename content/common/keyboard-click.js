@@ -694,69 +694,96 @@ if (window.KeyboardClickLoaded) {
       e.preventDefault()
       e.stopPropagation()
 
-      // 使用鼠标实际位置（而非元素中心），确保点击精确位置
-      // 这对于进度条等需要精确点击的场景很重要
+      // 优先使用原生 click() 方法（行为最接近真实点击）
+      // 对于某些特殊元素（如 video controls、shadow dom 内部），原生方法更可靠
+      if (typeof el.click === 'function') {
+        try {
+          el.click()
+          return
+        } catch (_) {
+          // 原生方法失败时回退到合成事件
+        }
+      }
+
       const clientX = this.mouseX
       const clientY = this.mouseY
 
-      // 计算相对于元素的偏移（进度条等控件依赖此属性）
-      const rect = el.getBoundingClientRect()
-      const offsetX = clientX - rect.left
-      const offsetY = clientY - rect.top
+      // 完整的标准鼠标事件属性，行为与真实点击完全一致
+      const eventProps = {
+        bubbles: true,
+        cancelable: true,
+        view: window,
+        detail: 1,
+        screenX: clientX + window.screenX,
+        screenY: clientY + window.screenY,
+        clientX,
+        clientY,
+        offsetX: clientX - el.getBoundingClientRect().left,
+        offsetY: clientY - el.getBoundingClientRect().top,
+        button: 0,
+        buttons: 1,
+        ctrlKey: e.ctrlKey || false,
+        altKey: e.altKey || false,
+        shiftKey: e.shiftKey || false,
+        metaKey: e.metaKey || false,
+        relatedTarget: null,
+      }
 
-      // Shadow DOM 内部元素优先使用 el.click()（若存在），否则回退到 dispatchEvent
-      let clickSuccess = false
-      if (this._isInShadowDOM(el) && el instanceof Element && typeof el.click === 'function') {
-        try {
-          el.click()
-          clickSuccess = true
-        } catch {
-          // 某些特殊元素（SVG、跨 frame）调用 click() 可能失败，回退到 dispatchEvent
+      // 指针事件（现代网站依赖）
+      if (typeof PointerEvent !== 'undefined') {
+        el.dispatchEvent(
+          new PointerEvent('pointerover', {
+            ...eventProps,
+            pointerId: 1,
+            pointerType: 'mouse',
+            isPrimary: true,
+          })
+        )
+        el.dispatchEvent(
+          new PointerEvent('pointerenter', {
+            ...eventProps,
+            pointerId: 1,
+            pointerType: 'mouse',
+            isPrimary: true,
+          })
+        )
+        el.dispatchEvent(
+          new PointerEvent('pointerdown', {
+            ...eventProps,
+            pointerId: 1,
+            pointerType: 'mouse',
+            isPrimary: true,
+          })
+        )
+      }
+
+      // 标准鼠标事件
+      el.dispatchEvent(new MouseEvent('mouseover', eventProps))
+      el.dispatchEvent(new MouseEvent('mouseenter', eventProps))
+      el.dispatchEvent(new MouseEvent('mousedown', eventProps))
+
+      // 模拟真实点击的时间间隔（避免某些网站的防机器人检测）
+      setTimeout(() => {
+        if (!el.isConnected) {
+          return
         }
-      }
-      if (!clickSuccess) {
-        // 1. mousedown
-        el.dispatchEvent(
-          new MouseEvent('mousedown', {
-            bubbles: true,
-            cancelable: true,
-            clientX,
-            clientY,
-            offsetX,
-            offsetY,
-            button: 0,
-            buttons: 1,
-          })
-        )
 
-        // 2. mouseup
-        el.dispatchEvent(
-          new MouseEvent('mouseup', {
-            bubbles: true,
-            cancelable: true,
-            clientX,
-            clientY,
-            offsetX,
-            offsetY,
-            button: 0,
-            buttons: 0,
-          })
-        )
+        const upProps = { ...eventProps, buttons: 0 }
 
-        // 3. click（带完整坐标信息）
-        el.dispatchEvent(
-          new MouseEvent('click', {
-            bubbles: true,
-            cancelable: true,
-            clientX,
-            clientY,
-            offsetX,
-            offsetY,
-            button: 0,
-            buttons: 0,
-          })
-        )
-      }
+        el.dispatchEvent(new MouseEvent('mouseup', upProps))
+        el.dispatchEvent(new MouseEvent('click', upProps))
+
+        if (typeof PointerEvent !== 'undefined') {
+          el.dispatchEvent(
+            new PointerEvent('pointerup', {
+              ...upProps,
+              pointerId: 1,
+              pointerType: 'mouse',
+              isPrimary: true,
+            })
+          )
+        }
+      }, 10)
     }
 
     // ========== X 右击 ==========

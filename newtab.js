@@ -2379,39 +2379,94 @@ function initImportBtn() {
 
   function doClick() {
     const el = findClickTarget(mouseX, mouseY)
-    if (!el) {
+    if (!el || !el.isConnected) {
       return
     }
-    el.dispatchEvent(
-      new MouseEvent('mousedown', {
-        bubbles: true,
-        cancelable: true,
-        clientX: mouseX,
-        clientY: mouseY,
-        button: 0,
-        buttons: 1,
-      })
-    )
-    el.dispatchEvent(
-      new MouseEvent('mouseup', {
-        bubbles: true,
-        cancelable: true,
-        clientX: mouseX,
-        clientY: mouseY,
-        button: 0,
-        buttons: 0,
-      })
-    )
-    el.dispatchEvent(
-      new MouseEvent('click', {
-        bubbles: true,
-        cancelable: true,
-        clientX: mouseX,
-        clientY: mouseY,
-        button: 0,
-        buttons: 0,
-      })
-    )
+
+    // 优先使用原生 click() 方法（行为最接近真实点击）
+    if (typeof el.click === 'function') {
+      try {
+        el.click()
+        return
+      } catch (_) {
+        // 原生方法失败时回退到合成事件
+      }
+    }
+
+    // 完整的标准鼠标事件属性，行为与真实点击完全一致
+    const eventProps = {
+      bubbles: true,
+      cancelable: true,
+      view: window,
+      detail: 1,
+      screenX: mouseX + window.screenX,
+      screenY: mouseY + window.screenY,
+      clientX: mouseX,
+      clientY: mouseY,
+      button: 0,
+      buttons: 1,
+      ctrlKey: false,
+      altKey: false,
+      shiftKey: false,
+      metaKey: false,
+      relatedTarget: null,
+    }
+
+    // 指针事件（现代网站依赖）
+    if (typeof PointerEvent !== 'undefined') {
+      el.dispatchEvent(
+        new PointerEvent('pointerover', {
+          ...eventProps,
+          pointerId: 1,
+          pointerType: 'mouse',
+          isPrimary: true,
+        })
+      )
+      el.dispatchEvent(
+        new PointerEvent('pointerenter', {
+          ...eventProps,
+          pointerId: 1,
+          pointerType: 'mouse',
+          isPrimary: true,
+        })
+      )
+      el.dispatchEvent(
+        new PointerEvent('pointerdown', {
+          ...eventProps,
+          pointerId: 1,
+          pointerType: 'mouse',
+          isPrimary: true,
+        })
+      )
+    }
+
+    // 标准鼠标事件
+    el.dispatchEvent(new MouseEvent('mouseover', eventProps))
+    el.dispatchEvent(new MouseEvent('mouseenter', eventProps))
+    el.dispatchEvent(new MouseEvent('mousedown', eventProps))
+
+    // 模拟真实点击的时间间隔
+    setTimeout(() => {
+      if (!el.isConnected) {
+        return
+      }
+
+      const upProps = { ...eventProps, buttons: 0 }
+
+      el.dispatchEvent(new MouseEvent('mouseup', upProps))
+      el.dispatchEvent(new MouseEvent('click', upProps))
+
+      if (typeof PointerEvent !== 'undefined') {
+        el.dispatchEvent(
+          new PointerEvent('pointerup', {
+            ...upProps,
+            pointerId: 1,
+            pointerType: 'mouse',
+            isPrimary: true,
+          })
+        )
+      }
+    }, 10)
   }
 
   function startTextSelection() {
