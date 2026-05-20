@@ -354,7 +354,8 @@ if (window.KeyboardClickLoaded) {
 
       // 核心规则：检查顶层元素是否在预览模态框内
       // 只要在预览内，就禁止穿透到下方的 video，确保空格点击能关闭遮罩
-      const inPreview = this._isInImagePreviewModal(topEl)
+      // 传入坐标校验，防止误触发画中画等小尺寸固定层
+      const inPreview = this._isInImagePreviewModal(topEl, x, y)
 
       // 如果在预览内（无论是图片还是遮罩层），优先找可关闭的父遮罩层
       // 解决空格点击非图片区域无法关闭预览的问题
@@ -371,8 +372,8 @@ if (window.KeyboardClickLoaded) {
         return this._findParentMask(topEl, x, y) || topEl
       }
 
-      // 如果顶层是遮罩/覆盖层，直接返回不穿透
-      if (this._isOverlayOrMask(topEl)) {
+      // 如果顶层是遮罩/覆盖层，直接返回不穿透（传入坐标校验）
+      if (this._isOverlayOrMask(topEl, x, y)) {
         return topEl
       }
 
@@ -400,8 +401,8 @@ if (window.KeyboardClickLoaded) {
       return this._deepElementFromPoint(x, y) || topEl
     }
 
-    /** 判断元素是否在图片预览/模态框内（带缓存优化） */
-    _isInImagePreviewModal(el) {
+    /** 判断元素是否在图片预览/模态框内（带缓存优化 + 坐标校验，排除画中画等小窗） */
+    _isInImagePreviewModal(el, x, y) {
       if (!el) {
         return false
       }
@@ -431,16 +432,26 @@ if (window.KeyboardClickLoaded) {
           return true
         }
 
-        // 仅在必要时检查样式（性能开销较大）
-        // fixed 定位 + 大尺寸容器 = 很可能是模态框
-        // 但排除视频播放器的控制栏（通常高度较小）
-        const style = getComputedStyle(current)
-        if (style.position === 'fixed') {
-          const rect = current.getBoundingClientRect()
-          // 高度 < 100px 的固定定位元素很可能是控制栏，不是预览容器
-          if (rect.width >= 200 && rect.height >= 200) {
-            return true
+        try {
+          const style = getComputedStyle(current)
+          // 高 z-index 过滤（> 1000 才是真正的遮罩层，排除画中画等）
+          const zIndex = parseInt(style.zIndex, 10) || 0
+          if (style.position === 'fixed' && zIndex > 1000) {
+            const rect = current.getBoundingClientRect()
+            // 坐标校验 + 大尺寸过滤：接近全屏才是真正的遮罩
+            if (
+              x >= rect.left &&
+              x <= rect.right &&
+              y >= rect.top &&
+              y <= rect.bottom &&
+              rect.width >= window.innerWidth * 0.5 &&
+              rect.height >= window.innerHeight * 0.5
+            ) {
+              return true
+            }
           }
+        } catch {
+          /* getComputedStyle 可能失败 */
         }
 
         current = current.parentElement
@@ -521,8 +532,8 @@ if (window.KeyboardClickLoaded) {
       return null
     }
 
-    /** 判断元素是否为遮罩/覆盖层（如图片预览遮罩），这类元素不应被穿透 */
-    _isOverlayOrMask(el) {
+    /** 判断元素是否为遮罩/覆盖层（带坐标校验，排除画中画等小窗），这类元素不应被穿透 */
+    _isOverlayOrMask(el, x, y) {
       if (!el) {
         return false
       }
@@ -553,13 +564,21 @@ if (window.KeyboardClickLoaded) {
 
         // 检查是否为固定/绝对定位的半透明全屏覆盖层
         const style = getComputedStyle(current)
-        if (style.position === 'fixed' || style.position === 'absolute') {
+        // 高 z-index 过滤（> 1000 才是真正的遮罩层，排除画中画等）
+        const zIndex = parseInt(style.zIndex, 10) || 0
+        if ((style.position === 'fixed' || style.position === 'absolute') && zIndex > 1000) {
           const bg = style.backgroundColor
-          // 半透明黑色背景 (rgba(0,0,0,x) 其中 x > 0)
+          // 半透明黑色背景 + 坐标在校 + 大尺寸 = 真正的遮罩
           if (bg.includes('rgba(0, 0, 0') || bg.includes('rgba(0,0,0')) {
-            // 检查是否接近全屏尺寸
             const rect = current.getBoundingClientRect()
-            if (rect.width >= window.innerWidth * 0.5 && rect.height >= window.innerHeight * 0.5) {
+            if (
+              x >= rect.left &&
+              x <= rect.right &&
+              y >= rect.top &&
+              y <= rect.bottom &&
+              rect.width >= window.innerWidth * 0.5 &&
+              rect.height >= window.innerHeight * 0.5
+            ) {
               return true
             }
           }

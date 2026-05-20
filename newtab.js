@@ -28,7 +28,9 @@ function getElSafe(id, defaultValue = null) {
  */
 function setText(id, text) {
   const el = getEl(id)
-  if (el) {el.textContent = text}
+  if (el) {
+    el.textContent = text
+  }
 }
 
 /**
@@ -50,7 +52,9 @@ function getText(id, defaultValue = '') {
  */
 function setStyle(id, prop, value) {
   const el = getEl(id)
-  if (el && el.style) {el.style[prop] = value}
+  if (el && el.style) {
+    el.style[prop] = value
+  }
 }
 
 // ========== 每日一言 ==========
@@ -78,7 +82,9 @@ const QUOTES = [
 function loadDailyQuote() {
   const quoteText = getEl('quote-text')
   const quoteAuthor = getEl('quote-author')
-  if (!quoteText) {return}
+  if (!quoteText) {
+    return
+  }
 
   // 根据日期选择一言（每天固定）
   const today = new Date()
@@ -112,7 +118,9 @@ async function loadWeather() {
   const tempEl = getEl('weather-temp')
   const descEl = getEl('weather-desc')
   const iconEl = getEl('weather-icon')
-  if (!tempEl) {return}
+  if (!tempEl) {
+    return
+  }
 
   try {
     // 使用 AbortController 设置超时
@@ -245,9 +253,15 @@ function initSettingsDom() {
   settingsCloseBtn = getEl('settingsCloseBtn')
   drawerOverlay = getEl('drawerOverlay')
 
-  if (settingsBtn) {settingsBtn.addEventListener('click', openSettings)}
-  if (settingsCloseBtn) {settingsCloseBtn.addEventListener('click', closeSettings)}
-  if (drawerOverlay) {drawerOverlay.addEventListener('click', closeSettings)}
+  if (settingsBtn) {
+    settingsBtn.addEventListener('click', openSettings)
+  }
+  if (settingsCloseBtn) {
+    settingsCloseBtn.addEventListener('click', closeSettings)
+  }
+  if (drawerOverlay) {
+    drawerOverlay.addEventListener('click', closeSettings)
+  }
 
   // 列数滑块
   columnsRange = getEl('columnsRange')
@@ -274,7 +288,9 @@ function initSettingsDom() {
   if (historyCountRange) {
     historyCountRange.addEventListener('input', (e) => {
       const value = parseInt(e.target.value)
-      if (historyCountValue) {historyCountValue.textContent = value}
+      if (historyCountValue) {
+        historyCountValue.textContent = value
+      }
 
       const settings = getSettings()
       settings.historyCount = value
@@ -2138,38 +2154,51 @@ function initImportBtn() {
 
   function findClickTarget(x, y) {
     const all = document.elementsFromPoint(x, y)
-    if (all.length === 0) {return null}
+    if (all.length === 0) {
+      return null
+    }
     const topEl = all[0]
 
     // 检测是否在图片预览模态框内：无论是图片还是遮罩层都适用
-    const inPreview = isInImagePreviewModal(topEl)
+    // 传入坐标校验，防止误触发画中画等小尺寸固定层
+    const inPreview = isInImagePreviewModal(topEl, x, y)
 
     // 如果在预览内，优先找可关闭的父遮罩层（解决空格点击非图片区域无法关闭预览的问题）
     // 传入坐标校验，防止误触发画中画等不相关的层
     if (inPreview) {
       const mask = findParentMask(topEl, x, y)
-      if (mask) {return mask}
+      if (mask) {
+        return mask
+      }
     }
 
     // 图片预览遮罩检测
     if (topEl.tagName === 'IMG' && inPreview) {
       return findParentMask(topEl, x, y) || topEl
     }
-    // 遮罩层本身直接返回
-    if (isOverlayOrMask(topEl)) {return topEl}
-    if (topEl.tagName === 'VIDEO' || topEl.tagName === 'AUDIO') {return topEl}
+    // 遮罩层本身直接返回（传入坐标校验）
+    if (isOverlayOrMask(topEl, x, y)) {
+      return topEl
+    }
+    if (topEl.tagName === 'VIDEO' || topEl.tagName === 'AUDIO') {
+      return topEl
+    }
 
     for (const candidate of all) {
       if (candidate.tagName === 'VIDEO' || candidate.tagName === 'AUDIO') {
-        if (!isInteractiveElement(topEl)) {return candidate}
+        if (!isInteractiveElement(topEl)) {
+          return candidate
+        }
         break
       }
     }
     return topEl
   }
 
-  function isInImagePreviewModal(el) {
-    if (!el) {return false}
+  function isInImagePreviewModal(el, x, y) {
+    if (!el) {
+      return false
+    }
     const patterns = [
       /modal/i,
       /dialog/i,
@@ -2182,13 +2211,29 @@ function initImportBtn() {
     ]
     let current = el
     for (let i = 0; i < 6 && current && current !== document.body; i++) {
-      if (current.className && patterns.some((p) => p.test(current.className))) {return true}
-      if (current.id && patterns.some((p) => p.test(current.id))) {return true}
+      if (current.className && patterns.some((p) => p.test(current.className))) {
+        return true
+      }
+      if (current.id && patterns.some((p) => p.test(current.id))) {
+        return true
+      }
       try {
         const style = getComputedStyle(current)
-        if (style.position === 'fixed') {
+        // 高 z-index 过滤（> 1000 才是真正的遮罩层，排除画中画等）
+        const zIndex = parseInt(style.zIndex, 10) || 0
+        if (style.position === 'fixed' && zIndex > 1000) {
           const rect = current.getBoundingClientRect()
-          if (rect.width >= 200 && rect.height >= 200) {return true}
+          // 坐标校验 + 大尺寸过滤：接近全屏才是真正的遮罩
+          if (
+            x >= rect.left &&
+            x <= rect.right &&
+            y >= rect.top &&
+            y <= rect.bottom &&
+            rect.width >= window.innerWidth * 0.5 &&
+            rect.height >= window.innerHeight * 0.5
+          ) {
+            return true
+          }
         }
       } catch {
         /* getComputedStyle 可能失败 */
@@ -2199,7 +2244,9 @@ function initImportBtn() {
   }
 
   function findParentMask(el, x, y) {
-    if (!el) {return null}
+    if (!el) {
+      return null
+    }
     const patterns = [
       /mask/i,
       /overlay/i,
@@ -2213,8 +2260,11 @@ function initImportBtn() {
     let current = el.parentElement
     for (let i = 0; i < 8 && current && current !== document.body; i++) {
       let matched = false
-      if (current.className && patterns.some((p) => p.test(current.className))) {matched = true}
-      else if (current.id && patterns.some((p) => p.test(current.id))) {matched = true}
+      if (current.className && patterns.some((p) => p.test(current.className))) {
+        matched = true
+      } else if (current.id && patterns.some((p) => p.test(current.id))) {
+        matched = true
+      }
 
       // 坐标校验：确保 (x, y) 真正在元素边界内
       try {
@@ -2255,7 +2305,9 @@ function initImportBtn() {
   }
 
   function isOverlayOrMask(el) {
-    if (!el) {return false}
+    if (!el) {
+      return false
+    }
     const patterns = [
       /mask/i,
       /overlay/i,
@@ -2269,16 +2321,21 @@ function initImportBtn() {
     ]
     let current = el
     for (let i = 0; i < 5 && current && current !== document.body; i++) {
-      if (current.className && patterns.some((p) => p.test(current.className))) {return true}
-      if (current.id && patterns.some((p) => p.test(current.id))) {return true}
+      if (current.className && patterns.some((p) => p.test(current.className))) {
+        return true
+      }
+      if (current.id && patterns.some((p) => p.test(current.id))) {
+        return true
+      }
       try {
         const style = getComputedStyle(current)
         if (style.position === 'fixed' || style.position === 'absolute') {
           const bg = style.backgroundColor
           if (bg.includes('rgba(0, 0, 0') || bg.includes('rgba(0,0,0')) {
             const rect = current.getBoundingClientRect()
-            if (rect.width >= window.innerWidth * 0.5 && rect.height >= window.innerHeight * 0.5)
-              {return true}
+            if (rect.width >= window.innerWidth * 0.5 && rect.height >= window.innerHeight * 0.5) {
+              return true
+            }
           }
         }
       } catch {
@@ -2290,21 +2347,31 @@ function initImportBtn() {
   }
 
   function isInteractiveElement(el) {
-    if (!el) {return false}
+    if (!el) {
+      return false
+    }
     const tags = ['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA', 'LABEL']
     let current = el
     for (let i = 0; i < 5 && current && current !== document.body; i++) {
-      if (tags.includes(current.tagName)) {return true}
-      if (current.isContentEditable) {return true}
+      if (tags.includes(current.tagName)) {
+        return true
+      }
+      if (current.isContentEditable) {
+        return true
+      }
       const role = current.getAttribute('role')
       if (
         role &&
         ['button', 'link', 'tab', 'menuitem', 'checkbox', 'radio', 'switch'].includes(role)
-      )
-        {return true}
-      if (current.hasAttribute?.('onclick')) {return true}
-      if (current.hasAttribute?.('tabindex') && current.getAttribute('tabindex') !== '-1')
-        {return true}
+      ) {
+        return true
+      }
+      if (current.hasAttribute?.('onclick')) {
+        return true
+      }
+      if (current.hasAttribute?.('tabindex') && current.getAttribute('tabindex') !== '-1') {
+        return true
+      }
       current = current.parentElement
     }
     return false

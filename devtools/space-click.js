@@ -154,10 +154,10 @@
     const topEl = all[0]
 
     // 检测是否在图片预览模态框内：无论是图片还是遮罩层都适用
-    const inPreview = isInImagePreviewModal(topEl)
+    // 传入坐标校验，防止误触发画中画等小尺寸固定层
+    const inPreview = isInImagePreviewModal(topEl, x, y)
 
     // 如果在预览内，优先找可关闭的父遮罩层（解决空格点击非图片区域无法关闭预览的问题）
-    // 传入坐标校验，防止误触发画中画等不相关的层
     if (inPreview) {
       const mask = findParentMask(topEl, x, y)
       if (mask) {
@@ -170,8 +170,8 @@
       return findParentMask(topEl, x, y) || topEl
     }
 
-    // 遮罩层本身直接返回（不穿透）
-    if (isOverlayOrMask(topEl)) {
+    // 遮罩层本身直接返回（不穿透）- 传入坐标校验
+    if (isOverlayOrMask(topEl, x, y)) {
       return topEl
     }
 
@@ -190,8 +190,8 @@
     return deepElementFromPoint(x, y) || topEl
   }
 
-  /** 判断元素是否在图片预览/模态框内 */
-  function isInImagePreviewModal(el) {
+  /** 判断元素是否在图片预览/模态框内（带坐标校验，排除画中画等小窗） */
+  function isInImagePreviewModal(el, x, y) {
     if (!el) {
       return false
     }
@@ -208,6 +208,7 @@
 
     let current = el
     for (let i = 0; i < 6 && current && current !== document.body; i++) {
+      // 先快速检查 class 和 id（字符串匹配比 getComputedStyle 快得多）
       if (current.className && patterns.some((p) => p.test(current.className))) {
         return true
       }
@@ -217,9 +218,20 @@
 
       try {
         const style = getComputedStyle(current)
-        if (style.position === 'fixed') {
+        // 高 z-index 过滤（> 1000 才是真正的遮罩层，排除画中画等）
+        const zIndex = parseInt(style.zIndex, 10) || 0
+        if (style.position === 'fixed' && zIndex > 1000) {
           const rect = current.getBoundingClientRect()
-          if (rect.width >= 200 && rect.height >= 200) {
+          // 坐标校验：确保 (x, y) 真正在元素边界内
+          // 尺寸过滤：接近全屏才是真正的遮罩（排除小尺寸画中画）
+          if (
+            x >= rect.left &&
+            x <= rect.right &&
+            y >= rect.top &&
+            y <= rect.bottom &&
+            rect.width >= window.innerWidth * 0.5 &&
+            rect.height >= window.innerHeight * 0.5
+          ) {
             return true
           }
         }
@@ -297,8 +309,8 @@
     return null
   }
 
-  /** 判断元素是否为遮罩/覆盖层 */
-  function isOverlayOrMask(el) {
+  /** 判断元素是否为遮罩/覆盖层（带坐标校验，排除画中画等小窗） */
+  function isOverlayOrMask(el, x, y) {
     if (!el) {
       return false
     }
@@ -316,6 +328,7 @@
 
     let current = el
     for (let i = 0; i < 5 && current && current !== document.body; i++) {
+      // 先快速检查 class 和 id
       if (current.className && patterns.some((p) => p.test(current.className))) {
         return true
       }
@@ -325,11 +338,21 @@
 
       try {
         const style = getComputedStyle(current)
-        if (style.position === 'fixed' || style.position === 'absolute') {
+        // 高 z-index 过滤（> 1000 才是真正的遮罩层）
+        const zIndex = parseInt(style.zIndex, 10) || 0
+        if ((style.position === 'fixed' || style.position === 'absolute') && zIndex > 1000) {
           const bg = style.backgroundColor
+          // 半透明黑色背景 + 坐标在校 + 大尺寸 = 真正的遮罩
           if (bg.includes('rgba(0, 0, 0') || bg.includes('rgba(0,0,0')) {
             const rect = current.getBoundingClientRect()
-            if (rect.width >= window.innerWidth * 0.5 && rect.height >= window.innerHeight * 0.5) {
+            if (
+              x >= rect.left &&
+              x <= rect.right &&
+              y >= rect.top &&
+              y <= rect.bottom &&
+              rect.width >= window.innerWidth * 0.5 &&
+              rect.height >= window.innerHeight * 0.5
+            ) {
               return true
             }
           }
