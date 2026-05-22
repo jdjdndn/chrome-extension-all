@@ -67,7 +67,9 @@
      * 初始化监听器
      */
     _init() {
-      if (this._initialized) {return}
+      if (this._initialized) {
+        return
+      }
 
       // document_start 阶段 document.documentElement 可能为 null
       // 等待 DOM 可用后再初始化
@@ -156,18 +158,46 @@
 
     /**
      * 处理 MutationObserver 回调
+     * 入口过滤：跳过仅由本扩展自身插入的 data-yc-internal 节点引发的 mutation
+     * 防止 preloader/html-optimizer/image-optimizer 自身 DOM 写入触发反馈环
      */
     _handleMutations(mutations) {
       this.stats.totalMutations += mutations.length
 
       // 暂停状态不处理
-      if (this._paused) {return}
+      if (this._paused) {
+        return
+      }
+
+      const filtered = []
+      for (const mutation of mutations) {
+        if (mutation.type !== 'childList' || mutation.addedNodes.length === 0) {
+          // 属性变更或仅移除节点 mutation 直接透传（不会触发反馈环）
+          filtered.push(mutation)
+          continue
+        }
+        let hasExternal = false
+        for (const node of mutation.addedNodes) {
+          // Element 节点且带 data-yc-internal 标记的视为内部
+          if (node.nodeType !== 1 || !node.dataset || node.dataset.ycInternal !== '1') {
+            hasExternal = true
+            break
+          }
+        }
+        if (hasExternal) {
+          filtered.push(mutation)
+        }
+      }
+
+      if (filtered.length === 0) {
+        return
+      }
 
       // 收集所有变更
-      this._pendingMutations.push(...mutations)
+      this._pendingMutations.push(...filtered)
 
       // 按优先级分发
-      this._dispatchByPriority(mutations)
+      this._dispatchByPriority(filtered)
     }
 
     /**
@@ -261,7 +291,9 @@
           let filteredMutations = mutations
           if (info.filter) {
             filteredMutations = mutations.filter(info.filter)
-            if (filteredMutations.length === 0) {continue}
+            if (filteredMutations.length === 0) {
+              continue
+            }
           }
 
           info.callback(filteredMutations)

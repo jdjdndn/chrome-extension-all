@@ -1,5 +1,5 @@
 // Tab 切换功能 - 独立模块，不依赖其他脚本
-(function() {
+(function () {
   'use strict'
 
   console.log('[TabSwitch] 开始初始化...')
@@ -33,26 +33,26 @@
       console.warn('[TabSwitch] 未找到内容:', 'tab-' + tabId)
     }
 
-    // Tab 特定初始化
-    try {
-      if (tabId === 'bookmarks' && typeof loadBookmarks === 'function') {
-        loadBookmarks()
-      }
-      if (tabId === 'history' && typeof loadHistory === 'function') {
-        loadHistory()
-      }
-      if (tabId === 'resources' && typeof initResourcesTab === 'function') {
-        initResourcesTab()
-      }
-      if (tabId === 'mock' && typeof renderMockList === 'function') {
-        renderMockList()
-      }
-      if (tabId === 'eventbus' && typeof renderEventBusMessages === 'function') {
-        renderEventBusMessages()
-      }
-    } catch (e) {
-      console.warn('[TabSwitch] Tab 初始化错误:', e)
-    }
+    // todo: Tab 特定初始化
+    // try {
+    //   if (tabId === 'bookmarks' && typeof loadBookmarks === 'function') {
+    //     loadBookmarks()
+    //   }
+    //   if (tabId === 'history' && typeof loadHistory === 'function') {
+    //     loadHistory()
+    //   }
+    //   if (tabId === 'resources' && typeof initResourcesTab === 'function') {
+    //     initResourcesTab()
+    //   }
+    //   if (tabId === 'mock' && typeof renderMockList === 'function') {
+    //     renderMockList()
+    //   }
+    //   if (tabId === 'eventbus' && typeof renderEventBusMessages === 'function') {
+    //     renderEventBusMessages()
+    //   }
+    // } catch (e) {
+    //   console.warn('[TabSwitch] Tab 初始化错误:', e)
+    // }
   }
 
   // Info 子 Tab 切换
@@ -84,11 +84,12 @@
     // 特殊处理：storage tab
     if (subtabId === 'storage') {
       try {
-        if (typeof loadAllStorageData === 'function') {
-          loadAllStorageData().catch((err) => {
-            console.error('[TabSwitch] 加载存储数据失败:', err)
-          })
-        }
+        // todo
+        // if (typeof loadAllStorageData === 'function') {
+        //   loadAllStorageData().catch((err) => {
+        //     console.error('[TabSwitch] 加载存储数据失败:', err)
+        //   })
+        // }
       } catch (e) {
         console.warn('[TabSwitch] Storage 加载错误:', e)
       }
@@ -96,25 +97,29 @@
   }
 
   // 使用事件委托绑定点击事件
-  document.addEventListener('click', (e) => {
-    // 检查点击的是否是侧边栏 Tab
-    var sidebarTab = e.target.closest('.sidebar-tab')
-    if (sidebarTab && sidebarTab.dataset.tab) {
-      e.preventDefault()
-      e.stopPropagation()
-      switchSidebarTab(sidebarTab.dataset.tab)
-      return
-    }
+  document.addEventListener(
+    'click',
+    (e) => {
+      // 检查点击的是否是侧边栏 Tab
+      var sidebarTab = e.target.closest('.sidebar-tab')
+      if (sidebarTab && sidebarTab.dataset.tab) {
+        e.preventDefault()
+        e.stopPropagation()
+        switchSidebarTab(sidebarTab.dataset.tab)
+        return
+      }
 
-    // 检查点击的是否是 Info 子 Tab
-    var infoSubTab = e.target.closest('.info-sub-tab')
-    if (infoSubTab && infoSubTab.dataset.subtab) {
-      e.preventDefault()
-      e.stopPropagation()
-      switchInfoSubTab(infoSubTab.dataset.subtab)
-      return
-    }
-  }, true) // 使用捕获阶段确保事件优先处理
+      // 检查点击的是否是 Info 子 Tab
+      var infoSubTab = e.target.closest('.info-sub-tab')
+      if (infoSubTab && infoSubTab.dataset.subtab) {
+        e.preventDefault()
+        e.stopPropagation()
+        switchInfoSubTab(infoSubTab.dataset.subtab)
+        return
+      }
+    },
+    true
+  ) // 使用捕获阶段确保事件优先处理
 
   // 暴露全局函数供其他脚本调用
   window.switchSidebarTab = switchSidebarTab

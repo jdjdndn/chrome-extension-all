@@ -118,7 +118,8 @@
         return
       }
 
-      const { type, id, success, dataUrl, originalSize, compressedSize, error, retryable, status } = e.data
+      const { type, id, success, dataUrl, originalSize, compressedSize, error, retryable, status } =
+        e.data
 
       // 处理心跳响应
       if (type === 'pong') {
@@ -157,9 +158,10 @@
       const compressDuration = task.createdAt ? Date.now() - task.createdAt : 0
       this._performanceMetrics.totalCompressTime += compressDuration
       this._performanceMetrics.compressCount++
-      this._performanceMetrics.avgCompressTime = this._performanceMetrics.compressCount > 0
-        ? this._performanceMetrics.totalCompressTime / this._performanceMetrics.compressCount
-        : 0
+      this._performanceMetrics.avgCompressTime =
+        this._performanceMetrics.compressCount > 0
+          ? this._performanceMetrics.totalCompressTime / this._performanceMetrics.compressCount
+          : 0
 
       if (success && dataUrl) {
         this.stats.successfulTasks++
@@ -174,7 +176,9 @@
 
         // 检查是否需要重试
         if (retryable && task.retryCount < this.maxRetries) {
-          console.log(`[ImageCompressorPool] 任务 ${id} 将重试 (${task.retryCount + 1}/${this.maxRetries})`)
+          console.log(
+            `[ImageCompressorPool] 任务 ${id} 将重试 (${task.retryCount + 1}/${this.maxRetries})`
+          )
           this.stats.retriedTasks++
           this.retryQueue.push({
             ...task,
@@ -237,7 +241,9 @@
       // 限制最大重启次数
       const maxRestarts = 3
       if (workerInfo.restartCount >= maxRestarts) {
-        console.error(`[ImageCompressorPool] Worker ${workerIndex} 已达最大重启次数 (${maxRestarts})，停止重启`)
+        console.error(
+          `[ImageCompressorPool] Worker ${workerIndex} 已达最大重启次数 (${maxRestarts})，停止重启`
+        )
         workerInfo.status = 'unhealthy'
         return
       }
@@ -277,7 +283,9 @@
 
           this.stats.workerRestarts++
 
-          console.log(`[ImageCompressorPool] Worker ${workerIndex} 重启成功 (第 ${workerInfo.restartCount} 次)`)
+          console.log(
+            `[ImageCompressorPool] Worker ${workerIndex} 重启成功 (第 ${workerInfo.restartCount} 次)`
+          )
 
           // 重启后处理重试队列
           this._processRetryQueue()
@@ -393,7 +401,9 @@
         const timeout = 10000 // 10秒无心跳视为不健康（优化：更快发现异常）
 
         if (heartbeatAge > timeout) {
-          console.warn(`[ImageCompressorPool] Worker ${index} 心跳超时 (${(heartbeatAge / 1000).toFixed(0)}s)`)
+          console.warn(
+            `[ImageCompressorPool] Worker ${index} 心跳超时 (${(heartbeatAge / 1000).toFixed(0)}s)`
+          )
           workerInfo.status = 'unhealthy'
           this._restartWorker(index)
         } else {
@@ -433,12 +443,7 @@
         throw new Error('ImageCompressorPool 已销毁')
       }
 
-      const {
-        quality = 0.8,
-        maxWidth = 1920,
-        maxHeight = 1920,
-        priority = 0,
-      } = options
+      const { quality = 0.8, maxWidth = 1920, maxHeight = 1920, priority = 0 } = options
 
       const id = ++this.taskId
       const isCors = this._isCorsUrl(src)
@@ -818,7 +823,28 @@
         {
           priority: window.UnifiedDOMWatcher.Priority.NORMAL,
           name: 'ImageOptimizer-images',
-          filter: (mutation) => mutation.type === 'childList' && mutation.addedNodes.length > 0,
+          filter: (mutation) => {
+            if (mutation.type !== 'childList' || mutation.addedNodes.length === 0) {
+              return false
+            }
+            for (const node of mutation.addedNodes) {
+              if (node.nodeType !== 1) {
+                continue
+              }
+              const tag = node.tagName
+              if (tag === 'IMG' || tag === 'VIDEO') {
+                return true
+              }
+              // 跳过本扩展内部节点
+              if (node.dataset?.ycInternal === '1') {
+                continue
+              }
+              if (node.querySelector?.('img, video')) {
+                return true
+              }
+            }
+            return false
+          },
         }
       )
     }
@@ -852,8 +878,12 @@
      * 保存原始src到data-src，设置占位图
      */
     prepareLazyLoad(img) {
-      if (this.processedImages.has(img)) {return}
-      if (!img.src || img.dataset.src) {return}
+      if (this.processedImages.has(img)) {
+        return
+      }
+      if (!img.src || img.dataset.src) {
+        return
+      }
 
       // 保存原始src
       img.dataset.src = img.src
@@ -886,7 +916,9 @@
      */
     async loadImage(img, priority = 5) {
       const originalSrc = img.dataset.src
-      if (!originalSrc) {return}
+      if (!originalSrc) {
+        return
+      }
 
       try {
         // 跨域图片跳过压缩，避免CORS错误
@@ -1036,13 +1068,19 @@
      */
     shouldProcess(img) {
       // 已处理
-      if (this.processedImages.has(img)) {return false}
+      if (this.processedImages.has(img)) {
+        return false
+      }
 
       // 无src
-      if (!img.src && !img.dataset.src) {return false}
+      if (!img.src && !img.dataset.src) {
+        return false
+      }
 
       // data URI 跳过
-      if (img.src && img.src.startsWith('data:')) {return false}
+      if (img.src && img.src.startsWith('data:')) {
+        return false
+      }
 
       // 检查排除选择器
       for (const selector of this.excludeSelectors) {
@@ -1142,7 +1180,26 @@
           {
             priority: window.UnifiedDOMWatcher.Priority.NORMAL,
             name: 'ImageOptimizer-videos',
-            filter: (mutation) => mutation.type === 'childList' && mutation.addedNodes.length > 0,
+            filter: (mutation) => {
+              if (mutation.type !== 'childList' || mutation.addedNodes.length === 0) {
+                return false
+              }
+              for (const node of mutation.addedNodes) {
+                if (node.nodeType !== 1) {
+                  continue
+                }
+                if (node.tagName === 'VIDEO') {
+                  return true
+                }
+                if (node.dataset?.ycInternal === '1') {
+                  continue
+                }
+                if (node.querySelector?.('video')) {
+                  return true
+                }
+              }
+              return false
+            },
           }
         )
       } else {
@@ -1173,7 +1230,9 @@
     _observeVideos() {
       document.querySelectorAll('video').forEach((v) => {
         if (!this._processedVideos.has(v)) {
-          if (this.observer) {this.observer.observe(v)}
+          if (this.observer) {
+            this.observer.observe(v)
+          }
         }
       })
     }
@@ -1182,14 +1241,20 @@
      * 准备视频懒加载
      */
     _prepareVideo(video) {
-      if (this._processedVideos.has(video)) {return}
+      if (this._processedVideos.has(video)) {
+        return
+      }
 
       // 保存原始 src/poster
       const sources = video.querySelectorAll('source')
-      if (sources.length === 0 && !video.src) {return}
+      if (sources.length === 0 && !video.src) {
+        return
+      }
 
       // 已有 preload 设置则跳过
-      if (video.preload === 'none') {return}
+      if (video.preload === 'none') {
+        return
+      }
 
       // 保存原始 src
       if (video.src) {
@@ -1218,7 +1283,9 @@
      * 加载懒加载的视频
      */
     _loadVideo(video) {
-      if (!video.dataset.videoLazyLoading) {return}
+      if (!video.dataset.videoLazyLoading) {
+        return
+      }
 
       // 恢复 source src
       video.querySelectorAll('source').forEach((source) => {
@@ -1274,7 +1341,13 @@
 
       this._processedVideos = new WeakSet()
       this.processedImages = new WeakSet()
-      this.stats = { lazyLoaded: 0, compressed: 0, skipped: 0, videosLazyLoaded: 0, compressionErrors: 0 }
+      this.stats = {
+        lazyLoaded: 0,
+        compressed: 0,
+        skipped: 0,
+        videosLazyLoaded: 0,
+        compressionErrors: 0,
+      }
       console.log('[ImageOptimizer] 已销毁')
     }
 
@@ -1375,7 +1448,10 @@
         const result = { compress: false, lazyLoad: false }
 
         // 恢复压缩功能
-        if (options.recoverCompress !== false && this.stats.degradationOptions?.disableCompress !== false) {
+        if (
+          options.recoverCompress !== false &&
+          this.stats.degradationOptions?.disableCompress !== false
+        ) {
           this.compressEnabled = true
 
           // 重新初始化压缩池

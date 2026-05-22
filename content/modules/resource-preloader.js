@@ -53,6 +53,25 @@
       // 3. 监听动态资源
       this._setupObserver()
 
+      // 4. window load 后页面动态资源极少，取消订阅避免反馈环
+      this._loadHandler = () => {
+        if (this._unsubscribe) {
+          this._unsubscribe()
+          this._unsubscribe = null
+        }
+        if (this._observer) {
+          this._observer.disconnect()
+          this._observer = null
+        }
+        console.log(`${LOG_PREFIX} load 后已取消 DOM 监听`)
+      }
+      if (document.readyState === 'complete') {
+        // 已 load，延迟一拍取消（确保 onLoad 钩子先跑）
+        setTimeout(this._loadHandler, 100)
+      } else {
+        window.addEventListener('load', this._loadHandler, { once: true })
+      }
+
       console.log(`${LOG_PREFIX} 初始化完成`)
     }
 
@@ -60,7 +79,9 @@
      * 为所有CDN源添加 preconnect 和 dns-prefetch
      */
     _preconnectCDNs() {
-      if (!window.CDNMappings?.CDN_SOURCES) {return}
+      if (!window.CDNMappings?.CDN_SOURCES) {
+        return
+      }
 
       const head = document.head || document.documentElement
 
@@ -74,6 +95,7 @@
             const dnsLink = document.createElement('link')
             dnsLink.rel = 'dns-prefetch'
             dnsLink.href = origin
+            dnsLink.dataset.ycInternal = '1'
             head.insertBefore(dnsLink, head.firstChild)
           }
 
@@ -162,7 +184,9 @@
     _handleMutations(mutations) {
       mutations.forEach((mutation) => {
         mutation.addedNodes.forEach((node) => {
-          if (this.stats.preloaded >= this.maxPreloads) {return}
+          if (this.stats.preloaded >= this.maxPreloads) {
+            return
+          }
 
           if (node.tagName === 'SCRIPT' && node.src && this.preloadJS) {
             if (this._isCritical(node.src, 'js')) {
@@ -179,13 +203,17 @@
           // 检查子节点
           if (node.querySelectorAll) {
             node.querySelectorAll('script[src]').forEach((script) => {
-              if (this.stats.preloaded >= this.maxPreloads) {return}
+              if (this.stats.preloaded >= this.maxPreloads) {
+                return
+              }
               if (this.preloadJS && this._isCritical(script.src, 'js')) {
                 this._addPreload(script.src, 'script')
               }
             })
             node.querySelectorAll('link[rel="stylesheet"]').forEach((link) => {
-              if (this.stats.preloaded >= this.maxPreloads) {return}
+              if (this.stats.preloaded >= this.maxPreloads) {
+                return
+              }
               if (this.preloadCSS && this._isCritical(link.href, 'css')) {
                 this._addPreload(link.href, 'style')
               }
@@ -200,10 +228,18 @@
      * 基于CDN映射表匹配(已知库=关键)
      */
     _isCritical(url, type) {
-      if (!url || typeof url !== 'string') {return false}
-      if (this._processedUrls.has(url)) {return false}
-      if (this._isExcluded(url)) {return false}
-      if (url.startsWith('data:') || url.startsWith('blob:')) {return false}
+      if (!url || typeof url !== 'string') {
+        return false
+      }
+      if (this._processedUrls.has(url)) {
+        return false
+      }
+      if (this._isExcluded(url)) {
+        return false
+      }
+      if (url.startsWith('data:') || url.startsWith('blob:')) {
+        return false
+      }
 
       // CDN映射表中的库视为关键资源
       if (type === 'js' && window.CDNMappings) {
@@ -218,7 +254,9 @@
 
     _isExcluded(url) {
       const defaults = [/^chrome-extension:/i, /^moz-extension:/i, /^about:/i]
-      if (defaults.some((p) => p.test(url))) {return true}
+      if (defaults.some((p) => p.test(url))) {
+        return true
+      }
       return this.excludePatterns.some((p) => p.test(url))
     }
 
@@ -226,7 +264,9 @@
      * 添加preload提示
      */
     _addPreload(url, asType) {
-      if (this._processedUrls.has(url)) {return}
+      if (this._processedUrls.has(url)) {
+        return
+      }
       if (this.stats.preloaded >= this.maxPreloads) {
         this.stats.skipped++
         return
@@ -243,6 +283,7 @@
       link.rel = 'preload'
       link.href = url
       link.as = asType
+      link.dataset.ycInternal = '1'
 
       if (asType === 'script') {
         link.crossOrigin = 'anonymous'
@@ -291,12 +332,15 @@
      * 添加preconnect提示
      */
     _addPreconnect(url) {
-      if (document.querySelector(`link[rel="preconnect"][href="${url}"]`)) {return}
+      if (document.querySelector(`link[rel="preconnect"][href="${url}"]`)) {
+        return
+      }
 
       const link = document.createElement('link')
       link.rel = 'preconnect'
       link.href = url
       link.crossOrigin = 'anonymous'
+      link.dataset.ycInternal = '1'
 
       const head = document.head || document.documentElement
       head.insertBefore(link, head.firstChild)
@@ -320,6 +364,12 @@
     }
 
     destroy() {
+      // 取消 window load 监听
+      if (this._loadHandler) {
+        window.removeEventListener('load', this._loadHandler)
+        this._loadHandler = null
+      }
+
       // 取消 UnifiedDOMWatcher 订阅
       if (this._unsubscribe) {
         this._unsubscribe()

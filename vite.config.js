@@ -381,9 +381,6 @@ export default defineConfig({
     target: 'chrome100',
     minify: false,
     sourcemap: false,
-    watch: {
-      include: ['content/**/*', 'popup/**/*', 'styles/**/*', 'shared/**/*'],
-    },
     rollupOptions: {
       input: { dummy: DUMMY_ID },
       output: {

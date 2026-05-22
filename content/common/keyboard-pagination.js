@@ -331,7 +331,7 @@ if (window.KeyboardPaginationLoaded) {
       }
     }
 
-    isValidButton(el, type) {
+    isValidButton(el, _type) {
       if (!el) {
         return false
       }
@@ -442,21 +442,70 @@ if (window.KeyboardPaginationLoaded) {
       }
       document.addEventListener('keydown', this._keydownHandler, true)
 
-      // 监听 DOM 变化，重新检测分页按钮（防抖避免 SPA 路由切换时频繁触发）
-      let detectTimer = null
-      this._observer = new MutationObserver(() => {
-        clearTimeout(detectTimer)
-        detectTimer = setTimeout(() => this.detectPagination(), 300)
-      })
-      this._observer.observe(document.body, { childList: true, subtree: true })
+      // 监听 DOM 变化，重新检测分页按钮
+      this._setupDOMWatch()
 
       // SPA URL 变化时重新检测分页按钮
       this._popstateHandler = () => {
-        clearTimeout(detectTimer)
-        detectTimer = setTimeout(() => this.detectPagination(), 300)
+        clearTimeout(this._detectTimer)
+        this._detectTimer = setTimeout(() => this.detectPagination(), 1500)
       }
       window.addEventListener('popstate', this._popstateHandler)
       window.addEventListener('hashchange', this._popstateHandler)
+    }
+
+    /**
+     * 设置 DOM 变更监听
+     * 优先使用 UnifiedDOMWatcher LOW 优先级 + 严格 filter
+     * 仅当 addedNodes 包含 a/button/nav 元素时才重新检测
+     */
+    _setupDOMWatch() {
+      const scheduleDetect = () => {
+        clearTimeout(this._detectTimer)
+        this._detectTimer = setTimeout(() => {
+          // prev+next 都在 DOM 中且未 disabled → 跳过扫描
+          if (
+            this.prevButton &&
+            this.nextButton &&
+            document.body.contains(this.prevButton) &&
+            document.body.contains(this.nextButton) &&
+            !this.prevButton.disabled &&
+            !this.nextButton.disabled
+          ) {
+            return
+          }
+          this.detectPagination()
+        }, 1500)
+      }
+
+      if (window.UnifiedDOMWatcher) {
+        this._unsubscribe = window.UnifiedDOMWatcher.subscribe(scheduleDetect, {
+          priority: window.UnifiedDOMWatcher.Priority.LOW,
+          name: 'KeyboardPagination',
+          filter: (mutation) => {
+            if (mutation.type !== 'childList' || mutation.addedNodes.length === 0) {
+              return false
+            }
+            for (const node of mutation.addedNodes) {
+              if (node.nodeType !== 1) {
+                continue
+              }
+              const tag = node.tagName
+              if (tag === 'A' || tag === 'BUTTON' || tag === 'NAV') {
+                return true
+              }
+              if (node.querySelector?.('a, button, nav')) {
+                return true
+              }
+            }
+            return false
+          },
+        })
+      } else {
+        // 降级：独立 MutationObserver + 防抖
+        this._observer = new MutationObserver(scheduleDetect)
+        this._observer.observe(document.body, { childList: true, subtree: true })
+      }
     }
 
     isInputFocused() {
@@ -513,7 +562,9 @@ if (window.KeyboardPaginationLoaded) {
     // 检测焦点是否在视频元素上（替代旧的 hasVisibleVideo，避免页面有视频就禁用翻页）
     isVideoFocused() {
       const active = document.activeElement
-      if (!active) {return false}
+      if (!active) {
+        return false
+      }
       return !!(active.matches?.('video, audio') || active.closest?.('video, audio'))
     }
 
@@ -522,7 +573,9 @@ if (window.KeyboardPaginationLoaded) {
       if (!document.body.contains(button)) {
         this.detectPagination()
         button = type === 'prev' ? this.prevButton : this.nextButton
-        if (!button) {return}
+        if (!button) {
+          return
+        }
       }
 
       // 高亮按钮

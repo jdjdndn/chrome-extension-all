@@ -73,9 +73,9 @@
    * 错误级别枚举
    */
   const ErrorLevel = {
-    FATAL: 'fatal',     // 致命错误：模块完全不可用
-    SEVERE: 'severe',   // 严重错误：核心功能受损
-    MINOR: 'minor',     // 轻微错误：不影响核心功能
+    FATAL: 'fatal', // 致命错误：模块完全不可用
+    SEVERE: 'severe', // 严重错误：核心功能受损
+    MINOR: 'minor', // 轻微错误：不影响核心功能
   }
 
   /**
@@ -132,7 +132,12 @@
      * @param {any} context.data - 额外数据
      */
     handle(error, context = {}) {
-      const { module = 'unknown', operation = 'unknown', level = ErrorLevel.MINOR, data = null } = context
+      const {
+        module = 'unknown',
+        operation = 'unknown',
+        level = ErrorLevel.MINOR,
+        data = null,
+      } = context
 
       // 构建错误记录
       const errorRecord = {
@@ -338,7 +343,13 @@
      */
     degradeModule(module, moduleName, reason, cleanupConfig = {}) {
       const {
-        listenerProperties = ['_unsubscribe', '_observer', '_videoUnsubscribe', '_videoObserver', '_mutationObserver'],
+        listenerProperties = [
+          '_unsubscribe',
+          '_observer',
+          '_videoUnsubscribe',
+          '_videoObserver',
+          '_mutationObserver',
+        ],
         disableMethod = 'disable',
       } = cleanupConfig
 
@@ -378,7 +389,6 @@
       console.log(`${LOG_PREFIX}[DegradationManager] ${moduleName} 降级完成，保留统计数据`)
     }
   }
-
 
   /**
    * ListenerTracker - 事件监听器追踪器
@@ -420,7 +430,9 @@
      * @returns {boolean}
      */
     _isChromeEvent(target) {
-      return typeof target?.addListener === 'function' && typeof target?.removeListener === 'function'
+      return (
+        typeof target?.addListener === 'function' && typeof target?.removeListener === 'function'
+      )
     }
 
     /**
@@ -533,8 +545,13 @@
     enable: () => {},
     disable: () => {},
     getStats: () => ({
-      total: 0, replaced: 0, skipped: 0, errors: 0, details: [],
-      enabled: false, skippedByDetector: true,
+      total: 0,
+      replaced: 0,
+      skipped: 0,
+      errors: 0,
+      details: [],
+      enabled: false,
+      skippedByDetector: true,
     }),
     enabled: false,
     _processedLinks: { has: () => true, add: () => {} },
@@ -559,9 +576,9 @@
       // 缓存数据 - 分级缓存结构
       this.cache = {
         js: {
-          small: {},   // 小文件缓存（<10KB）
-          medium: {},  // 中文件缓存（10-100KB）
-          large: {},   // 大文件缓存（>100KB）- 仅URL映射
+          small: {}, // 小文件缓存（<10KB）
+          medium: {}, // 中文件缓存（10-100KB）
+          large: {}, // 大文件缓存（>100KB）- 仅URL映射
         },
         fonts: {
           small: {},
@@ -768,7 +785,6 @@
       // 4. 监听统计消息
       this.listenStats()
 
-
       console.log(`${LOG_PREFIX} 初始化完成（关键路径）`)
 
       // 性能标记：初始化结束（不包含延迟加载）
@@ -868,12 +884,14 @@
           }
 
           console.log(`${LOG_PREFIX} 空闲资源加载完成`, {
-            jsCacheCount: Object.keys(this.cache.js.small || {}).length +
-                         Object.keys(this.cache.js.medium || {}).length +
-                         Object.keys(this.cache.js.large || {}).length,
-            fontCacheCount: Object.keys(this.cache.fonts.small || {}).length +
-                           Object.keys(this.cache.fonts.medium || {}).length +
-                           Object.keys(this.cache.fonts.large || {}).length,
+            jsCacheCount:
+              Object.keys(this.cache.js.small || {}).length +
+              Object.keys(this.cache.js.medium || {}).length +
+              Object.keys(this.cache.js.large || {}).length,
+            fontCacheCount:
+              Object.keys(this.cache.fonts.small || {}).length +
+              Object.keys(this.cache.fonts.medium || {}).length +
+              Object.keys(this.cache.fonts.large || {}).length,
           })
         } catch (error) {
           console.warn(`${LOG_PREFIX} 空闲资源加载失败:`, error.message)
@@ -894,11 +912,15 @@
      * 利用浏览器空闲时间预热高频CDN资源
      */
     _startCacheWarmup() {
-      if (!CACHE_WARMUP_CONFIG.enabled) {return}
+      if (!CACHE_WARMUP_CONFIG.enabled) {
+        return
+      }
 
       // 收集页面中需要预热的高频CDN资源
       const warmupTargets = this._collectWarmupTargets()
-      if (warmupTargets.length === 0) {return}
+      if (warmupTargets.length === 0) {
+        return
+      }
 
       // 限制预热数量
       const targetsToWarmup = warmupTargets.slice(0, CACHE_WARMUP_CONFIG.maxWarmupEntries)
@@ -924,22 +946,29 @@
 
         // 使用 requestIdleCallback 预热
         if (typeof requestIdleCallback !== 'undefined') {
-          const idleId = requestIdleCallback(() => {
-            this._warmupSingleResource(target).then(() => {
-              warmupNext(index + 1)
-            }).catch(() => {
-              warmupNext(index + 1)
-            })
-          }, { timeout: 1000 })
+          const idleId = requestIdleCallback(
+            () => {
+              this._warmupSingleResource(target)
+                .then(() => {
+                  warmupNext(index + 1)
+                })
+                .catch(() => {
+                  warmupNext(index + 1)
+                })
+            },
+            { timeout: 1000 }
+          )
           this._idleCallbackIds.push(idleId)
         } else {
           // 降级：使用 setTimeout
           setTimeout(() => {
-            this._warmupSingleResource(target).then(() => {
-              warmupNext(index + 1)
-            }).catch(() => {
-              warmupNext(index + 1)
-            })
+            this._warmupSingleResource(target)
+              .then(() => {
+                warmupNext(index + 1)
+              })
+              .catch(() => {
+                warmupNext(index + 1)
+              })
           }, 100)
         }
       }
@@ -960,7 +989,7 @@
       const links = document.querySelectorAll('link[rel="stylesheet"]')
 
       // 收集 JS 资源
-      scripts.forEach(script => {
+      scripts.forEach((script) => {
         const url = script.src
         if (this._isHighFrequencyCDN(url)) {
           targets.push({ type: 'js', url })
@@ -968,7 +997,7 @@
       })
 
       // 收集 CSS 资源
-      links.forEach(link => {
+      links.forEach((link) => {
         const url = link.href
         if (this._isHighFrequencyCDN(url)) {
           targets.push({ type: 'css', url })
@@ -977,7 +1006,7 @@
 
       // 收集字体资源
       const fontLinks = document.querySelectorAll('link[rel="preload"][as="font"]')
-      fontLinks.forEach(link => {
+      fontLinks.forEach((link) => {
         const url = link.href
         if (this._isHighFrequencyCDN(url)) {
           targets.push({ type: 'fonts', url })
@@ -993,13 +1022,13 @@
      * @returns {boolean}
      */
     _isHighFrequencyCDN(url) {
-      if (!url) {return false}
+      if (!url) {
+        return false
+      }
 
       try {
         const urlObj = new URL(url)
-        return CACHE_WARMUP_CONFIG.highFrequencyCDNs.some(cdn =>
-          urlObj.hostname.includes(cdn)
-        )
+        return CACHE_WARMUP_CONFIG.highFrequencyCDNs.some((cdn) => urlObj.hostname.includes(cdn))
       } catch {
         return false
       }
@@ -1098,7 +1127,9 @@
      */
     async loadCache() {
       try {
-        if (!this.config.cacheEnabled) {return}
+        if (!this.config.cacheEnabled) {
+          return
+        }
 
         if (typeof chrome !== 'undefined' && chrome.storage?.local) {
           const result = await chrome.storage.local.get(CACHE_KEY)
@@ -1221,7 +1252,9 @@
      * 保存缓存(debounce批量写入 + LRU淘汰)
      */
     saveCache() {
-      if (!this.config.cacheEnabled) {return}
+      if (!this.config.cacheEnabled) {
+        return
+      }
 
       // LRU淘汰: 超过上限时清理最旧的条目
       this._evictCache('js')
@@ -1254,17 +1287,23 @@
     _evictCache(type) {
       const performEviction = () => {
         const cache = this.cache[type]
-        if (!cache || typeof cache !== 'object') {return}
+        if (!cache || typeof cache !== 'object') {
+          return
+        }
 
         // 遍历所有大小分类进行淘汰
         for (const sizeCategory of ['small', 'medium', 'large']) {
           const entries = cache[sizeCategory]
-          if (!entries || typeof entries !== 'object') {continue}
+          if (!entries || typeof entries !== 'object') {
+            continue
+          }
 
           const maxSize = this._getMaxCacheEntries(sizeCategory)
           const keys = Object.keys(entries)
 
-          if (keys.length <= maxSize) {continue}
+          if (keys.length <= maxSize) {
+            continue
+          }
 
           // 计算需要淘汰的数量
           const toRemove = keys.length - maxSize
@@ -1333,7 +1372,9 @@
      * 生成缓存键
      */
     getCacheKey(url) {
-      if (!url || typeof url !== 'string') {return null}
+      if (!url || typeof url !== 'string') {
+        return null
+      }
       // 移除协议和查询参数，保留核心路径
       try {
         const urlObj = new URL(url)
@@ -1352,8 +1393,12 @@
     _estimateFileSize(url, contentLength = null) {
       // 如果有明确的内容长度，直接使用
       if (contentLength !== null && contentLength !== undefined) {
-        if (contentLength < CACHE_SIZE_CONFIG.small.threshold) {return 'small'}
-        if (contentLength < CACHE_SIZE_CONFIG.medium.threshold) {return 'medium'}
+        if (contentLength < CACHE_SIZE_CONFIG.small.threshold) {
+          return 'small'
+        }
+        if (contentLength < CACHE_SIZE_CONFIG.medium.threshold) {
+          return 'medium'
+        }
         return 'large'
       }
 
@@ -1363,24 +1408,40 @@
         const pathname = urlObj.pathname.toLowerCase()
 
         // 常见小文件类型
-        if (pathname.endsWith('.css') || pathname.endsWith('.js') ||
-            pathname.endsWith('.json') || pathname.endsWith('.svg') ||
-            pathname.endsWith('.woff') || pathname.endsWith('.woff2') ||
-            pathname.endsWith('.ttf') || pathname.endsWith('.eot')) {
+        if (
+          pathname.endsWith('.css') ||
+          pathname.endsWith('.js') ||
+          pathname.endsWith('.json') ||
+          pathname.endsWith('.svg') ||
+          pathname.endsWith('.woff') ||
+          pathname.endsWith('.woff2') ||
+          pathname.endsWith('.ttf') ||
+          pathname.endsWith('.eot')
+        ) {
           return 'small'
         }
 
         // 常见中等文件类型
-        if (pathname.endsWith('.png') || pathname.endsWith('.jpg') ||
-            pathname.endsWith('.jpeg') || pathname.endsWith('.gif') ||
-            pathname.endsWith('.webp') || pathname.endsWith('.mp4') ||
-            pathname.endsWith('.woff') || pathname.endsWith('.woff2')) {
+        if (
+          pathname.endsWith('.png') ||
+          pathname.endsWith('.jpg') ||
+          pathname.endsWith('.jpeg') ||
+          pathname.endsWith('.gif') ||
+          pathname.endsWith('.webp') ||
+          pathname.endsWith('.mp4') ||
+          pathname.endsWith('.woff') ||
+          pathname.endsWith('.woff2')
+        ) {
           return 'medium'
         }
 
         // 常见大文件类型
-        if (pathname.endsWith('.mp4') || pathname.endsWith('.webm') ||
-            pathname.endsWith('.zip') || pathname.endsWith('.tar.gz')) {
+        if (
+          pathname.endsWith('.mp4') ||
+          pathname.endsWith('.webm') ||
+          pathname.endsWith('.zip') ||
+          pathname.endsWith('.tar.gz')
+        ) {
           return 'large'
         }
 
@@ -1407,7 +1468,9 @@
      * @returns {number} 分数（0-1，越高越应该保留）
      */
     _calculateLRUScore(entry) {
-      if (!entry) {return 0}
+      if (!entry) {
+        return 0
+      }
 
       const now = Date.now()
       const accessCount = entry._accessCount || 0
@@ -1421,8 +1484,7 @@
       const timeDecay = Math.exp(-timeSinceLastAccess / LRU_CONFIG.decayFactor)
 
       // 综合分数
-      const score = (accessScore * LRU_CONFIG.accessWeight) +
-                    (timeDecay * LRU_CONFIG.timeWeight)
+      const score = accessScore * LRU_CONFIG.accessWeight + timeDecay * LRU_CONFIG.timeWeight
 
       return score
     }
@@ -1435,15 +1497,21 @@
      * @returns {Object|null} 缓存条目
      */
     _getCacheEntry(type, url, contentLength = null) {
-      if (!this.config.cacheEnabled || !url) {return null}
+      if (!this.config.cacheEnabled || !url) {
+        return null
+      }
 
       const cacheKey = this.getCacheKey(url)
-      if (!cacheKey) {return null}
+      if (!cacheKey) {
+        return null
+      }
 
       const sizeCategory = this._estimateFileSize(url, contentLength)
       const cache = this.cache[type]
 
-      if (!cache || !cache[sizeCategory]) {return null}
+      if (!cache || !cache[sizeCategory]) {
+        return null
+      }
 
       // 尝试精确匹配（带版本号的key）
       if (cache[sizeCategory][cacheKey]) {
@@ -1466,15 +1534,21 @@
      * @param {number} contentLength - 响应内容长度（可选）
      */
     _setCacheEntry(type, url, cdnUrl, contentLength = null) {
-      if (!this.config.cacheEnabled || !url || !cdnUrl) {return}
+      if (!this.config.cacheEnabled || !url || !cdnUrl) {
+        return
+      }
 
       const cacheKey = this.getCacheKey(url)
-      if (!cacheKey) {return}
+      if (!cacheKey) {
+        return
+      }
 
       const sizeCategory = this._estimateFileSize(url, contentLength)
       const cache = this.cache[type]
 
-      if (!cache[sizeCategory]) {return}
+      if (!cache[sizeCategory]) {
+        return
+      }
 
       // 创建缓存条目（带访问统计）
       const entry = {
@@ -1500,15 +1574,21 @@
      * @param {boolean} isHit - 是否命中
      */
     _recordCacheAccess(type, url, isHit) {
-      if (!this.config.cacheEnabled) {return}
+      if (!this.config.cacheEnabled) {
+        return
+      }
 
       const cacheKey = this.getCacheKey(url)
-      if (!cacheKey) {return}
+      if (!cacheKey) {
+        return
+      }
 
       const sizeCategory = this._estimateFileSize(url)
       const cache = this.cache[type]
 
-      if (!cache[sizeCategory]) {return}
+      if (!cache[sizeCategory]) {
+        return
+      }
 
       // 更新访问统计
       const entry = cache[sizeCategory][cacheKey] || cache[sizeCategory][url]
@@ -1552,7 +1632,9 @@
 
       for (const type of ['js', 'fonts', 'css']) {
         const cache = this.cache[type]
-        if (!cache) {continue}
+        if (!cache) {
+          continue
+        }
 
         stats.small.count += Object.keys(cache.small || {}).length / 2 // 除以2因为每个条目存储两个key
         stats.medium.count += Object.keys(cache.medium || {}).length / 2
@@ -1568,7 +1650,9 @@
      * 优化：使用分块处理，每处理一批让出主线程，减少 INP
      */
     _applyCacheToPage() {
-      if (!this.config.cacheEnabled) {return}
+      if (!this.config.cacheEnabled) {
+        return
+      }
 
       // 重置中止标志
       this._applyCacheAborted = false
@@ -1586,11 +1670,11 @@
           const chunk = items.slice(i, i + CHUNK_SIZE)
           chunk.forEach(processor)
           // 让出主线程
-          await new Promise(resolve => setTimeout(resolve, 0))
+          await new Promise((resolve) => setTimeout(resolve, 0))
         }
       }
 
-// 处理已存在的script标签
+      // 处理已存在的script标签
       const jsCacheStats = this._getCacheSizeStats()
       if (this.config.jsReplace && jsCacheStats.total > 0) {
         const scripts = document.querySelectorAll('script[src]')
@@ -1741,7 +1825,8 @@
           try {
             this.modules.imageOptimizer = new window.ImageOptimizer({
               // 如果检测到页面已有懒加载，禁用懒加载但保留压缩功能
-              lazyLoadEnabled: this.config.imageLazyLoad && !this._skippedOptimizations.imageLazyLoad,
+              lazyLoadEnabled:
+                this.config.imageLazyLoad && !this._skippedOptimizations.imageLazyLoad,
               lazyLoadThreshold: this.config.lazyLoadThreshold,
               compressEnabled: this.config.imageCompress,
               compressQuality: this.config.imageQuality,
@@ -1755,7 +1840,12 @@
               module: 'imageOptimizer',
               operation: 'init',
               level: ErrorLevel.SEVERE,
-              data: { config: { lazyLoad: this.config.imageLazyLoad, compress: this.config.imageCompress } },
+              data: {
+                config: {
+                  lazyLoad: this.config.imageLazyLoad,
+                  compress: this.config.imageCompress,
+                },
+              },
             })
             this._degradeModule('imageOptimizer', '初始化失败: ' + error.message)
           }
@@ -1840,7 +1930,9 @@
      */
     _degradeModule(moduleName, reason) {
       const module = this.modules[moduleName]
-      if (!module || module === NOOP_MODULE) {return}
+      if (!module || module === NOOP_MODULE) {
+        return
+      }
 
       // 模块清理配置映射
       const cleanupConfigs = {
@@ -1857,7 +1949,13 @@
           disableMethod: 'disable',
         },
         imageOptimizer: {
-          listenerProperties: ['observer', '_unsubscribe', '_videoUnsubscribe', '_videoObserver', '_mutationObserver'],
+          listenerProperties: [
+            'observer',
+            '_unsubscribe',
+            '_videoUnsubscribe',
+            '_videoObserver',
+            '_mutationObserver',
+          ],
           disableMethod: 'disableLazyLoad',
         },
         preloader: {
@@ -1894,14 +1992,17 @@
      * @param {string} moduleName - 模块名称
      */
     _recoverModule(moduleName) {
-      if (!this.degradationManager.isDegraded(moduleName)) {return}
+      if (!this.degradationManager.isDegraded(moduleName)) {
+        return
+      }
 
       // 重新初始化模块
       const initMethod = {
         jsReplacer: () => this.config.jsReplace && window.JSReplacer,
         fontReplacer: () => this.config.fontReplace && window.FontReplacer,
         cssAccelerator: () => this.config.cssReplace && window.CSSAccelerator,
-        imageOptimizer: () => (this.config.imageLazyLoad || this.config.imageCompress) && window.ImageOptimizer,
+        imageOptimizer: () =>
+          (this.config.imageLazyLoad || this.config.imageCompress) && window.ImageOptimizer,
         preloader: () => this.config.preloadEnabled && window.ResourcePreloader,
         deduplicator: () => this.config.dedupEnabled && window.ResourceDeduplicator,
       }
@@ -2035,7 +2136,9 @@
      * - 自适应探测间隔：健康CDN延长间隔，不健康CDN缩短间隔
      */
     _probeCDNHealth() {
-      if (!window.CDNMappings?.CDNHealthProbe) {return}
+      if (!window.CDNMappings?.CDNHealthProbe) {
+        return
+      }
 
       const allCdnIds = window.CDNMappings.CDN_SOURCES.filter((c) => c.format !== 'font').map(
         (c) => c.id
@@ -2065,17 +2168,20 @@
           }
 
           if (typeof requestIdleCallback !== 'undefined') {
-            const idleId = requestIdleCallback(async () => {
-              // 执行前检查停止标志
-              if (this._healthProbeStopped) {
-                return
-              }
-              await window.CDNMappings.CDNHealthProbe.probeAll(allCdnIds)
-              // 递归调度下一次探测（先检查停止标志）
-              if (!this._healthProbeStopped) {
-                scheduleHealthProbe()
-              }
-            }, { timeout: 10000 })
+            const idleId = requestIdleCallback(
+              async () => {
+                // 执行前检查停止标志
+                if (this._healthProbeStopped) {
+                  return
+                }
+                await window.CDNMappings.CDNHealthProbe.probeAll(allCdnIds)
+                // 递归调度下一次探测（先检查停止标志）
+                if (!this._healthProbeStopped) {
+                  scheduleHealthProbe()
+                }
+              },
+              { timeout: 10000 }
+            )
             // 存储 requestIdleCallback ID
             this._idleCallbackIds.push(idleId)
           } else {
@@ -2101,7 +2207,9 @@
      */
     _getAdaptiveProbeInterval(cdnIds) {
       const probe = window.CDNMappings?.CDNHealthProbe
-      if (!probe) {return 5 * 60 * 1000} // 默认5分钟
+      if (!probe) {
+        return 5 * 60 * 1000
+      } // 默认5分钟
 
       // 收集所有CDN的建议间隔
       const intervals = cdnIds.map((id) => probe.getAdaptiveInterval(id))
@@ -2141,7 +2249,9 @@
       // 尝试下一个降级CDN
       const next = match.fallbackUrls.shift()
       if (!next) {
-        console.warn(`${LOG_PREFIX} 无可用降级CDN，原始URL: ${originalUrl}，失败CDN: ${failedCdnName}`)
+        console.warn(
+          `${LOG_PREFIX} 无可用降级CDN，原始URL: ${originalUrl}，失败CDN: ${failedCdnName}`
+        )
         return false
       }
 
@@ -2150,7 +2260,7 @@
 
       console.log(
         `${LOG_PREFIX} 降级: ${failedCdnName} → ${nextCdnName} ` +
-        `(剩余${remaining}个降级CDN), 原始: ${originalUrl}`
+          `(剩余${remaining}个降级CDN), 原始: ${originalUrl}`
       )
 
       if (element.tagName === 'SCRIPT') {
@@ -2166,7 +2276,9 @@
       const cacheKey = this.getCacheKey(originalUrl)
       const cacheType = element.tagName === 'SCRIPT' ? 'js' : 'css'
       if (cacheKey && this.config.cacheEnabled) {
-        if (!this.cache[cacheType]) {this.cache[cacheType] = {}}
+        if (!this.cache[cacheType]) {
+          this.cache[cacheType] = {}
+        }
         this.cache[cacheType][cacheKey] = next.url
         this.cache[cacheType][originalUrl] = next.url
         this.saveCache()
@@ -2192,10 +2304,13 @@
             // 所有降级都失败，恢复原始URL
             console.warn(
               `${LOG_PREFIX} 所有CDN降级失败，恢复原始URL: ${originalUrl} ` +
-              `(最后失败CDN: ${failedCdnName})`
+                `(最后失败CDN: ${failedCdnName})`
             )
-            if (element.tagName === 'SCRIPT') {element.src = originalUrl}
-            else if (element.tagName === 'LINK') {element.href = originalUrl}
+            if (element.tagName === 'SCRIPT') {
+              element.src = originalUrl
+            } else if (element.tagName === 'LINK') {
+              element.href = originalUrl
+            }
           }
         },
         { once: true }
@@ -2206,7 +2321,9 @@
      * 包装JSReplacer的processScript方法，添加缓存逻辑
      */
     _wrapJSReplacer() {
-      if (!this.modules.jsReplacer) {return}
+      if (!this.modules.jsReplacer) {
+        return
+      }
 
       this._originalProcessScript = this.modules.jsReplacer.processScript.bind(
         this.modules.jsReplacer
@@ -2214,13 +2331,19 @@
       const self = this
 
       this.modules.jsReplacer.processScript = function (script) {
-        if (!self.config.enabled) {return}
+        if (!self.config.enabled) {
+          return
+        }
 
         const url = script.src
-        if (!url) {return}
+        if (!url) {
+          return
+        }
 
         // 避免重复处理
-        if (self.modules.jsReplacer._processedScripts.has(script)) {return}
+        if (self.modules.jsReplacer._processedScripts.has(script)) {
+          return
+        }
 
         // 1. 先查缓存（使用分级缓存）
         const cachedEntry = self._getCacheEntry('js', url)
@@ -2274,7 +2397,9 @@
      * 包装FontReplacer的processLink方法，添加缓存逻辑
      */
     _wrapFontReplacer() {
-      if (!this.modules.fontReplacer) {return}
+      if (!this.modules.fontReplacer) {
+        return
+      }
 
       this._originalProcessLink = this.modules.fontReplacer.processLink.bind(
         this.modules.fontReplacer
@@ -2282,13 +2407,19 @@
       const self = this
 
       this.modules.fontReplacer.processLink = function (link) {
-        if (!self.config.enabled) {return}
+        if (!self.config.enabled) {
+          return
+        }
 
         const url = link.href
-        if (!url) {return}
+        if (!url) {
+          return
+        }
 
         // 避免重复处理
-        if (self.modules.fontReplacer._processedLinks.has(link)) {return}
+        if (self.modules.fontReplacer._processedLinks.has(link)) {
+          return
+        }
 
         // 1. 先查缓存（使用分级缓存）
         const cachedEntry = self._getCacheEntry('fonts', url)
@@ -2332,19 +2463,27 @@
      * 包装CSSAccelerator的processLink方法，添加缓存逻辑
      */
     _wrapCSSAccelerator() {
-      if (!this.modules.cssAccelerator) {return}
+      if (!this.modules.cssAccelerator) {
+        return
+      }
 
       const origProcess = this.modules.cssAccelerator.processLink.bind(this.modules.cssAccelerator)
       this._originalProcessCSSLink = origProcess
       const self = this
 
       this.modules.cssAccelerator.processLink = function (link) {
-        if (!self.config.enabled) {return}
+        if (!self.config.enabled) {
+          return
+        }
 
         const url = link.href
-        if (!url) {return}
+        if (!url) {
+          return
+        }
 
-        if (self.modules.cssAccelerator._processedLinks.has(link)) {return}
+        if (self.modules.cssAccelerator._processedLinks.has(link)) {
+          return
+        }
 
         // 查缓存（使用分级缓存）
         const cachedEntry = self._getCacheEntry('css', url)
@@ -2431,7 +2570,9 @@
      * 更新统计
      */
     updateStats(message) {
-      if (!message || !message.type) {return}
+      if (!message || !message.type) {
+        return
+      }
 
       switch (message.type) {
         case 'JS_REPLACER_STATS':
@@ -2587,31 +2728,35 @@
         // 缓存统计
         cacheHits: m.cacheHits,
         cacheMisses: m.cacheMisses,
-        cacheHitRate: cacheTotal > 0 ? (m.cacheHits / cacheTotal * 100).toFixed(1) + '%' : 'N/A',
+        cacheHitRate: cacheTotal > 0 ? ((m.cacheHits / cacheTotal) * 100).toFixed(1) + '%' : 'N/A',
         // 替换统计
         replacements: {
           js: {
             total: m.replacements.js.total,
             success: m.replacements.js.success,
-            successRate: m.replacements.js.total > 0
-              ? (m.replacements.js.success / m.replacements.js.total * 100).toFixed(1) + '%'
-              : 'N/A',
+            successRate:
+              m.replacements.js.total > 0
+                ? ((m.replacements.js.success / m.replacements.js.total) * 100).toFixed(1) + '%'
+                : 'N/A',
             avgDuration: avgTimes.js.toFixed(2) + 'ms',
           },
           fonts: {
             total: m.replacements.fonts.total,
             success: m.replacements.fonts.success,
-            successRate: m.replacements.fonts.total > 0
-              ? (m.replacements.fonts.success / m.replacements.fonts.total * 100).toFixed(1) + '%'
-              : 'N/A',
+            successRate:
+              m.replacements.fonts.total > 0
+                ? ((m.replacements.fonts.success / m.replacements.fonts.total) * 100).toFixed(1) +
+                  '%'
+                : 'N/A',
             avgDuration: avgTimes.fonts.toFixed(2) + 'ms',
           },
           css: {
             total: m.replacements.css.total,
             success: m.replacements.css.success,
-            successRate: m.replacements.css.total > 0
-              ? (m.replacements.css.success / m.replacements.css.total * 100).toFixed(1) + '%'
-              : 'N/A',
+            successRate:
+              m.replacements.css.total > 0
+                ? ((m.replacements.css.success / m.replacements.css.total) * 100).toFixed(1) + '%'
+                : 'N/A',
             avgDuration: avgTimes.css.toFixed(2) + 'ms',
           },
         },

@@ -160,6 +160,7 @@
         document: 'document',
       }
       link.as = asMap[type] || type
+      link.dataset.ycInternal = '1'
 
       // 字体需要 crossorigin
       if (type === 'font') {
@@ -220,6 +221,7 @@
       const link = document.createElement('link')
       link.rel = 'prefetch'
       link.href = url
+      link.dataset.ycInternal = '1'
 
       if (type !== 'document') {
         link.as = type
@@ -272,6 +274,7 @@
       const link = document.createElement('link')
       link.rel = 'dns-prefetch'
       link.href = `//${hostname}`
+      link.dataset.ycInternal = '1'
 
       head.insertBefore(link, head.firstChild)
 
@@ -321,6 +324,7 @@
       const link = document.createElement('link')
       link.rel = 'preconnect'
       link.href = originUrl
+      link.dataset.ycInternal = '1'
 
       // 对于跨域资源，添加 crossorigin 属性
       if (originUrl !== window.location.origin) {
@@ -702,6 +706,7 @@
 
     const style = document.createElement('style')
     style.id = styleId
+    style.dataset.ycInternal = '1'
     style.textContent = `
       @keyframes skeleton-loading {
         0% { background-position: 200% 0; }
