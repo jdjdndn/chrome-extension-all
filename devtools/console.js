@@ -405,6 +405,35 @@ function safeInit() {
   // 初始化资源嗅探
   initResourcesTab()
 
+  // 订阅 tab-switch 派发的事件（解耦：tab-switch.js 不再直接调用各模块函数）
+  window.addEventListener('devtools:tab:switched', (e) => {
+    const tabId = e.detail && e.detail.tabId
+    try {
+      if (tabId === 'bookmarks' && typeof loadBookmarks === 'function') {
+        loadBookmarks()
+      } else if (tabId === 'history' && typeof loadHistory === 'function') {
+        loadHistory()
+      } else if (tabId === 'mock' && typeof renderMockList === 'function') {
+        renderMockList()
+      } else if (tabId === 'eventbus' && typeof renderEventBusMessages === 'function') {
+        renderEventBusMessages()
+      }
+    } catch (err) {
+      console.warn('[console] tab switch handler error:', err)
+    }
+  })
+
+  window.addEventListener('devtools:subtab:switched', (e) => {
+    const subtabId = e.detail && e.detail.subtabId
+    if (subtabId === 'storage' && typeof loadAllStorageData === 'function') {
+      loadAllStorageData().catch((err) => {
+        if (!isContextInvalidatedError(err)) {
+          console.error('[console] 加载存储数据失败:', err)
+        }
+      })
+    }
+  })
+
   // ========== EventBus 事件绑定 ==========
   // 清空消息
   if (eventbusClearBtn) {
@@ -1674,7 +1703,10 @@ async function initBatchPicker() {
             // 验证脚本是否真正加载成功
             const verified = await verifyPickerInjected()
             if (!verified) {
-              showNotification('元素拾取器注入失败，可能被页面 CSP 拦截。请检查控制台错误。', 'error')
+              showNotification(
+                '元素拾取器注入失败，可能被页面 CSP 拦截。请检查控制台错误。',
+                'error'
+              )
               startPickerBtn.textContent = originalText
               startPickerBtn.disabled = false
               return
@@ -2735,99 +2767,99 @@ function renderStorageItem(key, value, sectionId) {
 // Toggle expand/collapse using event delegation
 if (outputEl) {
   outputEl.addEventListener('click', (e) => {
-  // Handle JSON tree toggle clicks directly
-  if (e.target.classList.contains('json-tree-toggle')) {
-    const treeItem = e.target.closest('.json-tree-item')
-    if (treeItem) {
-      treeItem.classList.toggle('collapsed')
-      const isCollapsed = treeItem.classList.contains('collapsed')
-      e.target.textContent = isCollapsed ? '▶' : '▼'
-      const children = treeItem.querySelector('.json-tree-children')
-      if (children) {
-        children.style.display = isCollapsed ? 'none' : 'block'
+    // Handle JSON tree toggle clicks directly
+    if (e.target.classList.contains('json-tree-toggle')) {
+      const treeItem = e.target.closest('.json-tree-item')
+      if (treeItem) {
+        treeItem.classList.toggle('collapsed')
+        const isCollapsed = treeItem.classList.contains('collapsed')
+        e.target.textContent = isCollapsed ? '▶' : '▼'
+        const children = treeItem.querySelector('.json-tree-children')
+        if (children) {
+          children.style.display = isCollapsed ? 'none' : 'block'
+        }
       }
-    }
-    return
-  }
-
-  // Handle toggle buttons
-  const btn = e.target.closest('.toggle-btn')
-  if (btn) {
-    const container = btn.closest('.value-container, .object-value-wrapper, .json-tree-item')
-    if (!container) {
       return
     }
 
-    if (container.classList.contains('value-container')) {
-      container.classList.toggle('expanded')
-    } else if (container.classList.contains('object-value-wrapper')) {
-      container.classList.toggle('collapsed')
-      container.classList.toggle('expanded')
-    } else if (container.classList.contains('json-tree-item')) {
-      container.classList.toggle('collapsed')
-      const icon = container.querySelector('.json-tree-toggle')
-      if (icon) {
-        icon.textContent = container.classList.contains('collapsed') ? '▶' : '▼'
+    // Handle toggle buttons
+    const btn = e.target.closest('.toggle-btn')
+    if (btn) {
+      const container = btn.closest('.value-container, .object-value-wrapper, .json-tree-item')
+      if (!container) {
+        return
       }
-      const children = container.querySelector('.json-tree-children')
-      if (children) {
-        children.style.display = container.classList.contains('collapsed') ? 'none' : 'block'
+
+      if (container.classList.contains('value-container')) {
+        container.classList.toggle('expanded')
+      } else if (container.classList.contains('object-value-wrapper')) {
+        container.classList.toggle('collapsed')
+        container.classList.toggle('expanded')
+      } else if (container.classList.contains('json-tree-item')) {
+        container.classList.toggle('collapsed')
+        const icon = container.querySelector('.json-tree-toggle')
+        if (icon) {
+          icon.textContent = container.classList.contains('collapsed') ? '▶' : '▼'
+        }
+        const children = container.querySelector('.json-tree-children')
+        if (children) {
+          children.style.display = container.classList.contains('collapsed') ? 'none' : 'block'
+        }
       }
+      return
     }
-    return
-  }
 
-  // Handle copy buttons
-  const copyBtn = e.target.closest('.storage-copy-btn')
-  if (copyBtn) {
-    const textToCopy = copyBtn.dataset.value
-    if (textToCopy) {
-      copyToClipboard(textToCopy).then(() => {
-        const originalText = copyBtn.innerHTML
-        copyBtn.innerHTML = '<span class="icon">✓</span><span>已复制</span>'
-        setTimeout(() => {
-          copyBtn.innerHTML = originalText
-        }, 1500)
-      })
-    }
-    return
-  }
-
-  // Handle delete buttons
-  const deleteBtn = e.target.closest('.storage-delete-btn')
-  if (deleteBtn) {
-    const sectionId = deleteBtn.dataset.section
-    const key = deleteBtn.dataset.key
-    if (sectionId && key) {
-      const areaName = sectionId.replace('storage-', '')
-      if (confirm(`确定要删除 "${key}" 吗？`)) {
-        chrome.storage[areaName]
-          .remove(key)
-          .then(() => {
-            return loadStorageArea(areaName)
-          })
-          .then(() => {
-            renderAll()
-            showNotification(`已删除: ${key}`)
-          })
+    // Handle copy buttons
+    const copyBtn = e.target.closest('.storage-copy-btn')
+    if (copyBtn) {
+      const textToCopy = copyBtn.dataset.value
+      if (textToCopy) {
+        copyToClipboard(textToCopy).then(() => {
+          const originalText = copyBtn.innerHTML
+          copyBtn.innerHTML = '<span class="icon">✓</span><span>已复制</span>'
+          setTimeout(() => {
+            copyBtn.innerHTML = originalText
+          }, 1500)
+        })
       }
+      return
     }
-    return
-  }
 
-  // Handle section refresh buttons
-  const refreshBtn = e.target.closest('.section-refresh-btn')
-  if (refreshBtn) {
-    const sectionId = refreshBtn.dataset.section
-    if (sectionId) {
-      const areaName = sectionId.replace('storage-', '')
-      loadStorageArea(areaName).then(() => {
-        renderAll()
-        showNotification(`${storageSections[sectionId].title} 已刷新`)
-      })
+    // Handle delete buttons
+    const deleteBtn = e.target.closest('.storage-delete-btn')
+    if (deleteBtn) {
+      const sectionId = deleteBtn.dataset.section
+      const key = deleteBtn.dataset.key
+      if (sectionId && key) {
+        const areaName = sectionId.replace('storage-', '')
+        if (confirm(`确定要删除 "${key}" 吗？`)) {
+          chrome.storage[areaName]
+            .remove(key)
+            .then(() => {
+              return loadStorageArea(areaName)
+            })
+            .then(() => {
+              renderAll()
+              showNotification(`已删除: ${key}`)
+            })
+        }
+      }
+      return
     }
-    return
-  }
+
+    // Handle section refresh buttons
+    const refreshBtn = e.target.closest('.section-refresh-btn')
+    if (refreshBtn) {
+      const sectionId = refreshBtn.dataset.section
+      if (sectionId) {
+        const areaName = sectionId.replace('storage-', '')
+        loadStorageArea(areaName).then(() => {
+          renderAll()
+          showNotification(`${storageSections[sectionId].title} 已刷新`)
+        })
+      }
+      return
+    }
   })
 }
 
@@ -3016,10 +3048,13 @@ function showNotification(message, type = 'info') {
   notificationEl.classList.add('show')
   notificationEl.style.borderColor = type === 'error' ? '#ef4444' : ''
 
-  setTimeout(() => {
-    notificationEl.classList.remove('show')
-    notificationEl.style.borderColor = ''
-  }, type === 'error' ? 4000 : 2000)
+  setTimeout(
+    () => {
+      notificationEl.classList.remove('show')
+      notificationEl.style.borderColor = ''
+    },
+    type === 'error' ? 4000 : 2000
+  )
 }
 
 // ============================================
@@ -4820,8 +4855,8 @@ if (mockFilterInput) {
 // Clear button handler
 if (mockClearBtn) {
   mockClearBtn.addEventListener('click', () => {
-  // 清空页面上下文中的所有 mock 数据
-  const code = `
+    // 清空页面上下文中的所有 mock 数据
+    const code = `
     (function() {
       if (window.__mockData) {
         window.__mockData = {};
@@ -4830,25 +4865,25 @@ if (mockClearBtn) {
       return true;
     })()
   `
-  chrome.devtools.inspectedWindow.eval(code)
+    chrome.devtools.inspectedWindow.eval(code)
 
-  // 清空 storage 中的所有开关状态
-  chrome.storage.session.set({ mockSwitchStates: {} })
-  chrome.storage.session.set({ mockGlobalEnabled: false })
+    // 清空 storage 中的所有开关状态
+    chrome.storage.session.set({ mockSwitchStates: {} })
+    chrome.storage.session.set({ mockGlobalEnabled: false })
 
-  // 更新总开关 UI
-  const mockGlobalSwitch = document.getElementById('mock-global-switch')
-  if (mockGlobalSwitch) {
-    mockGlobalSwitch.checked = false
-    updateMockGlobalStatus(false)
-  }
+    // 更新总开关 UI
+    const mockGlobalSwitch = document.getElementById('mock-global-switch')
+    if (mockGlobalSwitch) {
+      mockGlobalSwitch.checked = false
+      updateMockGlobalStatus(false)
+    }
 
-  mockRequests = []
-  selectedRequestId = null
-  knownRequestIds = new Set() // Reset known IDs
-  renderMockList()
-  renderEmptyEditor()
-  showNotification('已清空请求列表和所有 Mock 规则')
+    mockRequests = []
+    selectedRequestId = null
+    knownRequestIds = new Set() // Reset known IDs
+    renderMockList()
+    renderEmptyEditor()
+    showNotification('已清空请求列表和所有 Mock 规则')
   })
 }
 

@@ -115,8 +115,10 @@ function bindHideElementsEvents() {
     })
   }
 
-  // todo
-  function saveSelectors() {}
+  async function saveSelectors() {
+    const userSelectors = parseSelectorsFromEditor()
+    await saveHideElementsSettings(userSelectors)
+  }
 
   if (saveSelectorsBtn) {
     saveSelectorsBtn.addEventListener('click', saveSelectors)

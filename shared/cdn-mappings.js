@@ -80,10 +80,14 @@
 
   // ========== 版本提取工具 ==========
   function extractVersion(url, patterns) {
-    if (!url) {return null}
+    if (!url) {
+      return null
+    }
     for (const pattern of patterns) {
       const match = url.match(pattern)
-      if (match && match[1]) {return match[1]}
+      if (match && match[1]) {
+        return match[1]
+      }
     }
     return null
   }
@@ -515,8 +519,8 @@
     },
     // 历史上限配置
     _historyLimits: {
-      responseTimes: 20,   // 保留最近20次响应时间
-      healthHistory: 50,   // 保留最近50次健康状态
+      responseTimes: 20, // 保留最近20次响应时间
+      healthHistory: 50, // 保留最近50次健康状态
     },
 
     /**
@@ -601,17 +605,10 @@
 
         const latency = Math.round(performance.now() - start)
         this._stats.successfulProbes++
-        console.log(`[CDNProbe] ${cdn.name} ✓ ${latency}ms`)
         return { healthy: true, latency, timestamp: Date.now() }
       } catch (e) {
         const latency = Math.round(performance.now() - start)
         this._stats.failedProbes++
-        console.warn(
-          `[CDNProbe] ${cdn.name} ✗ ${latency}ms`,
-          `url=${probeFile}`,
-          `[${e?.name || 'Error'}] ${e?.message || 'unknown'}`,
-          e?.cause ? `cause=${e.cause}` : ''
-        )
         return { healthy: false, latency: Infinity, timestamp: Date.now() }
       }
     },
@@ -669,7 +666,9 @@
     getAverageResponseTime(cdnId, lastN = 10) {
       const times = this._responseTimes[cdnId] || []
       const recent = times.slice(-lastN)
-      if (recent.length === 0) {return Infinity}
+      if (recent.length === 0) {
+        return Infinity
+      }
 
       const total = recent.reduce((sum, item) => sum + item.latency, 0)
       return Math.round(total / recent.length)
@@ -684,7 +683,9 @@
     getHealthRate(cdnId, lastN = 20) {
       const history = this._history[cdnId] || []
       const recent = history.slice(-lastN)
-      if (recent.length === 0) {return 0}
+      if (recent.length === 0) {
+        return 0
+      }
 
       const healthyCount = recent.filter((item) => item.healthy).length
       return healthyCount / recent.length
@@ -702,11 +703,11 @@
       const counts = this._healthCounts[cdnId] || { healthy: 0, unhealthy: 0 }
 
       // 基础间隔配置
-      const HEALTHY_BASE = 30 * 60 * 1000       // 健康CDN基础间隔：30分钟
-      const UNHEALTHY_BASE = 1 * 60 * 1000      // 不健康CDN基础间隔：1分钟
-      const DEGRADED_INTERVAL = 5 * 60 * 1000   // 未知状态间隔：5分钟
-      const MAX_HEALTHY = 60 * 60 * 1000        // 最大健康间隔：1小时
-      const MIN_UNHEALTHY = 30 * 1000            // 最小不健康间隔：30秒
+      const HEALTHY_BASE = 30 * 60 * 1000 // 健康CDN基础间隔：30分钟
+      const UNHEALTHY_BASE = 1 * 60 * 1000 // 不健康CDN基础间隔：1分钟
+      const DEGRADED_INTERVAL = 5 * 60 * 1000 // 未知状态间隔：5分钟
+      const MAX_HEALTHY = 60 * 60 * 1000 // 最大健康间隔：1小时
+      const MIN_UNHEALTHY = 30 * 1000 // 最小不健康间隔：30秒
 
       if (!cached) {
         return DEGRADED_INTERVAL
@@ -715,12 +716,18 @@
       if (cached.healthy) {
         // 健康CDN：根据连续健康次数延长间隔（指数增长）
         const consecutiveHealthy = counts.healthy
-        const multiplier = Math.min(Math.pow(1.5, Math.floor(consecutiveHealthy / 3)), MAX_HEALTHY / HEALTHY_BASE)
+        const multiplier = Math.min(
+          Math.pow(1.5, Math.floor(consecutiveHealthy / 3)),
+          MAX_HEALTHY / HEALTHY_BASE
+        )
         return Math.min(HEALTHY_BASE * multiplier, MAX_HEALTHY)
       } else {
         // 不健康CDN：根据连续不健康次数缩短间隔（指数衰减）
         const consecutiveUnhealthy = counts.unhealthy
-        const multiplier = Math.max(Math.pow(0.8, Math.floor(consecutiveUnhealthy / 2)), MIN_UNHEALTHY / UNHEALTHY_BASE)
+        const multiplier = Math.max(
+          Math.pow(0.8, Math.floor(consecutiveUnhealthy / 2)),
+          MIN_UNHEALTHY / UNHEALTHY_BASE
+        )
         return Math.max(UNHEALTHY_BASE * multiplier, MIN_UNHEALTHY)
       }
     },
@@ -740,7 +747,9 @@
       return cdnIds
         .map((id) => {
           const cached = this._cache[id]
-          if (!cached || now - cached.timestamp >= this.TTL) {return null}
+          if (!cached || now - cached.timestamp >= this.TTL) {
+            return null
+          }
           return { id, ...cached }
         })
         .filter(Boolean)
@@ -754,8 +763,6 @@
     markUnhealthy(cdnId) {
       this._cache[cdnId] = { healthy: false, latency: Infinity, timestamp: Date.now() }
       this._recordProbeResult(cdnId, { healthy: false, latency: Infinity, timestamp: Date.now() })
-      const cdn = CDN_BY_ID[cdnId]
-      if (cdn) {console.warn(`[CDNProbe] ${cdn.name} 标记不可用`)}
     },
 
     /**
@@ -773,7 +780,9 @@
       let latencyCount = 0
 
       for (const cdn of CDN_SOURCES) {
-        if (cdn.format === 'font') {continue}
+        if (cdn.format === 'font') {
+          continue
+        }
 
         const cached = this._cache[cdn.id]
         const avgResponseTime = this.getAverageResponseTime(cdn.id)
@@ -824,7 +833,9 @@
   // ========== 匹配方法 ==========
 
   function matchFromMap(url, map, type) {
-    if (!url || typeof url !== 'string') {return null}
+    if (!url || typeof url !== 'string') {
+      return null
+    }
 
     for (const [name, config] of Object.entries(map)) {
       for (const pattern of config.patterns) {
@@ -920,9 +931,13 @@
 
     for (const { cdnId } of scoredCDNs) {
       const cdn = CDN_BY_ID[cdnId]
-      if (!cdn) {continue}
+      if (!cdn) {
+        continue
+      }
       const url = buildCDNUrl(cdn, config, version, config.file)
-      if (!url) {continue}
+      if (!url) {
+        continue
+      }
 
       if (!primary) {
         primary = { url, cdnId }
@@ -939,9 +954,13 @@
     // 全部不可用时回退到第一个
     for (const cdnId of cdnOrder) {
       const cdn = CDN_BY_ID[cdnId]
-      if (!cdn) {continue}
+      if (!cdn) {
+        continue
+      }
       const url = buildCDNUrl(cdn, config, version, config.file)
-      if (url) {return { url, cdnId, fallbackUrls: [] }}
+      if (url) {
+        return { url, cdnId, fallbackUrls: [] }
+      }
     }
     return null
   }

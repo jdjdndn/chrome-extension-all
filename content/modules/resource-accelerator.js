@@ -781,7 +781,9 @@
       this._detectPageOptimizations()
 
       // 2. 后台探测CDN健康(不阻塞初始化，CDN映射表已立即加载)
-      this._probeCDNHealth()
+      // 已取消：主动探测在弱网/CSP/AdBlock 环境产生大量 ✗ 噪音且无收益。
+      // 实际加载失败时由 _handleLoadError → markUnhealthy 反应式标记。
+      // this._probeCDNHealth()
 
       // 3. 初始化子模块（使用默认配置，配置加载后会同步更新）
       // 如果检测到页面已有优化，会跳过相应模块

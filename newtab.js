@@ -2675,9 +2675,21 @@ function initAIAggregator() {
     return false
   })
 
-  // 直接使用默认配置，不请求 background
-  aiAggregator.sites = DEFAULT_AI_SITES.filter((s) => s.enabled)
-  renderSiteSelector()
+  // 优先读取用户保存的覆盖配置，与默认配置合并
+  chrome.storage.local
+    .get(['aiAggregatorSites'])
+    .then((res) => {
+      const overrides = res && res.aiAggregatorSites ? res.aiAggregatorSites : {}
+      aiAggregator.sites = DEFAULT_AI_SITES.map((s) => ({
+        ...s,
+        ...(overrides[s.id] || {}),
+      })).filter((s) => s.enabled)
+      renderSiteSelector()
+    })
+    .catch(() => {
+      aiAggregator.sites = DEFAULT_AI_SITES.filter((s) => s.enabled)
+      renderSiteSelector()
+    })
 
   // 发送按钮点击
   sendBtn.addEventListener('click', () => {
@@ -3329,10 +3341,78 @@ function resetAggregator() {
   questionInput.disabled = false
 }
 
-// 显示网站配置
-function showSiteConfig(siteId) {
-  // TODO: 实现配置面板
-  alert(`配置功能开发中: ${siteId}`)
+// 显示网站配置（最小可用：启用开关 + URL 编辑）
+async function showSiteConfig(siteId) {
+  const site = DEFAULT_AI_SITES.find((s) => s.id === siteId)
+  if (!site) {
+    return
+  }
+  const res = await chrome.storage.local.get(['aiAggregatorSites'])
+  const overrides = res.aiAggregatorSites || {}
+  const current = { ...site, ...(overrides[siteId] || {}) }
+
+  let overlay = document.getElementById('aiSiteConfigOverlay')
+  if (!overlay) {
+    overlay = document.createElement('div')
+    overlay.id = 'aiSiteConfigOverlay'
+    overlay.className = 'modal-overlay'
+    overlay.innerHTML = `
+      <div class="modal">
+        <div class="modal-title" id="aiSiteConfigTitle"></div>
+        <label style="display:flex;align-items:center;gap:8px;margin:8px 0;">
+          <input type="checkbox" id="aiSiteConfigEnabled" /> 启用
+        </label>
+        <input type="text" class="modal-input" id="aiSiteConfigUrl" placeholder="URL" />
+        <div class="modal-actions">
+          <button class="modal-btn cancel" id="aiSiteConfigCancel">取消</button>
+          <button class="modal-btn confirm" id="aiSiteConfigSave">保存</button>
+        </div>
+      </div>
+    `
+    document.body.appendChild(overlay)
+  }
+
+  const titleEl = overlay.querySelector('#aiSiteConfigTitle')
+  const enabledEl = overlay.querySelector('#aiSiteConfigEnabled')
+  const urlEl = overlay.querySelector('#aiSiteConfigUrl')
+  const cancelBtn = overlay.querySelector('#aiSiteConfigCancel')
+  const saveBtn = overlay.querySelector('#aiSiteConfigSave')
+
+  titleEl.textContent = `配置 ${current.name || siteId}`
+  enabledEl.checked = !!current.enabled
+  urlEl.value = current.url || ''
+  overlay.classList.add('open')
+
+  const close = () => overlay.classList.remove('open')
+
+  const onCancel = () => {
+    close()
+    cancelBtn.removeEventListener('click', onCancel)
+    saveBtn.removeEventListener('click', onSave)
+  }
+  const onSave = async () => {
+    const next = await chrome.storage.local.get(['aiAggregatorSites'])
+    const all = next.aiAggregatorSites || {}
+    all[siteId] = {
+      ...(all[siteId] || {}),
+      enabled: enabledEl.checked,
+      url: urlEl.value.trim() || site.url,
+    }
+    await chrome.storage.local.set({ aiAggregatorSites: all })
+
+    aiAggregator.sites = DEFAULT_AI_SITES.map((s) => ({
+      ...s,
+      ...(all[s.id] || {}),
+    })).filter((s) => s.enabled)
+    renderSiteSelector()
+
+    close()
+    cancelBtn.removeEventListener('click', onCancel)
+    saveBtn.removeEventListener('click', onSave)
+  }
+
+  cancelBtn.addEventListener('click', onCancel)
+  saveBtn.addEventListener('click', onSave)
 }
 
 // 绑定操作按钮事件

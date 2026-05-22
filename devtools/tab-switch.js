@@ -33,26 +33,7 @@
       console.warn('[TabSwitch] 未找到内容:', 'tab-' + tabId)
     }
 
-    // todo: Tab 特定初始化
-    // try {
-    //   if (tabId === 'bookmarks' && typeof loadBookmarks === 'function') {
-    //     loadBookmarks()
-    //   }
-    //   if (tabId === 'history' && typeof loadHistory === 'function') {
-    //     loadHistory()
-    //   }
-    //   if (tabId === 'resources' && typeof initResourcesTab === 'function') {
-    //     initResourcesTab()
-    //   }
-    //   if (tabId === 'mock' && typeof renderMockList === 'function') {
-    //     renderMockList()
-    //   }
-    //   if (tabId === 'eventbus' && typeof renderEventBusMessages === 'function') {
-    //     renderEventBusMessages()
-    //   }
-    // } catch (e) {
-    //   console.warn('[TabSwitch] Tab 初始化错误:', e)
-    // }
+    window.dispatchEvent(new CustomEvent('devtools:tab:switched', { detail: { tabId } }))
   }
 
   // Info 子 Tab 切换
@@ -83,16 +64,7 @@
 
     // 特殊处理：storage tab
     if (subtabId === 'storage') {
-      try {
-        // todo
-        // if (typeof loadAllStorageData === 'function') {
-        //   loadAllStorageData().catch((err) => {
-        //     console.error('[TabSwitch] 加载存储数据失败:', err)
-        //   })
-        // }
-      } catch (e) {
-        console.warn('[TabSwitch] Storage 加载错误:', e)
-      }
+      window.dispatchEvent(new CustomEvent('devtools:subtab:switched', { detail: { subtabId } }))
     }
   }
 
