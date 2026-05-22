@@ -398,15 +398,26 @@
         }
 
         const heartbeatAge = Date.now() - workerInfo.lastHeartbeat
-        const timeout = 10000 // 10秒无心跳视为不健康（优化：更快发现异常）
+        const timeout = 30000 // 30秒无心跳视为不健康（弱机降低假阳性）
 
         if (heartbeatAge > timeout) {
-          console.warn(
-            `[ImageCompressorPool] Worker ${index} 心跳超时 (${(heartbeatAge / 1000).toFixed(0)}s)`
-          )
-          workerInfo.status = 'unhealthy'
-          this._restartWorker(index)
+          // 连续 2 次心跳超时才重启，单次超时仅警告
+          workerInfo.missedHeartbeats = (workerInfo.missedHeartbeats || 0) + 1
+          if (workerInfo.missedHeartbeats >= 2) {
+            console.warn(
+              `[ImageCompressorPool] Worker ${index} 连续 ${workerInfo.missedHeartbeats} 次心跳超时 (${(heartbeatAge / 1000).toFixed(0)}s)，触发重启`
+            )
+            workerInfo.status = 'unhealthy'
+            workerInfo.missedHeartbeats = 0
+            this._restartWorker(index)
+          } else {
+            console.warn(
+              `[ImageCompressorPool] Worker ${index} 心跳超时 (${(heartbeatAge / 1000).toFixed(0)}s)，再观察一轮`
+            )
+            workerInfo.worker.postMessage({ type: 'ping', id: Date.now() })
+          }
         } else {
+          workerInfo.missedHeartbeats = 0
           // 发送心跳检测
           workerInfo.worker.postMessage({ type: 'ping', id: Date.now() })
         }
@@ -799,13 +810,80 @@
       if (!window.UnifiedDOMWatcher) {
         console.warn('[ImageOptimizer] UnifiedDOMWatcher 未加载，使用独立 MutationObserver')
 
-        // 降级：使用独立 MutationObserver
+        // 降级：使用独立 MutationObserver（带节流 + 熔断 + 廉价过滤）
         if (this._mutationObserver) {
           this._mutationObserver.disconnect()
         }
 
+        this._degradedMutationCount = 0
+        this._degradedBurstWindowStart = Date.now()
+        this._degradedDisabled = false
+        let scheduled = false
+        let pendingMutations = []
+
+        const flush = () => {
+          scheduled = false
+          if (pendingMutations.length === 0) {
+            return
+          }
+          const batch = pendingMutations
+          pendingMutations = []
+          this._handleImageMutations(batch)
+        }
+
         this._mutationObserver = new MutationObserver((mutations) => {
-          this._handleImageMutations(mutations)
+          if (this._degradedDisabled) {
+            return
+          }
+
+          // 熔断：1 秒窗口 > 3000 mutation 直接 disconnect
+          const now = Date.now()
+          if (now - this._degradedBurstWindowStart > 1000) {
+            this._degradedBurstWindowStart = now
+            this._degradedMutationCount = 0
+          }
+          this._degradedMutationCount += mutations.length
+          if (this._degradedMutationCount > 3000) {
+            console.warn(
+              '[ImageOptimizer] 降级 observer 触发熔断 (>3000 mut/s)，断开监听以保护页面性能'
+            )
+            this._mutationObserver.disconnect()
+            this._degradedDisabled = true
+            return
+          }
+
+          // 廉价预过滤：只保留含 IMG 的 childList mutation
+          for (const m of mutations) {
+            if (m.type !== 'childList' || m.addedNodes.length === 0) {
+              continue
+            }
+            let hit = false
+            for (const node of m.addedNodes) {
+              if (node.nodeType !== 1) {
+                continue
+              }
+              if (node.dataset?.ycInternal === '1') {
+                continue
+              }
+              if (node.tagName === 'IMG' || node.querySelector?.('img')) {
+                hit = true
+                break
+              }
+            }
+            if (hit) {
+              pendingMutations.push(m)
+            }
+          }
+
+          if (pendingMutations.length === 0) {
+            return
+          }
+
+          // 节流：rAF 合批
+          if (!scheduled) {
+            scheduled = true
+            requestAnimationFrame(flush)
+          }
         })
 
         this._mutationObserver.observe(document.body, {
@@ -1203,9 +1281,21 @@
           }
         )
       } else {
-        // 降级：使用独立 MutationObserver
-        this._videoObserver = new MutationObserver((mutations) => {
-          mutations.forEach((mutation) => {
+        // 降级：使用独立 MutationObserver（带节流 + 熔断 + 廉价过滤）
+        this._videoDegradedCount = 0
+        this._videoDegradedWindowStart = Date.now()
+        this._videoDegradedDisabled = false
+        let scheduled = false
+        let pending = []
+
+        const flush = () => {
+          scheduled = false
+          if (pending.length === 0) {
+            return
+          }
+          const batch = pending
+          pending = []
+          batch.forEach((mutation) => {
             mutation.addedNodes.forEach((node) => {
               if (node.nodeName === 'VIDEO') {
                 this._prepareVideo(node)
@@ -1215,6 +1305,51 @@
               }
             })
           })
+        }
+
+        this._videoObserver = new MutationObserver((mutations) => {
+          if (this._videoDegradedDisabled) {
+            return
+          }
+          const now = Date.now()
+          if (now - this._videoDegradedWindowStart > 1000) {
+            this._videoDegradedWindowStart = now
+            this._videoDegradedCount = 0
+          }
+          this._videoDegradedCount += mutations.length
+          if (this._videoDegradedCount > 3000) {
+            console.warn('[ImageOptimizer] 视频降级 observer 触发熔断 (>3000 mut/s)，断开监听')
+            this._videoObserver.disconnect()
+            this._videoDegradedDisabled = true
+            return
+          }
+
+          for (const m of mutations) {
+            if (m.type !== 'childList' || m.addedNodes.length === 0) {
+              continue
+            }
+            let hit = false
+            for (const node of m.addedNodes) {
+              if (node.nodeType !== 1) {
+                continue
+              }
+              if (node.dataset?.ycInternal === '1') {
+                continue
+              }
+              if (node.tagName === 'VIDEO' || node.querySelector?.('video')) {
+                hit = true
+                break
+              }
+            }
+            if (hit) {
+              pending.push(m)
+            }
+          }
+
+          if (pending.length > 0 && !scheduled) {
+            scheduled = true
+            requestAnimationFrame(flush)
+          }
         })
 
         this._videoObserver.observe(document.body, { childList: true, subtree: true })

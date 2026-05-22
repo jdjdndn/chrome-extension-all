@@ -10,26 +10,33 @@
       this.observer = null
       this.callbacks = callbacks
       this.debounceTimer = null
-      this.debounceDelay = 100
+      this.debounceDelay = 200
       this.isActive = false
+
+      // 熔断：1 秒窗口 > 3000 mutation 自动 disconnect
+      this._burstCount = 0
+      this._burstWindowStart = 0
+      this._disabled = false
     }
 
     /**
      * 启动监听
      */
     start() {
-      if (this.isActive || !document.body) {return}
+      if (this.isActive || !document.body) {
+        return
+      }
 
       this.isActive = true
       this.observer = new MutationObserver((mutations) => {
         this._handleMutations(mutations)
       })
 
+      // 仅监听 childList + subtree，不再监听 attributes（attributes 在富页面会风暴）
+      // 如需 attributes 监听，请使用 watchElement 针对特定元素订阅
       this.observer.observe(document.body, {
         childList: true,
         subtree: true,
-        attributes: true,
-        attributeFilter: ['class', 'style', 'id', 'hidden', 'disabled'],
       })
     }
 
@@ -48,6 +55,24 @@
      * 处理 DOM 变化
      */
     _handleMutations(mutations) {
+      if (this._disabled) {
+        return
+      }
+
+      // 熔断检测
+      const now = Date.now()
+      if (now - this._burstWindowStart > 1000) {
+        this._burstWindowStart = now
+        this._burstCount = 0
+      }
+      this._burstCount += mutations.length
+      if (this._burstCount > 3000) {
+        console.warn('[DOMWatcher] 熔断: >3000 mut/s，断开监听')
+        this.stop()
+        this._disabled = true
+        return
+      }
+
       // 防抖处理
       clearTimeout(this.debounceTimer)
       this.debounceTimer = setTimeout(() => {

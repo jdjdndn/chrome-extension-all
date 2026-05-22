@@ -13,6 +13,13 @@
   'use strict'
 
   const LOG_PREFIX = '[ResourceAccelerator]'
+
+  // 单例守卫：防止 bundle 被多次评估（双入口/多 frame）导致重复注册 DOMContentLoaded
+  if (window.__resourceAcceleratorLoaded) {
+    console.log(`${LOG_PREFIX} 已加载，跳过重复评估`)
+    return
+  }
+  window.__resourceAcceleratorLoaded = true
   const CACHE_KEY = 'resourceAcceleratorCache'
   const CONFIG_KEY = 'resourceAcceleratorConfig'
   const CACHE_TTL = 7 * 24 * 60 * 60 * 1000 // 7天过期
@@ -2144,9 +2151,25 @@
         (c) => c.id
       )
 
+      // 并发锁：防止多次 probeAll 叠加成 fetch 风暴
+      this._probeInflight = false
+      const safeProbeAll = async () => {
+        if (this._probeInflight || this._healthProbeStopped) {
+          return
+        }
+        this._probeInflight = true
+        try {
+          await window.CDNMappings.CDNHealthProbe.probeAll(allCdnIds)
+        } catch (e) {
+          console.warn(`${LOG_PREFIX} CDN 探测失败:`, e?.message)
+        } finally {
+          this._probeInflight = false
+        }
+      }
+
       // 延迟探测，不阻塞页面初始化
       setTimeout(() => {
-        window.CDNMappings.CDNHealthProbe.probeAll(allCdnIds).then(() => {
+        safeProbeAll().then(() => {
           console.log(`${LOG_PREFIX} CDN健康探测完成`)
         })
       }, 2000)
@@ -2158,7 +2181,7 @@
           return
         }
 
-        // 获取自适应探测间隔（基于各CDN健康状态计算最短间隔）
+        // 获取自适应探测间隔（基于各CDN健康状态计算最短间隔，内部已保底 30s）
         const probeInterval = this._getAdaptiveProbeInterval(allCdnIds)
 
         this._healthProbeTimer = setTimeout(() => {
@@ -2174,7 +2197,7 @@
                 if (this._healthProbeStopped) {
                   return
                 }
-                await window.CDNMappings.CDNHealthProbe.probeAll(allCdnIds)
+                await safeProbeAll()
                 // 递归调度下一次探测（先检查停止标志）
                 if (!this._healthProbeStopped) {
                   scheduleHealthProbe()
@@ -2186,7 +2209,7 @@
             this._idleCallbackIds.push(idleId)
           } else {
             // 降级：直接执行
-            window.CDNMappings.CDNHealthProbe.probeAll(allCdnIds).then(() => {
+            safeProbeAll().then(() => {
               if (!this._healthProbeStopped) {
                 scheduleHealthProbe()
               }
@@ -3011,7 +3034,7 @@
 
   // 根据文档状态选择初始化时机
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', autoInit)
+    document.addEventListener('DOMContentLoaded', autoInit, { once: true })
   } else {
     // 延迟初始化，确保其他模块已加载
     setTimeout(autoInit, 0)

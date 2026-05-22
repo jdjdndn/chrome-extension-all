@@ -51,11 +51,24 @@
       // 暂停标志
       this._paused = false
 
+      // 队列上限：超过即丢弃旧 mutation，防止内存暴涨
+      this._MAX_PENDING = 2000
+
+      // 运行时熔断：滑动窗口统计 mutation 速率
+      this._burstWindowMs = 1000
+      this._burstThreshold = 5000 // 1 秒内 > 5000 条视为风暴
+      this._burstAutoResumeMs = 10000 // 熔断 10 秒后自动恢复
+      this._burstSamples = [] // [{ t, n }]
+      this._circuitOpenAt = 0
+      this._circuitResumeTimer = null
+
       // 统计数据
       this.stats = {
         totalMutations: 0,
         processedBatches: 0,
         subscriberCount: 0,
+        droppedMutations: 0,
+        circuitOpenCount: 0,
         memoryUsage: {
           lastCheckTime: 0,
           peakMutations: 0,
@@ -169,6 +182,11 @@
         return
       }
 
+      // 熔断检测：超阈值自动暂停
+      if (this._tripCircuitIfBurst(mutations.length)) {
+        return
+      }
+
       const filtered = []
       for (const mutation of mutations) {
         if (mutation.type !== 'childList' || mutation.addedNodes.length === 0) {
@@ -193,11 +211,65 @@
         return
       }
 
-      // 收集所有变更
+      // 收集所有变更（带上限，超过丢弃旧的 FIFO，防止内存暴涨）
       this._pendingMutations.push(...filtered)
+      if (this._pendingMutations.length > this._MAX_PENDING) {
+        const dropCount = this._pendingMutations.length - this._MAX_PENDING
+        this._pendingMutations.splice(0, dropCount)
+        this.stats.droppedMutations += dropCount
+      }
 
       // 按优先级分发
       this._dispatchByPriority(filtered)
+
+      // 分发完成后清空待处理队列：当前批次已经传给订阅者，
+      // _pendingMutations 仅用于 peak 统计，不能无界累积
+      if (this._pendingMutations.length > this.stats.memoryUsage.peakMutations) {
+        this.stats.memoryUsage.peakMutations = this._pendingMutations.length
+      }
+      this._pendingMutations.length = 0
+    }
+
+    /**
+     * 熔断器：滑动窗口内 mutation 数超阈值则自动 pause
+     * @returns {boolean} 是否已熔断（调用方应直接 return）
+     */
+    _tripCircuitIfBurst(n) {
+      const now = Date.now()
+      // 清理窗口外样本
+      const cutoff = now - this._burstWindowMs
+      while (this._burstSamples.length > 0 && this._burstSamples[0].t < cutoff) {
+        this._burstSamples.shift()
+      }
+      this._burstSamples.push({ t: now, n })
+
+      let total = 0
+      for (const s of this._burstSamples) {
+        total += s.n
+      }
+
+      if (total > this._burstThreshold) {
+        this._paused = true
+        this.stats.circuitOpenCount++
+        this._circuitOpenAt = now
+        console.warn(
+          `${LOG_PREFIX} 熔断器触发: ${total} mutations/${this._burstWindowMs}ms 超阈值 ${this._burstThreshold}，自动暂停 ${this._burstAutoResumeMs}ms`
+        )
+        // 清空待处理队列，释放内存
+        this._pendingMutations.length = 0
+        this._burstSamples.length = 0
+        // 自动恢复
+        if (this._circuitResumeTimer) {
+          clearTimeout(this._circuitResumeTimer)
+        }
+        this._circuitResumeTimer = setTimeout(() => {
+          this._paused = false
+          this._circuitResumeTimer = null
+          console.warn(`${LOG_PREFIX} 熔断器自动恢复`)
+        }, this._burstAutoResumeMs)
+        return true
+      }
+      return false
     }
 
     /**
@@ -305,11 +377,6 @@
       }
 
       this.stats.processedBatches++
-
-      // 更新内存使用统计
-      if (this._pendingMutations.length > this.stats.memoryUsage.peakMutations) {
-        this.stats.memoryUsage.peakMutations = this._pendingMutations.length
-      }
       this.stats.memoryUsage.lastCheckTime = now
     }
 
@@ -363,10 +430,15 @@
         cancelIdleCallback(this._ricId)
         this._ricId = null
       }
+      if (this._circuitResumeTimer) {
+        clearTimeout(this._circuitResumeTimer)
+        this._circuitResumeTimer = null
+      }
 
       // 清理状态
       this._subscribers.clear()
       this._pendingMutations = []
+      this._burstSamples = []
       this._initialized = false
       this._paused = false
 
