@@ -183,19 +183,8 @@ async function loadScriptSwitches() {
     const result = await chrome.storage.local.get(SCRIPT_SWITCHES_KEY)
     const switches = result[SCRIPT_SWITCHES_KEY] || {}
 
-    // 获取默认开关配置
-    const defaultSwitches = {
-      'redirect-links': true,
-      'text-to-link': true,
-      'link-blank': true,
-      'add-title': true,
-      'doc-generator': true,
-      'text-collector': true,
-      'keyboard-pagination': true,
-      'panel-position-manager': true,
-      'widen-page': false,
-      'tab-focus': true,
-    }
+    // 默认开关来自 content/common/script-switch.js（popup.html 已先加载），单一来源
+    const defaultSwitches = window.getDefaultScriptSwitches ? window.getDefaultScriptSwitches() : {}
 
     // 合并默认值和存储的值
     const mergedSwitches = { ...defaultSwitches, ...switches }
@@ -235,7 +224,9 @@ scriptSwitchCheckboxes.forEach((checkbox) => {
     // widen-page 开关联动宽度设置显示
     if (scriptName === 'widen-page') {
       const widthSetting = document.getElementById('widen-page-width-setting')
-      if (widthSetting) {widthSetting.style.display = enabled ? 'block' : 'none'}
+      if (widthSetting) {
+        widthSetting.style.display = enabled ? 'block' : 'none'
+      }
     }
   })
 })
@@ -250,7 +241,9 @@ if (widenPageWidthSlider) {
   chrome.storage.local.get('widenPageWidth', (result) => {
     const width = result.widenPageWidth || 80
     widenPageWidthSlider.value = width
-    if (widenPageWidthValue) {widenPageWidthValue.textContent = width}
+    if (widenPageWidthValue) {
+      widenPageWidthValue.textContent = width
+    }
 
     // 根据开关状态显示/隐藏宽度设置
     const widthSetting = document.getElementById('widen-page-width-setting')
@@ -262,7 +255,9 @@ if (widenPageWidthSlider) {
   // 滑块变更时保存并实时通知页面
   widenPageWidthSlider.addEventListener('input', () => {
     const width = parseInt(widenPageWidthSlider.value, 10)
-    if (widenPageWidthValue) {widenPageWidthValue.textContent = width}
+    if (widenPageWidthValue) {
+      widenPageWidthValue.textContent = width
+    }
     chrome.storage.local.set({ widenPageWidth: width })
 
     // 实时通知当前活动标签页更新宽度
@@ -351,7 +346,9 @@ function escapeHtml(text) {
 
 // Add blocked domain
 async function addDomain(domain) {
-  if (!domain) {return}
+  if (!domain) {
+    return
+  }
 
   const result = await sendMessage('ADD_BLOCKED_DOMAIN', { domain })
 
@@ -377,7 +374,9 @@ async function removeDomain(domain) {
 
 // Add blocked response domain
 async function addResponseDomain(domain) {
-  if (!domain) {return}
+  if (!domain) {
+    return
+  }
 
   const result = await sendMessage('ADD_BLOCKED_RESPONSE_DOMAIN', { domain })
 
@@ -519,12 +518,16 @@ chrome.runtime.onMessage.addListener((message, _sender, _sendResponse) => {
 
 // Parse domain input - supports both single domain and multiple domains separated by comma
 function parseDomainInput(input) {
-  if (!input) {return []}
+  if (!input) {
+    return []
+  }
 
   // Remove quotes if present (both single and double quotes)
   const cleaned = input.replace(/['"]/g, '').trim()
 
-  if (!cleaned) {return []}
+  if (!cleaned) {
+    return []
+  }
 
   // Split by comma and trim each entry
   return cleaned
@@ -747,7 +750,9 @@ const defaultAutoFollowKeywords = ['ootd']
  * Auto deduplicates
  */
 function parseKeywords(text) {
-  if (!text) {return []}
+  if (!text) {
+    return []
+  }
 
   // 按换行符分割，每行一个关键词
   const lines = text
@@ -819,7 +824,9 @@ function updateKeywordsCount() {
  * Save keywords to storage and notify content script
  */
 async function saveKeywords() {
-  if (!notInterestedKeywordsTextarea) {return}
+  if (!notInterestedKeywordsTextarea) {
+    return
+  }
 
   // Only save keywords for Douyin domains
   const domain = await getCurrentDomain()
@@ -876,7 +883,9 @@ async function saveKeywords() {
  * Save auto-follow keywords
  */
 async function saveAutoFollowKeywords() {
-  if (!autoFollowKeywordsTextarea) {return}
+  if (!autoFollowKeywordsTextarea) {
+    return
+  }
 
   // Only save keywords for Douyin domains
   const domain = await getCurrentDomain()
@@ -943,7 +952,9 @@ const defaultHideElementsSelectors = []
  * Supports: newline-separated, space-separated (with quotes for complex selectors)
  */
 function parseSelectors(text) {
-  if (!text) {return []}
+  if (!text) {
+    return []
+  }
 
   // 首先尝试按换行符分割（优先）
   const lines = text
@@ -1354,7 +1365,9 @@ async function saveHideElementsSettings(userSelectors = null) {
  */
 async function renderHideSelectorsList() {
   const domain = await getCurrentDomain()
-  if (!domain) {return}
+  if (!domain) {
+    return
+  }
 
   // 获取默认选择器
   const defaultSelectors = await getDefaultHideSelectors()
@@ -1394,7 +1407,9 @@ async function renderHideSelectorsList() {
 
   // 获取编辑器容器
   const editor = document.getElementById('hide-elements-editor')
-  if (!editor) {return}
+  if (!editor) {
+    return
+  }
 
   // 清空现有内容
   editor.innerHTML = ''
@@ -1439,7 +1454,9 @@ async function renderHideSelectorsList() {
  */
 async function deleteSelector(selector) {
   const domain = await getCurrentDomain()
-  if (!domain) {return}
+  if (!domain) {
+    return
+  }
 
   // 获取当前设置
   const result = await chrome.storage.local.get(['hideElementsSettings'])
@@ -1498,7 +1515,9 @@ if (batchAddBtn) {
   batchAddBtn.addEventListener('click', () => {
     if (batchAddPanel) {
       batchAddPanel.style.display = batchAddPanel.style.display === 'none' ? 'block' : 'none'
-      if (batchSelectorsInput) {batchSelectorsInput.focus()}
+      if (batchSelectorsInput) {
+        batchSelectorsInput.focus()
+      }
     }
   })
 }
@@ -1507,19 +1526,27 @@ if (closeBatchPanelBtn) {
   closeBatchPanelBtn.addEventListener('click', () => {
     if (batchAddPanel) {
       batchAddPanel.style.display = 'none'
-      if (batchSelectorsInput) {batchSelectorsInput.value = ''}
+      if (batchSelectorsInput) {
+        batchSelectorsInput.value = ''
+      }
     }
   })
 }
 
 if (confirmBatchAddBtn) {
   confirmBatchAddBtn.addEventListener('click', async () => {
-    if (!batchSelectorsInput) {return}
+    if (!batchSelectorsInput) {
+      return
+    }
     const inputText = batchSelectorsInput.value.trim()
-    if (!inputText) {return}
+    if (!inputText) {
+      return
+    }
 
     const newSelectors = parseSelectors(inputText)
-    if (newSelectors.length === 0) {return}
+    if (newSelectors.length === 0) {
+      return
+    }
 
     // 添加到现有选择器
     const domain = await getCurrentDomain()
@@ -1558,7 +1585,7 @@ async function loadModule(moduleName) {
 
   const startTime = performance.now()
   try {
-    const module = await import(`./modules/${moduleName}.js`)
+    const module = await import(chrome.runtime.getURL(`popup/modules/${moduleName}.js`))
     _moduleCache[moduleName] = module
     const duration = (performance.now() - startTime).toFixed(1)
     console.log(`[Popup] 模块 ${moduleName} 加载完成, 耗时: ${duration}ms`)
@@ -1618,7 +1645,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 域名管理模块（page tab 使用）
   modulePromises.push(
-    loadModule('domain-manager').then(module => {
+    loadModule('domain-manager').then((module) => {
       if (module) {
         module.initDomainManager()
         module.loadBlockedDomains()
@@ -1630,7 +1657,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 关键词管理模块（根据域名加载）
   if (isDouyinDomain(domain) || isBilibiliDomain(domain)) {
     modulePromises.push(
-      loadModule('keyword-manager').then(module => {
+      loadModule('keyword-manager').then((module) => {
         if (module) {
           module.initKeywordManager()
           module.loadKeywords()
@@ -1645,20 +1672,22 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 隐藏元素管理模块（page tab 使用）
   modulePromises.push(
-    loadModule('hide-elements-manager').then(module => {
-      if (module) {
-        module.initHideElementsManager()
-        _moduleLoadState.hideElementsManager = true
-      }
-    }).catch(() => {
-      // 如果模块不存在，使用原有函数
-      loadHideElementsSettings().catch(console.error)
-    })
+    loadModule('hide-elements-manager')
+      .then((module) => {
+        if (module) {
+          module.initHideElementsManager()
+          _moduleLoadState.hideElementsManager = true
+        }
+      })
+      .catch(() => {
+        // 如果模块不存在，使用原有函数
+        loadHideElementsSettings().catch(console.error)
+      })
   )
 
   // 统计面板模块（stats tab 使用）
   modulePromises.push(
-    loadModule('stats-panel').then(module => {
+    loadModule('stats-panel').then((module) => {
       if (module) {
         module.initStatsPanel()
         _moduleLoadState.statsPanel = true
@@ -1668,7 +1697,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 剪贴板历史模块（home tab 使用）
   modulePromises.push(
-    loadModule('clipboard-history').then(module => {
+    loadModule('clipboard-history').then((module) => {
       if (module) {
         module.initClipboardHistory()
         _moduleLoadState.clipboardHistory = true
@@ -1678,7 +1707,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 资源加速器模块（page tab 使用）
   modulePromises.push(
-    loadModule('resource-accelerator').then(module => {
+    loadModule('resource-accelerator').then((module) => {
       if (module) {
         module.initResourceAccelerator()
         _moduleLoadState.resourceAccelerator = true
@@ -1770,7 +1799,9 @@ async function checkLocalServerStatus() {
   const statusText = document.getElementById('server-status-text')
   const statusDetail = document.getElementById('server-status-detail')
 
-  if (!statusDot || !statusText) {return}
+  if (!statusDot || !statusText) {
+    return
+  }
 
   try {
     const response = await fetch(`${LOCAL_SERVER_URL}/api/health`, {
@@ -1826,11 +1857,15 @@ async function checkLocalServerStatus() {
 
 // Add copy event listener for keywords textareas - copy as array format
 function setupCopyAsArray(textarea) {
-  if (!textarea) {return}
+  if (!textarea) {
+    return
+  }
 
   textarea.addEventListener('copy', (e) => {
     const selection = window.getSelection()
-    if (!selection.rangeCount) {return}
+    if (!selection.rangeCount) {
+      return
+    }
 
     // Get selected text, or full textarea value if no selection
     let selectedText = selection.toString()
@@ -1857,7 +1892,9 @@ setupCopyAsArray(autoFollowKeywordsTextarea)
 
 // Add paste event listener - auto convert JSON array to space-separated format
 function setupPasteFromArray(textarea) {
-  if (!textarea) {return}
+  if (!textarea) {
+    return
+  }
 
   textarea.addEventListener('paste', (e) => {
     const pastedText = e.clipboardData.getData('text')
@@ -1910,14 +1947,18 @@ if (saveFollowKeywordsBtn) {
 
 // Check if current domain is Douyin-related
 function isDouyinDomain(domain) {
-  if (!domain) {return false}
+  if (!domain) {
+    return false
+  }
   const douyinDomains = ['douyin.com', 'www.douyin.com', 'iesdouyin.com']
   return douyinDomains.some((d) => domain === d || domain.endsWith('.' + d))
 }
 
 // Check if current domain is Bilibili-related
 function isBilibiliDomain(domain) {
-  if (!domain) {return false}
+  if (!domain) {
+    return false
+  }
   const biliDomains = ['bilibili.com', 'www.bilibili.com']
   return biliDomains.some((d) => domain === d || domain.endsWith('.' + d))
 }
@@ -1993,7 +2034,9 @@ async function loadBiliKeywords() {
  * Save Bilibili keywords to storage and notify content script
  */
 async function saveBiliKeywords() {
-  if (!biliNotInterestedKeywordsTextarea) {return}
+  if (!biliNotInterestedKeywordsTextarea) {
+    return
+  }
 
   // Only save keywords for Bilibili domains
   const domain = await getCurrentDomain()
@@ -2176,7 +2219,9 @@ function applyTheme(theme) {
 
 async function initThemeToggle() {
   const themeToggle = document.getElementById('theme-toggle')
-  if (!themeToggle) {return}
+  if (!themeToggle) {
+    return
+  }
 
   const result = await chrome.storage.local.get('theme')
   const savedTheme = result.theme || 'light'
@@ -2201,7 +2246,9 @@ const saveSelectorsBtn = document.getElementById('save-selectors-btn')
  */
 async function loadSelectorsEditor() {
   const domain = await getCurrentDomain()
-  if (!domain) {return}
+  if (!domain) {
+    return
+  }
 
   // 更新当前域名显示
   if (currentDomainName) {
@@ -2296,9 +2343,13 @@ function updateSelectorsCount(
  * 从编辑器解析选择器（每行一个）
  */
 function parseSelectorsFromEditor() {
-  if (!selectorsEditor) {return []}
+  if (!selectorsEditor) {
+    return []
+  }
   const text = selectorsEditor.value.trim()
-  if (!text) {return []}
+  if (!text) {
+    return []
+  }
 
   // 按换行分割，去重，过滤空行
   const lines = text
@@ -2313,7 +2364,9 @@ function parseSelectorsFromEditor() {
  */
 async function saveSelectors() {
   const domain = await getCurrentDomain()
-  if (!domain) {return}
+  if (!domain) {
+    return
+  }
 
   // 用户选择器（从编辑器读取）
   const userSelectors = parseSelectorsFromEditor()
@@ -2417,7 +2470,9 @@ if (selectorsEditor) {
   // 实时更新计数（需要重新获取默认和本地服务器选择器来计算总数）
   selectorsEditor.addEventListener('input', async () => {
     const domain = await getCurrentDomain()
-    if (!domain) {return}
+    if (!domain) {
+      return
+    }
 
     const defaultSelectors = await getDefaultHideSelectors()
     let localServerSelectors = []
@@ -2507,27 +2562,32 @@ function initNavigation() {
   showTab('home')
 }
 
-
 // ========== 通知中心 ==========（已在统一初始化中调用 initNotificationPanel）
 // 以下代码已废弃
 
 async function loadNotifications() {
   const list = document.getElementById('notification-list')
   const badge = document.getElementById('notification-badge')
-  if (!list) {return}
+  if (!list) {
+    return
+  }
 
   const result = await chrome.storage.local.get('notifications')
   const notifications = result.notifications || []
 
   if (notifications.length === 0) {
     list.innerHTML = '<div style="color: #999; text-align: center; padding: 20px;">暂无通知</div>'
-    if (badge) {badge.style.display = 'none'}
+    if (badge) {
+      badge.style.display = 'none'
+    }
     return
   }
 
   // 显示未读数量
   const unreadCount = notifications.filter((n) => !n.read).length
-  if (badge) {badge.style.display = unreadCount > 0 ? 'block' : 'none'}
+  if (badge) {
+    badge.style.display = unreadCount > 0 ? 'block' : 'none'
+  }
 
   list.innerHTML = notifications
     .map(
@@ -2548,7 +2608,9 @@ async function markNotificationsRead() {
   await chrome.storage.local.set({ notifications })
 
   const badge = document.getElementById('notification-badge')
-  if (badge) {badge.style.display = 'none'}
+  if (badge) {
+    badge.style.display = 'none'
+  }
 }
 
 // 添加通知（供其他模块调用）
@@ -2572,15 +2634,21 @@ const currentClipboardFilter = 'all'
 
 async function loadClipboardHistory(searchQuery = '', filter = 'all') {
   const list = document.getElementById('clipboard-list')
-  if (!list) {return}
+  if (!list) {
+    return
+  }
 
   const result = await chrome.storage.local.get('clipboardHistory')
   let history = result.clipboardHistory || []
 
   // 分类检测
   const categorize = (text) => {
-    if (/^https?:\/\//i.test(text)) {return 'url'}
-    if (/[\{\}\[\]\(\);=>]/.test(text) && text.includes('\n')) {return 'code'}
+    if (/^https?:\/\//i.test(text)) {
+      return 'url'
+    }
+    if (/[\{\}\[\]\(\);=>]/.test(text) && text.includes('\n')) {
+      return 'code'
+    }
     return 'text'
   }
 
@@ -2649,20 +2717,23 @@ function escapeRegex(string) {
 
 // 记录剪贴板内容（供content script调用）
 async function recordClipboard(text) {
-  if (!text || text.length > 1000) {return}
+  if (!text || text.length > 1000) {
+    return
+  }
 
   const result = await chrome.storage.local.get('clipboardHistory')
   const history = result.clipboardHistory || []
 
   // 去重
-  if (history.some((h) => h.text === text)) {return}
+  if (history.some((h) => h.text === text)) {
+    return
+  }
 
   history.unshift({ text, time: Date.now() })
   await chrome.storage.local.set({ clipboardHistory: history.slice(0, 20) })
 }
 
 // ========== 快捷键帮助面板 ==========（已在统一初始化中调用 initShortcutsHelp）
-
 
 // ========== 资源加速器控制 ==========
 async function initResourceAccelerator() {
@@ -2693,7 +2764,9 @@ async function initResourceAccelerator() {
   const qualityValueEl = document.getElementById('ra-quality-value')
   const settingsPanel = document.getElementById('ra-settings')
 
-  if (!enabledEl) {return}
+  if (!enabledEl) {
+    return
+  }
 
   // 检查当前站点是否被排除
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
@@ -2708,14 +2781,22 @@ async function initResourceAccelerator() {
   )
 
   enabledEl.checked = config.enabled
-  if (siteEnabledEl) {siteEnabledEl.checked = !isSiteExcluded}
+  if (siteEnabledEl) {
+    siteEnabledEl.checked = !isSiteExcluded
+  }
   jsReplaceEl.checked = config.jsReplace
   fontReplaceEl.checked = config.fontReplace
-  if (cssReplaceEl) {cssReplaceEl.checked = config.cssReplace !== false}
+  if (cssReplaceEl) {
+    cssReplaceEl.checked = config.cssReplace !== false
+  }
   imageLazyEl.checked = config.imageLazyLoad
   imageCompressEl.checked = config.imageCompress
-  if (preloadEl) {preloadEl.checked = config.preloadEnabled !== false}
-  if (dedupEl) {dedupEl.checked = config.dedupEnabled !== false}
+  if (preloadEl) {
+    preloadEl.checked = config.preloadEnabled !== false
+  }
+  if (dedupEl) {
+    dedupEl.checked = config.dedupEnabled !== false
+  }
   qualityEl.value = config.imageQuality * 100
   qualityValueEl.textContent = Math.round(config.imageQuality * 100)
   settingsPanel.style.display = config.enabled ? 'block' : 'none'
@@ -2735,7 +2816,9 @@ async function initResourceAccelerator() {
   // 站点级开关
   if (siteEnabledEl) {
     siteEnabledEl.addEventListener('change', async (e) => {
-      if (!config.excludeDomains) {config.excludeDomains = []}
+      if (!config.excludeDomains) {
+        config.excludeDomains = []
+      }
       if (!e.target.checked) {
         if (!config.excludeDomains.includes(currentHost)) {
           config.excludeDomains.push(currentHost)
@@ -2840,12 +2923,16 @@ async function initResourceAccelerator() {
       const isOpen = excludePanel.style.display !== 'none'
       excludePanel.style.display = isOpen ? 'none' : 'block'
       excludeToggle.textContent = isOpen ? '排除域名 ▼' : '排除域名 ▲'
-      if (!isOpen) {renderExcludeList()}
+      if (!isOpen) {
+        renderExcludeList()
+      }
     })
   }
 
   function renderExcludeList() {
-    if (!excludeList) {return}
+    if (!excludeList) {
+      return
+    }
     const domains = config.excludeDomains || []
     if (domains.length === 0) {
       excludeList.innerHTML = '<div style="color: #999;">暂无排除域名</div>'
@@ -2875,8 +2962,12 @@ async function initResourceAccelerator() {
   if (excludeAdd && excludeInput) {
     excludeAdd.addEventListener('click', async () => {
       const domain = excludeInput.value.trim()
-      if (!domain) {return}
-      if (!config.excludeDomains) {config.excludeDomains = []}
+      if (!domain) {
+        return
+      }
+      if (!config.excludeDomains) {
+        config.excludeDomains = []
+      }
       if (!config.excludeDomains.includes(domain)) {
         config.excludeDomains.push(domain)
         await saveAndNotify()
@@ -2902,7 +2993,9 @@ async function initResourceAccelerator() {
 
 function showCacheDetails(stats) {
   const listEl = document.getElementById('ra-details-list')
-  if (!listEl || !stats) {return}
+  if (!listEl || !stats) {
+    return
+  }
 
   document.getElementById('ra-details-panel').style.display = 'block'
 
@@ -2946,18 +3039,31 @@ async function loadResourceAcceleratorStats() {
   const totalReplacedEl = document.getElementById('ra-total-replaced')
   const dedupRemovedEl = document.getElementById('ra-dedup-removed')
 
-  if (jsCountEl) {jsCountEl.textContent = `(${stats.totalJsReplaced})`}
-  if (fontCountEl) {fontCountEl.textContent = `(${stats.totalFontsReplaced})`}
-  if (cssCountEl) {cssCountEl.textContent = `(${stats.totalCssReplaced || 0})`}
-  if (lazyCountEl) {lazyCountEl.textContent = `(${stats.totalImagesOptimized})`}
-  if (compressCountEl) {compressCountEl.textContent = `(${stats.totalImagesOptimized})`}
-  if (totalReplacedEl)
-    {totalReplacedEl.textContent =
+  if (jsCountEl) {
+    jsCountEl.textContent = `(${stats.totalJsReplaced})`
+  }
+  if (fontCountEl) {
+    fontCountEl.textContent = `(${stats.totalFontsReplaced})`
+  }
+  if (cssCountEl) {
+    cssCountEl.textContent = `(${stats.totalCssReplaced || 0})`
+  }
+  if (lazyCountEl) {
+    lazyCountEl.textContent = `(${stats.totalImagesOptimized})`
+  }
+  if (compressCountEl) {
+    compressCountEl.textContent = `(${stats.totalImagesOptimized})`
+  }
+  if (totalReplacedEl) {
+    totalReplacedEl.textContent =
       (stats.totalJsReplaced || 0) +
       (stats.totalFontsReplaced || 0) +
       (stats.totalCssReplaced || 0) +
-      (stats.totalImagesOptimized || 0)}
-  if (dedupRemovedEl) {dedupRemovedEl.textContent = stats.totalDedupRemoved || 0}
+      (stats.totalImagesOptimized || 0)
+  }
+  if (dedupRemovedEl) {
+    dedupRemovedEl.textContent = stats.totalDedupRemoved || 0
+  }
 }
 
 function notifyResourceAccelerator(config) {

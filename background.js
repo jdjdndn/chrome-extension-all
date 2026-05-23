@@ -193,7 +193,9 @@ function matchDomainScripts(tabUrl, baseAlreadyInjected = false) {
  */
 function getTabScriptCache(tabId) {
   const cached = _tabScriptCache.get(tabId)
-  if (!cached) {return null}
+  if (!cached) {
+    return null
+  }
   if (Date.now() - cached.timestamp > _tabScriptCacheMaxAge) {
     _tabScriptCache.delete(tabId)
     return null
@@ -856,7 +858,7 @@ function setupEventListeners() {
     if (message && message._aiAggregator) {
       console.log('[Background] 收到 AI 聚合器消息:', message.type)
       if (globalThis._aiAggregatorTabId) {
-        chrome.tabs.sendMessage(globalThis._aiAggregatorTabId, message).catch(e => {
+        chrome.tabs.sendMessage(globalThis._aiAggregatorTabId, message).catch((e) => {
           console.log('[Background] 转发 AI 消息失败:', e)
         })
       }
@@ -1248,7 +1250,9 @@ async function injectAllScriptsForTab(tabId, tabUrl) {
       hostname = cachedMatch.hostname
       if (baseAlreadyInjected) {
         // 基础脚本已注入，只需域名脚本
-        scriptsToInject = cachedMatch.scripts.filter((s) => !s.includes('core-bundle.js') && !s.includes('common-bundle.js'))
+        scriptsToInject = cachedMatch.scripts.filter(
+          (s) => !s.includes('core-bundle.js') && !s.includes('common-bundle.js')
+        )
       } else {
         scriptsToInject = [...cachedMatch.scripts]
       }
@@ -1259,7 +1263,9 @@ async function injectAllScriptsForTab(tabId, tabUrl) {
       hostname = url.hostname
       const matchResult = matchDomainScripts(tabUrl, baseAlreadyInjected)
       scriptsToInject = matchResult.scripts
-      console.log(`[Background] tabId=${tabId} 缓存未命中，实时匹配, 脚本数: ${scriptsToInject.length}`)
+      console.log(
+        `[Background] tabId=${tabId} 缓存未命中，实时匹配, 脚本数: ${scriptsToInject.length}`
+      )
     }
 
     if (scriptsToInject.length === 0) {
@@ -1274,6 +1280,37 @@ async function injectAllScriptsForTab(tabId, tabUrl) {
     const domainScriptsToInject = scriptsToInject.filter(
       (s) => s !== 'content/core-bundle.js' && s !== 'content/common-bundle.js'
     )
+
+    // 预写 popup 写入但 content 同步读 localStorage 的状态到页面 localStorage
+    // 原因：popup origin 与宿主页面 origin 隔离，两个 localStorage 不互通，
+    //       必须由 background 桥接才能让 common 脚本的同步入口检查读到正确值。
+    // 当前桥接键：
+    //   - scriptSwitches  (content/common/script-switch.js)
+    //   - widenPageWidth  (content/common/widen-page.js 首次注入读取)
+    if (baseScriptsToInject.includes('content/common-bundle.js')) {
+      try {
+        const bridge = await chrome.storage.local.get(['scriptSwitches', 'widenPageWidth'])
+        if (bridge.scriptSwitches || bridge.widenPageWidth != null) {
+          await chrome.scripting.executeScript({
+            target: { tabId },
+            world: 'ISOLATED',
+            func: (b) => {
+              try {
+                if (b.scriptSwitches) {
+                  localStorage.setItem('scriptSwitches', JSON.stringify(b.scriptSwitches))
+                }
+                if (b.widenPageWidth != null) {
+                  localStorage.setItem('widenPageWidth', String(b.widenPageWidth))
+                }
+              } catch {}
+            },
+            args: [bridge],
+          })
+        }
+      } catch (e) {
+        console.warn('[Background] 预写 popup→content 桥接键失败:', e)
+      }
+    }
 
     // 并行注入基础脚本（core-bundle.js 和 common-bundle.js 互相独立）
     if (baseScriptsToInject.length > 0) {
@@ -1293,7 +1330,9 @@ async function injectAllScriptsForTab(tabId, tabUrl) {
       )
       await Promise.all(basePromises)
       const baseDuration = (performance.now() - baseStartTime).toFixed(1)
-      console.log(`[Background] 基础脚本并行注入完成, 耗时: ${baseDuration}ms, 脚本数: ${baseScriptsToInject.length}`)
+      console.log(
+        `[Background] 基础脚本并行注入完成, 耗时: ${baseDuration}ms, 脚本数: ${baseScriptsToInject.length}`
+      )
     }
 
     // 域名脚本也并行注入（各脚本有自己的防重复加载机制）
@@ -1314,13 +1353,15 @@ async function injectAllScriptsForTab(tabId, tabUrl) {
       )
       await Promise.all(domainPromises)
       const domainDuration = (performance.now() - domainStartTime).toFixed(1)
-      console.log(`[Background] 域名脚本并行注入完成, 耗时: ${domainDuration}ms, 脚本数: ${domainScriptsToInject.length}`)
+      console.log(
+        `[Background] 域名脚本并行注入完成, 耗时: ${domainDuration}ms, 脚本数: ${domainScriptsToInject.length}`
+      )
     }
 
     const totalDuration = (performance.now() - injectStartTime).toFixed(1)
     console.log(
       `[Background] 标签页 ${tabId} (${hostname}) 脚本注入完成, ` +
-      `总耗时: ${totalDuration}ms, 总脚本数: ${scriptsToInject.length}`
+        `总耗时: ${totalDuration}ms, 总脚本数: ${scriptsToInject.length}`
     )
 
     // 注入完成，清除缓存（下次导航会重新预解析）
@@ -2763,11 +2804,11 @@ self.addEventListener('activate', () => {
 // ========== Popup 预热机制 ==========
 // 预加载关键数据到内存，加速 Popup 打开速度
 const _popupPreheatCache = {
-  settings: null,           // 设置缓存
-  blockedDomains: null,     // 阻断域名缓存
-  currentTabDomain: null,   // 当前 tab 域名
-  currentTabId: null,       // 当前 tab ID
-  timestamp: 0,             // 缓存时间戳
+  settings: null, // 设置缓存
+  blockedDomains: null, // 阻断域名缓存
+  currentTabDomain: null, // 当前 tab 域名
+  currentTabId: null, // 当前 tab ID
+  timestamp: 0, // 缓存时间戳
 }
 
 // 预热有效期（ms）
@@ -2791,7 +2832,10 @@ async function preheatPopupData() {
     _popupPreheatCache.settings = {
       enabled: settings.enabled !== false,
       debugMode: settings.debugMode || false,
-      domainBlockedData: settings.domainBlockedData || { blockedDomains: {}, blockedResponseDomains: {} },
+      domainBlockedData: settings.domainBlockedData || {
+        blockedDomains: {},
+        blockedResponseDomains: {},
+      },
     }
 
     // 缓存统计数据

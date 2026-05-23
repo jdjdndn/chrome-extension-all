@@ -1164,7 +1164,9 @@
 
     injectCustomStyles()
     // 异步加载设置，错误时使用默认值
-    loadDomainHideSettings().catch((err) => logger.error('加载设置失败:', err))
+    loadDomainHideSettings().catch((err) =>
+      logger.error('[抖音脚本] 加载隐藏设置失败（已暴露根因）:', err)
+    )
     registerBlockedDomains().catch((err) => logger.error('注册域名失败:', err))
     TimerManager.register(setVideoTime())
     loopFunc(processCurrentVideo)

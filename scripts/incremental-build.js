@@ -73,6 +73,34 @@ function computeBufferHash(buffer) {
   return crypto.createHash('md5').update(buffer).digest('hex')
 }
 
+// ========== mtime 守卫 ==========
+// 防御：若 bundle 输出文件 mtime 早于其任一依赖源文件 mtime，缓存视为 stale，强制重建。
+// 解决"改了源码但 esbuild metafile 缓存命中导致 bundle 不更新"的隐患。
+function getMtime(filePath) {
+  try {
+    return fs.statSync(filePath).mtimeMs
+  } catch {
+    return 0
+  }
+}
+
+function isBundleStaleByMtime(bundle) {
+  const outPath = resolvePath(bundle.outfile)
+  if (!fs.existsSync(outPath)) {return true}
+  const outMtime = getMtime(outPath)
+  const deps = BuildCache.bundleDependencies.get(bundle.name)
+  if (!deps || deps.size === 0) {return true}
+  for (const dep of deps) {
+    if (getMtime(dep) > outMtime) {
+      if (CONFIG.debug) {
+        console.log(`[Incremental] mtime stale: ${bundle.name} <- ${dep}`)
+      }
+      return true
+    }
+  }
+  return false
+}
+
 // ========== 缓存持久化 ==========
 function loadCache() {
   try {
@@ -288,6 +316,18 @@ async function incrementalBuild(bundles, buildFn) {
     }
   }
 
+  // mtime 守卫：检测 bundle 输出旧于其依赖的情况（防御 metafile 缓存吞改动）
+  const staleByMtimeBundles = new Set()
+  for (const bundle of bundles) {
+    if (missingOutputBundles.has(bundle.name)) {continue}
+    if (isBundleStaleByMtime(bundle)) {
+      staleByMtimeBundles.add(bundle.name)
+    }
+  }
+  if (staleByMtimeBundles.size > 0) {
+    console.log(`[Incremental] mtime 失效: ${Array.from(staleByMtimeBundles).join(', ')}`)
+  }
+
   // 如果有输出文件缺失，输出日志
   if (missingOutputBundles.size > 0) {
     console.log(`[Incremental] 输出文件缺失: ${Array.from(missingOutputBundles).join(', ')}`)
@@ -303,24 +343,32 @@ async function incrementalBuild(bundles, buildFn) {
 
   // 构建受影响的 bundle
   for (const bundle of bundles) {
-    // 检查是否需要构建：有变化 或 输出缺失 或 需要分析依赖
+    // 检查是否需要构建：有变化 或 输出缺失 或 需要分析依赖 或 mtime 失效
     const needsBuild =
       affectedBundles.includes(bundle.name) ||
       needAnalyzeDependencies.has(bundle.name) ||
-      missingOutputBundles.has(bundle.name)
+      missingOutputBundles.has(bundle.name) ||
+      staleByMtimeBundles.has(bundle.name)
 
     if (needsBuild) {
       try {
         const buildStart = Date.now()
-        await buildFn(bundle)
+        const realDeps = await buildFn(bundle)
         const buildDuration = Date.now() - buildStart
 
         results.rebuilt.push(bundle.name)
 
-        // 更新 bundle 依赖
+        // 更新 bundle 依赖（优先使用 esbuild metafile 返回的真实依赖）
         const entryPath = resolvePath(bundle.entry)
-        const dependencies = new Set([entryPath])
+        const dependencies = new Set(
+          Array.isArray(realDeps) && realDeps.length > 0 ? realDeps : [entryPath]
+        )
         BuildCache.bundleDependencies.set(bundle.name, dependencies)
+        // 同步把所有依赖的 hash 记入 fileHashes，下次才能检出变化
+        for (const dep of dependencies) {
+          const h = computeFileHash(dep)
+          if (h) {BuildCache.fileHashes.set(dep, h)}
+        }
 
         // 更新输出 hash
         const outPath = resolvePath(bundle.outfile)
@@ -330,7 +378,9 @@ async function incrementalBuild(bundles, buildFn) {
         }
 
         if (CONFIG.debug) {
-          console.log(`[Incremental] 构建完成: ${bundle.name} (${buildDuration}ms)`)
+          console.log(
+            `[Incremental] 构建完成: ${bundle.name} (${buildDuration}ms, deps=${dependencies.size})`
+          )
         }
       } catch (err) {
         results.errors.push({ bundle: bundle.name, error: err.message })
@@ -368,20 +418,21 @@ async function fullBuild(bundles, buildFn, results) {
   for (const bundle of bundles) {
     try {
       const buildStart = Date.now()
-      await buildFn(bundle)
+      const realDeps = await buildFn(bundle)
       const buildDuration = Date.now() - buildStart
 
       results.rebuilt.push(bundle.name)
 
-      // 记录文件 hash
+      // 记录依赖（优先 esbuild metafile）
       const entryPath = resolvePath(bundle.entry)
-      if (fs.existsSync(entryPath)) {
-        BuildCache.fileHashes.set(entryPath, computeFileHash(entryPath))
-      }
-
-      // 记录依赖
-      const dependencies = new Set([entryPath])
+      const dependencies = new Set(
+        Array.isArray(realDeps) && realDeps.length > 0 ? realDeps : [entryPath]
+      )
       BuildCache.bundleDependencies.set(bundle.name, dependencies)
+      for (const dep of dependencies) {
+        const h = computeFileHash(dep)
+        if (h) {BuildCache.fileHashes.set(dep, h)}
+      }
 
       // 记录输出 hash
       const outPath = resolvePath(bundle.outfile)
@@ -391,7 +442,9 @@ async function fullBuild(bundles, buildFn, results) {
       }
 
       if (CONFIG.debug) {
-        console.log(`[Incremental] 全量构建: ${bundle.name} (${buildDuration}ms)`)
+        console.log(
+          `[Incremental] 全量构建: ${bundle.name} (${buildDuration}ms, deps=${dependencies.size})`
+        )
       }
     } catch (err) {
       results.errors.push({ bundle: bundle.name, error: err.message })

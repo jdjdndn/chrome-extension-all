@@ -203,7 +203,9 @@ function handleLinkClick(event) {
 // ========== 初始化 ==========
 function init() {
   // 异步加载设置，错误时使用默认值
-  loadDomainHideSettings().catch((err) => console.error('[Pornhub脚本] 加载设置失败:', err))
+  loadDomainHideSettings().catch((err) =>
+    console.error('[Pornhub脚本] 加载隐藏设置失败（已暴露根因）:', err)
+  )
   registerBlockedDomains().catch((err) => console.error('[Pornhub脚本] 注册域名失败:', err))
 
   // 在捕获阶段处理链接点击

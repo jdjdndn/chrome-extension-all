@@ -52,8 +52,6 @@
     // 返回默认值
     return DEFAULT_SWITCHES[scriptName] !== false
   }
-
-  // 异步获取开关状态（从 chrome.storage）
   window.getScriptSwitchAsync = async function (scriptName) {
     try {
       const result = await chrome.storage.local.get(STORAGE_KEY)
@@ -132,6 +130,19 @@
     'tab-focus': 'Tab激活自动聚焦',
     'list-link-split-view': '列表链接拆分视图',
   }
+
+  // 监听 chrome.storage 变化，运行中改开关也能即时同步缓存与 localStorage
+  try {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== 'local' || !changes[STORAGE_KEY]) {return}
+      const next = changes[STORAGE_KEY].newValue || {}
+      cachedSwitches = next
+      cacheExpiry = Date.now() + CACHE_TTL
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+      } catch {}
+    })
+  } catch {}
 
   console.log('[ScriptSwitch] 脚本开关模块已加载')
 })()

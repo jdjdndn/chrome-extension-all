@@ -17,22 +17,42 @@ if (window.ScriptLoader) {
 
 function initTabFocus() {
   if (window.TabFocusLoaded) {
-    console.log('[通用脚本] Tab焦点激活已加载，跳过')
     return
   }
 
-  if (!window.getScriptSwitch || !window.getScriptSwitch('tab-focus')) {
-    console.log('[通用脚本] Tab焦点激活已禁用')
-    return
+  const handler = () => {
+    if (document.visibilityState === 'visible') {
+      window.focus()
+    }
+  }
+
+  function enable() {
+    if (window._ycTabFocusActive) {return}
+    document.addEventListener('visibilitychange', handler)
+    window._ycTabFocusActive = true
+  }
+  function disable() {
+    if (!window._ycTabFocusActive) {return}
+    document.removeEventListener('visibilitychange', handler)
+    window._ycTabFocusActive = false
   }
 
   window.TabFocusLoaded = true
 
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-      window.focus()
-    }
-  })
+  if (!window.getScriptSwitch || !window.getScriptSwitch('tab-focus')) {
+    console.log('[通用脚本] Tab焦点激活已禁用')
+  } else {
+    enable()
+    console.log('[通用脚本] Tab焦点激活已加载')
+  }
 
-  console.log('[通用脚本] Tab焦点激活已加载')
+  // 运行时热切换
+  try {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== 'local' || !changes.scriptSwitches) {return}
+      const next = changes.scriptSwitches.newValue || {}
+      if (next['tab-focus'] === false) {disable()}
+      else {enable()}
+    })
+  } catch {}
 }

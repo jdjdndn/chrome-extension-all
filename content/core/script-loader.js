@@ -226,15 +226,21 @@
 
   /**
    * 安全执行回调
+   * 修复：除了 log 外，把错误以 rejected Promise 形式返回，让上层调用者（如 declare 返回的 Promise）可观测失败
    */
   function safeExecute(name, callback) {
     try {
       const result = callback()
       if (result instanceof Promise) {
-        result.catch((err) => log(`脚本 "${name}" 执行错误: ${err.message}`, 'error'))
+        return result.catch((err) => {
+          log(`脚本 "${name}" 执行错误: ${err.message}`, 'error')
+          throw err
+        })
       }
+      return Promise.resolve(result)
     } catch (err) {
       log(`脚本 "${name}" 执行错误: ${err.message}`, 'error')
+      return Promise.reject(err)
     }
   }
 
@@ -242,7 +248,9 @@
    * 日志输出
    */
   function log(message, level = 'info') {
-    if (!state.debugMode && level !== 'error') {return}
+    if (!state.debugMode && level !== 'error') {
+      return
+    }
 
     const prefix = '[ScriptLoader]'
     switch (level) {
@@ -307,7 +315,9 @@
        * 执行队列中的所有初始化调用
        */
       async process() {
-        if (isProcessing || queue.length === 0) {return}
+        if (isProcessing || queue.length === 0) {
+          return
+        }
 
         isProcessing = true
         log(`队列 "${queueName}" 开始处理，共 ${queue.length} 项`)

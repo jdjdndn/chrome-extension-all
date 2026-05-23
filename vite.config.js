@@ -15,6 +15,71 @@ import { execSync } from 'child_process'
 // 增量构建模块
 import { incrementalBuild, clearCache, getStats } from './scripts/incremental-build.js'
 
+// ========== Build Assertions ==========
+// 声明"源码改了什么必须出现在哪个产物里"，构建末尾自动校验
+// 失败即构建退出非 0，杜绝"改了源码但 dist 未更新"的静默失败
+// 用法：在 BUILD_ASSERTIONS 中追加 { src, needle, dist } 即可
+const BUILD_ASSERTIONS = [
+  // bili 站点核心
+  { src: 'content/bili.js', needle: 'biliSite.init()', dist: 'content/bundled/bili.bundle.js' },
+  {
+    src: 'content/core/site-base.js',
+    needle: 'state.initialized',
+    dist: 'content/bundled/bili.bundle.js',
+  },
+  {
+    src: 'content/core/script-loader.js',
+    needle: 'return Promise.reject',
+    dist: 'content/core-bundle.js',
+  },
+]
+
+// esbuild 默认把非 ASCII 字符转 \uXXXX，grep 字面会假阴性，需双形式比对
+function toUnicodeEscape(s) {
+  let out = ''
+  for (const ch of s) {
+    const cp = ch.codePointAt(0)
+    out += cp < 128 ? ch : '\\u' + cp.toString(16).toUpperCase().padStart(4, '0')
+  }
+  return out
+}
+
+function runBuildAssertions(distRoot) {
+  const failures = []
+  for (const { src, needle, dist } of BUILD_ASSERTIONS) {
+    const srcPath = resolve(src)
+    const distPath = resolve(distRoot, dist)
+    if (!existsSync(srcPath)) {
+      failures.push(`源码缺失: ${src}`)
+      continue
+    }
+    if (!existsSync(distPath)) {
+      failures.push(`产物缺失: ${dist}（src=${src}）`)
+      continue
+    }
+    const srcMtime = require('fs').statSync(srcPath).mtimeMs
+    const distMtime = require('fs').statSync(distPath).mtimeMs
+    if (srcMtime > distMtime) {
+      failures.push(
+        `mtime 失效: ${dist} 旧于 ${src}（缓存吞改动；rm node_modules/.cache/build-cache.json && FULL_BUILD=true npm run build）`
+      )
+      continue
+    }
+    const content = readFileSync(distPath, 'utf-8')
+    const literal = content.includes(needle)
+    const escaped = !literal && content.includes(toUnicodeEscape(needle))
+    if (!literal && !escaped) {
+      failures.push(`grep 未命中: "${needle}" 应在 ${dist}（src=${src}）`)
+    }
+  }
+  if (failures.length > 0) {
+    console.error('[BuildAssert] ❌ 验证失败:')
+    for (const f of failures) console.error('  - ' + f)
+    throw new Error(`[BuildAssert] ${failures.length} 项断言失败，构建中止`)
+  }
+  console.log(`[BuildAssert] ✅ ${BUILD_ASSERTIONS.length} 项断言全部通过`)
+}
+
 // ========== Environment Variables Auto-Injection ==========
 // 支持从命令行参数或环境变量注入配置
 // 用法: HOT_RELOAD=true npm run build
@@ -222,7 +287,7 @@ async function buildContentScripts(dist) {
     const outfile = resolve(dist, bundle.outfile)
     mkdirSync(resolve(outfile, '..'), { recursive: true })
 
-    await esbuildBuild({
+    const result = await esbuildBuild({
       entryPoints: [entry],
       bundle: true,
       format: 'iife',
@@ -230,8 +295,11 @@ async function buildContentScripts(dist) {
       target: ['chrome100'],
       sourcemap: true,
       minify: false,
+      metafile: true,
       define: { 'process.env.NODE_ENV': '"production"' },
     })
+    // 返回真实依赖列表，供增量缓存记录
+    return Object.keys(result.metafile?.inputs || {}).map((p) => resolve(p))
   }
 
   // 准备 bundle 配置（调整路径）
@@ -316,6 +384,13 @@ function chromeExtensionPlugin() {
       copyAllToDist(dist)
       await buildContentScripts(dist)
 
+      // 校验所有 dynamic import 目标已部署到 dist
+      try {
+        execSync('node scripts/verify-dynamic-imports.js', { stdio: 'inherit' })
+      } catch {
+        throw new Error('[Build] dynamic import 校验失败，构建中止')
+      }
+
       // 热重载支持（根据环境变量自动注入）
       if (ENV_CONFIG.HOT_RELOAD) {
         const manifestPath = resolve(dist, 'manifest.json')
@@ -366,6 +441,15 @@ function chromeExtensionPlugin() {
     },
 
     closeBundle() {
+      // Build Assertions：产物必含关键源码字符串 + mtime 新于源码
+      // 失败即抛错让 vite build 退出非 0
+      try {
+        runBuildAssertions(resolve('dist'))
+      } catch (err) {
+        console.error(err.message)
+        throw err
+      }
+
       // 构建完成后通知热重载服务器（非阻塞，不影响 Vite watch 模式）
       if (ENV_CONFIG.HOT_RELOAD) {
         notifyHotReloadServer().catch(() => {})

@@ -36,6 +36,7 @@
         blockedDomains = [],
         localServerEnabled = true,
         localServerUrl = 'http://localhost:3000',
+        debug = false,
       } = options
 
       this.domain = domain
@@ -44,6 +45,7 @@
       this.blockedDomains = [...blockedDomains]
       this.localServerEnabled = localServerEnabled
       this.localServerUrl = localServerUrl
+      this.debug = debug
 
       // 状态
       this.state = {
@@ -54,6 +56,12 @@
 
       // 防止重复初始化
       this.initKey = `${domain}_site_loaded`
+
+      if (this.debug) {
+        console.log(
+          `[SiteBase:${this.domain}] 构造完成 initKey=${this.initKey}, alreadySet=${!!window[this.initKey]}`
+        )
+      }
     }
 
     /**
@@ -77,11 +85,11 @@
         // 2. 注册阻止域名
         await this.registerBlockedDomains()
 
-        // 3. 加载设置
-        await this.loadSettings()
-
-        // 4. 自定义初始化
+        // 3. 自定义初始化（先执行，让子类准备 defaultSelectors）
         await this.customInit()
+
+        // 4. 加载设置（依赖 defaultSelectors 已就绪）
+        await this.loadSettings()
 
         // 5. 应用隐藏元素
         await this.applyHideElements()
@@ -118,7 +126,9 @@
      * 注册阻止域名到 Background
      */
     async registerBlockedDomains() {
-      if (this.blockedDomains.length === 0) {return}
+      if (this.blockedDomains.length === 0) {
+        return
+      }
 
       try {
         // 优先使用 Services
@@ -202,11 +212,15 @@
      * 从本地服务器加载数据
      */
     async loadFromServer(path) {
-      if (!this.state.localServerAvailable) {return null}
+      if (!this.state.localServerAvailable) {
+        return null
+      }
 
       try {
         const response = await fetch(`${this.localServerUrl}/api/data/${path}/${this.domain}`)
-        if (!response.ok) {return null}
+        if (!response.ok) {
+          return null
+        }
 
         const data = await response.json()
         return data?.success ? data.data : null
@@ -219,7 +233,9 @@
      * 保存数据到本地服务器
      */
     async saveToServer(path, data) {
-      if (!this.state.localServerAvailable) {return false}
+      if (!this.state.localServerAvailable) {
+        return false
+      }
 
       try {
         const response = await fetch(`${this.localServerUrl}/api/data/${path}/${this.domain}`, {

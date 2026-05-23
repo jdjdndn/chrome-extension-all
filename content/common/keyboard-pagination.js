@@ -30,24 +30,19 @@ if (window.KeyboardPaginationLoaded) {
         hintDuration: 2000,
       }
 
-      // 常见分页按钮选择器
+      // 常见分页按钮选择器（仅保留语义明确的"分页/章节"标识，避免误把
+      // 普通"下一个/上一个"按钮当成翻页）
       this.selectors = {
         prev: [
-          // 通用上一页
+          // 标准语义
           'a[rel="prev"]',
           'link[rel="prev"]',
-          '[class*="prev"]:not([class*="preview"])',
-          '[class*="Prev"]:not([class*="Preview"])',
-          '[class*="previous"]',
-          '[class*="Previous"]',
-          '[class*="pre-page"]',
-          '[class*="prePage"]',
           '[aria-label*="上一页"]',
           '[aria-label*="Previous"]',
           '[title*="上一页"]',
           '[title*="Previous"]',
-          'a:has(.arrow-left)',
-          'button:has(.arrow-left)',
+
+          // 明确含 "page/pagination" 语义
           '.pagination-prev',
           '.pager-prev',
           '.page-prev',
@@ -59,20 +54,14 @@ if (window.KeyboardPaginationLoaded) {
           '.el-pagination .prev',
           '[data-page="prev"]',
           'nav[aria-label*="pagination"] a:first-child',
-
-          // 中文网站
-          '.page-pre',
-          '.pre',
-          '.pre-btn',
-          '.btn-pre',
-          '.btn-prev',
-          '.prev-btn',
-          'a.prev',
-          'button.prev',
           '.layui-laypage-prev',
           '.laypage-prev',
 
-          // 漫画/小说网站
+          // 明确含 "btn" 后缀（class 名而非任意元素）
+          '.btn-prev',
+          '.prev-btn',
+
+          // 漫画/小说/阅读器章节类
           '.comic-prev',
           '.chapter-prev',
           '.manga-prev',
@@ -84,29 +73,25 @@ if (window.KeyboardPaginationLoaded) {
           '.btn-prev-chapter',
           '.btn-prev-page',
 
-          // 电商平台
+          // 电商
           '.j-prev',
           '.ui-page-prev',
           '.pager .prev',
 
-          // 社交媒体
+          // 社交媒体（明确 testid）
           '[data-testid="prev-button"]',
           '[data-testid="pagination-prev"]',
         ],
         next: [
-          // 通用下一页
+          // 标准语义
           'a[rel="next"]',
           'link[rel="next"]',
-          '[class*="next"]:not([class*="textarea"])',
-          '[class*="Next"]:not([class*="Textarea"])',
-          '[class*="next-page"]',
-          '[class*="nextPage"]',
           '[aria-label*="下一页"]',
           '[aria-label*="Next"]',
           '[title*="下一页"]',
           '[title*="Next"]',
-          'a:has(.arrow-right)',
-          'button:has(.arrow-right)',
+
+          // 明确含 "page/pagination" 语义
           '.pagination-next',
           '.pager-next',
           '.page-next',
@@ -118,18 +103,14 @@ if (window.KeyboardPaginationLoaded) {
           '.el-pagination .next',
           '[data-page="next"]',
           'nav[aria-label*="pagination"] a:last-child',
-
-          // 中文网站
-          '.page-next',
-          '.next',
-          '.next-btn',
-          '.btn-next',
-          'a.next',
-          'button.next',
           '.layui-laypage-next',
           '.laypage-next',
 
-          // 漫画/小说网站
+          // 明确含 "btn" 后缀
+          '.btn-next',
+          '.next-btn',
+
+          // 漫画/小说/阅读器章节类
           '.comic-next',
           '.chapter-next',
           '.manga-next',
@@ -141,7 +122,7 @@ if (window.KeyboardPaginationLoaded) {
           '.btn-next-chapter',
           '.btn-next-page',
 
-          // 电商平台
+          // 电商
           '.j-next',
           '.ui-page-next',
           '.pager .next',
@@ -194,33 +175,175 @@ if (window.KeyboardPaginationLoaded) {
     }
 
     init() {
+      // 分页容器存在性闸：页面上完全没有"分页语义"节点 → 不绑定任何事件、不注入样式。
+      // SPA 场景由轻量 popstate/hashchange 兜底（仅重新探测+按需绑定，初次不绑）。
+      if (!this.hasPaginationSemantics()) {
+        this._setupSPAReinitGuard()
+        return
+      }
+
       this.detectPagination()
+
+      // 探测后若仍未找到任一按钮 → 同样不绑全局 keydown。
+      if (!this.prevButton && !this.nextButton) {
+        this._setupSPAReinitGuard()
+        return
+      }
+
       this.bindEvents()
       this.createHint()
       this.injectStyles()
 
-      if (this.prevButton || this.nextButton) {
-        console.log('[键盘翻页] 检测到分页按钮', {
-          prev: this.prevButton ? this.getButtonInfo(this.prevButton) : null,
-          next: this.nextButton ? this.getButtonInfo(this.nextButton) : null,
-        })
+      console.log('[键盘翻页] 检测到分页按钮', {
+        prev: this.prevButton ? this.getButtonInfo(this.prevButton) : null,
+        next: this.nextButton ? this.getButtonInfo(this.nextButton) : null,
+      })
+    }
+
+    // 单源真相：闸用 this.selectors 的并集，避免与 detectPagination 出现死路径
+    hasPaginationSemantics() {
+      try {
+        const all = this.selectors.prev.concat(this.selectors.next).join(',')
+        if (document.querySelector(all)) {
+          return true
+        }
+      } catch (_e) {
+        // 个别站点带不支持的伪类，降级到逐条尝试
+        for (const selector of this.selectors.prev.concat(this.selectors.next)) {
+          try {
+            if (document.querySelector(selector)) {
+              return true
+            }
+          } catch (_e2) {
+            /* ignore */
+          }
+        }
       }
+      // 额外探：明确的分页容器（容器存在即视作语义命中）
+      const containers = [
+        '.pagination',
+        '.pager',
+        '.ant-pagination',
+        '.el-pagination',
+        '.layui-laypage',
+        'nav[aria-label*="pagination"]',
+        'nav[aria-label*="分页"]',
+      ]
+      for (const selector of containers) {
+        try {
+          if (document.querySelector(selector)) {
+            return true
+          }
+        } catch (_e) {
+          /* ignore */
+        }
+      }
+      return false
+    }
+
+    // SPA 兜底：URL 变化 + 一次性 DOM 注入观察（命中即解绑），覆盖
+    // "切 Tab 不改 URL，仅注入分页 DOM" 的场景（B站动态、知乎评论分页等）。
+    _setupSPAReinitGuard() {
+      if (this._spaGuardBound) {
+        return
+      }
+      this._spaGuardBound = true
+
+      const tryReinit = () => {
+        if (this._eventsBound) {
+          return // 已经绑过事件，无需再走 init
+        }
+        if (!this.hasPaginationSemantics()) {
+          return
+        }
+        this.detectPagination()
+        if (this.prevButton || this.nextButton) {
+          this.bindEvents()
+          this.createHint()
+          this.injectStyles()
+          console.log('[键盘翻页] 兜底激活：检测到分页按钮')
+        }
+      }
+
+      const debounced = () => {
+        clearTimeout(this._spaReinitTimer)
+        this._spaReinitTimer = setTimeout(tryReinit, 1500)
+      }
+
+      window.addEventListener('popstate', debounced)
+      window.addEventListener('hashchange', debounced)
+
+      // 一次性 DOM 注入观察：30s TTL，命中 nav/分页类即解绑
+      const domTtl = 30000
+      const filter = (mutation) => {
+        if (mutation.type !== 'childList' || mutation.addedNodes.length === 0) {
+          return false
+        }
+        for (const node of mutation.addedNodes) {
+          if (node.nodeType !== 1) {
+            continue
+          }
+          if (node.tagName === 'NAV') {
+            return true
+          }
+          const cls = node.className && typeof node.className === 'string' ? node.className : ''
+          if (/pagination|pager|chapter|reader|laypage/i.test(cls)) {
+            return true
+          }
+          if (node.querySelector?.('nav, [class*="pagination"], [class*="pager"]')) {
+            return true
+          }
+        }
+        return false
+      }
+
+      const onDOMChange = () => {
+        clearTimeout(this._spaReinitTimer)
+        this._spaReinitTimer = setTimeout(tryReinit, 800)
+      }
+
+      if (window.UnifiedDOMWatcher) {
+        this._spaUnsubscribe = window.UnifiedDOMWatcher.subscribe(onDOMChange, {
+          priority: window.UnifiedDOMWatcher.Priority.LOW,
+          name: 'KeyboardPagination-SPA',
+          filter,
+        })
+      } else {
+        this._spaObserver = new MutationObserver((mutations) => {
+          for (const m of mutations) {
+            if (filter(m)) {
+              onDOMChange()
+              return
+            }
+          }
+        })
+        this._spaObserver.observe(document.body, { childList: true, subtree: true })
+      }
+
+      // TTL 到期解绑兜底（永驻 MutationObserver 是性能负担）
+      setTimeout(() => {
+        if (this._spaUnsubscribe) {
+          this._spaUnsubscribe()
+          this._spaUnsubscribe = null
+        }
+        if (this._spaObserver) {
+          this._spaObserver.disconnect()
+          this._spaObserver = null
+        }
+      }, domTtl)
     }
 
     detectPagination() {
-      // 尝试通过选择器检测
+      // 1) 语义明确的选择器
       this.prevButton = this.findElement('prev')
       this.nextButton = this.findElement('next')
 
-      // 如果选择器没找到，尝试通过文本检测
-      if (!this.prevButton || !this.nextButton) {
-        this.detectByText()
-      }
-
-      // 如果还是没找到，尝试检测分页容器
+      // 2) 在明确的分页容器内推断（容器本身就是分页语义，可放宽到首/末元素）
       if (!this.prevButton || !this.nextButton) {
         this.detectInPaginationContainer()
       }
+      // 已移除：detectByText —— 全站 a/button 文本扫描会把任意"next/上一个"
+      // 按钮误判为翻页按钮，导致没有分页组件的页面也响应左右键。
     }
 
     findElement(type) {
@@ -240,42 +363,6 @@ if (window.KeyboardPaginationLoaded) {
         }
       }
       return null
-    }
-
-    detectByText() {
-      const links = document.querySelectorAll('a, button')
-      const patterns = {
-        prev: this.textPatterns.prev,
-        next: this.textPatterns.next,
-      }
-
-      links.forEach((link) => {
-        const text = (link.textContent || link.innerText || '').trim().toLowerCase()
-        const title = (link.title || link.getAttribute('aria-label') || '').toLowerCase()
-        const combined = `${text} ${title}`.toLowerCase()
-
-        if (!this.prevButton) {
-          for (const pattern of patterns.prev) {
-            if (combined.includes(pattern.toLowerCase())) {
-              if (this.isValidButton(link, 'prev')) {
-                this.prevButton = link
-                break
-              }
-            }
-          }
-        }
-
-        if (!this.nextButton) {
-          for (const pattern of patterns.next) {
-            if (combined.includes(pattern.toLowerCase())) {
-              if (this.isValidButton(link, 'next')) {
-                this.nextButton = link
-                break
-              }
-            }
-          }
-        }
-      })
     }
 
     detectInPaginationContainer() {
@@ -397,6 +484,11 @@ if (window.KeyboardPaginationLoaded) {
     }
 
     bindEvents() {
+      // SPA 兜底场景会二次调用 init() → bindEvents()，必须幂等
+      if (this._eventsBound) {
+        return
+      }
+      this._eventsBound = true
       this._keydownHandler = (e) => {
         // 忽略输入框中的按键
         if (this.isInputFocused()) {
@@ -445,13 +537,8 @@ if (window.KeyboardPaginationLoaded) {
       // 监听 DOM 变化，重新检测分页按钮
       this._setupDOMWatch()
 
-      // SPA URL 变化时重新检测分页按钮
-      this._popstateHandler = () => {
-        clearTimeout(this._detectTimer)
-        this._detectTimer = setTimeout(() => this.detectPagination(), 1500)
-      }
-      window.addEventListener('popstate', this._popstateHandler)
-      window.addEventListener('hashchange', this._popstateHandler)
+      // SPA URL/DOM 兜底统一交给 _setupSPAReinitGuard（init 路径会调用一次）
+      // 此处不再绑 popstate/hashchange，避免与兜底重复双绑。
     }
 
     /**

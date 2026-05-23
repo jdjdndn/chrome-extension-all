@@ -61,6 +61,7 @@
           blockedDomains: [],
           localServerEnabled: true,
           localServerUrl: 'http://localhost:3000',
+          debug: true,
         })
 
         // Bilibili 特有的配置
@@ -92,6 +93,8 @@
           '.floor-single-card:has(.floor-title)',
           '.bili-feed-card:not(:has(a))',
           '.feed-card:not(:has(a))',
+          '.floor-single-card:has(.badge)',
+          '.bili-video-card.is-rcmd:has(.bili-video-card__info--owner.disable-hover)',
         ]
       }
 
@@ -340,6 +343,10 @@
     // ========== 实例化 ==========
     const biliSite = new BiliSite()
 
+    // 启动站点初始化链：loadSettings → customInit → applyHideElements
+    // 缺这一步会导致 <style id="bili-content-hide-style"> 永不注入，所有隐藏选择器失效
+    biliSite.init().catch((err) => console.error('[Bilibili脚本] biliSite.init() 抛错:', err))
+
     // ========== 配置导出 ==========
     window.BiliScriptConfig = {
       get DEFAULT_HIDE_SELECTORS() {
@@ -433,7 +440,10 @@
   if (window.ScriptLoader) {
     ScriptLoader.declare({
       name: 'bili-script',
-      dependencies: ['EventBus', 'MessagingUtils', 'SiteBase'],
+      // 补齐 runBiliScript 真实使用的依赖：StorageUtils(line 173,204)、DOMUtils(经由 SiteBase.applyHideStyle)
+      // 漏声明虽然在当前注入顺序下能跑（background 串行 await 基础脚本），
+      // 但 ScriptLoader.safeExecute 会吞 ReferenceError，未来注入顺序变更会静默失败
+      dependencies: ['EventBus', 'MessagingUtils', 'SiteBase', 'StorageUtils', 'DOMUtils'],
       onReady: initBiliScript,
     })
   } else {
