@@ -215,7 +215,7 @@ const FILE_MAPPINGS = [
   { src: 'eventbus-devtools.js', dest: 'devtools/eventbus-devtools.js' },
 ]
 
-const STATIC_DIRS = ['icons', 'devtools', 'shared', 'src', 'styles']
+const STATIC_DIRS = ['icons', 'devtools', 'shared', 'styles', 'popup']
 const SKIP_CONTENT_DIRS = ['entries', 'utils']
 
 // ========== Hot Reload Notification ==========
@@ -383,6 +383,13 @@ function chromeExtensionPlugin() {
       const dist = resolve('dist')
       copyAllToDist(dist)
       await buildContentScripts(dist)
+
+      // 校验构建配置完整性
+      try {
+        execSync('node scripts/verify-build-config.js', { stdio: 'inherit' })
+      } catch {
+        throw new Error('[Build] 构建配置校验失败，构建中止')
+      }
 
       // 校验所有 dynamic import 目标已部署到 dist
       try {

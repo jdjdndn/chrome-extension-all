@@ -657,6 +657,7 @@
       // 压缩配置
       this.compressQuality = options.compressQuality || 0.8
       this.compressMinSize = options.compressMinSize || 51200 // 50KB
+      this.compressMinRatio = options.compressMinRatio || 0.9 // 压缩收益阈值
       this.compressEnabled = options.compressEnabled || false
 
       // 排除选择器
@@ -853,12 +854,21 @@
           }
 
           // 廉价预过滤：只保留含 IMG 的 childList mutation
+          // P0优化：限制单批处理节点数上限，避免大量DOM插入时的长任务
+          const MAX_NODES_PER_BATCH = 100
+          let nodeCount = 0
+
           for (const m of mutations) {
             if (m.type !== 'childList' || m.addedNodes.length === 0) {
               continue
             }
             let hit = false
             for (const node of m.addedNodes) {
+              // 节点数节流：超出上限等待下一批
+              if (++nodeCount > MAX_NODES_PER_BATCH) {
+                console.warn('[ImageOptimizer] 单批节点数超过100，等待下一批处理')
+                return
+              }
               if (node.nodeType !== 1) {
                 continue
               }
@@ -1023,17 +1033,33 @@
 
     /**
      * 判断是否需要压缩
+     * P2优化：移除HEAD请求（节省~100ms延迟），改用事后判断
      */
     async _shouldCompress(url) {
-      // 检查文件大小
-      try {
-        const response = await fetch(url, { method: 'HEAD' })
-        const contentLength = response.headers.get('content-length')
-        if (contentLength && parseInt(contentLength) < this.compressMinSize) {
-          return false
-        }
-      } catch {
-        // 无法获取大小，默认压缩
+      // 直接返回true，移除HEAD请求阻塞
+      // 压缩后由 compressImage 判断是否值得保留
+      return true
+    }
+
+    /**
+     * 判断压缩结果是否值得保留
+     * @param {number} originalSize - 原图大小
+     * @param {number} compressedSize - 压缩后大小
+     * @returns {boolean} 是否值得使用压缩结果
+     */
+    _isCompressionWorthIt(originalSize, compressedSize) {
+      // 边界保护：无大小信息时默认保留压缩结果
+      if (!originalSize || originalSize <= 0) {
+        return compressedSize > 0
+      }
+      // 原图小于阈值，不值得压缩
+      if (originalSize < this.compressMinSize) {
+        return false
+      }
+      // 压缩收益小于10%，不值得
+      const ratio = compressedSize / originalSize
+      if (ratio > this.compressMinRatio) {
+        return false
       }
       return true
     }
@@ -1055,6 +1081,17 @@
             maxHeight: 1920,
             priority,
           })
+
+          // P2优化：事后判断压缩是否值得
+          if (!this._isCompressionWorthIt(result.originalSize, result.compressedSize)) {
+            console.log(`[ImageOptimizer] 压缩收益不足，使用原图: ${url}`, {
+              originalSize: result.originalSize,
+              compressedSize: result.compressedSize,
+              ratio: ((result.compressedSize / result.originalSize) * 100).toFixed(1) + '%',
+            })
+            return url
+          }
+
           console.log(`[ImageOptimizer] Worker 压缩成功: ${url}`, {
             originalSize: result.originalSize,
             compressedSize: result.compressedSize,
@@ -1062,13 +1099,16 @@
           })
           return result.dataUrl
         } catch (error) {
-          console.warn('[ImageOptimizer] Worker 压缩失败，回退到主线程:', error.message)
+          console.warn('[ImageOptimizer] Worker 压缩失败，使用原图:', error.message)
           this.stats.compressionErrors++
+          // P0优化：移除主线程回退，避免阻塞UI
+          return url
         }
       }
 
-      // 回退到主线程压缩
-      return this._compressOnMainThread(url)
+      // P0优化：无Worker时直接使用原图，不回退主线程压缩
+      console.warn('[ImageOptimizer] Worker不可用，使用原图')
+      return url
     }
 
     /**

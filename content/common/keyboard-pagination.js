@@ -37,12 +37,18 @@ if (window.KeyboardPaginationLoaded) {
           // 标准语义
           'a[rel="prev"]',
           'link[rel="prev"]',
+          '[class*="prev"]:not([class*="preview"])',
+          '[class*="Prev"]:not([class*="Preview"])',
+          '[class*="previous"]',
+          '[class*="Previous"]',
+          '[class*="pre-page"]',
+          '[class*="prePage"]',
           '[aria-label*="上一页"]',
           '[aria-label*="Previous"]',
           '[title*="上一页"]',
           '[title*="Previous"]',
-
-          // 明确含 "page/pagination" 语义
+          'a:has(.arrow-left)',
+          'button:has(.arrow-left)',
           '.pagination-prev',
           '.pager-prev',
           '.page-prev',
@@ -54,6 +60,16 @@ if (window.KeyboardPaginationLoaded) {
           '.el-pagination .prev',
           '[data-page="prev"]',
           'nav[aria-label*="pagination"] a:first-child',
+          '.layui-laypage-prev',
+          '.laypage-prev',
+          '.page-pre',
+          '.pre',
+          '.pre-btn',
+          '.btn-pre',
+          '.btn-prev',
+          '.prev-btn',
+          'a.prev',
+          'button.prev',
           '.layui-laypage-prev',
           '.laypage-prev',
 
@@ -90,8 +106,12 @@ if (window.KeyboardPaginationLoaded) {
           '[aria-label*="Next"]',
           '[title*="下一页"]',
           '[title*="Next"]',
-
-          // 明确含 "page/pagination" 语义
+          '[class*="next"]:not([class*="textarea"])',
+          '[class*="Next"]:not([class*="Textarea"])',
+          '[class*="next-page"]',
+          '[class*="nextPage"]',
+          'a:has(.arrow-right)',
+          'button:has(.arrow-right)',
           '.pagination-next',
           '.pager-next',
           '.page-next',
@@ -105,6 +125,13 @@ if (window.KeyboardPaginationLoaded) {
           'nav[aria-label*="pagination"] a:last-child',
           '.layui-laypage-next',
           '.laypage-next',
+          // 中文网站
+          '.page-next',
+          '.next',
+          '.next-btn',
+          '.btn-next',
+          'a.next',
+          'button.next',
 
           // 明确含 "btn" 后缀
           '.btn-next',
@@ -223,6 +250,9 @@ if (window.KeyboardPaginationLoaded) {
       const containers = [
         '.pagination',
         '.pager',
+        '.fanye', // 中文"翻页"拼音
+        '.page-nav',
+        '.pagenavi',
         '.ant-pagination',
         '.el-pagination',
         '.layui-laypage',
@@ -370,6 +400,7 @@ if (window.KeyboardPaginationLoaded) {
       const containerSelectors = [
         '.pagination',
         '.pager',
+        '.fanye', // 中文"翻页"拼音
         '.page-nav',
         '.pagenavi',
         '.layui-laypage',

@@ -19,7 +19,7 @@ import '../common/link-blank.js'
 import '../common/add-title.js'
 import '../common/doc-generator.js'
 import '../common/text-collector.js'
-import '../common/keyboard-pagination.js'
+// keyboard-pagination.js 已移至 core.js 入口，提前加载
 import '../common/keyboard-click.js'
 import '../common/lang-to-zh.js'
 import '../common/widen-page.js'

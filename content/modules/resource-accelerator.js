@@ -621,6 +621,20 @@
         totalSize: 0,
       }
 
+      // 缓存迁移监控
+      this._migrationMonitor = {
+        totalAttempts: 0, // 总迁移尝试次数
+        successes: 0, // 成功次数
+        failures: 0, // 失败次数
+        rollbacks: 0, // 回退次数
+        failureReasons: {}, // 失败原因统计 {reason: count}
+        lastMigrationTime: 0, // 最后迁移时间
+      }
+
+      // URL解析缓存（LRU）
+      this._urlParseCache = new Map()
+      this._urlParseCacheMaxSize = 100
+
       // 缓存预热队列
       this._cacheWarmupQueue = []
       this._cacheWarmupTimer = null
@@ -1132,7 +1146,7 @@
     }
 
     /**
-     * 加载缓存
+     * 加载缓存（支持双格式兼容 + 异步迁移）
      */
     async loadCache() {
       try {
@@ -1159,18 +1173,34 @@
               return
             }
 
-            // 兼容旧格式缓存（自动迁移到分级缓存）
-            if (loaded.js && !loaded.js.small) {
-              // 旧格式：直接平铺存储
-              console.log(`${LOG_PREFIX} 检测到旧格式缓存，正在迁移...`)
-              this.cache = this._migrateLegacyCache(loaded)
-            } else {
-              // 新格式：分级缓存
+            const format = this._detectCacheFormat(loaded)
+
+            // 新格式：直接使用
+            if (format === 'new') {
+              this.cache = loaded
+            }
+            // 旧格式：立即兼容读取 + 后台异步迁移
+            else if (format === 'legacy') {
+              console.log(`${LOG_PREFIX} 检测到旧格式缓存，启用兼容模式`)
+
+              // 保留旧缓存作为备份
+              this._legacyCacheBackup = loaded
+
+              // 立即使用旧格式（兼容读取）
+              this.cache = loaded
+
+              // 后台异步迁移，不阻塞主流程
+              this._scheduleBackgroundMigration(loaded)
+            }
+            // 空缓存或未知格式
+            else {
+              console.log(`${LOG_PREFIX} 缓存格式: ${format}`)
               this.cache = loaded
             }
 
             const cacheSizeStats = this._getCacheSizeStats()
             console.log(`${LOG_PREFIX} 缓存已加载`, {
+              format,
               total: cacheSizeStats.total,
               small: cacheSizeStats.small.count,
               medium: cacheSizeStats.medium.count,
@@ -1181,6 +1211,148 @@
       } catch (error) {
         console.warn(`${LOG_PREFIX} 加载缓存失败:`, error.message)
       }
+    }
+
+    /**
+     * 后台异步迁移（不阻塞主流程）
+     * @param {Object} legacyCache - 旧格式缓存
+     */
+    _scheduleBackgroundMigration(legacyCache) {
+      // 使用 requestIdleCallback 在浏览器空闲时迁移
+      if (typeof requestIdleCallback !== 'undefined') {
+        const idleId = requestIdleCallback(() => {
+          this._executeMigration(legacyCache)
+        })
+        this._idleCallbackIds.push(idleId)
+      } else {
+        // 降级：延迟执行
+        setTimeout(() => {
+          this._executeMigration(legacyCache)
+        }, 1000)
+      }
+    }
+
+    /**
+     * 执行迁移（带回退机制）
+     * @param {Object} legacyCache - 旧格式缓存
+     */
+    _executeMigration(legacyCache) {
+      this._migrationMonitor.totalAttempts++
+      this._migrationMonitor.lastMigrationTime = Date.now()
+
+      try {
+        const newCache = this._migrateLegacyCache(legacyCache)
+
+        // 校验新缓存
+        if (!this._validateMigratedCache(newCache, legacyCache)) {
+          throw new Error('validation_failed')
+        }
+
+        // 迁移成功
+        this._migrationMonitor.successes++
+        this.cache = newCache
+
+        // 清除备份
+        this._legacyCacheBackup = null
+
+        console.log(`${LOG_PREFIX} 缓存迁移成功`)
+        this._logMigrationReport()
+      } catch (error) {
+        // 迁移失败，回退到旧格式
+        this._migrationMonitor.failures++
+        const reason = error.message || 'unknown'
+        this._migrationMonitor.failureReasons[reason] =
+          (this._migrationMonitor.failureReasons[reason] || 0) + 1
+
+        // 回退
+        this._migrationMonitor.rollbacks++
+        this.cache = this._legacyCacheBackup || legacyCache
+
+        console.warn(`${LOG_PREFIX} 缓存迁移失败，已回退:`, reason)
+        this._logMigrationReport()
+      }
+    }
+
+    /**
+     * 校验迁移后的缓存
+     * @param {Object} newCache - 新格式缓存
+     * @param {Object} legacyCache - 旧格式缓存
+     * @returns {boolean} 校验是否通过
+     */
+    _validateMigratedCache(newCache, legacyCache) {
+      try {
+        // 检查新格式结构
+        if (!newCache.js?.small || !newCache.fonts?.small || !newCache.css?.small) {
+          return false
+        }
+
+        // 检查条目数是否一致（允许少量误差）
+        const legacyCount = this._countCacheEntries(legacyCache)
+        const newCount = this._countCacheEntries(newCache)
+
+        // 允许5%的误差（某些无效条目可能被过滤）
+        const tolerance = Math.ceil(legacyCount * 0.05)
+        if (Math.abs(legacyCount - newCount) > tolerance) {
+          console.warn(`${LOG_PREFIX} 缓存迁移校验失败: 条目数不一致 ${legacyCount} -> ${newCount}`)
+          return false
+        }
+
+        return true
+      } catch (error) {
+        console.warn(`${LOG_PREFIX} 缓存校验异常:`, error.message)
+        return false
+      }
+    }
+
+    /**
+     * 统计缓存条目数
+     * @param {Object} cache - 缓存对象
+     * @returns {number} 条目总数
+     */
+    _countCacheEntries(cache) {
+      let count = 0
+
+      const countType = (typeCache) => {
+        if (!typeCache || typeof typeCache !== 'object') {
+          return
+        }
+        // 新格式
+        if (typeCache.small) {
+          count += Object.keys(typeCache.small || {}).length
+          count += Object.keys(typeCache.medium || {}).length
+          count += Object.keys(typeCache.large || {}).length
+        } else {
+          // 旧格式
+          count += Object.keys(typeCache).length
+        }
+      }
+
+      countType(cache.js)
+      countType(cache.fonts)
+      countType(cache.css)
+
+      return count
+    }
+
+    /**
+     * 输出迁移监控报告
+     */
+    _logMigrationReport() {
+      const m = this._migrationMonitor
+      const successRate =
+        m.totalAttempts > 0 ? ((m.successes / m.totalAttempts) * 100).toFixed(1) : 0
+      const rollbackRate =
+        m.totalAttempts > 0 ? ((m.rollbacks / m.totalAttempts) * 100).toFixed(1) : 0
+
+      console.log(
+        `${LOG_PREFIX} 缓存迁移报告:
+  尝试: ${m.totalAttempts}
+  成功: ${m.successes} (${successRate}%)
+  失败: ${m.failures}
+  回退: ${m.rollbacks} (${rollbackRate}%)
+  失败原因:`,
+        m.failureReasons
+      )
     }
 
     /**
@@ -1373,24 +1545,45 @@
         const idleId = requestIdleCallback(performEviction, { timeout: 5000 })
         this._idleCallbackIds.push(idleId)
       } else {
-        // 降级：使用 setTimeout
-        setTimeout(performEviction, 0)
+        // 降级：使用 setTimeout，16ms延迟配合渲染节奏
+        setTimeout(performEviction, 16)
       }
     }
     /**
-     * 生成缓存键
+     * 生成缓存键（带LRU缓存优化）
      */
     getCacheKey(url) {
       if (!url || typeof url !== 'string') {
         return null
       }
-      // 移除协议和查询参数，保留核心路径
+
+      // 检查缓存
+      if (this._urlParseCache.has(url)) {
+        // LRU: 删除后重新插入，更新访问顺序
+        const cached = this._urlParseCache.get(url)
+        this._urlParseCache.delete(url)
+        this._urlParseCache.set(url, cached)
+        return cached
+      }
+
+      // 解析URL
+      let result
       try {
         const urlObj = new URL(url)
-        return urlObj.hostname + urlObj.pathname
+        result = urlObj.hostname + urlObj.pathname
       } catch {
-        return url
+        result = url
       }
+
+      // LRU淘汰：超过容量时删除最旧的条目
+      if (this._urlParseCache.size >= this._urlParseCacheMaxSize) {
+        const oldestKey = this._urlParseCache.keys().next().value
+        this._urlParseCache.delete(oldestKey)
+      }
+
+      // 存入缓存
+      this._urlParseCache.set(url, result)
+      return result
     }
 
     /**
@@ -1505,6 +1698,31 @@
      * @param {number} contentLength - 响应内容长度（可选）
      * @returns {Object|null} 缓存条目
      */
+    /**
+     * 检测缓存格式
+     * @param {Object} cache - 缓存对象
+     * @returns {string} 'new' | 'legacy' | 'empty' | 'unknown'
+     */
+    _detectCacheFormat(cache) {
+      if (!cache) {
+        return 'empty'
+      }
+      if (cache.js?.small) {
+        return 'new'
+      } // 新格式：分级缓存
+      if (cache.js && typeof cache.js === 'object') {
+        return 'legacy'
+      } // 旧格式：平铺存储
+      return 'unknown'
+    }
+
+    /**
+     * 双格式兼容读取缓存条目
+     * @param {string} type - 缓存类型（js/fonts/css）
+     * @param {string} url - 资源URL
+     * @param {number} contentLength - 响应内容长度（可选）
+     * @returns {Object|null} 缓存条目或null
+     */
     _getCacheEntry(type, url, contentLength = null) {
       if (!this.config.cacheEnabled || !url) {
         return null
@@ -1515,21 +1733,66 @@
         return null
       }
 
-      const sizeCategory = this._estimateFileSize(url, contentLength)
-      const cache = this.cache[type]
+      const format = this._detectCacheFormat(this.cache)
 
-      if (!cache || !cache[sizeCategory]) {
+      // 新格式：分级缓存读取
+      if (format === 'new') {
+        const sizeCategory = this._estimateFileSize(url, contentLength)
+        const cache = this.cache[type]
+
+        if (!cache || !cache[sizeCategory]) {
+          return null
+        }
+
+        // 尝试精确匹配（带版本号的key）
+        if (cache[sizeCategory][cacheKey]) {
+          return cache[sizeCategory][cacheKey]
+        }
+
+        // 尝试URL全路径匹配
+        if (cache[sizeCategory][url]) {
+          return cache[sizeCategory][url]
+        }
+
         return null
       }
 
-      // 尝试精确匹配（带版本号的key）
-      if (cache[sizeCategory][cacheKey]) {
-        return cache[sizeCategory][cacheKey]
-      }
+      // 旧格式：平铺存储读取（兼容模式）
+      if (format === 'legacy') {
+        const cache = this.cache[type]
+        if (!cache || typeof cache !== 'object') {
+          return null
+        }
 
-      // 尝试URL全路径匹配
-      if (cache[sizeCategory][url]) {
-        return cache[sizeCategory][url]
+        // 旧格式直接用key或URL读取
+        if (cache[cacheKey]) {
+          // 如果是字符串，包装成对象返回
+          if (typeof cache[cacheKey] === 'string') {
+            return {
+              url: cache[cacheKey],
+              _accessTime: Date.now(),
+              _accessCount: 1,
+              _size: 0,
+              _sizeCategory: 'small',
+            }
+          }
+          return cache[cacheKey]
+        }
+
+        if (cache[url]) {
+          if (typeof cache[url] === 'string') {
+            return {
+              url: cache[url],
+              _accessTime: Date.now(),
+              _accessCount: 1,
+              _size: 0,
+              _sizeCategory: 'small',
+            }
+          }
+          return cache[url]
+        }
+
+        return null
       }
 
       return null
@@ -1678,8 +1941,14 @@
           }
           const chunk = items.slice(i, i + CHUNK_SIZE)
           chunk.forEach(processor)
-          // 让出主线程
-          await new Promise((resolve) => setTimeout(resolve, 0))
+          // 让出主线程 - 使用 requestIdleCallback 优化 INP
+          await new Promise((resolve) => {
+            if (typeof requestIdleCallback !== 'undefined') {
+              requestIdleCallback(resolve, { timeout: 100 })
+            } else {
+              setTimeout(resolve, 16) // 降级：~60fps
+            }
+          })
         }
       }
 

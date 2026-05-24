@@ -47,3 +47,5 @@ test-*.html
 
 # Worktrees
 .worktrees/
+
+output/

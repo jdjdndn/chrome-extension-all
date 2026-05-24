@@ -134,7 +134,7 @@
   async function waitForDomainConfig(timeout = 2000) {
     const startTime = Date.now()
     while (!window.DomainConfig && Date.now() - startTime < timeout) {
-      await new Promise(resolve => setTimeout(resolve, 50))
+      await new Promise((resolve) => setTimeout(resolve, 50))
     }
     if (!window.DomainConfig) {
       throw new Error('DomainConfig 加载超时，请检查 critical-bundle.js 是否正确加载')
@@ -209,7 +209,8 @@
   const executeByPriority = () => {
     setupEarlyIntervention()
     init().catch((err) => {
-      console.error('[Main] 初始化失败:', err)
+      console.error('[Main] 初始化失败:', err.message || err)
+      console.error('[Main] 错误堆栈:', err.stack)
     })
   }
 

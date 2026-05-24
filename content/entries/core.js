@@ -70,6 +70,7 @@ import '../base/SiteScript.js'
 
 // 通用功能模块
 import '../common/script-switch.js'
+import '../common/keyboard-pagination.js' // 提前加载，用户高频使用
 import '../common/list-link-split-view.js'
 import '../common/clipboard-watcher.js'
 
