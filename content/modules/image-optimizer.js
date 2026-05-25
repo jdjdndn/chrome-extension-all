@@ -209,6 +209,21 @@
       workerInfo.crashCount++
       this.stats.workerCrashes++
 
+      // 将已分派给该 Worker 的 pendingTasks 转移到 retryQueue（避免 promise 泄漏）
+      for (const [id, task] of this.pendingTasks) {
+        if (task.retryCount < this.maxRetries) {
+          this.retryQueue.push({
+            ...task,
+            retryCount: (task.retryCount || 0) + 1,
+          })
+          this.stats.retriedTasks++
+          console.log(`[ImageCompressorPool] 已分派任务 ${id} 已转移到重试队列`)
+        } else {
+          task.reject(new Error('Worker 崩溃，已达最大重试次数'))
+        }
+        this.pendingTasks.delete(id)
+      }
+
       // 将 taskQueue 中的任务转移到 retryQueue（避免任务丢失）
       while (this.taskQueue.length > 0) {
         const task = this.taskQueue.shift()
@@ -300,7 +315,7 @@
      * 获取空闲 Worker
      */
     _getAvailableWorker() {
-      return this.workers.find((w) => !w.busy)
+      return this.workers.find((w) => w && !w.busy)
     }
 
     /**
@@ -355,6 +370,9 @@
 
       const task = this.retryQueue.shift()
       workerInfo.busy = true
+
+      // 重新加入 pendingTasks，以便 Worker 响应时能找到对应任务
+      this.pendingTasks.set(task.id, task)
 
       workerInfo.worker.postMessage({
         type: 'compress',
@@ -517,6 +535,7 @@
               }
 
               const timeout = setTimeout(() => {
+                workerInfo.worker.removeEventListener('message', handler)
                 resolve({
                   index,
                   healthy: false,
@@ -1048,9 +1067,13 @@
      * @returns {boolean} 是否值得使用压缩结果
      */
     _isCompressionWorthIt(originalSize, compressedSize) {
-      // 边界保护：无大小信息时默认保留压缩结果
+      // 边界保护：无效大小信息时保留压缩结果仅当压缩后有效
       if (!originalSize || originalSize <= 0) {
         return compressedSize > 0
+      }
+      // 压缩结果无效（0字节、负数），不值得保留
+      if (!compressedSize || compressedSize <= 0) {
+        return false
       }
       // 原图小于阈值，不值得压缩
       if (originalSize < this.compressMinSize) {

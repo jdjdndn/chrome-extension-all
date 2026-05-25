@@ -26,6 +26,7 @@
         replaced: 0,
         skipped: 0,
         errors: 0,
+        degraded: false,
         details: [],
       }
 
@@ -98,12 +99,18 @@
      * 处理单个link标签
      */
     processLink(link) {
-      if (!this.enabled) {return}
+      if (!this.enabled) {
+        return
+      }
 
       const url = link.href
-      if (!url) {return}
+      if (!url) {
+        return
+      }
 
-      if (this._processedLinks.has(link)) {return}
+      if (this._processedLinks.has(link)) {
+        return
+      }
       this._processedLinks.add(link)
 
       this.stats.total++
@@ -152,7 +159,9 @@
     }
 
     _shouldExclude(url) {
-      if (!url || typeof url !== 'string') {return true}
+      if (!url || typeof url !== 'string') {
+        return true
+      }
 
       const defaultExcludes = [
         /^chrome-extension:/i,
@@ -164,12 +173,16 @@
         /\/internal\//i,
       ]
 
-      if (defaultExcludes.some((pattern) => pattern.test(url))) {return true}
+      if (defaultExcludes.some((pattern) => pattern.test(url))) {
+        return true
+      }
       return this.excludePatterns.some((pattern) => pattern.test(url))
     }
 
     _reportReplacement(match) {
-      if (!this.reportEnabled) {return}
+      if (!this.reportEnabled) {
+        return
+      }
 
       try {
         if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {

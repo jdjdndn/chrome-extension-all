@@ -81,7 +81,7 @@
      */
     _generateKey() {
       const array = new Uint8Array(this.config.keyLength / 8)
-      crypto.getRandom(array)
+      crypto.getRandomValues(array)
       return Array.from(array)
         .map((b) => b.toString(16).padStart(2, '0'))
         .join('')
@@ -108,9 +108,9 @@
 
         // 从密钥派生子密钥
         const keyMaterial = await crypto.subtle.importKey(
+          'raw',
           new TextEncoder().encode(this._encryptionKey),
           { name: 'PBKDF2' },
-          'raw',
           false,
           ['deriveBits']
         )
@@ -127,7 +127,7 @@
         )
 
         // 导入加密密钥
-        const cryptoKey = await crypto.subtle.importKey(key, { name: 'AES-GCM' }, 'raw', false, [
+        const cryptoKey = await crypto.subtle.importKey('raw', key, { name: 'AES-GCM' }, false, [
           'encrypt',
           'decrypt',
         ])
@@ -175,9 +175,9 @@
 
         // 从密钥派生子密钥
         const keyMaterial = await crypto.subtle.importKey(
+          'raw',
           new TextEncoder().encode(this._encryptionKey),
           { name: 'PBKDF2' },
-          'raw',
           false,
           ['deriveBits']
         )
@@ -194,7 +194,7 @@
         )
 
         // 导入解密密钥
-        const cryptoKey = await crypto.subtle.importKey(key, { name: 'AES-GCM' }, 'raw', false, [
+        const cryptoKey = await crypto.subtle.importKey('raw', key, { name: 'AES-GCM' }, false, [
           'encrypt',
           'decrypt',
         ])

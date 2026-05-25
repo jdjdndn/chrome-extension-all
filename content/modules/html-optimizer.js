@@ -139,7 +139,7 @@
     }
 
     // 检查是否已存在
-    const existing = head.querySelector(`link[rel="preload"][href="${url}"]`)
+    const existing = head.querySelector(`link[rel="preload"][href="${CSS.escape(url)}"]`)
     if (existing) {
       state.preloadedUrls.add(url)
       return
@@ -211,7 +211,7 @@
     }
 
     // 检查是否已存在
-    const existing = head.querySelector(`link[rel="prefetch"][href="${url}"]`)
+    const existing = head.querySelector(`link[rel="prefetch"][href="${CSS.escape(url)}"]`)
     if (existing) {
       state.preloadedUrls.add(url)
       return
@@ -265,7 +265,9 @@
       }
 
       // 检查是否已存在
-      const existing = head.querySelector(`link[rel="dns-prefetch"][href*="${hostname}"]`)
+      const existing = head.querySelector(
+        `link[rel="dns-prefetch"][href*="${CSS.escape(hostname)}"]`
+      )
       if (existing) {
         state.preconnectedOrigins.add(origin)
         return
@@ -315,7 +317,7 @@
       }
 
       // 检查是否已存在
-      const existing = head.querySelector(`link[rel="preconnect"][href="${originUrl}"]`)
+      const existing = head.querySelector(`link[rel="preconnect"][href="${CSS.escape(originUrl)}"]`)
       if (existing) {
         state.preconnectedOrigins.add(origin)
         return

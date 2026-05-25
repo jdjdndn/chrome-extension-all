@@ -19,6 +19,7 @@
   const RuleConflictDetector = {
     // 冲突类型
     conflictTypes: {
+      SELECTOR_DUPLICATE: '选择器重复',
       SELECTOR_OVERLAP: '选择器重叠',
       SELECTOR_CONFLICT: '选择器冲突',
       KEYWORD_DUPLICATE: '关键词重复',
@@ -36,12 +37,16 @@
       const conflicts = []
 
       for (const newSelector of newSelectors) {
-        if (!newSelector || typeof newSelector !== 'string') {continue}
+        if (!newSelector || typeof newSelector !== 'string') {
+          continue
+        }
 
         const normalized = newSelector.trim()
 
         for (const existing of existingSelectors) {
-          if (!existing || typeof existing !== 'string') {continue}
+          if (!existing || typeof existing !== 'string') {
+            continue
+          }
 
           const normalizedExisting = existing.trim()
 

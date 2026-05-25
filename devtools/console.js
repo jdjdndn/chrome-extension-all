@@ -330,6 +330,12 @@ function safeInit() {
 
   // ========== 初始化所有 DOM 元素引用 ==========
   outputEl = document.getElementById('console-output')
+
+  // 事件委托：折叠展开 / 复制 / 删除 / 刷新（必须在 outputEl 赋值后绑定）
+  if (outputEl) {
+    outputEl.addEventListener('click', storageItemClickHandler)
+  }
+
   notificationEl = document.getElementById('change-notification')
   notificationTextEl = document.getElementById('notification-text')
 
@@ -2668,10 +2674,12 @@ function renderStorageItem(key, value, sectionId) {
   const jsonStr = typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value)
 
   if (typeof value === 'object' && value !== null) {
-    // Object/Array value - use JSON tree view
+    // Object/Array value - use collapsible JSON tree view
     const isArray = Array.isArray(value)
     const itemCount = isArray ? value.length : Object.keys(value).length
     const typeLabel = isArray ? '数组' : '对象'
+    const previewStr = JSON.stringify(value)
+    const needsCollapse = previewStr.length > TRUNCATE_LIMIT || itemCount > 3
 
     return `
       <div class="storage-item">
@@ -2688,8 +2696,27 @@ function renderStorageItem(key, value, sectionId) {
           </div>
         </div>
         <div class="storage-value ${typeClass}">
-          <div class="json-tree-view">
-            ${createJsonTreeView(value)}
+          <div class="value-container ${needsCollapse ? '' : 'expanded'}" id="${itemId}">
+            <div class="value-preview">
+              <code class="json-preview">${escapeHtml(previewStr.substring(0, TRUNCATE_LIMIT))}</code>
+              <span class="truncate-indicator">... (${previewStr.length - TRUNCATE_LIMIT} 字符)</span>
+              <button class="toggle-btn">
+                <span class="icon">▼</span>
+                <span>展开</span>
+              </button>
+            </div>
+            <div class="value-full">
+              <div class="sticky-header">
+                <span class="sticky-label">${escapeHtml(key)}</span>
+                <button class="toggle-btn expanded sticky-btn">
+                  <span class="icon">▲</span>
+                  <span>收起</span>
+                </button>
+              </div>
+              <div class="json-tree-view">
+                ${createJsonTreeView(value)}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -2764,103 +2791,115 @@ function renderStorageItem(key, value, sectionId) {
   }
 }
 
-// Toggle expand/collapse using event delegation
-if (outputEl) {
-  outputEl.addEventListener('click', (e) => {
-    // Handle JSON tree toggle clicks directly
-    if (e.target.classList.contains('json-tree-toggle')) {
-      const treeItem = e.target.closest('.json-tree-item')
-      if (treeItem) {
-        treeItem.classList.toggle('collapsed')
-        const isCollapsed = treeItem.classList.contains('collapsed')
-        e.target.textContent = isCollapsed ? '▶' : '▼'
-        const children = treeItem.querySelector('.json-tree-children')
-        if (children) {
-          children.style.display = isCollapsed ? 'none' : 'block'
-        }
+// 事件委托处理器：折叠展开 / 复制 / 删除 / 刷新
+function storageItemClickHandler(e) {
+  // Handle JSON tree toggle clicks directly
+  if (e.target.classList.contains('json-tree-toggle')) {
+    const treeItem = e.target.closest('.json-tree-item')
+    if (treeItem) {
+      treeItem.classList.toggle('collapsed')
+      const isCollapsed = treeItem.classList.contains('collapsed')
+      e.target.textContent = isCollapsed ? '▶' : '▼'
+      const children = treeItem.querySelector('.json-tree-children')
+      if (children) {
+        children.style.display = isCollapsed ? 'none' : 'block'
       }
+    }
+    return
+  }
+
+  // Handle toggle buttons
+  const btn = e.target.closest('.toggle-btn')
+  if (btn) {
+    const container = btn.closest('.value-container, .object-value-wrapper, .json-tree-item')
+    if (!container) {
       return
     }
 
-    // Handle toggle buttons
-    const btn = e.target.closest('.toggle-btn')
-    if (btn) {
-      const container = btn.closest('.value-container, .object-value-wrapper, .json-tree-item')
-      if (!container) {
-        return
+    if (container.classList.contains('value-container')) {
+      container.classList.toggle('expanded')
+    } else if (container.classList.contains('object-value-wrapper')) {
+      container.classList.toggle('collapsed')
+      container.classList.toggle('expanded')
+    } else if (container.classList.contains('json-tree-item')) {
+      container.classList.toggle('collapsed')
+      const icon = container.querySelector('.json-tree-toggle')
+      if (icon) {
+        icon.textContent = container.classList.contains('collapsed') ? '▶' : '▼'
       }
-
-      if (container.classList.contains('value-container')) {
-        container.classList.toggle('expanded')
-      } else if (container.classList.contains('object-value-wrapper')) {
-        container.classList.toggle('collapsed')
-        container.classList.toggle('expanded')
-      } else if (container.classList.contains('json-tree-item')) {
-        container.classList.toggle('collapsed')
-        const icon = container.querySelector('.json-tree-toggle')
-        if (icon) {
-          icon.textContent = container.classList.contains('collapsed') ? '▶' : '▼'
-        }
-        const children = container.querySelector('.json-tree-children')
-        if (children) {
-          children.style.display = container.classList.contains('collapsed') ? 'none' : 'block'
-        }
+      const children = container.querySelector('.json-tree-children')
+      if (children) {
+        children.style.display = container.classList.contains('collapsed') ? 'none' : 'block'
       }
-      return
     }
+    return
+  }
 
-    // Handle copy buttons
-    const copyBtn = e.target.closest('.storage-copy-btn')
-    if (copyBtn) {
-      const textToCopy = copyBtn.dataset.value
-      if (textToCopy) {
-        copyToClipboard(textToCopy).then(() => {
-          const originalText = copyBtn.innerHTML
-          copyBtn.innerHTML = '<span class="icon">✓</span><span>已复制</span>'
-          setTimeout(() => {
-            copyBtn.innerHTML = originalText
-          }, 1500)
-        })
-      }
-      return
+  // Handle copy buttons
+  const copyBtn = e.target.closest('.storage-copy-btn')
+  if (copyBtn) {
+    const textToCopy = copyBtn.dataset.value
+    if (textToCopy) {
+      copyToClipboard(textToCopy).then(() => {
+        const originalText = copyBtn.innerHTML
+        copyBtn.innerHTML = '<span class="icon">✓</span><span>已复制</span>'
+        setTimeout(() => {
+          copyBtn.innerHTML = originalText
+        }, 1500)
+      })
     }
+    return
+  }
 
-    // Handle delete buttons
-    const deleteBtn = e.target.closest('.storage-delete-btn')
-    if (deleteBtn) {
-      const sectionId = deleteBtn.dataset.section
-      const key = deleteBtn.dataset.key
-      if (sectionId && key) {
-        const areaName = sectionId.replace('storage-', '')
-        if (confirm(`确定要删除 "${key}" 吗？`)) {
-          chrome.storage[areaName]
-            .remove(key)
-            .then(() => {
-              return loadStorageArea(areaName)
-            })
-            .then(() => {
-              renderAll()
-              showNotification(`已删除: ${key}`)
-            })
-        }
+  // Handle delete buttons
+  const deleteBtn = e.target.closest('.storage-delete-btn')
+  if (deleteBtn) {
+    const sectionId = deleteBtn.dataset.section
+    const key = deleteBtn.dataset.key
+    if (sectionId && key) {
+      const areaName = sectionId.replace('storage-', '')
+      if (confirm(`确定要删除 "${key}" 吗？`)) {
+        chrome.storage[areaName]
+          .remove(key)
+          .then(() => {
+            return loadStorageArea(areaName)
+          })
+          .then(() => {
+            renderAll()
+            showNotification(`已删除: ${key}`)
+          })
       }
-      return
     }
+    return
+  }
 
-    // Handle section refresh buttons
-    const refreshBtn = e.target.closest('.section-refresh-btn')
-    if (refreshBtn) {
-      const sectionId = refreshBtn.dataset.section
-      if (sectionId) {
-        const areaName = sectionId.replace('storage-', '')
-        loadStorageArea(areaName).then(() => {
-          renderAll()
-          showNotification(`${storageSections[sectionId].title} 已刷新`)
-        })
+  // Handle section header clicks (collapse/expand)
+  const sectionHeader = e.target.closest('.section-header')
+  if (sectionHeader && !e.target.closest('.section-refresh-btn')) {
+    const section = sectionHeader.closest('.console-section')
+    if (section) {
+      section.classList.toggle('collapsed')
+      const icon = sectionHeader.querySelector('.section-icon')
+      if (icon) {
+        icon.textContent = section.classList.contains('collapsed') ? '▶' : '▼'
       }
-      return
     }
-  })
+    return
+  }
+
+  // Handle section refresh buttons
+  const refreshBtn = e.target.closest('.section-refresh-btn')
+  if (refreshBtn) {
+    const sectionId = refreshBtn.dataset.section
+    if (sectionId) {
+      const areaName = sectionId.replace('storage-', '')
+      loadStorageArea(areaName).then(() => {
+        renderAll()
+        showNotification(`${storageSections[sectionId].title} 已刷新`)
+      })
+    }
+    return
+  }
 }
 
 // JSON Syntax Highlighting
@@ -4319,7 +4358,7 @@ function handleRequest(harEntry) {
     const reqData = {
       id:
         harEntry._requestId ||
-        Date.now().toString() + '_' + Math.random().toString(36).substr(2, 9),
+        Date.now().toString() + '_' + Math.random().toString(36).slice(2, 11),
       url: url,
       method: method,
       status: isMocked ? 'mocked' : response.status || 200,
@@ -4488,8 +4527,8 @@ function scanPageResources() {
         const style = el.style.backgroundImage;
         if (style && style !== 'none') {
           const match = style.match(/url\\(['"]?([^'"]+)['"]?\\)/);
-          if (match && match[2]) {
-            let src = match[2];
+          if (match && match[1]) {
+            let src = match[1];
             // 处理相对路径
             if (!src.startsWith('http') && !src.startsWith('//')) {
               try {
@@ -5014,7 +5053,14 @@ function findBookmarkNode(node, id) {
 function getFaviconUrl(url) {
   try {
     const domain = new URL(url).hostname
-    return `chrome://favicon/${domain}`
+    // chrome://favicon/ 在 Chrome 99+ 已移除，改用 _favicon 扩展 API
+    if (typeof chrome !== 'undefined' && chrome.runtime?.getURL) {
+      const faviconUrl = new URL(chrome.runtime.getURL('/_favicon/'))
+      faviconUrl.searchParams.set('pageUrl', `https://${domain}`)
+      faviconUrl.searchParams.set('size', '16')
+      return faviconUrl.toString()
+    }
+    return `https://${domain}/favicon.ico`
   } catch {
     return ''
   }

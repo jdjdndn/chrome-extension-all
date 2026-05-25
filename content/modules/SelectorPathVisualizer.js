@@ -23,7 +23,7 @@
       bottom: 60px;
       left: 50%;
       transform: translateX(-50%);
-      background: rgba(0, 1, 1, 1, 0.95);
+      background: rgba(0, 0, 0, 0.95);
       color: #d4d4d4;
       padding: 10px 16px;
       border-radius: 8px;

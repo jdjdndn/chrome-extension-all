@@ -93,10 +93,17 @@ function bindDomainEvents() {
  * 解析域名输入 - 支持单个和逗号分隔的多个域名
  */
 function parseDomainInput(input) {
-  if (!input) {return []}
+  if (!input) {
+    return []
+  }
   const cleaned = input.replace(/['"]/g, '').trim()
-  if (!cleaned) {return []}
-  return cleaned.split(',').map(d => d.trim()).filter(d => d)
+  if (!cleaned) {
+    return []
+  }
+  return cleaned
+    .split(',')
+    .map((d) => d.trim())
+    .filter((d) => d)
 }
 
 /**
@@ -124,56 +131,72 @@ export async function loadBlockedDomains() {
  * 渲染阻断域名列表
  */
 function renderBlockedDomains(domains) {
-  if (!blockedDomainsList) {return}
+  if (!blockedDomainsList) {
+    return
+  }
 
   if (!domains || domains.length === 0) {
     blockedDomainsList.innerHTML = '<div class="empty-state">暂无阻止的域名</div>'
-    if (clearDomainsBtn) {clearDomainsBtn.disabled = true}
+    if (clearDomainsBtn) {
+      clearDomainsBtn.disabled = true
+    }
     return
   }
 
   blockedDomainsList.innerHTML = domains
-    .map(domain => `
+    .map(
+      (domain) => `
       <div class="domain-list-item">
         <span class="domain-text" title="${escapeHtml(domain)}">${escapeHtml(domain)}</span>
         <button class="domain-remove-btn remove-domain" data-domain="${escapeHtml(domain)}">删除</button>
       </div>
-    `)
+    `
+    )
     .join('')
 
-  document.querySelectorAll('.remove-domain').forEach(btn => {
+  document.querySelectorAll('.remove-domain').forEach((btn) => {
     btn.addEventListener('click', () => removeDomain(btn.dataset.domain))
   })
 
-  if (clearDomainsBtn) {clearDomainsBtn.disabled = false}
+  if (clearDomainsBtn) {
+    clearDomainsBtn.disabled = false
+  }
 }
 
 /**
  * 渲染阻断响应域名列表
  */
 function renderBlockedResponseDomains(domains) {
-  if (!blockedResponseDomainsList) {return}
+  if (!blockedResponseDomainsList) {
+    return
+  }
 
   if (!domains || domains.length === 0) {
     blockedResponseDomainsList.innerHTML = '<div class="empty-state">暂无阻止的域名</div>'
-    if (clearResponseDomainsBtn) {clearResponseDomainsBtn.disabled = true}
+    if (clearResponseDomainsBtn) {
+      clearResponseDomainsBtn.disabled = true
+    }
     return
   }
 
   blockedResponseDomainsList.innerHTML = domains
-    .map(domain => `
+    .map(
+      (domain) => `
       <div class="domain-list-item">
         <span class="domain-text" title="${escapeHtml(domain)}">${escapeHtml(domain)}</span>
         <button class="domain-remove-btn remove-response-domain" data-domain="${escapeHtml(domain)}" style="background-color: #e0a800;">删除</button>
       </div>
-    `)
+    `
+    )
     .join('')
 
-  document.querySelectorAll('.remove-response-domain').forEach(btn => {
+  document.querySelectorAll('.remove-response-domain').forEach((btn) => {
     btn.addEventListener('click', () => removeResponseDomain(btn.dataset.domain))
   })
 
-  if (clearResponseDomainsBtn) {clearResponseDomainsBtn.disabled = false}
+  if (clearResponseDomainsBtn) {
+    clearResponseDomainsBtn.disabled = false
+  }
 }
 
 /**
@@ -185,7 +208,7 @@ async function addDomains(domains) {
 
   for (const domain of domains) {
     const result = await sendMessage('ADD_BLOCKED_DOMAIN', { domain })
-    if (result.success) {
+    if (result?.success) {
       addedCount++
     } else {
       failedCount++
@@ -207,9 +230,9 @@ async function addDomains(domains) {
  */
 async function removeDomain(domain) {
   const result = await sendMessage('REMOVE_BLOCKED_DOMAIN', { domain })
-  if (result.success) {
+  if (result?.success) {
     const updatedResult = await sendMessage('GET_BLOCKED_DOMAINS')
-    renderBlockedDomains(updatedResult.blockedDomains || [])
+    renderBlockedDomains(updatedResult?.blockedDomains || [])
   } else {
     alert('Failed to remove domain')
   }
@@ -224,7 +247,7 @@ async function addResponseDomains(domains) {
 
   for (const domain of domains) {
     const result = await sendMessage('ADD_BLOCKED_RESPONSE_DOMAIN', { domain })
-    if (result.success) {
+    if (result?.success) {
       addedCount++
     } else {
       failedCount++
@@ -246,9 +269,9 @@ async function addResponseDomains(domains) {
  */
 async function removeResponseDomain(domain) {
   const result = await sendMessage('REMOVE_BLOCKED_RESPONSE_DOMAIN', { domain })
-  if (result.success) {
+  if (result?.success) {
     const updatedResult = await sendMessage('GET_BLOCKED_DOMAINS')
-    renderBlockedResponseDomains(updatedResult.domains || [])
+    renderBlockedResponseDomains(updatedResult?.blockedResponseDomains || [])
   } else {
     alert('Failed to remove response domain')
   }
@@ -259,7 +282,9 @@ async function removeResponseDomain(domain) {
  */
 async function clearAllDomains() {
   const result = await sendMessage('GET_BLOCKED_DOMAINS')
-  if (!result || !result.blockedDomains || result.blockedDomains.length === 0) {return}
+  if (!result || !result.blockedDomains || result.blockedDomains.length === 0) {
+    return
+  }
 
   for (const domain of result.blockedDomains) {
     await sendMessage('REMOVE_BLOCKED_DOMAIN', { domain })
@@ -272,7 +297,9 @@ async function clearAllDomains() {
  */
 async function clearAllResponseDomains() {
   const result = await sendMessage('GET_BLOCKED_DOMAINS')
-  if (!result || !result.blockedResponseDomains || result.blockedResponseDomains.length === 0) {return}
+  if (!result || !result.blockedResponseDomains || result.blockedResponseDomains.length === 0) {
+    return
+  }
 
   for (const domain of result.blockedResponseDomains) {
     await sendMessage('REMOVE_BLOCKED_RESPONSE_DOMAIN', { domain })

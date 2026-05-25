@@ -1908,9 +1908,14 @@
           continue
         }
 
-        stats.small.count += Object.keys(cache.small || {}).length / 2 // 除以2因为每个条目存储两个key
-        stats.medium.count += Object.keys(cache.medium || {}).length / 2
-        stats.large.count += Object.keys(cache.large || {}).length / 2
+        // 按 entry 对象引用去重（cacheKey 和 url 指向同一 entry），避免 /2 在 cacheKey===url 时偏低
+        for (const size of ['small', 'medium', 'large']) {
+          const bucket = cache[size]
+          if (!bucket) {
+            continue
+          }
+          stats[size].count += new Set(Object.values(bucket)).size
+        }
       }
 
       stats.total = stats.small.count + stats.medium.count + stats.large.count
@@ -2566,15 +2571,10 @@
         return false
       }
 
-      // 更新缓存
-      const cacheKey = this.getCacheKey(originalUrl)
+      // 更新缓存（使用分级缓存 API，避免旧格式污染）
       const cacheType = element.tagName === 'SCRIPT' ? 'js' : 'css'
-      if (cacheKey && this.config.cacheEnabled) {
-        if (!this.cache[cacheType]) {
-          this.cache[cacheType] = {}
-        }
-        this.cache[cacheType][cacheKey] = next.url
-        this.cache[cacheType][originalUrl] = next.url
+      if (this.config.cacheEnabled) {
+        this._setCacheEntry(cacheType, originalUrl, next.url)
         this.saveCache()
       }
 

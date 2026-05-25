@@ -131,7 +131,7 @@
   /**
    * 等待 DomainConfig 加载完成
    */
-  async function waitForDomainConfig(timeout = 2000) {
+  async function waitForDomainConfig(timeout = 10000) {
     const startTime = Date.now()
     while (!window.DomainConfig && Date.now() - startTime < timeout) {
       await new Promise((resolve) => setTimeout(resolve, 50))

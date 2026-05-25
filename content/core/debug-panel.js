@@ -52,7 +52,9 @@
      * @param {object} data - 附加数据
      */
     log(message, level = 'info', data = null) {
-      if (!this.enabled && level !== 'error') {return}
+      if (!this.enabled && level !== 'error') {
+        return
+      }
 
       const entry = {
         timestamp: Date.now(),
@@ -181,9 +183,12 @@
      * 获取内存使用情况（估算）
      */
     _getMemoryUsage() {
-      const used = process.memoryUsage?.().heapUsed || 0
+      const mem = typeof performance !== 'undefined' ? performance.memory : null
+      if (!mem || typeof mem.usedJSHeapSize !== 'number') {
+        return { usedMB: 0, available: false }
+      }
       return {
-        usedMB: Math.round(used / 1024 / 1024),
+        usedMB: Math.round(mem.usedJSHeapSize / 1024 / 1024),
         available: true,
       }
     },

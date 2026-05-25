@@ -47,6 +47,9 @@
       pipeline: 'content/core/pipeline.js',
     },
 
+    // 自定义模块的全局名映射（由 registerModule 写入）
+    customGlobalNames: {},
+
     // 配置
     config: {
       timeout: 10000,
@@ -176,7 +179,7 @@
         pipeline: 'Pipeline',
       }
 
-      const globalName = globalNames[moduleName]
+      const globalName = globalNames[moduleName] || this.customGlobalNames[moduleName]
       return globalName && typeof window[globalName] !== 'undefined'
     },
 
@@ -247,14 +250,7 @@
       this.dependencies[name] = dependencies
 
       if (globalName) {
-        // 更新检查函数
-        const originalChecker = this._checkModuleReady.bind(this)
-        this._checkModuleReady = (moduleName) => {
-          if (moduleName === name) {
-            return typeof window[globalName] !== 'undefined'
-          }
-          return originalChecker(moduleName)
-        }
+        this.customGlobalNames[name] = globalName
       }
 
       console.log(`[LazyLoader] 注册模块: ${name}`)
