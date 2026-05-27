@@ -123,6 +123,17 @@
           for (const [, task] of this.pendingTasks) {
             this.worker.postMessage(task.message)
           }
+        } else {
+          // 重建失败，拒绝所有待处理任务
+          for (const [, task] of this.pendingTasks) {
+            if (task.reject) {
+              task.reject(new Error('Worker 重建失败'))
+            }
+            if (task.timeout) {
+              clearTimeout(task.timeout)
+            }
+          }
+          this.pendingTasks.clear()
         }
       }
     }
