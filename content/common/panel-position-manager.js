@@ -100,12 +100,14 @@ if (!window.PanelPositionManager) {
       init() {
         this.loadFromStorage()
 
-        window.addEventListener('resize', () => {
+        // 保存 resize 处理函数引用，以便 destroy 时移除
+        this._resizeHandler = () => {
           if (this._resizeTimer) {
             clearTimeout(this._resizeTimer)
           }
           this._resizeTimer = setTimeout(() => this.scheduleCalculate(), 200)
-        })
+        }
+        window.addEventListener('resize', this._resizeHandler)
 
         // 启动智能避让定时检测
         if (this.config.enableSmartAvoidance) {
@@ -289,7 +291,7 @@ if (!window.PanelPositionManager) {
         for (const c of visibleComponents) {
           // 使用智能避让寻找最佳位置
           if (this.config.enableSmartAvoidance) {
-            const bestPos = this.findBestIconPosition(iconTop, iconRight)
+            const bestPos = this.findBestIconPosition(iconTop, iconRight, c.iconEl)
             c._iconTop = bestPos.top
             c._iconRight = bestPos.right
             c._iconOnLeftSide = bestPos.onLeftSide
@@ -302,7 +304,9 @@ if (!window.PanelPositionManager) {
             c._iconRight = iconRight
             c._iconOnLeftSide = false
           }
-          iconTop += iconHeight + iconGap
+          // 使用实际 icon 尺寸计算下一个 icon 的起始位置，避免重叠
+          const actualH = c.iconEl ? c.iconEl.offsetHeight || iconHeight : iconHeight
+          iconTop = (c._iconTop || iconTop) + actualH + iconGap
         }
 
         // 第三步：识别展开的面板
@@ -427,11 +431,14 @@ if (!window.PanelPositionManager) {
             c.iconEl.classList.add('yc-position-ready')
 
             // 记录 icon 位置信息到元素上，用于碰撞检测
+            // 使用实际元素尺寸而非配置值，确保遮挡检测覆盖完整区域
+            const iconActualWidth = c.iconEl.offsetWidth > 0 ? c.iconEl.offsetWidth : iconWidth
+            const iconActualHeight = c.iconEl.offsetHeight > 0 ? c.iconEl.offsetHeight : iconHeight
             this.recordElementBounds(c.iconEl, 'icon', c.id, {
               right: iconRightToUse,
               top: c._iconTop,
-              width: iconWidth,
-              height: iconHeight,
+              width: iconActualWidth,
+              height: iconActualHeight,
             })
           }
 
@@ -771,8 +778,15 @@ if (!window.PanelPositionManager) {
             continue
           }
 
-          const el = document.elementFromPoint(point.x, point.y)
-          if (!this.isIgnorableElement(el, excludeElements)) {
+          const els = document.elementsFromPoint(point.x, point.y)
+          let hasContent = false
+          for (const e of els) {
+            if (!this.isIgnorableElement(e, excludeElements)) {
+              hasContent = true
+              break
+            }
+          }
+          if (hasContent) {
             return false
           }
         }
@@ -812,9 +826,12 @@ if (!window.PanelPositionManager) {
               continue
             }
 
-            const el = document.elementFromPoint(pointX, pointY)
-            if (!this.isIgnorableElement(el, excludeElements)) {
-              overlappedPoints++
+            const els = document.elementsFromPoint(pointX, pointY)
+            for (const e of els) {
+              if (!this.isIgnorableElement(e, excludeElements)) {
+                overlappedPoints++
+                break
+              }
             }
           }
         }
@@ -956,10 +973,19 @@ if (!window.PanelPositionManager) {
               continue
             }
 
-            const el = document.elementFromPoint(pointX, pointY)
+            const els = document.elementsFromPoint(pointX, pointY)
 
-            // 检查是否为可忽略元素
-            if (this.isIgnorableElement(el, excludeElements)) {
+            // 穿透自身元素，查找第一个非自身元素
+            let el = null
+            for (const e of els) {
+              if (!this.isIgnorableElement(e, excludeElements)) {
+                el = e
+                break
+              }
+            }
+
+            // 所有元素都是可忽略的（白屏或自身），跳过
+            if (!el) {
               continue
             }
 
@@ -2135,18 +2161,25 @@ if (!window.PanelPositionManager) {
         return collisions
       },
 
-      // 动态计算 icon 间距
+      // 动态计算 icon 间距（使用实际 icon 尺寸）
       calculateIconGap() {
         const vh = window.innerHeight
         const { edgeMargin, iconHeight, iconGapMin, iconGapMax } = this.config
 
-        const visibleCount = this.components.filter((c) => this.isComponentVisible(c)).length
+        const visibleComponents = this.components.filter((c) => this.isComponentVisible(c))
+        const visibleCount = visibleComponents.length
 
         if (visibleCount <= 1) {
           return iconGapMin
         }
 
-        const availableSpace = vh - edgeMargin * 2 - visibleCount * iconHeight
+        // 使用实际 icon 总高度计算可用空间，避免间距估算偏差
+        const totalActualHeight = visibleComponents.reduce((sum, c) => {
+          const actualH = c.iconEl ? c.iconEl.offsetHeight || iconHeight : iconHeight
+          return sum + actualH
+        }, 0)
+
+        const availableSpace = vh - edgeMargin * 2 - totalActualHeight
         const gapCount = visibleCount - 1
         const dynamicGap = Math.floor(availableSpace / gapCount)
 
@@ -2418,6 +2451,11 @@ if (!window.PanelPositionManager) {
         if (this.pendingCalculate) {
           clearTimeout(this.pendingCalculate)
         }
+        this.stopOcclusionCheck()
+        if (this._resizeHandler) {
+          window.removeEventListener('resize', this._resizeHandler)
+          this._resizeHandler = null
+        }
         this.components = []
       },
 
@@ -2425,9 +2463,9 @@ if (!window.PanelPositionManager) {
         const vh = window.innerHeight
         const { edgeMargin, panelGap, spaceUsageRatio } = this.config
 
+        const hasH = this.hasHTags()
         const expandedPanels = this.components.filter((c) => {
-          const hasH = this.hasHTags()
-          const isHidden = c.id.includes('doc') && this.config.docGeneratorRequireHTags && !hasH
+          const isHidden = this.isComponentHidden(c, hasH)
           const isCollapsed = this.collapsedStates[c.id]
           return !isHidden && !isCollapsed
         })
@@ -2455,6 +2493,42 @@ if (!window.PanelPositionManager) {
       },
 
       // ==================== 智能避让功能 ====================
+
+      /**
+       * 检查元素是否隐藏（视觉上不可见）
+       * @param {Element} el - DOM元素
+       * @returns {boolean} 是否隐藏
+       */
+      isHiddenElement(el) {
+        if (!el) {
+          return true
+        }
+
+        const style = window.getComputedStyle(el)
+
+        if (style.display === 'none') {
+          return true
+        }
+        if (style.visibility === 'hidden' || style.visibility === 'collapse') {
+          return true
+        }
+        if (parseFloat(style.opacity) === 0) {
+          return true
+        }
+
+        // 检查是否被裁剪隐藏
+        if (style.clip === 'rect(1px, 1px, 1px, 1px)' || style.clipPath === 'inset(50%)') {
+          return true
+        }
+
+        // 检查宽高为零
+        const rect = el.getBoundingClientRect()
+        if (rect.width === 0 && rect.height === 0) {
+          return true
+        }
+
+        return false
+      },
 
       /**
        * 检测区域内的可点击元素
@@ -2519,7 +2593,7 @@ if (!window.PanelPositionManager) {
        * @param {number} preferredRight - 首选的right位置
        * @returns {Object} 最佳位置 { top, right, score }
        */
-      findBestIconPosition(preferredTop, preferredRight) {
+      findBestIconPosition(preferredTop, preferredRight, iconEl = null) {
         const vh = window.innerHeight
         const vw = window.innerWidth
         const {
@@ -2531,6 +2605,10 @@ if (!window.PanelPositionManager) {
         } = this.config
         const scrollbarWidth = this.getScrollbarWidth()
 
+        // 使用实际 icon 尺寸（若可用），确保检测区域覆盖完整
+        const actualIconWidth = iconEl ? iconEl.offsetWidth || iconWidth : iconWidth
+        const actualIconHeight = iconEl ? iconEl.offsetHeight || iconHeight : iconHeight
+
         // 候选位置列表
         const candidates = []
 
@@ -2538,8 +2616,8 @@ if (!window.PanelPositionManager) {
         const preferredClickable = this.detectClickableElementsInArea({
           right: preferredRight,
           top: preferredTop,
-          width: iconWidth,
-          height: iconHeight,
+          width: actualIconWidth,
+          height: actualIconHeight,
         })
 
         candidates.push({
@@ -2554,12 +2632,12 @@ if (!window.PanelPositionManager) {
         for (let i = 1; i <= iconPositionSearchSteps; i++) {
           // 向下搜索
           const topDown = preferredTop + i * iconPositionSearchStepY
-          if (topDown + iconHeight <= vh - edgeMargin) {
+          if (topDown + actualIconHeight <= vh - edgeMargin) {
             const clickableDown = this.detectClickableElementsInArea({
               right: preferredRight,
               top: topDown,
-              width: iconWidth,
-              height: iconHeight,
+              width: actualIconWidth,
+              height: actualIconHeight,
             })
             candidates.push({
               top: topDown,
@@ -2576,8 +2654,8 @@ if (!window.PanelPositionManager) {
             const clickableUp = this.detectClickableElementsInArea({
               right: preferredRight,
               top: topUp,
-              width: iconWidth,
-              height: iconHeight,
+              width: actualIconWidth,
+              height: actualIconHeight,
             })
             candidates.push({
               top: topUp,
@@ -2593,12 +2671,12 @@ if (!window.PanelPositionManager) {
         const leftRight = edgeMargin + scrollbarWidth
         for (let i = 0; i <= iconPositionSearchSteps; i++) {
           const top = preferredTop + i * iconPositionSearchStepY
-          if (top + iconHeight <= vh - edgeMargin) {
+          if (top + actualIconHeight <= vh - edgeMargin) {
             const clickableLeft = this.detectClickableElementsInArea({
               right: leftRight,
               top: top,
-              width: iconWidth,
-              height: iconHeight,
+              width: actualIconWidth,
+              height: actualIconHeight,
             })
             candidates.push({
               top: top,
@@ -2792,18 +2870,20 @@ if (!window.PanelPositionManager) {
           if (compReport.icon && compReport.icon.hasOcclusion) {
             const iconBounds = this.getElementBounds(c.iconEl)
             if (iconBounds) {
-              const bestPos = this.findBestIconPosition(iconBounds.top, iconBounds.right)
+              const bestPos = this.findBestIconPosition(iconBounds.top, iconBounds.right, c.iconEl)
               if (bestPos.score > 50) {
                 // 只在找到更好位置时调整
                 c.iconEl.style.top = `${bestPos.top}px`
                 c.iconEl.style.right = `${bestPos.right}px`
 
-                // 更新记录
+                // 更新记录（使用实际元素尺寸）
+                const actualW = c.iconEl.offsetWidth || this.config.iconWidth
+                const actualH = c.iconEl.offsetHeight || this.config.iconHeight
                 this.recordElementBounds(c.iconEl, 'icon', c.id, {
                   right: bestPos.right,
                   top: bestPos.top,
-                  width: this.config.iconWidth,
-                  height: this.config.iconHeight,
+                  width: actualW,
+                  height: actualH,
                 })
 
                 logger.debug(` 调整 ${c.id} icon位置: top=${bestPos.top}, right=${bestPos.right}`)

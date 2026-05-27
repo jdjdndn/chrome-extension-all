@@ -18,7 +18,8 @@
     "history",
     "notifications",
     "contextMenus",
-    "downloads"
+    "downloads",
+    "favicon"
   ],
   "host_permissions": ["*://*/*", "http://localhost/*", "http://127.0.0.1/*"],
   "declarative_net_request": {

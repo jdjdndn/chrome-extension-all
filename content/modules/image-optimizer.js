@@ -227,13 +227,16 @@
       // 将 taskQueue 中的任务转移到 retryQueue（避免任务丢失）
       while (this.taskQueue.length > 0) {
         const task = this.taskQueue.shift()
-        if (task.retryCount < this.maxRetries) {
+        const currentRetry = task.retryCount || 0
+        if (currentRetry < this.maxRetries) {
           this.retryQueue.push({
             ...task,
-            retryCount: (task.retryCount || 0) + 1,
+            retryCount: currentRetry + 1,
           })
           this.stats.retriedTasks++
           console.log(`[ImageCompressorPool] 任务 ${task.id} 已转移到重试队列`)
+        } else {
+          task.reject?.(new Error('Worker 崩溃，已达最大重试次数'))
         }
       }
 
