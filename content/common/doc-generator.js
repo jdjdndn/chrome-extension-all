@@ -713,9 +713,10 @@ if (window.DocGeneratorLoaded) {
       this.bindDragEvents(panel)
 
       // 窗口大小变化时确保面板在可视范围内
-      window.addEventListener('resize', () => {
+      this._resizeHandler = () => {
         this.ensurePanelInViewport()
-      })
+      }
+      window.addEventListener('resize', this._resizeHandler)
 
       // 阻止面板内部滚动事件冒泡到外部
       const panelBody = panel.querySelector('.yc-doc-panel-body')

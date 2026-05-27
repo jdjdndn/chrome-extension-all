@@ -152,21 +152,19 @@
       document.head.appendChild(this.style)
 
       // 绑定滚动事件，更新位置
-      window.addEventListener(
-        'scroll',
-        () => {
-          if (this.isVisible) {
-            this.updatePosition()
-          }
-        },
-        true
-      )
-
-      window.addEventListener('resize', () => {
+      this._scrollHandler = () => {
         if (this.isVisible) {
           this.updatePosition()
         }
-      })
+      }
+      window.addEventListener('scroll', this._scrollHandler, true)
+
+      this._resizeHandler = () => {
+        if (this.isVisible) {
+          this.updatePosition()
+        }
+      }
+      window.addEventListener('resize', this._resizeHandler)
     }
 
     /**
@@ -388,6 +386,10 @@
      */
     destroy() {
       this.hide()
+      window.removeEventListener('scroll', this._scrollHandler, true)
+      window.removeEventListener('resize', this._resizeHandler)
+      this._scrollHandler = null
+      this._resizeHandler = null
       if (this.container) {
         this.container.remove()
       }
