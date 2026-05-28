@@ -204,7 +204,7 @@
           const isOdd = index % 2 === 1
           recommendations.push({
             type: isOdd ? '奇数位置' : '偶数位置',
-            selector: tag + ':nth-child(' + (isOdd ? 'odd' : 'even') + ')',
+            selector: tag + ':nth-of-type(' + (isOdd ? 'odd' : 'even') + ')',
             score: 45,
             description: `选择${isOdd ? '奇数' : '偶数'}位置的元素`,
             pros: ['批量选择'],

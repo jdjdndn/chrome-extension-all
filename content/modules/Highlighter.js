@@ -145,6 +145,14 @@
         overlay.remove()
         this.overlays.delete(pickerUid)
       }
+      // 断开对应的 ResizeObserver
+      if (this._resizeObservers) {
+        const observer = this._resizeObservers.get(pickerUid)
+        if (observer) {
+          observer.disconnect()
+          this._resizeObservers.delete(pickerUid)
+        }
+      }
     }
 
     /**
@@ -167,6 +175,11 @@
     clearAll() {
       this.overlays.forEach((overlay) => overlay.remove())
       this.overlays.clear()
+      // 断开所有 ResizeObserver
+      if (this._resizeObservers) {
+        this._resizeObservers.forEach((observer) => observer.disconnect())
+        this._resizeObservers.clear()
+      }
     }
 
     /**
@@ -221,6 +234,10 @@
           this.updatePosition(pickerUid, element)
         })
         observer.observe(element)
+        if (!this._resizeObservers) {
+          this._resizeObservers = new Map()
+        }
+        this._resizeObservers.set(pickerUid, observer)
       }
     }
 
@@ -231,6 +248,7 @@
       this.clearAll()
       this.clearPreview()
       this.hideHover()
+      this._resizeObservers = null
       if (this.container) {
         this.container.remove()
       }

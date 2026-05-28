@@ -28,6 +28,7 @@
         return
       }
 
+      this._disabled = false
       this.isActive = true
       this.observer = new MutationObserver((mutations) => {
         this._handleMutations(mutations)
