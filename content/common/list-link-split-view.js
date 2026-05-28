@@ -226,7 +226,7 @@ if (window.ListLinkSplitViewLoaded) {
     /**
      * 判断元素是否像列表项
      */
-    looksLikeListItem(element) {
+    looksLikeListItem(element, link) {
       // 获取元素的类名
       const className = element.className || ''
       const id = element.id || ''
