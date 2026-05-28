@@ -8,7 +8,7 @@
   class VirtualList {
     constructor(options = {}) {
       this.container = options.container
-      this.itemHeight = options.itemHeight || 30
+      this.itemHeight = options.itemHeight > 0 ? options.itemHeight : 30
       this.buffer = options.buffer || 5 // 上下缓冲数量
       this.renderItem =
         options.renderItem ||
