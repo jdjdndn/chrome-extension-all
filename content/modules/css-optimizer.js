@@ -601,6 +601,12 @@
         // 延迟加载
         const deferredLink = deferNonCriticalCSS(blobUrl, { media: link.media })
 
+        // 样式表加载后释放 blob URL
+        if (deferredLink) {
+          deferredLink.addEventListener('load', () => URL.revokeObjectURL(blobUrl))
+          deferredLink.addEventListener('error', () => URL.revokeObjectURL(blobUrl))
+        }
+
         // 移除原始样式表
         link.remove()
 
