@@ -67,7 +67,7 @@
       }
       if (document.readyState === 'complete') {
         // 已 load，延迟一拍取消（确保 onLoad 钩子先跑）
-        setTimeout(this._loadHandler, 100)
+        this._loadTimeoutId = setTimeout(this._loadHandler, 100)
       } else {
         window.addEventListener('load', this._loadHandler, { once: true })
       }
@@ -368,6 +368,10 @@
       if (this._loadHandler) {
         window.removeEventListener('load', this._loadHandler)
         this._loadHandler = null
+      }
+      if (this._loadTimeoutId) {
+        clearTimeout(this._loadTimeoutId)
+        this._loadTimeoutId = null
       }
 
       // 取消 UnifiedDOMWatcher 订阅
