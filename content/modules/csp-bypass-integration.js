@@ -13,6 +13,8 @@
     initialized: false,
     blockedScripts: new Set(),
     retryQueue: [],
+    _spvHandler: null,
+    _perfObserver: null,
   }
 
   /**
@@ -75,13 +77,14 @@
           }
         })
         observer.observe({ type: 'resource', buffered: true })
+        state._perfObserver = observer
       } catch (e) {
         console.warn(`${LOG_PREFIX} PerformanceObserver for CSP not supported`)
       }
     }
 
     // Listen for securitypolicyviolation events
-    window.addEventListener('securitypolicyviolation', (e) => {
+    state._spvHandler = (e) => {
       if (e.violatedDirective === 'script-src' || e.violatedDirective === 'script-src-elem') {
         const url = e.blockedURI
         if (
@@ -95,7 +98,8 @@
           handleCSPBlockedScript(url)
         }
       }
-    })
+    }
+    window.addEventListener('securitypolicyviolation', state._spvHandler)
 
     console.log(`${LOG_PREFIX} [CSPBypass] Handler initialized`)
   }
@@ -152,6 +156,19 @@
   window.CSPBypassHandler = {
     init,
     handleCSPBlockedScript,
+    destroy() {
+      if (state._spvHandler) {
+        window.removeEventListener('securitypolicyviolation', state._spvHandler)
+        state._spvHandler = null
+      }
+      if (state._perfObserver) {
+        state._perfObserver.disconnect()
+        state._perfObserver = null
+      }
+      state.initialized = false
+      state.blockedScripts.clear()
+      state.retryQueue = []
+    },
   }
 
   // Auto init
