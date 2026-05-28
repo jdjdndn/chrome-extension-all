@@ -77,8 +77,15 @@ function initAddTitle() {
     }
 
     const range = document.createRange()
-    range.setStart(cloneDom, 0)
-    range.setEnd(cloneDom, cloneDom.childNodes.length)
+    try {
+      range.setStart(cloneDom, 0)
+      range.setEnd(cloneDom, cloneDom.childNodes.length)
+    } catch (e) {
+      if (hasAbsChild) {
+        cloneDom.remove()
+      }
+      return false
+    }
 
     const rangeRect = range.getBoundingClientRect()
     if (hasAbsChild) {
