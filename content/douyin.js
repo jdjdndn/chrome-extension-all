@@ -42,6 +42,15 @@
   const STYLE_TAG_ID = 'douyin-content-hide-style'
   let currentSelectors = []
 
+  // 保存事件监听器引用，用于 destroy 时移除
+  const userActionListeners = {
+    keydown: null,
+    touchstart: null,
+    touchend: null,
+    touchcancel: null,
+    wheel: null,
+  }
+
   const DEFAULT_HIDE_SELECTORS = [
     '.qmhaloYp:nth-child(n):not(:nth-child(2)):not(:nth-child(5))',
     '.ooIf2jbM',
@@ -1219,7 +1228,7 @@
     }
 
     // 监听用户上滑操作，取消自动下滑检测
-    document.addEventListener('keydown', (e) => {
+    userActionListeners.keydown = (e) => {
       // 跳过脚本自动触发的键盘事件，仅响应用户操作
       if (isAutoTriggered) {
         return
@@ -1236,115 +1245,104 @@
         lastNavigationDirection = 'down'
         VideoChangeChecker.cancelAll()
       }
-    })
+    }
+    document.addEventListener('keydown', userActionListeners.keydown)
 
     // 触摸上滑检测（移动端）- 使用捕获阶段确保能捕获到事件
     // 使用 Map 跟踪每个触摸点，避免快速连续滑动时数据覆盖
     const touchTracker = new Map()
-    document.addEventListener(
-      'touchstart',
-      (e) => {
-        // 记录每个触摸点的起始位置和时间
-        for (const touch of e.changedTouches) {
-          touchTracker.set(touch.identifier, {
-            startY: touch.clientY,
-            startTime: Date.now(),
-          })
+    userActionListeners.touchstart = (e) => {
+      for (const touch of e.changedTouches) {
+        touchTracker.set(touch.identifier, {
+          startY: touch.clientY,
+          startTime: Date.now(),
+        })
+      }
+    }
+    document.addEventListener('touchstart', userActionListeners.touchstart, {
+      passive: true,
+      capture: true,
+    })
+    userActionListeners.touchend = (e) => {
+      for (const touch of e.changedTouches) {
+        const tracker = touchTracker.get(touch.identifier)
+        if (!tracker) {
+          continue
         }
-      },
-      { passive: true, capture: true }
-    )
-    document.addEventListener(
-      'touchend',
-      (e) => {
-        for (const touch of e.changedTouches) {
-          const tracker = touchTracker.get(touch.identifier)
-          if (!tracker) {
-            continue
-          }
 
-          const touchEndY = touch.clientY
-          const deltaY = touchEndY - tracker.startY
-          const deltaTime = Date.now() - tracker.startTime
-          // 降低阈值到 30px，并检测快速滑动（速度判断）
-          const velocity = deltaTime > 0 ? Math.abs(deltaY) / deltaTime : 0 // px/ms
-          // 上滑检测（deltaY > 0 表示手指向上滑动，页面向下滚动）
-          if (deltaY > 30 || (deltaY > 10 && velocity > 0.3)) {
+        const touchEndY = touch.clientY
+        const deltaY = touchEndY - tracker.startY
+        const deltaTime = Date.now() - tracker.startTime
+        const velocity = deltaTime > 0 ? Math.abs(deltaY) / deltaTime : 0
+        if (deltaY > 30 || (deltaY > 10 && velocity > 0.3)) {
+          logger.debug(
+            `[用户操作] 检测到触摸上滑 (deltaY=${deltaY.toFixed(1)}px, velocity=${velocity.toFixed(2)}px/ms)`
+          )
+          lastNavigationDirection = 'up'
+          VideoChangeChecker.cancelAll()
+          disableAutoPlay()
+        }
+        if (deltaY < -30 || (deltaY < -10 && velocity > 0.3)) {
+          logger.debug(`[用户操作] 检测到触摸下滑 (deltaY=${deltaY.toFixed(1)}px)`)
+          lastNavigationDirection = 'down'
+          VideoChangeChecker.cancelAll()
+        }
+        touchTracker.delete(touch.identifier)
+      }
+    }
+    document.addEventListener('touchend', userActionListeners.touchend, {
+      passive: true,
+      capture: true,
+    })
+    userActionListeners.touchcancel = (e) => {
+      for (const touch of e.changedTouches) {
+        touchTracker.delete(touch.identifier)
+      }
+    }
+    document.addEventListener('touchcancel', userActionListeners.touchcancel, {
+      passive: true,
+      capture: true,
+    })
+
+    // 鼠标滚轮上滑检测（桌面端）
+    let wheelTimeout = null
+    let wheelDeltaY = 0
+    userActionListeners.wheel = (e) => {
+      if (e.deltaY < 0) {
+        wheelDeltaY += Math.abs(e.deltaY)
+        if (wheelTimeout) {
+          clearTimeout(wheelTimeout)
+        }
+        wheelTimeout = setTimeout(() => {
+          if (wheelDeltaY > 50) {
             logger.debug(
-              `[用户操作] 检测到触摸上滑 (deltaY=${deltaY.toFixed(1)}px, velocity=${velocity.toFixed(2)}px/ms)`
+              `[用户操作] 检测到滚轮上滑 (累积=${wheelDeltaY.toFixed(1)}px)，取消所有自动下滑检测`
             )
             lastNavigationDirection = 'up'
             VideoChangeChecker.cancelAll()
             disableAutoPlay()
           }
-          // 下滑检测（用户主动操作）
-          if (deltaY < -30 || (deltaY < -10 && velocity > 0.3)) {
-            logger.debug(`[用户操作] 检测到触摸下滑 (deltaY=${deltaY.toFixed(1)}px)`)
+          wheelDeltaY = 0
+        }, 100)
+      }
+      if (e.deltaY > 0) {
+        wheelDeltaY -= e.deltaY
+        if (wheelTimeout) {
+          clearTimeout(wheelTimeout)
+        }
+        wheelTimeout = setTimeout(() => {
+          if (wheelDeltaY < -50) {
+            logger.debug(
+              `[用户操作] 检测到滚轮下滑 (累积=${Math.abs(wheelDeltaY).toFixed(1)}px)，取消自动下滑检测`
+            )
             lastNavigationDirection = 'down'
             VideoChangeChecker.cancelAll()
           }
-          // 清理已结束的触摸点
-          touchTracker.delete(touch.identifier)
-        }
-      },
-      { passive: true, capture: true }
-    )
-    // 触摸取消时也要清理
-    document.addEventListener(
-      'touchcancel',
-      (e) => {
-        for (const touch of e.changedTouches) {
-          touchTracker.delete(touch.identifier)
-        }
-      },
-      { passive: true, capture: true }
-    )
-
-    // 鼠标滚轮上滑检测（桌面端）
-    let wheelTimeout = null
-    let wheelDeltaY = 0
-    document.addEventListener(
-      'wheel',
-      (e) => {
-        // deltaY < 0 表示向上滚动（上滑返回）
-        if (e.deltaY < 0) {
-          wheelDeltaY += Math.abs(e.deltaY)
-          // 累积滚动量检测
-          if (wheelTimeout) {
-            clearTimeout(wheelTimeout)
-          }
-          wheelTimeout = setTimeout(() => {
-            if (wheelDeltaY > 50) {
-              logger.debug(
-                `[用户操作] 检测到滚轮上滑 (累积=${wheelDeltaY.toFixed(1)}px)，取消所有自动下滑检测`
-              )
-              lastNavigationDirection = 'up'
-              VideoChangeChecker.cancelAll()
-              disableAutoPlay()
-            }
-            wheelDeltaY = 0
-          }, 100)
-        }
-        // deltaY > 0 表示向下滚动（手动下滑）
-        if (e.deltaY > 0) {
-          wheelDeltaY -= e.deltaY
-          if (wheelTimeout) {
-            clearTimeout(wheelTimeout)
-          }
-          wheelTimeout = setTimeout(() => {
-            if (wheelDeltaY < -50) {
-              logger.debug(
-                `[用户操作] 检测到滚轮下滑 (累积=${Math.abs(wheelDeltaY).toFixed(1)}px)，取消自动下滑检测`
-              )
-              lastNavigationDirection = 'down'
-              VideoChangeChecker.cancelAll()
-            }
-            wheelDeltaY = 0
-          }, 100)
-        }
-      },
-      { passive: true, capture: true }
-    )
+          wheelDeltaY = 0
+        }, 100)
+      }
+    }
+    document.addEventListener('wheel', userActionListeners.wheel, { passive: true, capture: true })
 
     visibilityChangeHandler = () => {
       if (document.hidden) {
@@ -1368,12 +1366,60 @@
     }
   }
 
+  // ========== 清理函数 ==========
+  function destroy() {
+    // 移除用户操作监听器
+    if (userActionListeners.keydown) {
+      document.removeEventListener('keydown', userActionListeners.keydown)
+      userActionListeners.keydown = null
+    }
+    if (userActionListeners.touchstart) {
+      document.removeEventListener('touchstart', userActionListeners.touchstart, { capture: true })
+      userActionListeners.touchstart = null
+    }
+    if (userActionListeners.touchend) {
+      document.removeEventListener('touchend', userActionListeners.touchend, { capture: true })
+      userActionListeners.touchend = null
+    }
+    if (userActionListeners.touchcancel) {
+      document.removeEventListener('touchcancel', userActionListeners.touchcancel, {
+        capture: true,
+      })
+      userActionListeners.touchcancel = null
+    }
+    if (userActionListeners.wheel) {
+      document.removeEventListener('wheel', userActionListeners.wheel, { capture: true })
+      userActionListeners.wheel = null
+    }
+    // 移除页面生命周期监听器
+    if (visibilityChangeHandler) {
+      document.removeEventListener('visibilitychange', visibilityChangeHandler)
+      visibilityChangeHandler = null
+    }
+    if (beforeUnloadHandler) {
+      window.removeEventListener('beforeunload', beforeUnloadHandler)
+      beforeUnloadHandler = null
+    }
+    // 清理定时器和观察器
+    TimerManager.clearAll()
+    VideoChangeChecker.cancelAll()
+    // 清理隐藏样式
+    const style = document.getElementById(STYLE_TAG_ID)
+    if (style) {style.remove()}
+    currentSelectors = []
+    window.DouyinScript.isInitialized = false
+    logger.debug('脚本已销毁')
+  }
+
   // ========== 启动 ==========
   if (document.readyState === 'loading') {
     window.addEventListener('DOMContentLoaded', init)
   } else {
     init()
   }
+
+  // ========== 导出销毁函数 ==========
+  window.DouyinScriptDestroy = destroy
 
   // ========== 导出配置 ==========
   window.DouyinScriptConfig = {
