@@ -87,8 +87,14 @@
      * 更新可见项目
      */
     _update() {
-      if (!this.container || this.items.length === 0) {
+      if (!this.container) {
+        return
+      }
+      if (this.items.length === 0) {
         this.visibleItems = []
+        this.container.innerHTML = ''
+        this.startIndex = 0
+        this.endIndex = 0
         return
       }
 
