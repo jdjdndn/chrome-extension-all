@@ -107,7 +107,9 @@
           const priorityCDNs = ['bootcdn', 'baomitu', 'staticfile', 'jsdelivr']
           if (
             priorityCDNs.includes(cdn.id) &&
-            !document.querySelector(`link[rel="preconnect"][href="${origin}"]`)
+            !Array.from(document.querySelectorAll('link[rel="preconnect"]')).find(
+              (l) => l.href === origin
+            )
           ) {
             this._addPreconnect(origin)
           }
