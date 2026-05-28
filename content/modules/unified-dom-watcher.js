@@ -328,9 +328,19 @@
 
       // 4. LOW: 延迟执行
       if (lowSubscribers.length > 0) {
+        // 累积 mutations 避免取消 timeout 时丢失
+        if (!this._lowBuffer) {
+          this._lowBuffer = []
+        }
+        this._lowBuffer.push(...mutations)
+        if (this._lowTimeoutId) {
+          clearTimeout(this._lowTimeoutId)
+        }
         this._lowTimeoutId = setTimeout(() => {
+          const batch = this._lowBuffer
+          this._lowBuffer = []
           this._lowTimeoutId = null
-          this._executeSubscribers(lowSubscribers, mutations)
+          this._executeSubscribers(lowSubscribers, batch)
         }, 100)
       }
     }
