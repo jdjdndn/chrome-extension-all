@@ -35,10 +35,15 @@ class CSPBypassManager {
     // 检查缓存的成功策略
     const cached = this.cache.get(url)
     if (cached) {
-      const result = await cached.handler(url, type, options)
-      if (result.success) {
-        this.stats.success++
-        return result
+      try {
+        const result = await cached.handler(url, type, options)
+        if (result.success) {
+          this.stats.success++
+          return result
+        }
+      } catch (error) {
+        console.warn(`[CSPBypass] Cached strategy failed:`, error.message)
+        this.cache.delete(url)
       }
     }
 
@@ -80,15 +85,12 @@ class CSPBypassManager {
    * 策略1：declarativeNetRequest（已在网络层拦截）
    */
   async _useDNR() {
-    // DNR在background.js中配置，这里检查是否生效
-    // 通过检测请求头或实际加载判断
-
-    // 对于DNR，我们信任网络层已经处理
-    // 返回成功，实际重定向由DNR完成
+    // DNR在background.js中配置，这里无法确认是否生效
+    // 返回不确定，避免缓存错误的成功策略
     return {
-      success: true,
+      success: false,
       source: 'dnr',
-      message: 'DNR rule should handle this in network layer',
+      message: 'DNR rule may handle this in network layer, but cannot verify',
     }
   }
 
@@ -97,7 +99,9 @@ class CSPBypassManager {
    */
   async _useBackgroundFetch(url, type, options) {
     return new Promise((resolve, reject) => {
+      let settled = false
       const timeout = setTimeout(() => {
+        settled = true
         reject(new Error('Background fetch timeout'))
       }, options.timeout || 10000)
 
@@ -108,6 +112,7 @@ class CSPBypassManager {
           resourceType: type,
         },
         (response) => {
+          if (settled) {return}
           clearTimeout(timeout)
 
           if (chrome.runtime.lastError) {
