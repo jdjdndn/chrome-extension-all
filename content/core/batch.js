@@ -64,10 +64,15 @@
      * @param {string} id - 操作ID
      */
     async execute(id) {
-      const operation = this.pending.get(id) || this.completed.get(id)
+      const operation = this.pending.get(id) || this.running.get(id) || this.completed.get(id)
       if (!operation) {
         console.warn(`[BatchOps] 操作不存在: ${id}`)
         return { success: false, error: '操作不存在' }
+      }
+
+      if (operation.status === 'running') {
+        console.warn(`[BatchOps] 操作正在执行: ${id}`)
+        return { success: false, error: '操作正在执行' }
       }
 
       if (operation.status === 'completed') {
