@@ -182,7 +182,7 @@
         if (index === 1) {
           recommendations.push({
             type: '首元素选择器',
-            selector: tag + ':first-child',
+            selector: tag + ':first-of-type',
             score: 55,
             description: '选择第一个同类型元素',
             pros: ['简洁'],
@@ -191,7 +191,7 @@
         } else if (index === sameTagSiblings.length) {
           recommendations.push({
             type: '尾元素选择器',
-            selector: tag + ':last-child',
+            selector: tag + ':last-of-type',
             score: 55,
             description: '选择最后一个同类型元素',
             pros: ['简洁'],

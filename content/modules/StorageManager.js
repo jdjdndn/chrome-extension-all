@@ -253,7 +253,7 @@ ${data
       a.href = url
       a.download = filename
       a.click()
-      URL.revokeObjectURL(url)
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
     }
 
     // ========== 缓存管理 ==========
@@ -268,7 +268,9 @@ ${data
     getCache(key, maxAge = 60000) {
       // 默认1分钟
       const cached = this.cache.get(key)
-      if (!cached) {return null}
+      if (!cached) {
+        return null
+      }
 
       if (Date.now() - cached.timestamp > maxAge) {
         this.cache.delete(key)
