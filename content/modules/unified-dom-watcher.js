@@ -328,7 +328,8 @@
 
       // 4. LOW: 延迟执行
       if (lowSubscribers.length > 0) {
-        setTimeout(() => {
+        this._lowTimeoutId = setTimeout(() => {
+          this._lowTimeoutId = null
           this._executeSubscribers(lowSubscribers, mutations)
         }, 100)
       }
@@ -440,6 +441,10 @@
       if (this._circuitResumeTimer) {
         clearTimeout(this._circuitResumeTimer)
         this._circuitResumeTimer = null
+      }
+      if (this._lowTimeoutId) {
+        clearTimeout(this._lowTimeoutId)
+        this._lowTimeoutId = null
       }
 
       // 清理状态
