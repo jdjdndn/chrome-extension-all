@@ -109,13 +109,18 @@
       let lastError
 
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        let timeoutId
         try {
           const result = await Promise.race([
             operation.executor(),
-            this._createTimeout(operation.options.timeout),
+            new Promise((_, reject) => {
+              timeoutId = setTimeout(() => reject(new Error('操作超时')), operation.options.timeout)
+            }),
           ])
+          clearTimeout(timeoutId)
           return result
         } catch (error) {
+          clearTimeout(timeoutId)
           lastError = error
           if (attempt < maxRetries) {
             await this._delay(this.config.retryDelay * attempt)
