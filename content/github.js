@@ -11,6 +11,8 @@ if (window.GithubCopyFileLoaded) {
 
   // 当前悬停的链接元素
   let hoveredLink = null
+  let onMouseEnter = null
+  let onMouseLeave = null
 
   const SELECTORS = {
     // 文件树项目选择器
@@ -48,11 +50,15 @@ if (window.GithubCopyFileLoaded) {
   function getCurrentBranch() {
     // 从URL提取: /owner/repo/tree/branch/...
     const match = window.location.pathname.match(/\/tree\/([^/]+)/)
-    if (match) {return match[1]}
+    if (match) {
+      return match[1]
+    }
 
     // 从页面元素提取
     const branchButton = document.querySelector('[data-hotkey="w"] span')
-    if (branchButton) {return branchButton.textContent.trim()}
+    if (branchButton) {
+      return branchButton.textContent.trim()
+    }
 
     // 默认分支
     return 'main'
@@ -130,7 +136,9 @@ if (window.GithubCopyFileLoaded) {
     // 1. 优先检查通过 mouseenter 追踪的悬停链接
     if (hoveredLink) {
       const treeItem = hoveredLink.closest(SELECTORS.treeItem)
-      if (treeItem) {return treeItem}
+      if (treeItem) {
+        return treeItem
+      }
       // 如果链接本身不在 treeItem 中，直接返回链接
       if (hoveredLink.matches('a[href]')) {
         return hoveredLink
@@ -141,7 +149,9 @@ if (window.GithubCopyFileLoaded) {
     const hovered = document.querySelector(':hover')
     if (hovered) {
       const treeItem = hovered.closest(SELECTORS.treeItem)
-      if (treeItem) {return treeItem}
+      if (treeItem) {
+        return treeItem
+      }
     }
 
     // 3. 检查当前焦点元素
@@ -152,11 +162,15 @@ if (window.GithubCopyFileLoaded) {
 
     // 4. 向上查找文件树项目
     const treeItem = activeElement?.closest(SELECTORS.treeItem)
-    if (treeItem) {return treeItem}
+    if (treeItem) {
+      return treeItem
+    }
 
     // 5. 检查是否有选中状态的元素
     const selected = document.querySelector('[aria-selected="true"]')
-    if (selected) {return selected}
+    if (selected) {
+      return selected
+    }
 
     return null
   }
@@ -405,10 +419,14 @@ if (window.GithubCopyFileLoaded) {
       }
 
       const treeItem = getTargetTreeItem()
-      if (!treeItem) {return}
+      if (!treeItem) {
+        return
+      }
 
       const { path, isDirectory } = extractFileInfo(treeItem)
-      if (!path) {return}
+      if (!path) {
+        return
+      }
 
       event.preventDefault()
 
@@ -451,7 +469,9 @@ if (window.GithubCopyFileLoaded) {
 
     try {
       const response = await fetch(rawUrl)
-      if (!response.ok) {throw new Error(`HTTP ${response.status}`)}
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
 
       const blob = await response.blob()
       const url = URL.createObjectURL(blob)
@@ -491,37 +511,50 @@ if (window.GithubCopyFileLoaded) {
     document.addEventListener('keydown', handleKeyDown)
 
     // 监听鼠标移入/移出链接事件（使用事件委托）
-    document.addEventListener(
-      'mouseenter',
-      (e) => {
-        // 确保 e.target 是 Element 类型
-        if (!e.target || typeof e.target.closest !== 'function') {return}
-        const link = e.target.closest('a[href]')
-        if (link) {
-          // 检查是否是文件/文件夹链接
-          const href = link.getAttribute('href') || ''
-          if (href.includes('/blob/') || href.includes('/tree/') || link.closest('[data-path]')) {
-            hoveredLink = link
-          }
+    onMouseEnter = (e) => {
+      if (!e.target || typeof e.target.closest !== 'function') {
+        return
+      }
+      const link = e.target.closest('a[href]')
+      if (link) {
+        const href = link.getAttribute('href') || ''
+        if (href.includes('/blob/') || href.includes('/tree/') || link.closest('[data-path]')) {
+          hoveredLink = link
         }
-      },
-      true
-    )
+      }
+    }
 
-    document.addEventListener(
-      'mouseleave',
-      (e) => {
-        // 确保 e.target 是 Element 类型
-        if (!e.target || typeof e.target.closest !== 'function') {return}
-        const link = e.target.closest('a[href]')
-        if (link && link === hoveredLink) {
-          hoveredLink = null
-        }
-      },
-      true
-    )
+    onMouseLeave = (e) => {
+      if (!e.target || typeof e.target.closest !== 'function') {
+        return
+      }
+      const link = e.target.closest('a[href]')
+      if (link && link === hoveredLink) {
+        hoveredLink = null
+      }
+    }
+
+    document.addEventListener('mouseenter', onMouseEnter, true)
+    document.addEventListener('mouseleave', onMouseLeave, true)
 
     console.log('[GitHub脚本] 文件复制已加载 - Ctrl+C 复制文件内容')
+  }
+
+  // 清理函数
+  function cleanup() {
+    document.removeEventListener('keydown', handleKeyDown)
+    document.removeEventListener('mouseenter', onMouseEnter, true)
+    document.removeEventListener('mouseleave', onMouseLeave, true)
+    hoveredLink = null
+    const toast = document.getElementById('github-copy-toast')
+    if (toast) {toast.remove()}
+    const style = document.getElementById('github-toast-style')
+    if (style) {style.remove()}
+  }
+
+  window.GithubCopyFileDestroy = () => {
+    cleanup()
+    window.GithubCopyFileLoaded = false
   }
 
   // 立即初始化
