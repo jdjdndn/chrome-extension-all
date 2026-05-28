@@ -91,7 +91,11 @@
           const origin = url.origin
 
           // dns-prefetch
-          if (!document.querySelector(`link[rel="dns-prefetch"][href="${origin}"]`)) {
+          if (
+            !Array.from(document.querySelectorAll('link[rel="dns-prefetch"]')).find(
+              (l) => l.href === origin
+            )
+          ) {
             const dnsLink = document.createElement('link')
             dnsLink.rel = 'dns-prefetch'
             dnsLink.href = origin
@@ -273,7 +277,9 @@
       }
 
       // 检查是否已有preload
-      const existing = document.querySelector(`link[rel="preload"][href="${url}"]`)
+      const existing = Array.from(document.querySelectorAll('link[rel="preload"]')).find(
+        (link) => link.href === url
+      )
       if (existing) {
         this.stats.skipped++
         return
@@ -296,12 +302,14 @@
       this._processedUrls.add(url)
       this.stats.preloaded++
 
-      this.stats.details.push({
-        url,
-        type: asType,
-        action: 'preload',
-        time: Date.now(),
-      })
+      if (this.stats.details.length < 100) {
+        this.stats.details.push({
+          url,
+          type: asType,
+          action: 'preload',
+          time: Date.now(),
+        })
+      }
 
       console.log(`${LOG_PREFIX} preload(${asType}): ${url}`)
     }
@@ -332,7 +340,9 @@
      * 添加preconnect提示
      */
     _addPreconnect(url) {
-      if (document.querySelector(`link[rel="preconnect"][href="${url}"]`)) {
+      if (
+        Array.from(document.querySelectorAll('link[rel="preconnect"]')).find((l) => l.href === url)
+      ) {
         return
       }
 
