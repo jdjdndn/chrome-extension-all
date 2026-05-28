@@ -34,7 +34,7 @@ if (window.LangToZhLoaded) {
     const newUrl = needsConversion(window.location.href)
     if (newUrl) {
       console.log('[通用脚本] 语言转换:', window.location.href, '->', newUrl)
-      location.href = newUrl
+      location.replace(newUrl)
     }
   }
 
