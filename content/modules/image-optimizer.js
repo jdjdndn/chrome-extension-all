@@ -793,6 +793,8 @@
       // 低可视区图片延迟到空闲时处理
       if (idleEntries.length > 0) {
         const processIdleEntries = () => {
+          this._pendingIdleId = null
+          this._pendingIdleTimeoutId = null
           idleEntries.forEach((el) => {
             if (el.tagName === 'VIDEO') {
               this._loadVideo(el)
@@ -803,10 +805,9 @@
         }
 
         if (typeof requestIdleCallback !== 'undefined') {
-          requestIdleCallback(processIdleEntries, { timeout: 1000 })
+          this._pendingIdleId = requestIdleCallback(processIdleEntries, { timeout: 1000 })
         } else {
-          // 降级：使用 setTimeout
-          setTimeout(processIdleEntries, 0)
+          this._pendingIdleTimeoutId = setTimeout(processIdleEntries, 0)
         }
       }
     }
@@ -1155,6 +1156,10 @@
             const maxSize = 1920
 
             if (width > maxSize || height > maxSize) {
+              if (!width || !height) {
+                reject(new Error('图片尺寸无效'))
+                return
+              }
               const ratio = Math.min(maxSize / width, maxSize / height)
               width = Math.floor(width * ratio)
               height = Math.floor(height * ratio)
@@ -1513,6 +1518,16 @@
      */
     destroy() {
       this.disableLazyLoad()
+
+      // 取消待执行的 idleCallback/setTimeout
+      if (this._pendingIdleId != null) {
+        cancelIdleCallback(this._pendingIdleId)
+        this._pendingIdleId = null
+      }
+      if (this._pendingIdleTimeoutId != null) {
+        clearTimeout(this._pendingIdleTimeoutId)
+        this._pendingIdleTimeoutId = null
+      }
 
       // 取消 UnifiedDOMWatcher 订阅
       if (this._unsubscribe) {
