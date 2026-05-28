@@ -300,8 +300,9 @@ if (window.KeyboardPaginationLoaded) {
         this._spaReinitTimer = setTimeout(tryReinit, 1500)
       }
 
-      window.addEventListener('popstate', debounced)
-      window.addEventListener('hashchange', debounced)
+      this._spaDebounced = debounced
+      window.addEventListener('popstate', this._spaDebounced)
+      window.addEventListener('hashchange', this._spaDebounced)
 
       // 一次性 DOM 注入观察：30s TTL，命中 nav/分页类即解绑
       const domTtl = 30000
@@ -966,6 +967,11 @@ if (window.KeyboardPaginationLoaded) {
       }
       if (this._detectTimer) {
         clearTimeout(this._detectTimer)
+      }
+      if (this._spaDebounced) {
+        window.removeEventListener('popstate', this._spaDebounced)
+        window.removeEventListener('hashchange', this._spaDebounced)
+        this._spaDebounced = null
       }
       if (this._spaReinitTimer) {
         clearTimeout(this._spaReinitTimer)
