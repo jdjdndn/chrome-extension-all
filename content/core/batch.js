@@ -167,7 +167,7 @@
           onProgress({
             completed: results.length,
             total: ids.length,
-            percentage: Math.round((results.length / ids.length) * 100),
+            percentage: ids.length > 0 ? Math.round((results.length / ids.length) * 100) : 0,
           })
         }
       }
