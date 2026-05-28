@@ -716,8 +716,8 @@ if (window.TextCollectorLoaded) {
       }
 
       const rect = panel.getBoundingClientRect()
-      const currentRight = parseInt(panel.style.right) || 70
-      const currentTop = parseInt(panel.style.top) || 140
+      const currentRight = parseInt(panel.style.right, 10) || 70
+      const currentTop = parseInt(panel.style.top, 10) || 140
 
       let newRight = currentRight
       let newTop = currentTop
@@ -1014,7 +1014,7 @@ if (window.TextCollectorLoaded) {
         list.querySelectorAll('.yc-item-btn-copy').forEach((btn) => {
           btn.addEventListener('click', (e) => {
             e.stopPropagation()
-            const id = parseInt(btn.dataset.copy)
+            const id = parseInt(btn.dataset.copy, 10)
             const item = this.collectedItems.find((i) => i.id === id)
             if (item) {
               navigator.clipboard
@@ -1029,7 +1029,7 @@ if (window.TextCollectorLoaded) {
         list.querySelectorAll('.yc-item-btn-remove').forEach((btn) => {
           btn.addEventListener('click', (e) => {
             e.stopPropagation()
-            this.removeItem(parseInt(btn.dataset.remove))
+            this.removeItem(parseInt(btn.dataset.remove, 10))
           })
         })
       }

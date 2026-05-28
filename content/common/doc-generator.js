@@ -859,8 +859,8 @@ if (window.DocGeneratorLoaded) {
       }
 
       const rect = panel.getBoundingClientRect()
-      const currentRight = parseInt(panel.style.right) || 70
-      const currentTop = parseInt(panel.style.top) || 80
+      const currentRight = parseInt(panel.style.right, 10) || 70
+      const currentTop = parseInt(panel.style.top, 10) || 80
 
       let newRight = currentRight
       let newTop = currentTop
@@ -1372,7 +1372,7 @@ if (window.DocGeneratorLoaded) {
         const clipMatch = clip.match(/rect\s*\(\s*(\d+)/i)
         if (clipMatch) {
           const values = clip.match(/-?\d+/g)
-          if (values && values.every((v) => parseInt(v) === 0)) {
+          if (values && values.every((v) => parseInt(v, 10) === 0)) {
             return true
           }
         }
@@ -1830,7 +1830,7 @@ if (window.DocGeneratorLoaded) {
           uniqueSections.forEach((s, index) => {
             const escapedText = this.escapeHtml(s.text)
             // 获取标题级别 (h1=1, h2=2, ...)
-            const level = parseInt(s.type.replace('h', '')) || 1
+            const level = parseInt(s.type.replace('h', ''), 10) || 1
             const levelClass = `yc-doc-level-${level}`
             if (s.link) {
               html += `<li class="yc-doc-outline-item yc-doc-has-link ${levelClass}" data-index="${index}" data-level="${level}" title="${escapedText}" data-heading-text="${escapedText}">
