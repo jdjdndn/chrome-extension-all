@@ -76,14 +76,14 @@ if (window.ListLinkSplitViewLoaded) {
 
     init() {
       // 监听点击事件
-      document.addEventListener('click', (e) => this.handleClick(e), true)
-
-      // 监听键盘事件，显示提示
-      document.addEventListener('keydown', (e) => this.handleKeyDown(e))
-      document.addEventListener('keyup', (e) => this.handleKeyUp(e))
-
-      // 窗口失焦时清除状态
-      window.addEventListener('blur', () => this.handleBlur())
+      this._boundHandleClick = (e) => this.handleClick(e)
+      this._boundHandleKeyDown = (e) => this.handleKeyDown(e)
+      this._boundHandleKeyUp = (e) => this.handleKeyUp(e)
+      this._boundHandleBlur = () => this.handleBlur()
+      document.addEventListener('click', this._boundHandleClick, true)
+      document.addEventListener('keydown', this._boundHandleKeyDown)
+      document.addEventListener('keyup', this._boundHandleKeyUp)
+      window.addEventListener('blur', this._boundHandleBlur)
 
       console.log('[列表链接拆分视图] 初始化完成')
     }
@@ -444,6 +444,26 @@ if (window.ListLinkSplitViewLoaded) {
       links.forEach((link) => {
         delete link.dataset.altSplitView
       })
+    }
+
+    destroy() {
+      if (this._boundHandleClick) {
+        document.removeEventListener('click', this._boundHandleClick, true)
+      }
+      if (this._boundHandleKeyDown) {
+        document.removeEventListener('keydown', this._boundHandleKeyDown)
+      }
+      if (this._boundHandleKeyUp) {
+        document.removeEventListener('keyup', this._boundHandleKeyUp)
+      }
+      if (this._boundHandleBlur) {
+        window.removeEventListener('blur', this._boundHandleBlur)
+      }
+      this.hideAltHint()
+      const style = document.getElementById('list-link-split-view-hint-style')
+      if (style) {
+        style.remove()
+      }
     }
   }
 

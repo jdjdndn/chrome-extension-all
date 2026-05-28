@@ -59,7 +59,7 @@
   /**
    * 处理消息（EventBus 和原生消息）
    */
-  async function handleMessage(message, sender, sendResponse) {
+  function handleMessage(message, sender, sendResponse) {
     state.messageCount++
     console.log(`[ContentBridge] 收到消息 #${state.messageCount}:`, message.type)
 

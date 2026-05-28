@@ -836,7 +836,8 @@ if (!window.PanelPositionManager) {
           }
         }
 
-        return overlappedPoints / samplePoints
+        const totalPoints = cols * rows
+        return overlappedPoints / totalPoints
       },
 
       // ==================== 内容遮挡检测 ====================
