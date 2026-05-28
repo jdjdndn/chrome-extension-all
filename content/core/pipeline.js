@@ -69,16 +69,21 @@
       let result = input
       const startTime = Date.now()
       let timeoutId
+      let cancelled = false
 
       try {
         // 超时控制
         const timeoutPromise = new Promise((_, reject) => {
-          timeoutId = setTimeout(() => reject(new Error('管道执行超时')), options.timeout)
+          timeoutId = setTimeout(() => {
+            cancelled = true
+            reject(new Error('管道执行超时'))
+          }, options.timeout)
         })
 
         // 执行各阶段
         const executePromise = async () => {
           for (let i = 0; i < stages.length; i++) {
+            if (cancelled) {return null}
             const stage = stages[i]
             const stageName = stage.name || `stage_${i}`
 
