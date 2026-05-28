@@ -237,12 +237,12 @@ class SiteScript {
    */
   setupObservers() {
     // 默认实现：监听 DOM 变化，必要时重新应用样式
-    const observer = new MutationObserver(() => {
+    this._observer = new MutationObserver(() => {
       this.onDOMChange()
     })
 
     if (document.body) {
-      observer.observe(document.body, {
+      this._observer.observe(document.body, {
         childList: true,
         subtree: true,
       })
@@ -283,7 +283,7 @@ class SiteScript {
   setupStorageListener() {
     const storageKey = `${this.siteName}Settings`
 
-    chrome.storage.onChanged.addListener((changes, areaName) => {
+    this._boundStorageChange = (changes, areaName) => {
       if (areaName === 'local' && changes[storageKey]) {
         const newSettings = changes[storageKey].newValue
         if (newSettings) {
@@ -292,7 +292,8 @@ class SiteScript {
           console.log(`[${this.siteName}] 设置已更新:`, this.settings)
         }
       }
-    })
+    }
+    chrome.storage.onChanged.addListener(this._boundStorageChange)
   }
 
   /**
@@ -362,6 +363,29 @@ class SiteScript {
       }
       timer = setTimeout(() => func.apply(this, args), delay)
     }
+  }
+
+  /**
+   * 销毁实例，清理所有监听器和观察者
+   */
+  destroy() {
+    if (this._observer) {
+      this._observer.disconnect()
+      this._observer = null
+    }
+    if (this._boundStorageChange) {
+      try {
+        chrome.storage.onChanged.removeListener(this._boundStorageChange)
+      } catch {}
+      this._boundStorageChange = null
+    }
+    const styleEl = document.getElementById(this.options.styleId)
+    if (styleEl) {
+      styleEl.remove()
+    }
+    const globalKey = `__${this.siteName}ScriptLoaded`
+    window[globalKey] = false
+    this.initialized = false
   }
 }
 
