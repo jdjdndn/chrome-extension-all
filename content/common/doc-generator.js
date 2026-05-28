@@ -618,7 +618,7 @@ if (window.DocGeneratorLoaded) {
       const container = document.getElementById(CONTAINER_ID)
       const panel = document.getElementById(PANEL_ID)
 
-      container.addEventListener('click', (e) => {
+      this._boundContainerClick = (e) => {
         const btn = e.target.closest('[data-action]')
         if (btn) {
           const action = btn.dataset.action
@@ -696,10 +696,11 @@ if (window.DocGeneratorLoaded) {
           this.downloadGithubRepo(index)
           return
         }
-      })
+      }
+      container.addEventListener('click', this._boundContainerClick)
 
       // 监听选择变化
-      document.addEventListener('selectionchange', () => {
+      this._boundSelectionChange = () => {
         const selection = window.getSelection()
         const collectBtn = container.querySelector('[data-action="collect"]')
         if (collectBtn) {
@@ -707,7 +708,8 @@ if (window.DocGeneratorLoaded) {
             ? 'rgba(40, 167, 69, 0.6)'
             : 'rgba(255, 255, 255, 0.2)'
         }
-      })
+      }
+      document.addEventListener('selectionchange', this._boundSelectionChange)
 
       // 拖拽功能
       this.bindDragEvents(panel)
@@ -787,47 +789,34 @@ if (window.DocGeneratorLoaded) {
     bindDragEvents(panel) {
       const header = panel.querySelector('.yc-doc-panel-header')
 
-      header.addEventListener('mousedown', (e) => {
-        // 忽略按钮点击
+      this._boundDragStart = (e) => {
         if (e.target.closest('button')) {
           return
         }
-
         this.isDragging = true
         this.dragStart = { x: e.clientX, y: e.clientY }
-
         const rect = panel.getBoundingClientRect()
         this.panelStart = {
           right: window.innerWidth - rect.right,
           top: rect.top,
         }
-
         panel.classList.add('yc-dragging')
-
-        // 通知位置管理器拖拽开始
         if (window.PanelPositionManager) {
           window.PanelPositionManager.notifyDragStart('doc-generator')
         }
-
         e.preventDefault()
-      })
+      }
 
-      document.addEventListener('mousemove', (e) => {
+      this._boundDragMove = (e) => {
         if (!this.isDragging) {
           return
         }
-
         const dx = this.dragStart.x - e.clientX
         const dy = e.clientY - this.dragStart.y
-
         let newRight = this.panelStart.right + dx
         let newTop = this.panelStart.top + dy
-
-        // 获取面板尺寸
         const panelWidth = panel.offsetWidth
         const panelHeight = panel.offsetHeight
-
-        // 使用位置管理器限制位置（屏幕边界 + 不遮挡 icon）
         if (window.PanelPositionManager) {
           const constrained = window.PanelPositionManager.constrainPanelPosition(
             'doc-generator',
@@ -839,26 +828,27 @@ if (window.DocGeneratorLoaded) {
           newRight = constrained.right
           newTop = constrained.top
         } else {
-          // 回退到简单边界限制
           newRight = Math.max(20, Math.min(newRight, window.innerWidth - panelWidth - 20))
           newTop = Math.max(20, Math.min(newTop, window.innerHeight - panelHeight - 20))
         }
-
         panel.style.right = `${newRight}px`
         panel.style.top = `${newTop}px`
-      })
+      }
 
-      document.addEventListener('mouseup', () => {
+      this._boundDragEnd = () => {
         if (this.isDragging) {
           this.isDragging = false
           panel.classList.remove('yc-dragging')
-          // 通知位置管理器拖拽结束
           if (window.PanelPositionManager) {
             const toolbar = document.getElementById(TOOLBAR_ID)
             window.PanelPositionManager.notifyDragEnd('doc-generator', toolbar, panel)
           }
         }
-      })
+      }
+
+      header.addEventListener('mousedown', this._boundDragStart)
+      document.addEventListener('mousemove', this._boundDragMove)
+      document.addEventListener('mouseup', this._boundDragEnd)
     }
 
     // 确保面板在可视区域内
@@ -2124,6 +2114,33 @@ if (window.DocGeneratorLoaded) {
       const div = document.createElement('div')
       div.textContent = text
       return div.innerHTML
+    }
+
+    destroy() {
+      const container = document.getElementById(CONTAINER_ID)
+      if (container && this._boundContainerClick) {
+        container.removeEventListener('click', this._boundContainerClick)
+      }
+      if (this._boundSelectionChange) {
+        document.removeEventListener('selectionchange', this._boundSelectionChange)
+      }
+      if (this._boundDragMove) {
+        document.removeEventListener('mousemove', this._boundDragMove)
+      }
+      if (this._boundDragEnd) {
+        document.removeEventListener('mouseup', this._boundDragEnd)
+      }
+      if (this._resizeHandler) {
+        window.removeEventListener('resize', this._resizeHandler)
+      }
+      if (container) {
+        container.remove()
+      }
+      const style = document.getElementById('yc-doc-generator-style')
+      if (style) {
+        style.remove()
+      }
+      window.DocGeneratorLoaded = false
     }
   }
 
