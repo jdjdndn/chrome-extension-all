@@ -100,7 +100,7 @@ function processJobList() {
     // 解析时间（这里需要根据实际格式调整）
     // 示例：显示更新标记
 
-    const diffDays = getDiffDays(new Date().toISOString()) // 这里需要实际解析
+    const diffDays = getDiffDays(timeElement.textContent.trim())
 
     const updateClass = getUpdateClass(diffDays)
     if (!updateClass) {
@@ -109,7 +109,7 @@ function processJobList() {
 
     const badge = document.createElement('span')
     badge.className = `boss-job-update ${updateClass}`
-    badge.textContent = formatDate(new Date().toISOString())
+    badge.textContent = formatDate(timeElement.textContent.trim())
 
     const titleElement = card.querySelector('[class*="job-title"], [class*="name"]')
     if (titleElement) {
