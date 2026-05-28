@@ -40,14 +40,9 @@
     }
   }
 
-  /**
-   * 监听 copy 事件
-   */
-  document.addEventListener('copy', () => {
-    // 延迟读取剪贴板，确保内容已写入
+  async function handleClipboardEvent() {
     setTimeout(async () => {
       try {
-        // 尝试从剪贴板 API 读取
         if (navigator.clipboard && navigator.clipboard.readText) {
           const text = await navigator.clipboard.readText()
           if (text) {
@@ -55,35 +50,21 @@
           }
         }
       } catch (error) {
-        // 权限被拒绝，尝试从 selection 读取
         const selection = document.getSelection()
         if (selection && selection.toString()) {
           await recordClipboard(selection.toString())
         }
       }
     }, 100)
-  })
+  }
 
-  /**
-   * 监听 cut 事件
-   */
-  document.addEventListener('cut', () => {
-    setTimeout(async () => {
-      try {
-        if (navigator.clipboard && navigator.clipboard.readText) {
-          const text = await navigator.clipboard.readText()
-          if (text) {
-            await recordClipboard(text)
-          }
-        }
-      } catch (error) {
-        const selection = document.getSelection()
-        if (selection && selection.toString()) {
-          await recordClipboard(selection.toString())
-        }
-      }
-    }, 100)
-  })
+  document.addEventListener('copy', handleClipboardEvent)
+  document.addEventListener('cut', handleClipboardEvent)
+
+  window.ClipboardWatcherDestroy = () => {
+    document.removeEventListener('copy', handleClipboardEvent)
+    document.removeEventListener('cut', handleClipboardEvent)
+  }
 
   console.log('[ClipboardWatcher] 已初始化')
 })()
