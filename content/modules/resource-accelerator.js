@@ -1521,6 +1521,12 @@
             // 保留带版本号的精确匹配，优先删除 URL 全路径 key
             if (key.startsWith('http') || !entry) {
               delete entries[key]
+              // 同步删除孪生键，防止淘汰后仍可通过另一键访问
+              if (entry && entry._cacheKey && entry._cacheKey !== key) {
+                delete entries[entry._cacheKey]
+              } else if (entry && entry.url && entry.url !== key) {
+                delete entries[entry.url]
+              }
               removed++
               this._cacheStats.evictions++
               this._cacheStats.bySize[sizeCategory].evictions++
@@ -1533,7 +1539,14 @@
             for (let i = 0; i < entriesWithScore.length && removed < toRemove; i++) {
               const { key } = entriesWithScore[i]
               if (!key.startsWith('http')) {
+                const twinEntry = entries[key]
                 delete entries[key]
+                // 同步删除孪生键
+                if (twinEntry && twinEntry.url && twinEntry.url !== key) {
+                  delete entries[twinEntry.url]
+                } else if (twinEntry && twinEntry._cacheKey && twinEntry._cacheKey !== key) {
+                  delete entries[twinEntry._cacheKey]
+                }
                 removed++
                 this._cacheStats.evictions++
                 this._cacheStats.bySize[sizeCategory].evictions++
