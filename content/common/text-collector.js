@@ -581,24 +581,32 @@ if (window.TextCollectorLoaded) {
       this.bindDragEvents(panel)
 
       // 监听复制事件 (Ctrl+C)
-      document.addEventListener('copy', (e) => this.handleCopy(e))
+      this._boundHandleCopy = (e) => this.handleCopy(e)
+      document.addEventListener('copy', this._boundHandleCopy)
 
       // 元素选择模式
-      document.addEventListener('mouseover', (e) => this.handleMouseOver(e))
-      document.addEventListener('mouseout', (e) => this.handleMouseOut(e))
-      document.addEventListener('click', (e) => this.handleClick(e), true)
+      this._boundHandleMouseOver = (e) => this.handleMouseOver(e)
+      this._boundHandleMouseOut = (e) => this.handleMouseOut(e)
+      this._boundHandleClick = (e) => this.handleClick(e)
+      document.addEventListener('mouseover', this._boundHandleMouseOver)
+      document.addEventListener('mouseout', this._boundHandleMouseOut)
+      document.addEventListener('click', this._boundHandleClick, true)
 
       // 区域选择模式
-      document.addEventListener('mousedown', (e) => this.handleRegionStart(e))
-      document.addEventListener('mousemove', (e) => this.handleRegionMove(e))
-      document.addEventListener('mouseup', (e) => this.handleRegionEnd(e))
+      this._boundHandleRegionStart = (e) => this.handleRegionStart(e)
+      this._boundHandleRegionMove = (e) => this.handleRegionMove(e)
+      this._boundHandleRegionEnd = (e) => this.handleRegionEnd(e)
+      document.addEventListener('mousedown', this._boundHandleRegionStart)
+      document.addEventListener('mousemove', this._boundHandleRegionMove)
+      document.addEventListener('mouseup', this._boundHandleRegionEnd)
 
       // 键盘快捷键
-      document.addEventListener('keydown', (e) => {
+      this._boundHandleKeyDown = (e) => {
         if (e.key === 'Escape' && this.isSelecting) {
           this.cancelSelection()
         }
-      })
+      }
+      document.addEventListener('keydown', this._boundHandleKeyDown)
 
       // 窗口大小变化时确保面板在可视范围内
       this._resizeHandler = () => {
@@ -1090,6 +1098,44 @@ if (window.TextCollectorLoaded) {
       const div = document.createElement('div')
       div.textContent = text
       return div.innerHTML
+    }
+
+    destroy() {
+      if (this._boundHandleCopy) {
+        document.removeEventListener('copy', this._boundHandleCopy)
+      }
+      if (this._boundHandleMouseOver) {
+        document.removeEventListener('mouseover', this._boundHandleMouseOver)
+      }
+      if (this._boundHandleMouseOut) {
+        document.removeEventListener('mouseout', this._boundHandleMouseOut)
+      }
+      if (this._boundHandleClick) {
+        document.removeEventListener('click', this._boundHandleClick, true)
+      }
+      if (this._boundHandleRegionStart) {
+        document.removeEventListener('mousedown', this._boundHandleRegionStart)
+      }
+      if (this._boundHandleRegionMove) {
+        document.removeEventListener('mousemove', this._boundHandleRegionMove)
+      }
+      if (this._boundHandleRegionEnd) {
+        document.removeEventListener('mouseup', this._boundHandleRegionEnd)
+      }
+      if (this._boundHandleKeyDown) {
+        document.removeEventListener('keydown', this._boundHandleKeyDown)
+      }
+      if (this._resizeHandler) {
+        window.removeEventListener('resize', this._resizeHandler)
+      }
+      const container = document.getElementById(CONTAINER_ID)
+      if (container) {
+        container.remove()
+      }
+      const styles = document.getElementById('yc-text-collector-styles')
+      if (styles) {
+        styles.remove()
+      }
     }
   }
 
