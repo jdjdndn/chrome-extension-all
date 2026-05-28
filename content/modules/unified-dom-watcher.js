@@ -349,6 +349,12 @@
      * 使用 requestIdleCallback 调度
      */
     _scheduleIdle(subscribers, mutations) {
+      // 累积 mutations 避免取消 idle callback 时丢失
+      if (!this._normalBuffer) {
+        this._normalBuffer = []
+      }
+      this._normalBuffer.push(...mutations)
+
       const execute = (deadline) => {
         // 如果时间不够，分批处理
         const remaining = deadline.timeRemaining()
@@ -358,7 +364,9 @@
           return
         }
 
-        this._executeSubscribers(subscribers, mutations)
+        const batch = this._normalBuffer
+        this._normalBuffer = []
+        this._executeSubscribers(subscribers, batch)
         this._ricId = null
       }
 
