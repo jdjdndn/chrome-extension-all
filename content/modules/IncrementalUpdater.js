@@ -91,8 +91,12 @@
       const batch = this.updateQueue.splice(0, this.batchSize)
 
       try {
-        // 并行处理当前批次
-        await Promise.all(batch.map((task) => this.processTask(task)))
+        // 并行处理当前批次（allSettled防止单任务失败丢失整批）
+        const results = await Promise.allSettled(batch.map((task) => this.processTask(task)))
+        const failedCount = results.filter((r) => r.status === 'rejected').length
+        if (failedCount > 0) {
+          console.warn(`[IncrementalUpdater] 批次中 ${failedCount}/${batch.length} 个任务失败`)
+        }
 
         // 更新统计
         this.stats.batchesProcessed++
