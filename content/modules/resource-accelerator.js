@@ -2596,7 +2596,7 @@
       }
 
       const nextCdnName = window.CDNMappings.CDN_BY_ID[next.cdnId]?.name || next.cdnId
-      const remaining = match.fallbackUrls.length
+      const remaining = match.fallbackUrls.length - match._fallbackIndex
 
       console.log(
         `${LOG_PREFIX} 降级: ${failedCdnName} → ${nextCdnName} ` +
