@@ -367,7 +367,11 @@ function convertToDynamicImport(script) {
   const importScript = document.createElement('script')
   importScript.type = 'module'
   // 转义 URL 以防止 XSS
-  const escapedSrc = src.replace(/'/g, "\\'").replace(/`/g, '\\`').replace(/\$/g, '\\$')
+  const escapedSrc = src
+    .replace(/'/g, "\\'")
+    .replace(/`/g, '\\`')
+    .replace(/\$/g, '\\$')
+    .replace(/\)/g, '\\)')
   importScript.textContent = `
     // Dynamic import injected by Resource Accelerator
     (function() {
@@ -591,12 +595,4 @@ window.JSOptimizer = {
   isAnalyticsScript,
 }
 
-export {
-  optimizeScript,
-  batchOptimizeScripts,
-  analyzeScriptMetadata,
-  getStats,
-  reset,
-  isThirdPartyScript,
-  isAnalyticsScript,
-}
+// Named exports handled by bundler; do not add raw export statements

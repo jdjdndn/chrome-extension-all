@@ -1822,16 +1822,16 @@
         return
       }
 
-      // 创建缓存条目（带访问统计）
+      // 存储到对应的大小分类（entry记录双key以便联动淘汰）
       const entry = {
         url: cdnUrl,
+        _cacheKey: cacheKey,
         _accessTime: Date.now(),
         _accessCount: 1,
         _size: contentLength || 0,
         _sizeCategory: sizeCategory,
       }
 
-      // 存储到对应的大小分类
       cache[sizeCategory][cacheKey] = entry
       cache[sizeCategory][url] = entry
 
@@ -2545,8 +2545,13 @@
         window.CDNMappings.CDNHealthProbe.markUnhealthy(failedCdnId)
       }
 
-      // 尝试下一个降级CDN
-      const next = match.fallbackUrls.shift()
+      // 尝试下一个降级CDN（不修改原数组）
+      const fallbackCopy = match.fallbackUrls
+      if (!match._fallbackIndex) {
+        match._fallbackIndex = 0
+      }
+      const next = fallbackCopy[match._fallbackIndex]
+      match._fallbackIndex++
       if (!next) {
         console.warn(
           `${LOG_PREFIX} 无可用降级CDN，原始URL: ${originalUrl}，失败CDN: ${failedCdnName}`
