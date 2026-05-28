@@ -693,7 +693,8 @@ if (!window.PanelPositionManager) {
           rawRatios.push(panelHeightRatios[i] ?? 1 / panelCount)
         }
         const ratioSum = rawRatios.reduce((s, r) => s + r, 0)
-        const normalizedRatios = rawRatios.map((r) => r / ratioSum)
+        const normalizedRatios =
+          ratioSum > 0 ? rawRatios.map((r) => r / ratioSum) : rawRatios.map(() => 1 / panelCount)
 
         const heights = []
         for (let i = 0; i < panelCount; i++) {
@@ -737,6 +738,9 @@ if (!window.PanelPositionManager) {
 
       // 检测区域是否空白
       isAreaEmpty(x, y, width, height, excludeElements = []) {
+        if (width <= 0 || height <= 0) {
+          return true
+        }
         // 根据区域大小确定采样密度
         let samplePoints
         const area = width * height
@@ -803,6 +807,9 @@ if (!window.PanelPositionManager) {
       // 计算重叠比例
       calculateOverlapRatio(rect, excludeElements = []) {
         const { x, y, width, height } = rect
+        if (width <= 0 || height <= 0) {
+          return 0
+        }
         const area = width * height
 
         let samplePoints
@@ -941,6 +948,10 @@ if (!window.PanelPositionManager) {
       sampleOccludedElements(x, y, width, height, excludeElements) {
         const elements = []
         const seenElements = new Set()
+
+        if (width <= 0 || height <= 0) {
+          return { elements: [], ratio: 0 }
+        }
 
         // 根据区域大小确定采样密度
         const area = width * height
@@ -1915,6 +1926,9 @@ if (!window.PanelPositionManager) {
 
       // 评估元素作为主内容元素的可能性
       scoreMainElement(el, vw) {
+        if (!vw) {
+          return 0
+        }
         const rect = el.getBoundingClientRect()
         const width = rect.width
 
@@ -1950,6 +1964,9 @@ if (!window.PanelPositionManager) {
 
       // 通过 DOM 分析找到主体元素
       findMainElementByAnalysis(vw) {
+        if (!vw) {
+          return null
+        }
         // 获取 body 下直接子元素中，宽度适中且居中的元素
         const body = document.body
         const candidates = []
