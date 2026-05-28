@@ -172,5 +172,13 @@ import { createScriptGuard } from './utils/script-guard.js'
   }
 
   // 页面卸载时清理
-  window.addEventListener('beforeunload', cleanup)
+  function onBeforeUnload() {
+    cleanup()
+  }
+  window.addEventListener('beforeunload', onBeforeUnload)
+
+  window.ModelScopeDestroy = () => {
+    cleanup()
+    window.removeEventListener('beforeunload', onBeforeUnload)
+  }
 })()
