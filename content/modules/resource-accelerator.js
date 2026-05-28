@@ -896,7 +896,7 @@
 
           // 4. 先用缓存替换页面中已存在的资源
           this._mark('applyCacheToPage')
-          this._applyCacheToPage()
+          await this._applyCacheToPage()
           this._measure('applyCacheToPage')
 
           // 5. 加载累计统计
@@ -956,6 +956,10 @@
 
       // 使用 requestIdleCallback 逐个预热
       const warmupNext = (index) => {
+        if (this._destroyed) {
+          console.log(`${LOG_PREFIX} 缓存预热已中止（模块已销毁）`)
+          return
+        }
         if (index >= targetsToWarmup.length) {
           console.log(`${LOG_PREFIX} 缓存预热完成`)
           return
@@ -2883,7 +2887,9 @@
 
           // 清除缓存
           if (message.type === 'RESOURCE_ACCELERATOR_CLEAR_CACHE') {
-            this.clearCache().then(() => sendResponse({ cleared: true }))
+            this.clearCache()
+              .then(() => sendResponse({ cleared: true }))
+              .catch((err) => sendResponse({ cleared: false, error: err.message }))
             return true
           }
 
