@@ -222,7 +222,9 @@ function isValidId(id) {
 }
 
 function escapeCss(str) {
-  return CSS ? CSS.escape(str) : str.replace(/([\[\]\{\}\(\)\=\>\+\*\?\^\$\|\\])/g, '\\$1')
+  return typeof CSS !== 'undefined'
+    ? CSS.escape(str)
+    : str.replace(/([\[\]\{\}\(\)\=\>\+\*\?\^\$\|\\])/g, '\\$1')
 }
 
 function findSemanticClass(classes) {
