@@ -382,7 +382,7 @@ if (!window.PanelPositionManager) {
           const c = expandedPanels[i]
           const panelHeight = panelHeights[i] || this.config.minPanelHeight
           const maxAllowed = vh - autoLayoutTop - edgeMargin
-          const actualHeight = Math.min(panelHeight, maxAllowed)
+          const actualHeight = Math.max(0, Math.min(panelHeight, maxAllowed))
 
           panelPositions.set(c.id, {
             right: panelRight,
