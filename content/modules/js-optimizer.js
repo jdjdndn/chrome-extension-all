@@ -280,30 +280,44 @@ function deferToIdle(script) {
   script.dataset._deferredSrc = src
   script.dataset._deferralTime = Date.now().toString()
 
+  let idleHandle = null
+  let forceLoadTimer = null
+
+  const cleanup = () => {
+    if (forceLoadTimer !== null) {
+      clearTimeout(forceLoadTimer)
+      forceLoadTimer = null
+    }
+    if (idleHandle !== null) {
+      cancelIdleCallback(idleHandle)
+      idleHandle = null
+    }
+  }
+
   const loadFn = () => {
-    // 检查元素是否仍在 DOM 中
     if (!script.isConnected) {
+      cleanup()
       return
     }
     if (script.dataset._loaded) {
+      cleanup()
       return
     }
+    cleanup()
     script.src = src
     script.dataset._loaded = 'true'
     state.stats.deferred++
   }
 
-  // 最大延迟 5 秒
-  const forceLoadTimer = setTimeout(loadFn, 5000)
+  forceLoadTimer = setTimeout(loadFn, 5000)
 
   script.onload = () => {
-    clearTimeout(forceLoadTimer)
+    cleanup()
   }
 
   if ('requestIdleCallback' in window) {
-    requestIdleCallback(loadFn, { timeout: 3000 })
+    idleHandle = requestIdleCallback(loadFn, { timeout: 3000 })
   } else {
-    // 页面加载完成后延迟 1 秒
     if (document.readyState === 'complete') {
       setTimeout(loadFn, 1000)
     } else {
