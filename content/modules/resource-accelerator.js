@@ -684,6 +684,9 @@
       // requestIdleCallback 返回值存储（用于销毁时清理）
       this._idleCallbackIds = []
 
+      // setTimeout 降级路径的 timeoutId 存储（用于销毁时清理）
+      this._pendingTimeoutIds = []
+
       // 缓存应用控制标志
       this._applyCacheAborted = false
 
@@ -926,7 +929,8 @@
         const idleId = requestIdleCallback(deferredWork, { timeout: 5000 })
         this._idleCallbackIds.push(idleId)
       } else {
-        setTimeout(deferredWork, 0)
+        const timeoutId = setTimeout(deferredWork, 0)
+        this._pendingTimeoutIds.push(timeoutId)
       }
     }
 
@@ -984,7 +988,8 @@
           this._idleCallbackIds.push(idleId)
         } else {
           // 降级：使用 setTimeout
-          setTimeout(() => {
+          const timeoutId = setTimeout(() => {
+            this._removePendingTimeout(timeoutId)
             this._warmupSingleResource(target)
               .then(() => {
                 warmupNext(index + 1)
@@ -993,6 +998,7 @@
                 warmupNext(index + 1)
               })
           }, 100)
+          this._pendingTimeoutIds.push(timeoutId)
         }
       }
 
@@ -1226,9 +1232,11 @@
         this._idleCallbackIds.push(idleId)
       } else {
         // 降级：延迟执行
-        setTimeout(() => {
+        const timeoutId = setTimeout(() => {
+          this._removePendingTimeout(timeoutId)
           this._executeMigration(legacyCache)
         }, 1000)
+        this._pendingTimeoutIds.push(timeoutId)
       }
     }
 
@@ -1546,7 +1554,8 @@
         this._idleCallbackIds.push(idleId)
       } else {
         // 降级：使用 setTimeout，16ms延迟配合渲染节奏
-        setTimeout(performEviction, 16)
+        const timeoutId = setTimeout(performEviction, 16)
+        this._pendingTimeoutIds.push(timeoutId)
       }
     }
     /**
@@ -1888,6 +1897,16 @@
     _getCacheHitRate() {
       const total = this._cacheStats.hits + this._cacheStats.misses
       return total > 0 ? this._cacheStats.hits / total : 0
+    }
+
+    /**
+     * 从 _pendingTimeoutIds 中移除已执行的 timeoutId
+     */
+    _removePendingTimeout(id) {
+      const idx = this._pendingTimeoutIds.indexOf(id)
+      if (idx !== -1) {
+        this._pendingTimeoutIds.splice(idx, 1)
+      }
     }
 
     /**
@@ -3266,6 +3285,12 @@
           }
         })
         this._idleCallbackIds = []
+      }
+
+      // 清理所有 setTimeout 降级路径
+      if (this._pendingTimeoutIds && this._pendingTimeoutIds.length > 0) {
+        this._pendingTimeoutIds.forEach((id) => clearTimeout(id))
+        this._pendingTimeoutIds = []
       }
 
       // 清理所有事件监听器
