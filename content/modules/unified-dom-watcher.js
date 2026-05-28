@@ -310,6 +310,9 @@
           this._highBuffer = []
         }
         this._highBuffer.push(...mutations)
+        if (this._highBuffer.length > this._MAX_PENDING) {
+          this._highBuffer.splice(0, this._highBuffer.length - this._MAX_PENDING)
+        }
         if (this._rafId) {
           cancelAnimationFrame(this._rafId)
         }
@@ -333,6 +336,9 @@
           this._lowBuffer = []
         }
         this._lowBuffer.push(...mutations)
+        if (this._lowBuffer.length > this._MAX_PENDING) {
+          this._lowBuffer.splice(0, this._lowBuffer.length - this._MAX_PENDING)
+        }
         if (this._lowTimeoutId) {
           clearTimeout(this._lowTimeoutId)
         }
@@ -354,6 +360,9 @@
         this._normalBuffer = []
       }
       this._normalBuffer.push(...mutations)
+      if (this._normalBuffer.length > this._MAX_PENDING) {
+        this._normalBuffer.splice(0, this._normalBuffer.length - this._MAX_PENDING)
+      }
 
       const execute = (deadline) => {
         // 如果时间不够，分批处理
