@@ -72,7 +72,8 @@
       this.isProcessing = true
 
       // 使用 requestAnimationFrame 进行调度
-      requestAnimationFrame(() => {
+      this._rafId = requestAnimationFrame(() => {
+        this._rafId = null
         this.processBatch()
       })
     }
@@ -110,7 +111,10 @@
         // 继续处理剩余任务
         if (this.updateQueue.length > 0) {
           // 延迟一帧后继续
-          requestAnimationFrame(() => this.processBatch())
+          this._rafId = requestAnimationFrame(() => {
+            this._rafId = null
+            this.processBatch()
+          })
         } else {
           this.isProcessing = false
           if (this.callbacks.onComplete) {
@@ -242,6 +246,10 @@
      * 销毁
      */
     destroy() {
+      if (this._rafId) {
+        cancelAnimationFrame(this._rafId)
+        this._rafId = null
+      }
       this.clearQueue()
       this.callbacks = {}
     }
