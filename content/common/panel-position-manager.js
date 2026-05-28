@@ -679,7 +679,7 @@ if (!window.PanelPositionManager) {
 
         // 计算间隙总和
         const gapTotal = panelGap * (panelCount - 1)
-        const usableHeight = availableHeight - gapTotal
+        const usableHeight = Math.max(0, availableHeight - gapTotal)
 
         if (panelCount === 1) {
           // 单个面板独占全部可用高度
@@ -687,11 +687,17 @@ if (!window.PanelPositionManager) {
         }
 
         // 多个面板：按配置的比例分配（已按 priority 排序）
+        // 归一化比例，防止 panelHeightRatios 不足时 fallback 导致总和 >1
+        const rawRatios = []
+        for (let i = 0; i < panelCount; i++) {
+          rawRatios.push(panelHeightRatios[i] ?? 1 / panelCount)
+        }
+        const ratioSum = rawRatios.reduce((s, r) => s + r, 0)
+        const normalizedRatios = rawRatios.map((r) => r / ratioSum)
+
         const heights = []
         for (let i = 0; i < panelCount; i++) {
-          // 使用配置的比例，如果没有配置则均分
-          const ratio = panelHeightRatios[i] || 1 / panelCount
-          const height = Math.floor(usableHeight * ratio)
+          const height = Math.floor(usableHeight * normalizedRatios[i])
           heights.push(Math.max(height, minPanelHeight))
         }
 
