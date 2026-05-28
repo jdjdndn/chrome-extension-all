@@ -30,6 +30,25 @@ if (window.KeyboardClickLoaded) {
       // 长按阈值（毫秒）
       this.LONG_PRESS_THRESHOLD = 300
 
+      // 保存事件监听器引用，用于 destroy 时移除
+      this._boundMouseOver = (e) => {
+        this.hoveredEl = e.target
+      }
+      this._boundMouseOut = (e) => {
+        if (!e.relatedTarget) {
+          this.hoveredEl = null
+        }
+      }
+      this._boundMouseMove = (e) => {
+        this.mouseX = e.clientX
+        this.mouseY = e.clientY
+        if (this.spaceHeld) {
+          this._extendSelectionTo(e.clientX, e.clientY)
+        }
+      }
+      this._boundKeyDown = (e) => this._handleKeyDown(e)
+      this._boundKeyUp = (e) => this._handleKeyUp(e)
+
       this._init()
     }
 
@@ -64,99 +83,59 @@ if (window.KeyboardClickLoaded) {
 
     // ========== 鼠标追踪 ==========
     _bindMouse() {
-      // 追踪悬停元素
-      document.addEventListener(
-        'mouseover',
-        (e) => {
-          this.hoveredEl = e.target
-        },
-        true
-      )
-      document.addEventListener(
-        'mouseout',
-        (e) => {
-          if (!e.relatedTarget) {
-            this.hoveredEl = null
-          }
-        },
-        true
-      )
-
-      // 追踪精确坐标（空格选择需要像素级定位）
-      document.addEventListener(
-        'mousemove',
-        (e) => {
-          this.mouseX = e.clientX
-          this.mouseY = e.clientY
-          // 空格按住时实时扩展选择
-          if (this.spaceHeld) {
-            this._extendSelectionTo(e.clientX, e.clientY)
-          }
-        },
-        true
-      )
+      document.addEventListener('mouseover', this._boundMouseOver, true)
+      document.addEventListener('mouseout', this._boundMouseOut, true)
+      document.addEventListener('mousemove', this._boundMouseMove, true)
     }
 
     // ========== 键盘 ==========
     _bindKeyboard() {
-      document.addEventListener(
-        'keydown',
-        (e) => {
-          // 组合键（Ctrl+Space 等）不拦截
-          if (this._isComboKey(e)) {
-            return
+      document.addEventListener('keydown', this._boundKeyDown, true)
+      document.addEventListener('keyup', this._boundKeyUp, true)
+    }
+
+    _handleKeyDown(e) {
+      if (this._isComboKey(e)) {
+        return
+      }
+      if (this._isInputFocused()) {
+        return
+      }
+
+      switch (e.key) {
+        case ' ':
+          e.preventDefault()
+          e.stopImmediatePropagation()
+          if (!this.spaceHeld && !this.spaceTimer) {
+            this.spaceDownTime = Date.now()
+            this.spaceTimer = setTimeout(() => {
+              this._startTextSelection()
+              this.spaceTimer = null
+            }, this.LONG_PRESS_THRESHOLD)
           }
+          break
 
-          // 输入框聚焦时不拦截
-          if (this._isInputFocused()) {
-            return
+        case 'x':
+        case 'X':
+          if (!this.spaceHeld) {
+            this._doRightClick(e)
           }
+          break
 
-          switch (e.key) {
-            case ' ':
-              // 空格按下时完全阻止事件传播和默认行为
-              // stopImmediatePropagation 阻止同元素其他 capture 监听器触发
-              e.preventDefault()
-              e.stopImmediatePropagation()
-              if (!this.spaceHeld && !this.spaceTimer) {
-                this.spaceDownTime = Date.now()
-                // 设置长按定时器，超时后进入选择模式
-                this.spaceTimer = setTimeout(() => {
-                  this._startTextSelection()
-                  this.spaceTimer = null
-                }, this.LONG_PRESS_THRESHOLD)
-              }
-              break
-
-            case 'x':
-            case 'X':
-              if (!this.spaceHeld) {
-                this._doRightClick(e)
-              }
-              break
-
-            case 'Escape':
-              if (this.spaceHeld) {
-                this._cancelSelect()
-              }
-              break
+        case 'Escape':
+          if (this.spaceHeld) {
+            this._cancelSelect()
           }
-        },
-        true
-      )
+          break
+      }
+    }
 
-      document.addEventListener(
-        'keyup',
-        (e) => {
-          if (e.key === ' ' && !this._isComboKey(e)) {
-            // 阻止 keyup 的默认行为和传播，防止页面其他监听器二次处理空格键
-            e.preventDefault()
-            e.stopImmediatePropagation()
-            this._onSpaceUp(e)
-          }
-        },
-        true
-      )
+    _handleKeyUp(e) {
+      if (e.key === ' ' && !this._isComboKey(e)) {
+        e.preventDefault()
+        e.stopImmediatePropagation()
+        this._onSpaceUp(e)
+      }
     }
 
     _isInputFocused() {
@@ -856,8 +835,17 @@ if (window.KeyboardClickLoaded) {
 
     // ========== 销毁 ==========
     destroy() {
+      document.removeEventListener('mouseover', this._boundMouseOver, true)
+      document.removeEventListener('mouseout', this._boundMouseOut, true)
+      document.removeEventListener('mousemove', this._boundMouseMove, true)
+      document.removeEventListener('keydown', this._boundKeyDown, true)
+      document.removeEventListener('keyup', this._boundKeyUp, true)
       if (this.observer) {
         this.observer.disconnect()
+      }
+      if (this.spaceTimer) {
+        clearTimeout(this.spaceTimer)
+        this.spaceTimer = null
       }
       this._cancelSelect()
       this.hoveredEl = null
