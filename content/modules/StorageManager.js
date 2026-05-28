@@ -217,10 +217,10 @@
 // 生成时间: ${new Date().toISOString()}
 
 ${data
-  .map(
-    (item, i) =>
-      `// 元素 ${i + 1}: ${item.tagName}${item.id ? '#' + item.id : ''}${item.className ? '.' + item.className.split(' ')[0] : ''}\nconst element${i + 1} = await page.locator('${item.selector.replace(/'/g, "\\'")}');`
-  )
+  .map((item, i) => {
+    const safeSelector = JSON.stringify(item.selector)
+    return `// 元素 ${i + 1}: ${item.tagName}${item.id ? '#' + item.id : ''}${item.className ? '.' + item.className.split(' ')[0] : ''}\nconst element${i + 1} = await page.locator(${safeSelector});`
+  })
   .join('\n\n')}
 `
       this._download(code, 'selectors.playwright.js', 'text/javascript')
@@ -234,10 +234,10 @@ ${data
 // 生成时间: ${new Date().toISOString()}
 
 ${data
-  .map(
-    (item, i) =>
-      `// 元素 ${i + 1}: ${item.tagName}${item.id ? '#' + item.id : ''}${item.className ? '.' + item.className.split(' ')[0] : ''}\nconst element${i + 1} = await page.$('${item.selector.replace(/'/g, "\\'")}');`
-  )
+  .map((item, i) => {
+    const safeSelector = JSON.stringify(item.selector)
+    return `// 元素 ${i + 1}: ${item.tagName}${item.id ? '#' + item.id : ''}${item.className ? '.' + item.className.split(' ')[0] : ''}\nconst element${i + 1} = await page.$(${safeSelector});`
+  })
   .join('\n\n')}
 `
       this._download(code, 'selectors.puppeteer.js', 'text/javascript')
