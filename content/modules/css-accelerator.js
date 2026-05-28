@@ -142,12 +142,14 @@
 
         this._reportReplacement(match)
 
-        this.stats.details.push({
-          name: match.name,
-          original: originalHref,
-          cdn: match.cdnUrl,
-          time: Date.now(),
-        })
+        if (this.stats.details.length < 100) {
+          this.stats.details.push({
+            name: match.name,
+            original: originalHref,
+            cdn: match.cdnUrl,
+            time: Date.now(),
+          })
+        }
       } catch (error) {
         this.stats.errors++
         console.error(`${LOG_PREFIX} 替换失败:`, error)
@@ -255,6 +257,9 @@
 
         // 重新设置监听
         this._setupMutationObserver()
+
+        // 重处理降级期间遗漏的link
+        this._processExistingLinks()
 
         // 清除降级标记
         this.stats.degraded = false

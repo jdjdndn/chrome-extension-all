@@ -321,8 +321,12 @@ function deferToIdle(script) {
 
   forceLoadTimer = setTimeout(loadFn, 5000)
 
+  const prevOnload = script.onload
   script.onload = () => {
     cleanup()
+    if (typeof prevOnload === 'function') {
+      prevOnload.call(script)
+    }
   }
 
   if ('requestIdleCallback' in window) {

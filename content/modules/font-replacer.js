@@ -97,13 +97,19 @@
      * 处理单个link标签
      */
     processLink(link) {
-      if (!this.enabled) {return}
+      if (!this.enabled) {
+        return
+      }
 
       const url = link.href
-      if (!url) {return}
+      if (!url) {
+        return
+      }
 
       // 避免重复处理
-      if (this._processedLinks.has(link)) {return}
+      if (this._processedLinks.has(link)) {
+        return
+      }
       this._processedLinks.add(link)
 
       this.stats.total++
@@ -142,12 +148,14 @@
         this.reportReplacement(match)
 
         // 记录详情
-        this.stats.details.push({
-          name: match.name,
-          original: originalHref,
-          cdn: match.cdnUrl,
-          time: Date.now(),
-        })
+        if (this.stats.details.length < 100) {
+          this.stats.details.push({
+            name: match.name,
+            original: originalHref,
+            cdn: match.cdnUrl,
+            time: Date.now(),
+          })
+        }
       } catch (error) {
         this.stats.errors++
         console.error(`${LOG_PREFIX} 替换失败:`, error)
@@ -166,7 +174,9 @@
      * 检查排除规则
      */
     shouldExclude(url) {
-      if (!url || typeof url !== 'string') {return true}
+      if (!url || typeof url !== 'string') {
+        return true
+      }
 
       // 默认排除规则
       const defaultExcludes = [
@@ -191,7 +201,9 @@
      * 上报统计到background
      */
     reportReplacement(match) {
-      if (!this.reportEnabled) {return}
+      if (!this.reportEnabled) {
+        return
+      }
 
       try {
         if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
@@ -276,6 +288,9 @@
 
         // 重新设置监听
         this._setupMutationObserver()
+
+        // 重处理降级期间遗漏的link
+        this._processExistingLinks()
 
         // 清除降级标记
         this.stats.degraded = false

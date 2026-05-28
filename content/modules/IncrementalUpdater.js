@@ -133,10 +133,14 @@
           }
         }
       } catch (error) {
-        if (this.callbacks.onError) {
-          this.callbacks.onError(error, batch)
-        }
         this.isProcessing = false
+        try {
+          if (this.callbacks.onError) {
+            this.callbacks.onError(error, batch)
+          }
+        } catch (callbackError) {
+          console.warn('[IncrementalUpdater] onError callback threw:', callbackError)
+        }
         if (this.updateQueue.length > 0) {
           this.scheduleProcessing()
         }
