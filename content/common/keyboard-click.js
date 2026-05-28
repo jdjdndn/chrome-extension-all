@@ -208,6 +208,8 @@ if (window.KeyboardClickLoaded) {
         if (nonTextTypes.includes(type)) {
           return false
         }
+        // 文本类 INPUT（text/email/password 等）视为输入焦点
+        return true
       }
 
       return false
