@@ -380,18 +380,14 @@ function convertToDynamicImport(script) {
   // 创建动态 import 包装
   const importScript = document.createElement('script')
   importScript.type = 'module'
-  // 转义 URL 以防止 XSS
-  const escapedSrc = src
-    .replace(/'/g, "\\'")
-    .replace(/`/g, '\\`')
-    .replace(/\$/g, '\\$')
-    .replace(/\)/g, '\\)')
+  // JSON.stringify 自动转义引号、换行、控制字符等，防止XSS注入
+  const safeSrc = JSON.stringify(src)
   importScript.textContent = `
     // Dynamic import injected by Resource Accelerator
     (function() {
       const loadModule = function() {
-        import('${escapedSrc}')
-          .then(m => { console.log('[JS-Optimizer] Loaded:', '${escapedSrc.substring(0, 50)}'); })
+        import(${safeSrc})
+          .then(m => { console.log('[JS-Optimizer] Loaded:', ${safeSrc}.substring(0, 50)); })
           .catch(e => { console.error('[JS-Optimizer] Failed:', e); });
       };
       if ('requestIdleCallback' in window) {
