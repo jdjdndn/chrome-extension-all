@@ -39,9 +39,9 @@ if (window.LangToZhLoaded) {
   }
 
   // 监听 history 变化（SPA 应用）
-  const originalPushState = history.pushState
+  const originalPushState = history.pushState.bind(history)
   history.pushState = function (...args) {
-    originalPushState.apply(this, args)
+    originalPushState(...args)
     convertLangInURL()
   }
 
@@ -49,6 +49,15 @@ if (window.LangToZhLoaded) {
 
   // 页面加载时执行
   convertLangInURL()
+
+  // 清理：还原 pushState 并移除 popstate 监听器
+  window.LangToZhDestroy = () => {
+    if (originalPushState) {
+      history.pushState = originalPushState
+    }
+    window.removeEventListener('popstate', convertLangInURL)
+    window.LangToZhLoaded = false
+  }
 
   console.log('[通用脚本] 语言转换脚本已加载')
 }
