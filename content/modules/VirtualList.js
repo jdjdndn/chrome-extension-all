@@ -10,7 +10,13 @@
       this.container = options.container
       this.itemHeight = options.itemHeight || 30
       this.buffer = options.buffer || 5 // 上下缓冲数量
-      this.renderItem = options.renderItem || ((item) => `<div>${item}</div>`)
+      this.renderItem =
+        options.renderItem ||
+        ((item) => {
+          const div = document.createElement('div')
+          div.textContent = item
+          return div.innerHTML
+        })
 
       this.items = []
       this.visibleItems = []
@@ -104,7 +110,9 @@
      * 渲染可见项目
      */
     _render() {
-      if (!this.container) {return}
+      if (!this.container) {
+        return
+      }
 
       // 创建占位容器
       const wrapper = document.createElement('div')
