@@ -491,7 +491,10 @@ class ScriptDependencyManager {
  * 预加载关键脚本
  */
 function preloadCriticalScript(url) {
-  if (document.querySelector(`link[rel="preload"][href="${url}"]`)) {
+  const existing = Array.from(document.querySelectorAll('link[rel="preload"]')).find(
+    (link) => link.href === url
+  )
+  if (existing) {
     return
   }
 

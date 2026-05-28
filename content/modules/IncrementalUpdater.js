@@ -112,6 +112,13 @@
           this.callbacks.onUpdate(batch)
         }
 
+        // 检查是否被 clearQueue 取消
+        if (this._clearRequested) {
+          this._clearRequested = false
+          this.isProcessing = false
+          return
+        }
+
         // 继续处理剩余任务
         if (this.updateQueue.length > 0) {
           // 延迟一帧后继续
@@ -221,7 +228,7 @@
      */
     clearQueue() {
       this.updateQueue = []
-      this.isProcessing = false
+      this._clearRequested = true
     }
 
     /**
