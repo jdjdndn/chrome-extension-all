@@ -282,6 +282,8 @@ function deferToIdle(script) {
 
   let idleHandle = null
   let forceLoadTimer = null
+  let fallbackTimer = null
+  let loadHandler = null
 
   const cleanup = () => {
     if (forceLoadTimer !== null) {
@@ -291,6 +293,14 @@ function deferToIdle(script) {
     if (idleHandle !== null) {
       cancelIdleCallback(idleHandle)
       idleHandle = null
+    }
+    if (fallbackTimer !== null) {
+      clearTimeout(fallbackTimer)
+      fallbackTimer = null
+    }
+    if (loadHandler) {
+      window.removeEventListener('load', loadHandler)
+      loadHandler = null
     }
   }
 
@@ -319,11 +329,20 @@ function deferToIdle(script) {
     idleHandle = requestIdleCallback(loadFn, { timeout: 3000 })
   } else {
     if (document.readyState === 'complete') {
-      setTimeout(loadFn, 1000)
+      fallbackTimer = setTimeout(loadFn, 1000)
     } else {
-      window.addEventListener('load', () => setTimeout(loadFn, 1000), { once: true })
+      loadHandler = () => {
+        fallbackTimer = setTimeout(loadFn, 1000)
+      }
+      window.addEventListener('load', loadHandler, { once: true })
     }
   }
+
+  // 保存清理引用，供 destroy 使用
+  if (!state._pendingCleanups) {
+    state._pendingCleanups = []
+  }
+  state._pendingCleanups.push(cleanup)
 }
 
 // ========== 动态 import 代码分割
@@ -601,6 +620,13 @@ window.JSOptimizer = {
   reset,
   isThirdPartyScript,
   isAnalyticsScript,
+  destroy() {
+    if (state._pendingCleanups) {
+      state._pendingCleanups.forEach((fn) => fn())
+      state._pendingCleanups = []
+    }
+    reset()
+  },
 }
 
 // Named exports handled by bundler; do not add raw export statements
