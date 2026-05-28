@@ -154,8 +154,14 @@
     return true
   })
 
+  // 定时器引用（用于清理）
+  const timers = {
+    heartbeat: null,
+    checkEventBus: null,
+  }
+
   // 启动心跳
-  const heartbeatInterval = setInterval(async () => {
+  timers.heartbeat = setInterval(async () => {
     if (document.hidden) {
       return
     } // 页面隐藏时不发送心跳
@@ -181,21 +187,23 @@
   }, PING_INTERVAL)
 
   // 页面卸载时清理
-  window.addEventListener('beforeunload', () => {
-    clearInterval(heartbeatInterval)
-  })
+  function onBeforeUnload() {
+    clearInterval(timers.heartbeat)
+    clearInterval(timers.checkEventBus)
+  }
+  window.addEventListener('beforeunload', onBeforeUnload)
 
   // 等待 EventBus 就绪后初始化监听
-  const checkEventBusReady = setInterval(() => {
+  timers.checkEventBus = setInterval(() => {
     if (isEventBusReady()) {
-      clearInterval(checkEventBusReady)
+      clearInterval(timers.checkEventBus)
       initEventBusListeners()
       console.log('[ContentBridge] EventBus 监听已初始化')
     }
   }, 500)
 
   // 5秒后停止检查
-  setTimeout(() => clearInterval(checkEventBusReady), 5000)
+  setTimeout(() => clearInterval(timers.checkEventBus), 5000)
 
   // 导出接口
   window.ContentBridge = {
@@ -207,6 +215,12 @@
         return await EventBus.request(type, data)
       }
       return await chrome.runtime.sendMessage({ type, ...data })
+    },
+    destroy() {
+      clearInterval(timers.heartbeat)
+      clearInterval(timers.checkEventBus)
+      window.removeEventListener('beforeunload', onBeforeUnload)
+      state.isReady = false
     },
   }
 
