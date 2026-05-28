@@ -245,24 +245,57 @@ function initWidenPage() {
     }
   }
 
-  // 监听来自 popup 的实时宽度更新
-  window.addEventListener('yc-widen-page-update', (e) => {
+  // 保存监听器引用，用于清理
+  const onUpdate = (e) => {
     if (e.detail && e.detail.width) {
       inject(e.detail.width)
     }
-  })
-
-  // 监听开关变化
-  window.addEventListener('yc-widen-page-toggle', (e) => {
+  }
+  const onToggle = (e) => {
     if (e.detail && e.detail.enabled) {
       loadAndInject()
     } else {
       remove()
     }
-  })
+  }
+  const onStorageChange = (changes, area) => {
+    if (area !== 'local') {
+      return
+    }
+    if (changes.scriptSwitches) {
+      const next = changes.scriptSwitches.newValue || {}
+      if (next['widen-page'] === false) {
+        remove()
+      } else {
+        loadAndInject()
+      }
+    }
+    if (changes.widenPageWidth) {
+      const w = parseInt(changes.widenPageWidth.newValue, 10) || DEFAULT_WIDTH
+      if (!window.getScriptSwitch || window.getScriptSwitch('widen-page')) {
+        inject(w)
+      }
+    }
+  }
+
+  window.addEventListener('yc-widen-page-update', onUpdate)
+  window.addEventListener('yc-widen-page-toggle', onToggle)
+  window.addEventListener('beforeunload', remove)
+  try {
+    chrome.storage.onChanged.addListener(onStorageChange)
+  } catch {}
 
   // 清理
-  window.addEventListener('beforeunload', remove)
+  window.WidenPageDestroy = () => {
+    window.removeEventListener('yc-widen-page-update', onUpdate)
+    window.removeEventListener('yc-widen-page-toggle', onToggle)
+    window.removeEventListener('beforeunload', remove)
+    try {
+      chrome.storage.onChanged.removeListener(onStorageChange)
+    } catch {}
+    remove()
+    window.WidenPageLoaded = false
+  }
 
   // 初始注入
   function loadAndInject() {
