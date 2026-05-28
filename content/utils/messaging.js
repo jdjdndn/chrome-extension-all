@@ -170,7 +170,9 @@ export function createMessageHandler(handlerId, handlers) {
         const result = handler(message, sender)
         // 支持异步处理
         if (result instanceof Promise) {
-          result.then(sendResponse)
+          result.then(sendResponse).catch((err) => {
+            sendResponse({ error: err?.message || String(err) })
+          })
           return true // 保持通道开放
         }
         sendResponse(result)
