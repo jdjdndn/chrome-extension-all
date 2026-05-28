@@ -401,9 +401,11 @@
       this._resizeHandler = null
       if (this.container) {
         this.container.remove()
+        this.container = null
       }
       if (this.style) {
         this.style.remove()
+        this.style = null
       }
     }
   }
