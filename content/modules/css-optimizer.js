@@ -315,7 +315,12 @@
 
         if (criticalCount >= maxRules) {
           // 达到最大规则数，剩余规则归为非关键
-          nonCriticalRules.push(...rules.slice(rules.indexOf(rule) + 1))
+          const remainingIndex =
+            rules.indexOf(rule, criticalRules.length + nonCriticalRules.length) ||
+            rules.indexOf(rule)
+          if (remainingIndex >= 0) {
+            nonCriticalRules.push(...rules.slice(remainingIndex + 1))
+          }
           break
         }
       } else {

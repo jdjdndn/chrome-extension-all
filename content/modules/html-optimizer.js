@@ -598,8 +598,12 @@
       // 对于非关键样式，使用 media="print" + onload 技巧
       if (!isCriticalStyle(link)) {
         link.media = 'print'
+        const prevOnload = link.onload
         link.onload = function () {
           this.media = 'all'
+          if (typeof prevOnload === 'function') {
+            prevOnload.call(this)
+          }
         }
         state.stats.renderBlockingRemoved++
         addLog('info', 'render_blocking_removed', { type: 'style', href: link.href })
