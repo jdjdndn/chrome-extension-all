@@ -656,7 +656,7 @@ if (window.TextCollectorLoaded) {
         e.preventDefault()
       })
 
-      document.addEventListener('mousemove', (e) => {
+      this._boundPanelDragMove = (e) => {
         if (!this.isDragging) {
           return
         }
@@ -691,9 +691,10 @@ if (window.TextCollectorLoaded) {
         panel.style.right = `${newRight}px`
         panel.style.top = `${newTop}px`
         panel.style.bottom = 'auto'
-      })
+      }
+      document.addEventListener('mousemove', this._boundPanelDragMove)
 
-      document.addEventListener('mouseup', () => {
+      this._boundPanelDragEnd = () => {
         if (this.isDragging) {
           this.isDragging = false
           panel.classList.remove('yc-dragging')
@@ -703,7 +704,8 @@ if (window.TextCollectorLoaded) {
             window.PanelPositionManager.notifyDragEnd('text-collector', floatBtn, panel)
           }
         }
-      })
+      }
+      document.addEventListener('mouseup', this._boundPanelDragEnd)
     }
 
     // 确保面板在可视区域内
@@ -1124,6 +1126,12 @@ if (window.TextCollectorLoaded) {
       }
       if (this._boundHandleKeyDown) {
         document.removeEventListener('keydown', this._boundHandleKeyDown)
+      }
+      if (this._boundPanelDragMove) {
+        document.removeEventListener('mousemove', this._boundPanelDragMove)
+      }
+      if (this._boundPanelDragEnd) {
+        document.removeEventListener('mouseup', this._boundPanelDragEnd)
       }
       if (this._resizeHandler) {
         window.removeEventListener('resize', this._resizeHandler)
