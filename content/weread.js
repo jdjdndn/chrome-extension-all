@@ -154,6 +154,28 @@ async function init() {
   console.log('[微信阅读] 脚本已加载')
 }
 
+function cleanup() {
+  if (intervalId) {
+    clearInterval(intervalId)
+    intervalId = null
+  }
+  const btn = document.getElementById('floatBtn')
+  if (btn) {
+    btn.remove()
+  }
+  styleInjector.remove()
+}
+
+function onBeforeUnload() {
+  cleanup()
+}
+window.addEventListener('beforeunload', onBeforeUnload)
+
+window.WereadDestroy = () => {
+  cleanup()
+  window.removeEventListener('beforeunload', onBeforeUnload)
+}
+
 // 启动
 if (document.readyState === 'loading') {
   window.addEventListener('DOMContentLoaded', init)
