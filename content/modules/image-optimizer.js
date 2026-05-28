@@ -1038,6 +1038,12 @@
           const compressedUrl = await this.compressImage(originalSrc, priority)
           if (compressedUrl) {
             img.src = compressedUrl
+            // 压缩结果是 blob URL，加载后释放避免内存泄漏
+            if (compressedUrl.startsWith('blob:')) {
+              const revoke = () => URL.revokeObjectURL(compressedUrl)
+              img.addEventListener('load', revoke, { once: true })
+              img.addEventListener('error', revoke, { once: true })
+            }
             this.stats.compressed++
           } else {
             img.src = originalSrc
