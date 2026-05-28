@@ -106,7 +106,7 @@ class YouTubeScript extends SiteScript {
     let updated = 0
 
     items.forEach((item) => {
-      const currentVal = parseInt(item.getAttribute('items-per-row'))
+      const currentVal = parseInt(item.getAttribute('items-per-row'), 10)
       if (currentVal !== cols) {
         item.setAttribute('items-per-row', cols)
         updated++
@@ -335,7 +335,7 @@ class YouTubeScript extends SiteScript {
 
     drawer.querySelectorAll('.yt-col-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
-        const cols = parseInt(btn.dataset.cols)
+        const cols = parseInt(btn.dataset.cols, 10)
         this.updateSetting('gridColumns', cols)
         this.updateColumnButtons(cols)
         document.getElementById('yt-columns-value').textContent = cols
@@ -386,7 +386,7 @@ class YouTubeScript extends SiteScript {
     }
 
     drawer.querySelectorAll('.yt-col-btn').forEach((btn) => {
-      const btnCols = parseInt(btn.dataset.cols)
+      const btnCols = parseInt(btn.dataset.cols, 10)
       if (btnCols === cols) {
         btn.style.borderColor = '#1a73e8'
         btn.style.background = '#1a73e8'
@@ -466,9 +466,13 @@ class YouTubeScript extends SiteScript {
       this._onOutsideClick = null
     }
     const icon = document.getElementById(this.iconId)
-    if (icon) {icon.remove()}
+    if (icon) {
+      icon.remove()
+    }
     const drawer = document.getElementById(this.drawerId)
-    if (drawer) {drawer.remove()}
+    if (drawer) {
+      drawer.remove()
+    }
     super.destroy()
   }
 }

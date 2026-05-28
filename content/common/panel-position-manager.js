@@ -1331,7 +1331,7 @@ if (!window.PanelPositionManager) {
           }
 
           // 检查 z-index
-          const zIndex = parseInt(style.zIndex) || 0
+          const zIndex = parseInt(style.zIndex, 10) || 0
           if (zIndex < minZIndex && zIndex !== 0) {
             continue
           }
@@ -1466,7 +1466,7 @@ if (!window.PanelPositionManager) {
             elRect.top < rect.bottom &&
             elRect.bottom > rect.top
           ) {
-            const zIndex = parseInt(style.zIndex) || 0
+            const zIndex = parseInt(style.zIndex, 10) || 0
             occludingElements.push({
               element: el,
               tagName: el.tagName,
@@ -2106,7 +2106,7 @@ if (!window.PanelPositionManager) {
           top: parseFloat(el.dataset.ycTop) || 0,
           width: parseFloat(el.dataset.ycWidth) || 0,
           height: parseFloat(el.dataset.ycHeight) || 0,
-          updated: parseInt(el.dataset.ycUpdated) || 0,
+          updated: parseInt(el.dataset.ycUpdated, 10) || 0,
         }
       },
 
@@ -2352,8 +2352,8 @@ if (!window.PanelPositionManager) {
           // 标记为用户自定义位置
           c.userCustomizedPanel = true
 
-          const right = parseInt(panelEl.style.right) || 70
-          const top = parseInt(panelEl.style.top) || 20
+          const right = parseInt(panelEl.style.right, 10) || 70
+          const top = parseInt(panelEl.style.top, 10) || 20
           const width = panelEl.offsetWidth
           const height = panelEl.offsetHeight
 

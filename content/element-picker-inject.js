@@ -1089,7 +1089,7 @@
       // 数字键 1-9 快速选择同类型元素
       if (event.key >= '1' && event.key <= '9' && event.shiftKey) {
         event.preventDefault()
-        this.selectSimilarElements(parseInt(event.key))
+        this.selectSimilarElements(parseInt(event.key, 10))
       }
 
       // A 键全选当前高亮元素的同级元素
