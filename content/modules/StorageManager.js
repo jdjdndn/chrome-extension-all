@@ -85,7 +85,10 @@
           '*'
         )
 
-        setTimeout(() => resolve(false), 1000)
+        setTimeout(() => {
+          window.removeEventListener('message', messageHandler)
+          resolve(false)
+        }, 1000)
       })
     }
 
