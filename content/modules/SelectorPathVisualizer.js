@@ -280,6 +280,12 @@
       return segments
     }
 
+    _escapeHtml(str) {
+      const div = document.createElement('div')
+      div.textContent = str
+      return div.innerHTML
+    }
+
     /**
      * 构建路径 HTML
      */
@@ -288,33 +294,36 @@
         return ''
       }
 
+      const esc = this._escapeHtml.bind(this)
       const segments = path.map((seg, index) => {
         const isLast = index === path.length - 1
         let displayText = ''
-        let className = 'ep-path-segment ' + seg.type
+        let className = 'ep-path-segment ' + esc(seg.type)
 
         if (isLast) {
           className += ' current'
         }
 
+        const tag = esc(seg.tag || '*')
         // 构建显示文本
         if (seg.id) {
-          displayText = `<span class="tag">${seg.tag || '*'}</span><span class="id">#${seg.id}</span>`
+          displayText = `<span class="tag">${tag}</span><span class="id">#${esc(seg.id)}</span>`
         } else if (seg.classes.length > 0) {
-          displayText = `<span class="tag">${seg.tag || '*'}</span><span class="class">.${seg.classes[0]}</span>`
+          displayText = `<span class="tag">${tag}</span><span class="class">.${esc(seg.classes[0])}</span>`
         } else if (seg.attributes.length > 0) {
           const attr = seg.attributes[0]
-          displayText = `<span class="tag">${seg.tag || '*'}</span><span class="attr">[${attr.name}="${attr.value}"]</span>`
+          displayText = `<span class="tag">${tag}</span><span class="attr">[${esc(attr.name)}="${esc(attr.value)}"]</span>`
         } else if (seg.nth) {
-          displayText = `<span class="tag">${seg.tag || '*'}</span><span class="nth">:nth-child(${seg.nth})</span>`
+          displayText = `<span class="tag">${tag}</span><span class="nth">:nth-child(${esc(String(seg.nth))})</span>`
         } else {
-          displayText = `<span class="tag">${seg.tag || '*'}</span>`
+          displayText = `<span class="tag">${tag}</span>`
         }
 
         return `<div class="${className}" data-index="${index}">${displayText}</div>`
       })
 
       // 添加信息区域
+      const rawLength = path.map((s) => s.raw).join(' > ').length
       const infoHtml = `
       <div class="ep-path-info">
         <div class="ep-path-stats">
@@ -324,7 +333,7 @@
           </div>
           <div class="ep-path-stat">
             <span>长度:</span>
-            <span class="ep-path-stat-value">${path.map((s) => s.raw).join(' > ').length}</span>
+            <span class="ep-path-stat-value">${rawLength}</span>
           </div>
         </div>
       </div>
