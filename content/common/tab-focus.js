@@ -27,12 +27,16 @@ function initTabFocus() {
   }
 
   function enable() {
-    if (window._ycTabFocusActive) {return}
+    if (window._ycTabFocusActive) {
+      return
+    }
     document.addEventListener('visibilitychange', handler)
     window._ycTabFocusActive = true
   }
   function disable() {
-    if (!window._ycTabFocusActive) {return}
+    if (!window._ycTabFocusActive) {
+      return
+    }
     document.removeEventListener('visibilitychange', handler)
     window._ycTabFocusActive = false
   }
@@ -47,12 +51,26 @@ function initTabFocus() {
   }
 
   // 运行时热切换
+  const onStorageChange = (changes, area) => {
+    if (area !== 'local' || !changes.scriptSwitches) {
+      return
+    }
+    const next = changes.scriptSwitches.newValue || {}
+    if (next['tab-focus'] === false) {
+      disable()
+    } else {
+      enable()
+    }
+  }
   try {
-    chrome.storage.onChanged.addListener((changes, area) => {
-      if (area !== 'local' || !changes.scriptSwitches) {return}
-      const next = changes.scriptSwitches.newValue || {}
-      if (next['tab-focus'] === false) {disable()}
-      else {enable()}
-    })
+    chrome.storage.onChanged.addListener(onStorageChange)
   } catch {}
+
+  window.TabFocusDestroy = () => {
+    disable()
+    try {
+      chrome.storage.onChanged.removeListener(onStorageChange)
+    } catch {}
+    window.TabFocusLoaded = false
+  }
 }
