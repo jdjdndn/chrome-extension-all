@@ -133,7 +133,9 @@ class YouTubeScript extends SiteScript {
    * 创建浮动图标
    */
   createIcon() {
-    if (document.getElementById(this.iconId)) {return}
+    if (document.getElementById(this.iconId)) {
+      return
+    }
 
     const icon = document.createElement('div')
     icon.id = this.iconId
@@ -186,7 +188,9 @@ class YouTubeScript extends SiteScript {
    * 创建抽屉 - 使用 DOM 方法避免 TrustedHTML 错误
    */
   createDrawer() {
-    if (document.getElementById(this.drawerId)) {return}
+    if (document.getElementById(this.drawerId)) {
+      return
+    }
 
     const drawer = document.createElement('div')
     drawer.id = this.drawerId
@@ -356,7 +360,7 @@ class YouTubeScript extends SiteScript {
 
     // 点击外部关闭
     drawer.addEventListener('click', (e) => e.stopPropagation())
-    document.addEventListener('click', (e) => {
+    this._onOutsideClick = (e) => {
       const icon = document.getElementById(this.iconId)
       if (
         drawer.style.right === '0px' &&
@@ -366,7 +370,8 @@ class YouTubeScript extends SiteScript {
       ) {
         this.closeDrawer()
       }
-    })
+    }
+    document.addEventListener('click', this._onOutsideClick)
 
     console.log('[YouTube] 抽屉已创建')
   }
@@ -376,7 +381,9 @@ class YouTubeScript extends SiteScript {
    */
   updateColumnButtons(cols) {
     const drawer = document.getElementById(this.drawerId)
-    if (!drawer) {return}
+    if (!drawer) {
+      return
+    }
 
     drawer.querySelectorAll('.yt-col-btn').forEach((btn) => {
       const btnCols = parseInt(btn.dataset.cols)
@@ -397,16 +404,24 @@ class YouTubeScript extends SiteScript {
    */
   updateUI() {
     const drawer = document.getElementById(this.drawerId)
-    if (!drawer) {return}
+    if (!drawer) {
+      return
+    }
 
     const columnsValue = document.getElementById('yt-columns-value')
     const hideShortsCheckbox = document.getElementById('yt-hide-shorts')
     const hideAdsCheckbox = document.getElementById('yt-hide-ads')
 
-    if (columnsValue) {columnsValue.textContent = this.settings.gridColumns}
+    if (columnsValue) {
+      columnsValue.textContent = this.settings.gridColumns
+    }
     this.updateColumnButtons(this.settings.gridColumns)
-    if (hideShortsCheckbox) {hideShortsCheckbox.checked = this.settings.hideShorts}
-    if (hideAdsCheckbox) {hideAdsCheckbox.checked = this.settings.hideAds}
+    if (hideShortsCheckbox) {
+      hideShortsCheckbox.checked = this.settings.hideShorts
+    }
+    if (hideAdsCheckbox) {
+      hideAdsCheckbox.checked = this.settings.hideAds
+    }
   }
 
   /**
@@ -414,7 +429,9 @@ class YouTubeScript extends SiteScript {
    */
   toggleDrawer() {
     const drawer = document.getElementById(this.drawerId)
-    if (!drawer) {return}
+    if (!drawer) {
+      return
+    }
 
     if (drawer.style.right === '0px') {
       this.closeDrawer()
@@ -441,6 +458,18 @@ class YouTubeScript extends SiteScript {
     if (drawer) {
       drawer.style.right = '-320px'
     }
+  }
+
+  destroy() {
+    if (this._onOutsideClick) {
+      document.removeEventListener('click', this._onOutsideClick)
+      this._onOutsideClick = null
+    }
+    const icon = document.getElementById(this.iconId)
+    if (icon) {icon.remove()}
+    const drawer = document.getElementById(this.drawerId)
+    if (drawer) {drawer.remove()}
+    super.destroy()
   }
 }
 
