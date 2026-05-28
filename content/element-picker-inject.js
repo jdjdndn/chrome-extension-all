@@ -3396,13 +3396,19 @@
       document.body.appendChild(helpEl)
 
       // 点击外部关闭
+      let helpClickTimer = null
       const closeHelp = (e) => {
         if (!helpEl.contains(e.target)) {
           helpEl.remove()
           document.removeEventListener('click', closeHelp, true)
+          if (helpClickTimer) {
+            clearTimeout(helpClickTimer)
+            helpClickTimer = null
+          }
         }
       }
-      setTimeout(() => {
+      helpClickTimer = setTimeout(() => {
+        helpClickTimer = null
         document.addEventListener('click', closeHelp, true)
       }, 100)
     }
