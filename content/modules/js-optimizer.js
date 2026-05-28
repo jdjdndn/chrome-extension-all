@@ -466,8 +466,6 @@ class ScriptDependencyManager {
   }
 }
 
-const dependencyManager = new ScriptDependencyManager()
-
 // ========== 预加载优化
 
 /**
