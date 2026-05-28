@@ -2082,7 +2082,7 @@ if (!window.PanelPositionManager) {
         // 两侧都不够，使用默认位置（紧贴 icon 左侧）
         return {
           right: minRight,
-          width: Math.min(panelWidth, vw - minRight - edgeMargin),
+          width: Math.max(minPanelWidth, Math.min(panelWidth, vw - minRight - edgeMargin)),
           position: 'default',
         }
       },
