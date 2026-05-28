@@ -31,7 +31,7 @@ self.onmessage = async function (e) {
     // 计算目标尺寸
     let width = imageBitmap.width
     let height = imageBitmap.height
-    if (maxWidth > 0 && (width > maxWidth || height > maxHeight)) {
+    if (maxWidth > 0 && width > 0 && height > 0 && (width > maxWidth || height > maxHeight)) {
       const ratio = Math.min(maxWidth / width, maxHeight / height)
       width = Math.floor(width * ratio)
       height = Math.floor(height * ratio)
