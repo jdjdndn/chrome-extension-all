@@ -127,12 +127,10 @@
         const currentRect = current.getBoundingClientRect()
         const parentRect = parent.getBoundingClientRect()
 
-        const widthRatio =
-          Math.min(currentRect.width, parentRect.width) /
-          Math.max(currentRect.width, parentRect.width)
-        const heightRatio =
-          Math.min(currentRect.height, parentRect.height) /
-          Math.max(currentRect.height, parentRect.height)
+        const maxW = Math.max(currentRect.width, parentRect.width)
+        const maxH = Math.max(currentRect.height, parentRect.height)
+        const widthRatio = maxW > 0 ? Math.min(currentRect.width, parentRect.width) / maxW : 0
+        const heightRatio = maxH > 0 ? Math.min(currentRect.height, parentRect.height) / maxH : 0
 
         if (widthRatio < SIZE_THRESHOLD || heightRatio < SIZE_THRESHOLD) {
           break
@@ -1512,7 +1510,11 @@
         let part = `<span class="tag">${tag}</span>`
 
         if (current.id && !current.id.includes(' ')) {
-          part += `<span class="id">#${current.id}</span>`
+          const escapedId = current.id.replace(
+            /[&<>"']/g,
+            (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
+          )
+          part += `<span class="id">#${escapedId}</span>`
         } else if (current.className && typeof current.className === 'string') {
           const classes = current.className
             .trim()
@@ -1520,7 +1522,16 @@
             .filter((c) => c && !/^(css-|styled-|sc-|js-|_|data-)/.test(c))
             .slice(0, 2)
           if (classes.length > 0) {
-            part += classes.map((c) => `<span class="class">.${c}</span>`).join('')
+            part += classes
+              .map((c) => {
+                const escaped = c.replace(
+                  /[&<>"']/g,
+                  (ch) =>
+                    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]
+                )
+                return `<span class="class">.${escaped}</span>`
+              })
+              .join('')
           }
         }
 
@@ -3601,7 +3612,7 @@
   document.head.appendChild(style)
 
   // 监听来自 content script 的消息
-  document.addEventListener('element-picker-command', (event) => {
+  picker._commandHandler = (event) => {
     const { action, data } = event.detail || {}
 
     switch (action) {
@@ -3618,7 +3629,6 @@
         picker.clearSelection()
         break
       case 'REMOVE_ELEMENT_HIGHLIGHT':
-        // 优先使用 pickerUid，其次使用 selector（向后兼容）
         if (data?.pickerUid) {
           picker.removeElementByUid(data.pickerUid)
         } else if (data?.selector) {
@@ -3626,7 +3636,6 @@
         }
         break
       case 'UPDATE_SELECTION':
-        // 从 DevTools 更新选中状态
         picker.updateSelectionFromDevTools(data?.elements || [])
         break
       case 'GET_STATE':
@@ -3643,7 +3652,8 @@
         })
         break
     }
-  })
+  }
+  document.addEventListener('element-picker-command', picker._commandHandler)
 
   // 导出全局实例
   window.ElementPickerInject = picker
