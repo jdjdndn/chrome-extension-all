@@ -315,30 +315,6 @@ function initWidenPage() {
     inject(DEFAULT_WIDTH)
   }
 
-  // 监听 popup→content 桥接的 scriptSwitches 与 widenPageWidth 变化，运行时热切换
-  try {
-    chrome.storage.onChanged.addListener((changes, area) => {
-      if (area !== 'local') {
-        return
-      }
-      if (changes.scriptSwitches) {
-        const next = changes.scriptSwitches.newValue || {}
-        if (next['widen-page'] === false) {
-          remove()
-        } else {
-          loadAndInject()
-        }
-      }
-      if (changes.widenPageWidth) {
-        const w = parseInt(changes.widenPageWidth.newValue, 10) || DEFAULT_WIDTH
-        // 仅在开关启用时即时调整
-        if (!window.getScriptSwitch || window.getScriptSwitch('widen-page')) {
-          inject(w)
-        }
-      }
-    })
-  } catch {}
-
   if (document.head) {
     loadAndInject()
   } else if (document.readyState === 'loading') {
