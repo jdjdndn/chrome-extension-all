@@ -412,11 +412,12 @@
     }
 
     const rect = element.getBoundingClientRect()
-    const viewportHeight = window.innerHeight
-    const viewportWidth = window.innerWidth
+    const viewportHeight = window.innerHeight || 0
+    const viewportWidth = window.innerWidth || 0
+    const viewportArea = viewportWidth * viewportHeight
 
     // LCP 候选检测
-    const isLarge = rect.width * rect.height > (viewportWidth * viewportHeight) / 10
+    const isLarge = viewportArea > 0 ? rect.width * rect.height > viewportArea / 10 : false
 
     // 视口检测
     const inViewport = rect.top < viewportHeight && rect.bottom > 0
@@ -467,6 +468,8 @@
     const viewportHeight = window.innerHeight
     const viewportWidth = window.innerWidth
 
+    const viewportArea = viewportWidth * viewportHeight
+
     images.forEach((img) => {
       if (!img.src) {
         return
@@ -474,10 +477,9 @@
 
       const rect = img.getBoundingClientRect()
       const area = rect.width * rect.height
-      const viewportArea = viewportWidth * viewportHeight
 
       // 面积占比 > 5% 且在视口内
-      if (area > viewportArea * 0.05 && rect.top < viewportHeight) {
+      if (viewportArea > 0 && area > viewportArea * 0.05 && rect.top < viewportHeight) {
         critical.images.push(img.src)
       }
     })
@@ -749,8 +751,12 @@
 
     const nodeArray = Array.from(nodes)
     let index = 0
+    let idleId = null
+    let timeoutId = null
 
     function processChunk(deadline) {
+      idleId = null
+      timeoutId = null
       const useIdle = config.idleCallback && typeof deadline === 'object'
       const startTime = performance.now()
 
@@ -778,18 +784,30 @@
       // 如果还有剩余，继续调度
       if (index < nodeArray.length) {
         if (useIdle) {
-          requestIdleCallback(processChunk, { timeout: 100 })
+          idleId = requestIdleCallback(processChunk, { timeout: 100 })
         } else {
-          setTimeout(processChunk, config.chunkDelay)
+          timeoutId = setTimeout(processChunk, config.chunkDelay)
         }
       }
     }
 
     // 开始处理
     if (config.idleCallback && 'requestIdleCallback' in window) {
-      requestIdleCallback(processChunk, { timeout: 100 })
+      idleId = requestIdleCallback(processChunk, { timeout: 100 })
     } else {
       processChunk()
+    }
+
+    // 返回取消函数
+    return function cancelChunkedProcess() {
+      if (idleId !== null) {
+        cancelIdleCallback(idleId)
+        idleId = null
+      }
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId)
+        timeoutId = null
+      }
     }
   }
 
@@ -801,11 +819,11 @@
   function deferNonCritical(task, delay = 100) {
     if (!state.config.domParsing.enabled) {
       task()
-      return
+      return null
     }
 
     if (state.config.domParsing.idleCallback && 'requestIdleCallback' in window) {
-      requestIdleCallback(
+      const idleId = requestIdleCallback(
         (deadline) => {
           if (deadline.timeRemaining() > 0 || deadline.didTimeout) {
             task()
@@ -816,8 +834,14 @@
         },
         { timeout: delay }
       )
+      state._pendingIdleIds = state._pendingIdleIds || []
+      state._pendingIdleIds.push(idleId)
+      return idleId
     } else {
-      setTimeout(task, delay)
+      const timeoutId = setTimeout(task, delay)
+      state._pendingTimeoutIds = state._pendingTimeoutIds || []
+      state._pendingTimeoutIds.push(timeoutId)
+      return timeoutId
     }
   }
 
@@ -837,7 +861,8 @@
 
     // 页面加载完成后执行
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', onDOMReady)
+      state._domReadyHandler = onDOMReady
+      document.addEventListener('DOMContentLoaded', state._domReadyHandler)
     } else {
       onDOMReady()
     }
@@ -846,7 +871,8 @@
     if (document.readyState === 'complete') {
       onLoad()
     } else {
-      window.addEventListener('load', onLoad)
+      state._loadHandler = onLoad
+      window.addEventListener('load', state._loadHandler)
     }
 
     addLog('info', 'initialized', { config: state.config })
@@ -955,6 +981,25 @@
     getConfig: () => ({ ...state.config }),
     setConfig: (config) => {
       state.config = { ...state.config, ...config }
+    },
+    destroy() {
+      if (state._domReadyHandler) {
+        document.removeEventListener('DOMContentLoaded', state._domReadyHandler)
+        state._domReadyHandler = null
+      }
+      if (state._loadHandler) {
+        window.removeEventListener('load', state._loadHandler)
+        state._loadHandler = null
+      }
+      if (state._pendingIdleIds) {
+        state._pendingIdleIds.forEach((id) => cancelIdleCallback(id))
+        state._pendingIdleIds = []
+      }
+      if (state._pendingTimeoutIds) {
+        state._pendingTimeoutIds.forEach((id) => clearTimeout(id))
+        state._pendingTimeoutIds = []
+      }
+      state.initialized = false
     },
   }
 
