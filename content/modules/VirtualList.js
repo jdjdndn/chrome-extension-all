@@ -143,6 +143,10 @@
      */
     destroy() {
       this.container?.removeEventListener('scroll', this._onScroll)
+      if (this.container) {
+        this.container.innerHTML = ''
+        this.container = null
+      }
       this.items = []
       this.visibleItems = []
     }
