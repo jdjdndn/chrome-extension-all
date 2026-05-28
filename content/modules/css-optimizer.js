@@ -137,6 +137,9 @@
     // 检查元素尺寸（大元素更可能是关键元素）
     const elementArea = rect.width * rect.height
     const viewportArea = viewportHeight * viewportWidth
+    if (!viewportArea || viewportArea <= 0) {
+      return false
+    }
     const areaRatio = elementArea / viewportArea
 
     // 占视口面积 5% 以上的元素视为关键
@@ -533,12 +536,13 @@
         style.remove()
       }, 100)
     } else {
-      window.addEventListener('load', () => {
+      state._foucLoadHandler = () => {
         document.documentElement.setAttribute('data-styled', 'true')
         setTimeout(() => {
           style.remove()
         }, 100)
-      })
+      }
+      window.addEventListener('load', state._foucLoadHandler)
     }
 
     state.stats.foucPrevented++
@@ -676,10 +680,11 @@
 
       // 处理现有样式表
       if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
+        state._domReadyHandler = () => {
           processAllStylesheets()
           processInlineStyles()
-        })
+        }
+        document.addEventListener('DOMContentLoaded', state._domReadyHandler)
       } else {
         processAllStylesheets()
         processInlineStyles()
@@ -757,6 +762,18 @@
      */
     getConfig() {
       return { ...state.config }
+    },
+
+    destroy() {
+      if (state._foucLoadHandler) {
+        window.removeEventListener('load', state._foucLoadHandler)
+        state._foucLoadHandler = null
+      }
+      if (state._domReadyHandler) {
+        document.removeEventListener('DOMContentLoaded', state._domReadyHandler)
+        state._domReadyHandler = null
+      }
+      state.config.enabled = false
     },
   }
 
