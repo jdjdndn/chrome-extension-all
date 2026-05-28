@@ -144,9 +144,15 @@
      * 开始监听
      */
     async start() {
+      this.isWatching = true
       try {
         const container = await this.findContainer()
-        this.isWatching = true
+
+        // 防竞态：await 期间 stop() 可能已被调用
+        if (!this.isWatching) {
+          return
+        }
+
         console.log('[AI Aggregator Response Watcher] 开始监听回复')
 
         // 方式1: MutationObserver
