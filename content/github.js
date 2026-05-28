@@ -336,7 +336,7 @@ if (window.GithubCopyFileLoaded) {
   function escapeHtml(text) {
     const div = document.createElement('div')
     div.textContent = text
-    return div.innerHTML
+    return div.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;')
   }
 
   /**
@@ -547,9 +547,13 @@ if (window.GithubCopyFileLoaded) {
     document.removeEventListener('mouseleave', onMouseLeave, true)
     hoveredLink = null
     const toast = document.getElementById('github-copy-toast')
-    if (toast) {toast.remove()}
+    if (toast) {
+      toast.remove()
+    }
     const style = document.getElementById('github-toast-style')
-    if (style) {style.remove()}
+    if (style) {
+      style.remove()
+    }
   }
 
   window.GithubCopyFileDestroy = () => {
