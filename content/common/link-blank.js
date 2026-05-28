@@ -83,7 +83,9 @@ function initLinkBlank() {
   let active = false
 
   function enable() {
-    if (active) {return}
+    if (active) {
+      return
+    }
     if (!document.body) {
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', enable, { once: true })
@@ -108,7 +110,9 @@ function initLinkBlank() {
   }
 
   function disable() {
-    if (!active) {return}
+    if (!active) {
+      return
+    }
     if (observer) {
       observer.disconnect()
       observer = null
@@ -126,12 +130,27 @@ function initLinkBlank() {
     enable()
   }
 
+  const onStorageChange = (changes, area) => {
+    if (area !== 'local' || !changes.scriptSwitches) {
+      return
+    }
+    const next = changes.scriptSwitches.newValue || {}
+    if (next['link-blank'] === false) {
+      disable()
+    } else {
+      enable()
+    }
+  }
   try {
-    chrome.storage.onChanged.addListener((changes, area) => {
-      if (area !== 'local' || !changes.scriptSwitches) {return}
-      const next = changes.scriptSwitches.newValue || {}
-      if (next['link-blank'] === false) {disable()}
-      else {enable()}
-    })
+    chrome.storage.onChanged.addListener(onStorageChange)
   } catch {}
+
+  window.LinkBlankDestroy = () => {
+    disable()
+    window.removeEventListener('beforeunload', disable)
+    try {
+      chrome.storage.onChanged.removeListener(onStorageChange)
+    } catch {}
+    window.LinkBlankLoaded = false
+  }
 }
