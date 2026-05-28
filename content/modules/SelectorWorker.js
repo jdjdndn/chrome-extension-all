@@ -166,8 +166,9 @@
       const tag = element.tagName.toLowerCase()
       const id = element.id
 
+      const escapeId = typeof CSS !== 'undefined' ? CSS.escape(id) : id.replace(/([^\w-])/g, '\\$1')
       if (id && !id.includes(' ') && !/^\d/.test(id)) {
-        return { selector: '#' + CSS.escape(id), strategy: 'id', score: 100 }
+        return { selector: '#' + escapeId, strategy: 'id', score: 100 }
       }
 
       if (element.className && typeof element.className === 'string') {
@@ -176,7 +177,11 @@
           .split(' ')
           .filter((c) => c && !/^(css-|styled-|sc-|js-|_)/.test(c))
         if (classes.length > 0) {
-          return { selector: tag + '.' + CSS.escape(classes[0]), strategy: 'class', score: 85 }
+          const escaped =
+            typeof CSS !== 'undefined'
+              ? CSS.escape(classes[0])
+              : classes[0].replace(/([^\w-])/g, '\\$1')
+          return { selector: tag + '.' + escaped, strategy: 'class', score: 85 }
         }
       }
 
