@@ -13,6 +13,7 @@
 
 // 任务队列（按优先级排序）
 const taskQueue = []
+const MAX_QUEUE_SIZE = 100
 let isProcessing = false
 
 // Worker 状态
@@ -219,6 +220,9 @@ self.onmessage = async function (e) {
       await processCompressTask(taskData)
     } else {
       taskQueue.push({ data: taskData, priority: priority || 0 })
+      if (taskQueue.length > MAX_QUEUE_SIZE) {
+        taskQueue.splice(0, taskQueue.length - MAX_QUEUE_SIZE)
+      }
       processQueue()
     }
     return
