@@ -13,6 +13,7 @@
       this.debounceDelay = 200
       this.isActive = false
       this._pendingMutations = []
+      this._MAX_PENDING = 2000
 
       // 熔断：1 秒窗口 > 3000 mutation 自动 disconnect
       this._burstCount = 0
@@ -77,6 +78,9 @@
 
       // 防抖处理：累积所有批次，flush 时一次性处理，避免丢失中间批次
       this._pendingMutations.push(...mutations)
+      if (this._pendingMutations.length > this._MAX_PENDING) {
+        this._pendingMutations.splice(0, this._pendingMutations.length - this._MAX_PENDING)
+      }
       clearTimeout(this.debounceTimer)
       this.debounceTimer = setTimeout(() => {
         const batch = this._pendingMutations
