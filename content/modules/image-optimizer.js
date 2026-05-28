@@ -1114,7 +1114,10 @@
             console.log(`[ImageOptimizer] 压缩收益不足，使用原图: ${url}`, {
               originalSize: result.originalSize,
               compressedSize: result.compressedSize,
-              ratio: ((result.compressedSize / result.originalSize) * 100).toFixed(1) + '%',
+              ratio:
+                result.originalSize > 0
+                  ? ((result.compressedSize / result.originalSize) * 100).toFixed(1) + '%'
+                  : 'N/A',
             })
             return url
           }
@@ -1122,7 +1125,10 @@
           console.log(`[ImageOptimizer] Worker 压缩成功: ${url}`, {
             originalSize: result.originalSize,
             compressedSize: result.compressedSize,
-            ratio: ((result.compressedSize / result.originalSize) * 100).toFixed(1) + '%',
+            ratio:
+              result.originalSize > 0
+                ? ((result.compressedSize / result.originalSize) * 100).toFixed(1) + '%'
+                : 'N/A',
           })
           return result.dataUrl
         } catch (error) {
