@@ -1094,6 +1094,7 @@ if (window.DocGeneratorLoaded) {
             type: `h${ariaLevel}`,
             text: text,
             link: this.findLink(el),
+            _element: el,
           })
         }
       })
@@ -1116,6 +1117,7 @@ if (window.DocGeneratorLoaded) {
               type: 'h2',
               text: text,
               link: this.findLink(el),
+              _element: el,
             })
           }
         })
@@ -1148,17 +1150,22 @@ if (window.DocGeneratorLoaded) {
               type: 'h3',
               text: text,
               link: this.findLink(el),
+              _element: el,
             })
           }
         }
       })
 
-      // 按文档顺序排序
+      // 按文档顺序排序（使用 DOM 比较保持原始出现顺序）
       if (sections.length > 0) {
         sections.sort((a, b) => {
-          // 简单按文本长度排序，短的更像标题
-          return a.text.length - b.text.length
+          if (a._element && b._element) {
+            const pos = a._element.compareDocumentPosition(b._element)
+            return pos & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1
+          }
+          return 0
         })
+        sections.forEach((s) => delete s._element)
       }
 
       return sections
