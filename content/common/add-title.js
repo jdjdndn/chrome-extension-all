@@ -217,7 +217,14 @@ function initAddTitle() {
   }
 
   // 页面卸载时清理
-  window.addEventListener('beforeunload', cleanup)
+  const onBeforeUnload = () => cleanup()
+  window.addEventListener('beforeunload', onBeforeUnload)
+
+  window.AddTitleDestroy = () => {
+    cleanup()
+    window.removeEventListener('beforeunload', onBeforeUnload)
+    window.AddTitleLoaded = false
+  }
 
   // 立即尝试初始化
   init()

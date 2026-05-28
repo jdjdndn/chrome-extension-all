@@ -356,7 +356,14 @@ function initTextToLink() {
   }
 
   // 页面卸载时清理
-  window.addEventListener('beforeunload', cleanup)
+  const onBeforeUnload = () => cleanup()
+  window.addEventListener('beforeunload', onBeforeUnload)
+
+  window.TextToLinkDestroy = () => {
+    cleanup()
+    window.removeEventListener('beforeunload', onBeforeUnload)
+    window.TextToLinkLoaded = false
+  }
 
   // 立即尝试初始化
   init()

@@ -273,7 +273,14 @@ function initRedirectLinks() {
   }
 
   // 页面卸载时清理
-  window.addEventListener('beforeunload', cleanup)
+  const onBeforeUnload = () => cleanup()
+  window.addEventListener('beforeunload', onBeforeUnload)
+
+  window.RedirectLinksDestroy = () => {
+    cleanup()
+    window.removeEventListener('beforeunload', onBeforeUnload)
+    window.RedirectLinksLoaded = false
+  }
 
   // 导出纯函数供测试使用
   window.RedirectLinksUtils = { decodeUrlValue, extractUrlFromString, extractTargetUrl }
