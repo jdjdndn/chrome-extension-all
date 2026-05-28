@@ -92,7 +92,7 @@ async function processCompressTask(data) {
     let height = imageBitmap.height
 
     // 如果指定了最大尺寸，进行缩放
-    if (maxWidth && maxHeight) {
+    if (maxWidth && maxHeight && width > 0 && height > 0) {
       if (width > maxWidth || height > maxHeight) {
         const ratio = Math.min(maxWidth / width, maxHeight / height)
         width = Math.floor(width * ratio)
@@ -120,37 +120,31 @@ async function processCompressTask(data) {
       })
     }
 
-    // 6. 返回结果（使用 FileReader 转为 dataUrl）
-    const reader = new FileReader()
-    reader.onload = () => {
-      workerState.status = 'healthy'
-      self.postMessage({
-        id,
-        success: true,
-        dataUrl: reader.result,
-        originalSize: blob.size,
-        compressedSize: compressedBlob.size,
-      })
-    }
-    reader.onerror = () => {
-      workerState.status = 'error'
-      workerState.errorCount++
-      self.postMessage({
-        id,
-        success: false,
-        error: 'FileReader error',
-        retryable: true, // 标记为可重试
-      })
-    }
-    reader.readAsDataURL(compressedBlob)
+    // 6. 返回结果（Promise 化 FileReader 避免 processQueue 竞态）
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result)
+      reader.onerror = () => reject(new Error('FileReader error'))
+      reader.readAsDataURL(compressedBlob)
+    })
+
+    workerState.status = 'healthy'
+    self.postMessage({
+      id,
+      success: true,
+      dataUrl,
+      originalSize: blob.size,
+      compressedSize: compressedBlob.size,
+    })
   } catch (error) {
     workerState.status = 'error'
     workerState.errorCount++
 
     // 判断错误是否可重试
-    const retryable = !error.message.includes('cors_fetch_failed') &&
-                      !error.message.includes('404') &&
-                      !error.message.includes('403')
+    const retryable =
+      !error.message.includes('cors_fetch_failed') &&
+      !error.message.includes('404') &&
+      !error.message.includes('403')
 
     self.postMessage({
       id,
