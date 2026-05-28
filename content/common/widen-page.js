@@ -93,7 +93,7 @@ function initWidenPage() {
         if (EXCLUDE_TAGS.has(el.tagName)) {
           continue
         }
-        if (el.offsetParent === null && el.style.position !== 'fixed') {
+        if (el.offsetParent === null && getComputedStyle(el).position !== 'fixed') {
           continue
         } // 不可见
         if (EXCLUDE_SELECTORS.some((sel) => el.matches(sel))) {
@@ -285,7 +285,9 @@ function initWidenPage() {
   // 监听 popup→content 桥接的 scriptSwitches 与 widenPageWidth 变化，运行时热切换
   try {
     chrome.storage.onChanged.addListener((changes, area) => {
-      if (area !== 'local') {return}
+      if (area !== 'local') {
+        return
+      }
       if (changes.scriptSwitches) {
         const next = changes.scriptSwitches.newValue || {}
         if (next['widen-page'] === false) {

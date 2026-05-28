@@ -305,12 +305,19 @@
 
       // 2. HIGH: requestAnimationFrame
       if (highSubscribers.length > 0) {
+        // 累积 mutations 避免取消 RAF 时丢失
+        if (!this._highBuffer) {
+          this._highBuffer = []
+        }
+        this._highBuffer.push(...mutations)
         if (this._rafId) {
           cancelAnimationFrame(this._rafId)
         }
         this._rafId = requestAnimationFrame(() => {
-          this._executeSubscribers(highSubscribers, mutations)
+          const batch = this._highBuffer
+          this._highBuffer = []
           this._rafId = null
+          this._executeSubscribers(highSubscribers, batch)
         })
       }
 

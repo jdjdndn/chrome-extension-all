@@ -151,6 +151,12 @@
       } catch (error) {
         this.stats.errors++
         console.error(`${LOG_PREFIX} 替换失败:`, error)
+        if (this.stats.errors >= 5 && !this.stats.degraded) {
+          this.stats.degraded = true
+          this.stats.degradationReason = 'too_many_errors'
+          this.stats.degradationTime = Date.now()
+          console.warn(`${LOG_PREFIX} 错误次数过多，模块已降级`)
+        }
       }
     }
 
