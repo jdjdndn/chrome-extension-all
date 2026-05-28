@@ -946,8 +946,8 @@ if (window.KeyboardPaginationLoaded) {
         indicator.style.pointerEvents = 'none'
       }, 3000)
 
-      // 鼠标移到底部时显示
-      document.addEventListener('mousemove', (e) => {
+      // 鼠标移到底部时显示（保存引用以便销毁时清理）
+      this._indicatorMouseMove = (e) => {
         if (e.clientY > window.innerHeight - 50) {
           indicator.style.opacity = '1'
           indicator.style.pointerEvents = 'auto'
@@ -955,11 +955,62 @@ if (window.KeyboardPaginationLoaded) {
           indicator.style.opacity = '0'
           indicator.style.pointerEvents = 'none'
         }
-      })
+      }
+      document.addEventListener('mousemove', this._indicatorMouseMove)
+    }
+
+    destroy() {
+      if (this._keydownHandler) {
+        document.removeEventListener('keydown', this._keydownHandler, true)
+        this._keydownHandler = null
+      }
+      if (this._detectTimer) {
+        clearTimeout(this._detectTimer)
+      }
+      if (this._spaReinitTimer) {
+        clearTimeout(this._spaReinitTimer)
+      }
+      if (this._unsubscribe) {
+        this._unsubscribe()
+        this._unsubscribe = null
+      }
+      if (this._spaUnsubscribe) {
+        this._spaUnsubscribe()
+        this._spaUnsubscribe = null
+      }
+      if (this._spaObserver) {
+        this._spaObserver.disconnect()
+        this._spaObserver = null
+      }
+      if (this._observer) {
+        this._observer.disconnect()
+        this._observer = null
+      }
+      if (this._indicatorMouseMove) {
+        document.removeEventListener('mousemove', this._indicatorMouseMove)
+        this._indicatorMouseMove = null
+      }
+      if (this.hintTimer) {
+        clearTimeout(this.hintTimer)
+      }
+      const hint = document.getElementById('yc-pagination-hint')
+      if (hint) {
+        hint.remove()
+      }
+      const styles = document.getElementById('yc-pagination-styles')
+      if (styles) {
+        styles.remove()
+      }
+      const indicator = document.querySelector('.yc-pagination-indicator')
+      if (indicator) {
+        indicator.remove()
+      }
+      const help = document.querySelector('.yc-pagination-help')
+      if (help) {
+        help.remove()
+      }
     }
   }
-
-  // 初始化
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
       window.keyboardPagination = new KeyboardPagination()
