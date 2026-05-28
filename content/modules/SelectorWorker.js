@@ -233,6 +233,9 @@
      * 批量生成选择器
      */
     batchGenerate(elements) {
+      if (!elements || elements.length === 0) {
+        return Promise.resolve([])
+      }
       // 降级：Worker 不可用时使用主线程计算
       if (!this.isAvailable()) {
         return Promise.resolve(elements.map((el) => this._fallbackGenerateSelector(el)))
@@ -246,11 +249,11 @@
      * 生成合并选择器
      */
     generateMergedSelector(elements) {
+      if (!elements || elements.length === 0) {
+        return Promise.resolve(null)
+      }
       // 降级：Worker 不可用时返回第一个元素的选择器
       if (!this.isAvailable()) {
-        if (!elements || elements.length === 0) {
-          return Promise.resolve(null)
-        }
         return Promise.resolve(this._fallbackGenerateSelector(elements[0]))
       }
 
