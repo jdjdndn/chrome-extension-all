@@ -154,7 +154,16 @@ function cleanup() {
 }
 
 // 页面卸载时清理
-window.addEventListener('beforeunload', cleanup)
+function onBeforeUnload() {
+  cleanup()
+}
+window.addEventListener('beforeunload', onBeforeUnload)
+
+window.BossDestroy = () => {
+  cleanup()
+  styleInjector.remove()
+  window.removeEventListener('beforeunload', onBeforeUnload)
+}
 
 if (document.readyState === 'loading') {
   window.addEventListener('DOMContentLoaded', init)

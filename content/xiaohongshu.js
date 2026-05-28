@@ -148,7 +148,15 @@ function cleanup() {
   }
 }
 
-window.addEventListener('beforeunload', cleanup)
+function onBeforeUnload() {
+  cleanup()
+}
+window.addEventListener('beforeunload', onBeforeUnload)
+
+window.XiaohongshuDestroy = () => {
+  cleanup()
+  window.removeEventListener('beforeunload', onBeforeUnload)
+}
 
 if (document.readyState === 'loading') {
   window.addEventListener('DOMContentLoaded', init)
