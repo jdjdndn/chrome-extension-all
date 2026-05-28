@@ -65,11 +65,11 @@
   /**
    * 安全执行回调
    */
-  function safeExecute(name, callback) {
+  async function safeExecute(name, callback) {
     try {
       const result = callback()
       if (result instanceof Promise) {
-        result.catch((err) => log(`"${name}" 执行错误: ${err.message}`, 'error'))
+        await result
       }
     } catch (err) {
       log(`"${name}" 执行错误: ${err.message}`, 'error')
@@ -110,9 +110,6 @@
       return scheduler
         .postTask(callback, {
           priority: 'user-visible',
-        })
-        .then(() => {
-          callback({ didTimeout: false, timeRemaining: () => 50 })
         })
         .catch(() => {
           // 降级到 requestIdleCallback
@@ -301,16 +298,23 @@
       return
     }
 
-    const { priority = 0, dependencies = [] } = options
+    const { priority = 0, dependencies = [], _retryCount = 0 } = options
 
     log(`注册空闲模块: ${name} (优先级: ${priority})`)
 
     // 检查依赖
     const missingDeps = dependencies.filter((dep) => !state.loaded.has(dep))
     if (missingDeps.length > 0) {
+      if (_retryCount >= 30) {
+        log(`模块 "${name}" 依赖始终未满足，放弃: ${missingDeps.join(', ')}`, 'error')
+        return
+      }
       log(`模块 "${name}" 等待依赖: ${missingDeps.join(', ')}`)
       // 延迟检查依赖
-      setTimeout(() => registerIdle(name, callback, options), 100)
+      setTimeout(
+        () => registerIdle(name, callback, { ...options, _retryCount: _retryCount + 1 }),
+        100
+      )
       return
     }
 

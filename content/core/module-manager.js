@@ -26,6 +26,9 @@
     // 正在加载的模块
     loading: new Set(),
 
+    // 正在加载的模块 Promise（用于并发 coalesce）
+    loadingPromises: new Map(),
+
     /**
      * 注册模块
      * @param {object} moduleConfig - 模块配置
@@ -78,11 +81,23 @@
         return { success: true, message: '模块已加载' }
       }
 
-      if (this.loading.has(moduleId)) {
-        console.warn(`[ModuleManager] 模块正在加载: ${moduleId}`)
-        return { success: false, error: '模块正在加载' }
+      // 并发调用 coalesce：复用同一个 Promise
+      if (this.loadingPromises.has(moduleId)) {
+        return this.loadingPromises.get(moduleId)
       }
 
+      const loadPromise = this._doLoad(moduleId, config, options)
+      this.loadingPromises.set(moduleId, loadPromise)
+
+      try {
+        const result = await loadPromise
+        return result
+      } finally {
+        this.loadingPromises.delete(moduleId)
+      }
+    },
+
+    async _doLoad(moduleId, config, options) {
       this.loading.add(moduleId)
 
       try {
@@ -163,7 +178,10 @@
     async reload(moduleId) {
       console.log(`[ModuleManager] 重新加载模块: ${moduleId}`)
 
-      await this.unload(moduleId)
+      const unloadResult = await this.unload(moduleId)
+      if (!unloadResult.success) {
+        return unloadResult
+      }
       return await this.load(moduleId)
     },
 

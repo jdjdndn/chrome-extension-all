@@ -254,21 +254,15 @@
      * 去重
      */
     _deduplicate(selectors) {
-      const seen = new Map()
-      return selectors.filter((item) => {
+      const best = new Map()
+      for (const item of selectors) {
         const key = item.selector
-        if (seen.has(key)) {
-          // 保留更高优先级的
-          const existing = seen.get(key)
-          if (item.priority > existing.priority) {
-            seen.set(key, item)
-            return true
-          }
-          return false
+        const existing = best.get(key)
+        if (!existing || item.priority > existing.priority) {
+          best.set(key, item)
         }
-        seen.set(key, item)
-        return true
-      })
+      }
+      return [...best.values()]
     },
 
     /**

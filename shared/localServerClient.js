@@ -36,8 +36,9 @@
    */
   async function request(endpoint, options = {}, retry = 0) {
     const url = `${config.baseUrl}${endpoint}`
+    const timeout = options._timeout || config.timeout
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), config.timeout)
+    const timeoutId = setTimeout(() => controller.abort(), timeout)
 
     try {
       const response = await fetch(url, {
@@ -60,7 +61,7 @@
       clearTimeout(timeoutId)
 
       // 重试逻辑
-      if (retry < config.retryCount && !error.name === 'AbortError') {
+      if (retry < config.retryCount && error.name !== 'AbortError') {
         console.log(
           `[LocalServer] 请求失败，${config.retryDelay}ms 后重试 (${retry + 1}/${config.retryCount})`
         )
@@ -149,19 +150,11 @@
    * @returns {Promise<Object>} - AI 生成的选择器建议
    */
   async function aiGenerateSelector(context) {
-    // 设置更长的超时时间（AI 响应可能较慢）
-    const originalTimeout = config.timeout
-    config.timeout = 30000
-
-    try {
-      const result = await request('/api/ai/selector', {
-        method: 'POST',
-        body: JSON.stringify(context),
-      })
-      return result
-    } finally {
-      config.timeout = originalTimeout
-    }
+    return request('/api/ai/selector', {
+      method: 'POST',
+      body: JSON.stringify(context),
+      _timeout: 30000,
+    })
   }
 
   /**
@@ -170,18 +163,11 @@
    * @returns {Promise<Object>} - AI 分析结果
    */
   async function aiAnalyzeElement(elementInfo) {
-    const originalTimeout = config.timeout
-    config.timeout = 30000
-
-    try {
-      const result = await request('/api/ai/analyze', {
-        method: 'POST',
-        body: JSON.stringify(elementInfo),
-      })
-      return result
-    } finally {
-      config.timeout = originalTimeout
-    }
+    return request('/api/ai/analyze', {
+      method: 'POST',
+      body: JSON.stringify(elementInfo),
+      _timeout: 30000,
+    })
   }
 
   // 导出

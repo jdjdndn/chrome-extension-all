@@ -68,11 +68,12 @@
 
       let result = input
       const startTime = Date.now()
+      let timeoutId
 
       try {
         // 超时控制
         const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('管道执行超时')), options.timeout)
+          timeoutId = setTimeout(() => reject(new Error('管道执行超时')), options.timeout)
         })
 
         // 执行各阶段
@@ -106,6 +107,7 @@
         }
 
         result = await Promise.race([executePromise(), timeoutPromise])
+        clearTimeout(timeoutId)
 
         if (options.logProgress) {
           console.log(`[Pipeline] ${name} - 完成，耗时 ${Date.now() - startTime}ms`)
@@ -113,6 +115,7 @@
 
         return result
       } catch (error) {
+        clearTimeout(timeoutId)
         console.error(`[Pipeline] ${name} - 执行失败:`, error)
         throw error
       } finally {

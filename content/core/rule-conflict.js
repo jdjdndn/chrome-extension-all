@@ -134,9 +134,12 @@
             })
           }
 
-          // 包含关系
+          // 包含关系（排除精确匹配，上面已处理）
           for (const existingWord of existingWords) {
-            if (word.includes(existingWord) || existingWord.includes(word)) {
+            if (
+              word !== existingWord &&
+              (word.includes(existingWord) || existingWord.includes(word))
+            ) {
               conflicts.push({
                 type: this.conflictTypes.KEYWORD_DUPLICATE,
                 group,

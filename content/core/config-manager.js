@@ -115,7 +115,12 @@
     _mergeDefaults(config, defaults) {
       const result = { ...defaults }
       for (const key of Object.keys(config)) {
-        if (typeof config[key] === 'object' && !Array.isArray(config[key]) && defaults[key]) {
+        if (
+          typeof config[key] === 'object' &&
+          config[key] !== null &&
+          !Array.isArray(config[key]) &&
+          defaults[key]
+        ) {
           result[key] = this._mergeDefaults(config[key], defaults[key])
         } else {
           result[key] = config[key]
@@ -170,7 +175,7 @@
       const keys = path.split('.')
       const lastKey = keys.pop()
       const target = keys.reduce((obj, key) => {
-        if (!obj[key]) {
+        if (!obj[key] || typeof obj[key] !== 'object') {
           obj[key] = {}
         }
         return obj[key]
@@ -322,10 +327,15 @@
       const targetHistory = this.history.slice(0, historyIndex)
       this.history = []
 
-      // 重建配置
+      // 从默认值重建，避免在脏状态上重放
+      this.config = this._deepClone(this.defaults)
+
+      // 从干净状态重放目标历史
       for (const record of targetHistory) {
         await this.set(record.path, record.value, { silent: true })
       }
+
+      await this._saveToStorage()
 
       console.log(`[ConfigManager] 已回滚 ${steps} 步`)
       return true

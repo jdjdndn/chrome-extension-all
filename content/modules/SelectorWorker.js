@@ -90,6 +90,8 @@
           if (e.message && e.message.includes('Content Security Policy')) {
             console.warn('[SelectorWorker] Worker 被 CSP 阻止，禁用选择器 Worker 功能')
             this._isAvailable = false
+            this.worker.terminate()
+            this.worker = null
             return
           }
           // 已禁用时不处理
@@ -113,27 +115,34 @@
      * @private
      */
     _handleWorkerError() {
-      // 如果 Worker 崩溃，尝试重建
-      if (this.worker && this.pendingTasks.size > 0) {
-        console.log('[SelectorWorker] 尝试重建 Worker...')
-        const newWorker = this._createWorker()
-        if (newWorker) {
-          this.worker = newWorker
-          // 重新发送待处理任务
-          for (const [, task] of this.pendingTasks) {
-            this.worker.postMessage(task.message)
+      // Worker 崩溃，标记不可用
+      this._isAvailable = false
+
+      if (this.worker) {
+        if (this.pendingTasks.size > 0) {
+          console.log('[SelectorWorker] 尝试重建 Worker...')
+          const newWorker = this._createWorker()
+          if (newWorker) {
+            this.worker = newWorker
+            this._isAvailable = true
+            for (const [, task] of this.pendingTasks) {
+              this.worker.postMessage(task.message)
+            }
+          } else {
+            this.worker = null
+            for (const [, task] of this.pendingTasks) {
+              if (task.reject) {
+                task.reject(new Error('Worker 重建失败'))
+              }
+              if (task.timeout) {
+                clearTimeout(task.timeout)
+              }
+            }
+            this.pendingTasks.clear()
           }
         } else {
-          // 重建失败，拒绝所有待处理任务
-          for (const [, task] of this.pendingTasks) {
-            if (task.reject) {
-              task.reject(new Error('Worker 重建失败'))
-            }
-            if (task.timeout) {
-              clearTimeout(task.timeout)
-            }
-          }
-          this.pendingTasks.clear()
+          this.worker.terminate()
+          this.worker = null
         }
       }
     }
@@ -192,6 +201,12 @@
         const message = { type, data, taskId }
 
         this.pendingTasks.set(taskId, { resolve, reject, message, timeout })
+        if (!this.worker) {
+          this.pendingTasks.delete(taskId)
+          clearTimeout(timeout)
+          reject(new Error('Worker not available'))
+          return
+        }
         this.worker.postMessage(message)
       })
     }

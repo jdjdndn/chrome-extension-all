@@ -309,8 +309,8 @@
         this.state.currentSelectors = [...new Set([...this.defaultSelectors, ...selectors])]
         this.applyHideStyle(this.state.currentSelectors)
       } else {
-        this.state.currentSelectors = [...this.defaultSelectors]
-        this.applyHideStyle(this.state.currentSelectors)
+        this.state.currentSelectors = []
+        this.removeHideStyle()
       }
 
       // 保存到存储

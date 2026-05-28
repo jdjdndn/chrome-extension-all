@@ -69,7 +69,16 @@
       // 如果该层已初始化，直接执行
       if (initState.layers[layer].initialized) {
         console.log(`[LazyInitManager] ${layer} 已初始化，直接执行: ${name}`)
-        callback()
+        try {
+          const result = callback()
+          if (result instanceof Promise) {
+            result.catch((err) =>
+              console.error(`[LazyInitManager] ${layer} 回调执行失败: ${name}`, err)
+            )
+          }
+        } catch (err) {
+          console.error(`[LazyInitManager] ${layer} 回调执行失败: ${name}`, err)
+        }
         return
       }
 
