@@ -6,6 +6,45 @@
 const fs = require('fs')
 const path = require('path')
 
+// 排除有安全检测机制的站点：这些站点有自身CDN体系，CDN重定向会触发其安全风控
+// DNR 规则没有 initiatorDomains 限制就会全局生效，在这些站点上篡改资源URL会被检测为风险
+const EXCLUDED_INITIATOR_DOMAINS = [
+  'cdn.bootcdn.net',
+  'cdn.staticfile.org',
+  // 字节系：自有CDN，重定向会触发安全检测
+  'douyin.com',
+  'www.douyin.com',
+  'tiktok.com',
+  'bytedance.com',
+  'zijieapi.com',
+  // 腾讯系：自有CDN
+  'qq.com',
+  'weread.qq.com',
+  'weixin.qq.com',
+  'wechat.com',
+  'tencent.com',
+  // 阿里系：自有CDN
+  'aliyundrive.com',
+  'alipay.com',
+  'taobao.com',
+  'tmall.com',
+  'alibaba.com',
+  'aliyun.com',
+  'quark.cn',
+  // 百度系：自有CDN
+  'baidu.com',
+  'bilibili.com',
+  // 其他有安全检测的站点
+  'xiaohongshu.com',
+  'zhipin.com',
+  'youtube.com',
+  'github.com',
+  '18comic.vip',
+  '4hu.tv',
+  'wyaqpx.com',
+  'ymmfa.com',
+]
+
 // CDN源配置
 const CDN_SOURCES = {
   bootcdn: {
@@ -918,7 +957,7 @@ function generateDNRRules() {
             condition: {
               regexFilter,
               resourceTypes: ['script'],
-              excludedInitiatorDomains: ['cdn.bootcdn.net', 'cdn.staticfile.org'],
+              excludedInitiatorDomains: EXCLUDED_INITIATOR_DOMAINS,
             },
           })
         }
@@ -949,7 +988,7 @@ function generateDNRRules() {
         condition: {
           urlFilter,
           resourceTypes: ['script'],
-          excludedInitiatorDomains: ['cdn.bootcdn.net', 'cdn.staticfile.org'],
+          excludedInitiatorDomains: EXCLUDED_INITIATOR_DOMAINS,
         },
       })
 
