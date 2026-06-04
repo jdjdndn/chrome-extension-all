@@ -25,14 +25,18 @@
 
     const domain = window.location.hostname
     const selectors = DOMAIN_DEFAULT_HIDE_SELECTORS_EARLY[domain]
-    if (!selectors || selectors.length === 0) {return}
+    if (!selectors || selectors.length === 0) {
+      return
+    }
 
     const css = selectors
       .filter((s) => s && s.trim())
       .map((selector) => `${selector} { display: none !important; }`)
       .join('\n')
 
-    if (!css) {return}
+    if (!css) {
+      return
+    }
 
     const style = document.createElement('style')
     style.id = EARLY_HIDE_STYLE_ID
@@ -147,7 +151,9 @@
    */
   function getDomainDefaultHideSelectors() {
     const domain =
-      (typeof DOMUtils !== 'undefined' && DOMUtils.getCurrentDomain && DOMUtils.getCurrentDomain()) ||
+      (typeof DOMUtils !== 'undefined' &&
+        DOMUtils.getCurrentDomain &&
+        DOMUtils.getCurrentDomain()) ||
       window.location.hostname
     return DOMAIN_DEFAULT_HIDE_SELECTORS[domain] || []
   }
@@ -165,7 +171,7 @@
   }
 
   // Collected URLs set (for deduplication)
-  const collectedUrls = new Set()
+  const collectedUrls = new Map() // url -> timestamp，带过期时间
   let printTimer = null
   const PRINT_THROTTLE_DELAY = 3000
 
@@ -229,7 +235,9 @@
         DOMUtils.removeStyle(HIDE_ELEMENTS_STYLE_ID)
       } else {
         const existing = document.getElementById(HIDE_ELEMENTS_STYLE_ID)
-        if (existing) {existing.remove()}
+        if (existing) {
+          existing.remove()
+        }
       }
       return
     }
@@ -272,14 +280,15 @@
         DOMUtils.removeStyle(HIDE_ELEMENTS_STYLE_ID)
       } else {
         const existing = document.getElementById(HIDE_ELEMENTS_STYLE_ID)
-        if (existing) {existing.remove()}
+        if (existing) {
+          existing.remove()
+        }
       }
       console.log('[隐藏元素] 已移除隐藏规则')
     }
 
     // Save to storage
-    const domain =
-      (isDOMUtilsReady() && DOMUtils.getCurrentDomain()) || window.location.hostname
+    const domain = (isDOMUtilsReady() && DOMUtils.getCurrentDomain()) || window.location.hostname
     if (domain) {
       window.StorageUtils?.setDomainSettings('hideElementsSettings', domain, { enabled, selectors })
     }
@@ -544,26 +553,63 @@
   // For domain blocking and URL collection (mocking handled by inject.js)
   if (!window._originalFetch) {
     window._originalFetch = window.fetch
+
+    // 缓存当前域名（避免每次 fetch 都构造 URL 对象）
+    let _cachedCurrentDomain = null
+    try {
+      _cachedCurrentDomain = window.location.hostname
+    } catch {}
+
+    // 快速提取 hostname（避免构造 URL 对象）
+    function _extractHostname(urlStr) {
+      try {
+        // 简单字符串提取，避免 new URL() 的开销
+        const protocolEnd = urlStr.indexOf('://')
+        if (protocolEnd === -1) {return null}
+        const start = protocolEnd + 3
+        const pathStart = urlStr.indexOf('/', start)
+        const host = pathStart === -1 ? urlStr.substring(start) : urlStr.substring(start, pathStart)
+        // 移除端口号
+        const colonIdx = host.lastIndexOf(':')
+        return colonIdx === -1 ? host : host.substring(0, colonIdx)
+      } catch {
+        return null
+      }
+    }
+
     window.fetch = async function (url, options = {}) {
       try {
-        const urlString = typeof url === 'string' ? url : url.url
+        const urlString = typeof url === 'string' ? url : url?.url
+        if (!urlString) {return window._originalFetch(url, options)}
 
-        // Domain blocking check
-        const currentDomain = new URL(window.location.href).hostname
-        const requestDomain = new URL(urlString).hostname
+        // Domain blocking check（使用缓存域名）
+        const requestDomain = _extractHostname(urlString)
 
-        const result = await MessagingUtils.checkDomainBlocked(currentDomain, requestDomain)
+        // 仅当域名不同时才检查（同域请求跳过）
+        if (requestDomain && requestDomain !== _cachedCurrentDomain) {
+          const result = await MessagingUtils.checkDomainBlocked(
+            _cachedCurrentDomain,
+            requestDomain
+          )
 
-        if (result && result.blocked) {
-          if (settings.debugMode) {
-            console.log(`Fetch blocked: ${url}`, result)
+          if (result && result.blocked) {
+            if (settings.debugMode) {
+              console.log(`Fetch blocked: ${url}`, result)
+            }
+            return Promise.reject(new Error(`API request blocked: ${result.blockedReason}`))
           }
-          return Promise.reject(new Error(`API request blocked: ${result.blockedReason}`))
         }
 
-        // URL collection
+        // URL collection（带大小限制）
         if (typeof url === 'string' && !collectedUrls.has(url)) {
-          collectedUrls.add(url)
+          collectedUrls.set(url, Date.now())
+          // 限制大小，超过1000条清理过期
+          if (collectedUrls.size > 1000) {
+            const now = Date.now()
+            for (const [u, t] of collectedUrls) {
+              if (now - t > 60000) {collectedUrls.delete(u)} // 60秒过期
+            }
+          }
           throttledPrintUrls()
         }
 

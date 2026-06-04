@@ -1,5 +1,75 @@
 // Popup script runs in the context of the popup window
 
+// ========== 缓存 ==========
+// 避免重复调用 getCurrentDomain 和 localhost 请求
+const _popupCache = {
+  domain: null,
+  domainPromise: null,
+  localhostResponses: new Map(),
+}
+
+/**
+ * 获取当前域名（带缓存）
+ */
+async function getCachedDomain() {
+  if (_popupCache.domainPromise) {
+    return _popupCache.domainPromise
+  }
+  _popupCache.domainPromise = getCurrentDomain()
+  _popupCache.domain = await _popupCache.domainPromise
+  return _popupCache.domain
+}
+
+/**
+ * 从 localhost 获取选择器（带缓存）
+ */
+async function fetchLocalhostSelectors(domain) {
+  if (_popupCache.localhostResponses.has(domain)) {
+    return _popupCache.localhostResponses.get(domain)
+  }
+
+  let selectors = []
+  try {
+    const domainsToTry = [domain]
+    if (domain.startsWith('www.')) {
+      domainsToTry.push(domain.slice(4))
+    } else {
+      domainsToTry.push('www.' + domain)
+    }
+
+    for (const tryDomain of domainsToTry) {
+      try {
+        const response = await fetch(`http://localhost:3000/api/data/selectors/${tryDomain}`, {
+          signal: AbortSignal.timeout(2000),
+        })
+        const data = await response.json()
+        if (
+          data.success &&
+          data.data &&
+          (Array.isArray(data.data) || typeof data.data === 'string')
+        ) {
+          if (Array.isArray(data.data)) {
+            selectors = data.data
+          } else if (typeof data.data === 'string' && data.data.trim()) {
+            selectors = data.data
+              .split(',')
+              .map((s) => s.trim())
+              .filter((s) => s)
+          }
+          break
+        }
+      } catch (e) {
+        // 单个域名失败，尝试下一个
+      }
+    }
+  } catch (e) {
+    console.log('[Popup] localhost 请求失败:', e.message)
+  }
+
+  _popupCache.localhostResponses.set(domain, selectors)
+  return selectors
+}
+
 // ========== 消息通信层 ==========
 // Popup 与 content script 运行在隔离的上下文中，必须使用 Chrome Extension API 通信
 
@@ -777,7 +847,7 @@ function formatKeywords(keywords) {
  */
 async function loadKeywords() {
   // Only load keywords for Douyin domains
-  const domain = await getCurrentDomain()
+  const domain = await getCachedDomain()
   if (!isDouyinDomain(domain)) {
     return
   }
@@ -829,7 +899,7 @@ async function saveKeywords() {
   }
 
   // Only save keywords for Douyin domains
-  const domain = await getCurrentDomain()
+  const domain = await getCachedDomain()
   if (!isDouyinDomain(domain)) {
     console.log('非抖音域名，跳过保存关键词')
     return
@@ -888,7 +958,7 @@ async function saveAutoFollowKeywords() {
   }
 
   // Only save keywords for Douyin domains
-  const domain = await getCurrentDomain()
+  const domain = await getCachedDomain()
   if (!isDouyinDomain(domain)) {
     console.log('非抖音域名，跳过保存关键词')
     return
@@ -1146,7 +1216,7 @@ async function getDefaultHideSelectors() {
 
   // 失败时使用硬编码数据
   console.log('[隐藏元素] 使用硬编码默认选择器')
-  const domain = await getCurrentDomain()
+  const domain = await getCachedDomain()
   if (domain && DEFAULT_SELECTORS_BY_DOMAIN[domain]) {
     console.log('[隐藏元素] 硬编码数据:', domain, DEFAULT_SELECTORS_BY_DOMAIN[domain].length, '个')
     return DEFAULT_SELECTORS_BY_DOMAIN[domain]
@@ -1160,7 +1230,7 @@ async function getDefaultHideSelectors() {
  * Load hide elements settings from storage (domain-specific)
  */
 async function loadHideElementsSettings() {
-  const domain = await getCurrentDomain()
+  const domain = await getCachedDomain()
   const result = await chrome.storage.local.get(['hideElementsSettings'])
   const allSettings = result.hideElementsSettings || {}
 
@@ -1262,7 +1332,7 @@ async function loadHideElementsSettings() {
  */
 async function saveHideElementsSettings(userSelectors = null) {
   const enabled = hideElementsEnabledCheckbox ? hideElementsEnabledCheckbox.checked : false
-  const domain = await getCurrentDomain()
+  const domain = await getCachedDomain()
 
   if (!domain) {
     console.error('Failed to save hide elements settings: unable to get current domain')
@@ -1364,7 +1434,7 @@ async function saveHideElementsSettings(userSelectors = null) {
  * 渲染隐藏选择器列表
  */
 async function renderHideSelectorsList() {
-  const domain = await getCurrentDomain()
+  const domain = await getCachedDomain()
   if (!domain) {
     return
   }
@@ -1453,7 +1523,7 @@ async function renderHideSelectorsList() {
  * 删除选择器
  */
 async function deleteSelector(selector) {
-  const domain = await getCurrentDomain()
+  const domain = await getCachedDomain()
   if (!domain) {
     return
   }
@@ -1549,7 +1619,7 @@ if (confirmBatchAddBtn) {
     }
 
     // 添加到现有选择器
-    const domain = await getCurrentDomain()
+    const domain = await getCachedDomain()
     const result = await chrome.storage.local.get(['hideElementsSettings'])
     const allSettings = result.hideElementsSettings || {}
     const domainSettings = allSettings[domain] || { enabled: false, selectors: [] }
@@ -1637,7 +1707,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   ])
 
   // 4. 按需加载模块（根据当前 tab 域名决定）
-  const domain = await getCurrentDomain()
+  const domain = await getCachedDomain()
   console.log('[Popup] 当前域名:', domain)
 
   // 并行加载所有需要的模块
@@ -1816,7 +1886,7 @@ async function checkLocalServerStatus() {
 
       // 获取详细数据
       try {
-        let domain = await getCurrentDomain()
+        let domain = await getCachedDomain()
         if (domain) {
           // 尝试两种域名格式
           const domainsToTry = [domain]
@@ -1965,7 +2035,7 @@ function isBilibiliDomain(domain) {
 
 // Show/hide Douyin keywords section based on current domain
 async function updateDouyinKeywordsVisibility() {
-  const domain = await getCurrentDomain()
+  const domain = await getCachedDomain()
   const douyinSection = document.getElementById('douyin-keywords-section')
   if (douyinSection) {
     if (isDouyinDomain(domain)) {
@@ -2011,7 +2081,7 @@ const defaultBiliNotInterestedKeywords = [
  */
 async function loadBiliKeywords() {
   // Only load keywords for Bilibili domains
-  const domain = await getCurrentDomain()
+  const domain = await getCachedDomain()
   if (!isBilibiliDomain(domain)) {
     return
   }
@@ -2039,7 +2109,7 @@ async function saveBiliKeywords() {
   }
 
   // Only save keywords for Bilibili domains
-  const domain = await getCurrentDomain()
+  const domain = await getCachedDomain()
   if (!isBilibiliDomain(domain)) {
     console.log('非B站域名，跳过保存关键词')
     return
@@ -2084,7 +2154,7 @@ async function saveBiliKeywords() {
 
 // Show/hide Bilibili keywords section based on current domain
 async function updateBilibiliKeywordsVisibility() {
-  const domain = await getCurrentDomain()
+  const domain = await getCachedDomain()
   const biliSection = document.getElementById('bili-keywords-section')
   if (biliSection) {
     if (isBilibiliDomain(domain)) {
@@ -2245,7 +2315,7 @@ const saveSelectorsBtn = document.getElementById('save-selectors-btn')
  * 加载选择器到编辑器
  */
 async function loadSelectorsEditor() {
-  const domain = await getCurrentDomain()
+  const domain = await getCachedDomain()
   if (!domain) {
     return
   }
@@ -2363,7 +2433,7 @@ function parseSelectorsFromEditor() {
  * 保存选择器
  */
 async function saveSelectors() {
-  const domain = await getCurrentDomain()
+  const domain = await getCachedDomain()
   if (!domain) {
     return
   }
@@ -2469,7 +2539,7 @@ if (saveSelectorsBtn) {
 if (selectorsEditor) {
   // 实时更新计数（需要重新获取默认和本地服务器选择器来计算总数）
   selectorsEditor.addEventListener('input', async () => {
-    const domain = await getCurrentDomain()
+    const domain = await getCachedDomain()
     if (!domain) {
       return
     }

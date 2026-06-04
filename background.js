@@ -151,7 +151,12 @@ const _domainScriptMap = {
 }
 
 // 所有页面都需要的基础脚本
-const _baseScripts = ['content/core-bundle.js', 'content/common-bundle.js']
+const _baseScripts = [
+  'content/core-t1-bundle.js',
+  'content/core-t2-bundle.js',
+  'content/core-t3-bundle.js',
+  'content/common-bundle.js',
+]
 
 /**
  * 纯同步函数：根据 URL 匹配需要注入的脚本列表
@@ -318,6 +323,9 @@ const extensionState = {
     'bilibili.com': ['content/bili.js'],
   }, // 新增：域名到注入脚本映射 {域名: [文件名数组]}
 }
+
+// 内存缓存：已注入的 tab ID Set，避免每次 tab 更新都读取 storage
+const _injectedTabsCache = new Set()
 
 // Mock rules storage: { urlPattern: { response: any, enabled: boolean, statusCode: number } }
 let mockRules = {}
@@ -904,14 +912,13 @@ async function handleTabUpdate(tabId, tab) {
 
   // Only apply to specific URLs if needed
   if (tab.url && tab.status === 'complete' && tab.url.startsWith('http')) {
-    // 检查是否已经注入过
-    const result = await chrome.storage.local.get('injectedTabs')
-    const injectedTabs = result.injectedTabs || {}
     const tabKey = String(tabId)
 
-    // 如果已记录为手动注入过，跳过
-    if (injectedTabs[tabKey]) {
-      console.log(`[Background] 标签页 ${tabId} 已手动注入过，跳过`)
+    // 使用内存缓存快速检查（避免每次读取 storage）
+    if (_injectedTabsCache.has(tabKey)) {
+      if (extensionState.isDebugMode) {
+        console.log(`[Background] 标签页 ${tabId} 已注入（缓存），跳过`)
+      }
       return
     }
 
@@ -943,8 +950,16 @@ async function handleTabUpdate(tabId, tab) {
       // manifest.json 没有自动注入，需要手动注入（已存在的标签页）
       console.log(`[Background] 标签页 ${tabId} 需要手动注入`)
       await injectAllScriptsForTab(tabId, tab.url)
-      injectedTabs[tabKey] = Date.now()
-      await chrome.storage.local.set({ injectedTabs })
+      _injectedTabsCache.add(tabKey)
+      // 异步持久化（不阻塞）
+      chrome.storage.local
+        .get('injectedTabs')
+        .then((r) => {
+          const tabs = r.injectedTabs || {}
+          tabs[tabKey] = Date.now()
+          chrome.storage.local.set({ injectedTabs: tabs })
+        })
+        .catch(() => {})
     } catch (error) {
       // 特定错误处理
       if (error.message?.includes('error page') || error.message?.includes('cannot access')) {
@@ -1230,7 +1245,7 @@ async function injectAllScriptsForTab(tabId, tabUrl) {
       return
     }
 
-    // 检查基础脚本是否已注入（core-bundle.js 由 manifest.json 自动注入）
+    // 检查基础脚本是否已注入（core-t2-bundle.js 由 manifest.json 自动注入）
     const checkResult = await chrome.scripting.executeScript({
       target: { tabId },
       func: () => {
@@ -1251,7 +1266,7 @@ async function injectAllScriptsForTab(tabId, tabUrl) {
       if (baseAlreadyInjected) {
         // 基础脚本已注入，只需域名脚本
         scriptsToInject = cachedMatch.scripts.filter(
-          (s) => !s.includes('core-bundle.js') && !s.includes('common-bundle.js')
+          (s) => !s.includes('core-t2-bundle.js') && !s.includes('common-bundle.js')
         )
       } else {
         scriptsToInject = [...cachedMatch.scripts]
@@ -1275,10 +1290,10 @@ async function injectAllScriptsForTab(tabId, tabUrl) {
 
     // 分离基础脚本和域名脚本，基础脚本并行注入以提升速度
     const baseScriptsToInject = scriptsToInject.filter(
-      (s) => s === 'content/core-bundle.js' || s === 'content/common-bundle.js'
+      (s) => s === 'content/core-t2-bundle.js' || s === 'content/common-bundle.js'
     )
     const domainScriptsToInject = scriptsToInject.filter(
-      (s) => s !== 'content/core-bundle.js' && s !== 'content/common-bundle.js'
+      (s) => s !== 'content/core-t2-bundle.js' && s !== 'content/common-bundle.js'
     )
 
     // 预写 popup 写入但 content 同步读 localStorage 的状态到页面 localStorage
@@ -1312,7 +1327,7 @@ async function injectAllScriptsForTab(tabId, tabUrl) {
       }
     }
 
-    // 并行注入基础脚本（core-bundle.js 和 common-bundle.js 互相独立）
+    // 并行注入基础脚本（core-t2-bundle.js 和 common-bundle.js 互相独立）
     if (baseScriptsToInject.length > 0) {
       const baseStartTime = performance.now()
       const basePromises = baseScriptsToInject.map((scriptFile) =>

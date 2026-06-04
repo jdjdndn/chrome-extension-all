@@ -30,7 +30,7 @@ const BUILD_ASSERTIONS = [
   {
     src: 'content/core/script-loader.js',
     needle: 'return Promise.reject',
-    dist: 'content/core-bundle.js',
+    dist: 'content/core-t2-bundle.js',
   },
 ]
 
@@ -99,7 +99,9 @@ console.log('[Build] Environment config:', ENV_CONFIG)
 // ========== Content script bundles (from build-site-bundles.js) ==========
 const CONTENT_BUNDLES = [
   { name: 'critical', entry: 'content/entries/critical.js', outfile: 'content/critical-bundle.js' },
-  { name: 'core', entry: 'content/entries/core.js', outfile: 'content/core-bundle.js' },
+  { name: 'core-t1', entry: 'content/entries/core-t1.js', outfile: 'content/core-t1-bundle.js' },
+  { name: 'core-t2', entry: 'content/entries/core-t2.js', outfile: 'content/core-t2-bundle.js' },
+  { name: 'core-t3', entry: 'content/entries/core-t3.js', outfile: 'content/core-t3-bundle.js' },
   { name: 'common', entry: 'content/entries/common.js', outfile: 'content/common-bundle.js' },
   { name: 'bili', entry: 'content/entries/bili.js', outfile: 'content/bundled/bili.bundle.js' },
   {

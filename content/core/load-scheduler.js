@@ -399,35 +399,26 @@
   // ========== 自动触发懒加载 ==========
 
   /**
-   * 加载 core-bundle.js（懒加载核心模块）
-   * 通过动态脚本注入加载非关键模块
+   * 注入脚本到页面
    */
-  function loadCoreBundle() {
-    if (state.loaded.has('core-bundle')) {
-      log('core-bundle 已加载')
-      return Promise.resolve()
-    }
-
-    state.loaded.add('core-bundle')
-
+  function injectScript(url) {
     return new Promise((resolve) => {
-      // 确保 DOM 可用
       function inject() {
         if (!chrome?.runtime?.getURL) {
-          log('非 Chrome 扩展环境，跳过 core-bundle 加载', 'warn')
+          log('非 Chrome 扩展环境，跳过脚本加载', 'warn')
           resolve()
           return
         }
 
         const script = document.createElement('script')
-        script.src = chrome.runtime.getURL('content/core-bundle.js')
+        script.src = chrome.runtime.getURL(url)
         script.onload = () => {
-          log('core-bundle.js 加载完成')
+          log(`${url} 加载完成`)
           script.remove()
           resolve()
         }
         script.onerror = (e) => {
-          log(`core-bundle.js 加载失败: ${e.message || e.type}`, 'error')
+          log(`${url} 加载失败: ${e.message || e.type}`, 'error')
           script.remove()
           resolve()
         }
@@ -443,19 +434,78 @@
   }
 
   /**
-   * 触发懒加载
-   * 在浏览器空闲时自动加载 core-bundle.js
+   * 加载 core-t1-bundle.js（资源加速器核心）
+   * 在浏览器空闲时立即加载
+   */
+  function loadCoreT1Bundle() {
+    if (state.loaded.has('core-t1-bundle')) {
+      log('core-t1-bundle 已加载')
+      return Promise.resolve()
+    }
+
+    state.loaded.add('core-t1-bundle')
+    log('加载 core-t1-bundle（资源加速器核心）')
+    return injectScript('content/core-t1-bundle.js')
+  }
+
+  /**
+   * 加载 core-t2-bundle.js（基础设施模块）
+   * 在 core-t1 加载完成后加载
+   */
+  function loadCoreT2Bundle() {
+    if (state.loaded.has('core-t2-bundle')) {
+      log('core-t2-bundle 已加载')
+      return Promise.resolve()
+    }
+
+    state.loaded.add('core-t2-bundle')
+    log('加载 core-t2-bundle（基础设施模块）')
+    return injectScript('content/core-t2-bundle.js')
+  }
+
+  /**
+   * 加载 core-t3-bundle.js（辅助功能模块）
+   * 在 DOMContentLoaded 后加载
+   */
+  function loadCoreT3Bundle() {
+    if (state.loaded.has('core-t3-bundle')) {
+      log('core-t3-bundle 已加载')
+      return Promise.resolve()
+    }
+
+    state.loaded.add('core-t3-bundle')
+    log('加载 core-t3-bundle（辅助功能模块）')
+    return injectScript('content/core-t3-bundle.js')
+  }
+
+  /**
+   * 触发分层懒加载
+   * 在浏览器空闲时按优先级加载各层 bundle
    * 由 critical.js 入口调用
    */
   function triggerLazyLoad() {
-    if (state.loaded.has('core-bundle')) {
-      log('core-bundle 已在队列中')
+    if (state.loaded.has('core-t1-bundle')) {
+      log('分层 bundle 已在队列中')
       return
     }
 
-    log('注册 core-bundle 懒加载任务')
-    registerIdle('core-bundle', loadCoreBundle, {
+    log('注册分层 bundle 懒加载任务')
+
+    // Tier 1: 立即加载（资源加速器核心，优先级最高）
+    registerIdle('core-t1-bundle', loadCoreT1Bundle, {
+      priority: 20,
+    })
+
+    // Tier 2: 空闲加载（基础设施，依赖 T1）
+    registerIdle('core-t2-bundle', loadCoreT2Bundle, {
       priority: 10,
+      dependencies: ['core-t1-bundle'],
+    })
+
+    // Tier 3: 延迟加载（辅助功能，依赖 T2）
+    registerIdle('core-t3-bundle', loadCoreT3Bundle, {
+      priority: 5,
+      dependencies: ['core-t2-bundle'],
     })
   }
 
@@ -470,7 +520,9 @@
     registerIdle,
     registerDeferred,
     triggerLazyLoad,
-    loadCoreBundle,
+    loadCoreT1Bundle,
+    loadCoreT2Bundle,
+    loadCoreT3Bundle,
     isLoaded,
     getStats,
     getPerformanceMetrics,

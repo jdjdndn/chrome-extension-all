@@ -43,7 +43,11 @@ import '../domain-config.js'
   }
 
   // document_start 阶段 DOM 可能未就绪，找到第一个可用的父节点
-  const target = document.head || document.documentElement || document.querySelector('head') || document.querySelector('html')
+  const target =
+    document.head ||
+    document.documentElement ||
+    document.querySelector('head') ||
+    document.querySelector('html')
   if (target) {
     target.appendChild(script)
   } else {
@@ -60,7 +64,7 @@ import '../domain-config.js'
 })()
 
 // ========== 触发懒加载 ==========
-// 使用 LoadScheduler 在浏览器空闲时加载 core-bundle.js
+// 使用 LoadScheduler 在浏览器空闲时加载分层 bundle
 if (window.LoadScheduler) {
   window.LoadScheduler.triggerLazyLoad()
 }

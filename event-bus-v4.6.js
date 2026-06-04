@@ -710,21 +710,30 @@
       if (State.isReady) {return;}
 
       await Persistence.load();
-      Deduplication.start();
-      HealthCheck.start();
 
       if (isDevTools) {Transport.initPort();}
       Transport.onMessage(this._handleMessage.bind(this));
-      this._startHeartbeat();
 
       State.isReady = true;
       setTimeout(() => this.publish(MSG.READY, { from: State.id, env: ENV }), 100);
       Utils.log('EventBus', `V4.6.0 initialized [${ENV}]`, true);
     },
 
+    // 延迟启动定时器（首次 publish/subscribe 时调用）
+    _timersStarted: false,
+    _startTimersIfNeeded() {
+      if (this._timersStarted) {return;}
+      this._timersStarted = true;
+      Deduplication.start();
+      HealthCheck.start();
+      this._startHeartbeat();
+      Utils.log('EventBus', 'Timers started (lazy)');
+    },
+
     async request(type, data = {}, options = {}) {
       if (!Utils.validateType(type)) {throw new Error('Invalid message type');}
       if (!Utils.checkDataSize(data, CONFIG.MAX_DATA_SIZE)) {throw new Error('Data size exceeds limit');}
+      this._startTimersIfNeeded();
 
       return CircuitBreaker.execute(type, async () => {
         const { timeout = CONFIG.MESSAGE_TIMEOUT } = options;
@@ -764,6 +773,7 @@
     async publish(type, data = {}) {
       if (!Utils.validateType(type)) {throw new Error('Invalid message type');}
       if (!Utils.checkDataSize(data, CONFIG.MAX_DATA_SIZE)) {throw new Error('Data size exceeds limit');}
+      this._startTimersIfNeeded();
 
       const message = {
         __eventbus__: true, id: Utils.generateId(),
