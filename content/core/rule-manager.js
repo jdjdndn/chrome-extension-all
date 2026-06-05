@@ -9,6 +9,10 @@
     return
   }
 
+  // 创建持久化方法
+  const _persist =
+    typeof PersistableMixin !== 'undefined' ? PersistableMixin.create('ruleManager') : null
+
   /**
    * RuleManager - 规则管理器
    * 功能：
@@ -63,7 +67,19 @@
      */
     async _loadFromStorage() {
       try {
-        if (typeof StorageUtils !== 'undefined') {
+        if (_persist) {
+          const data = await _persist._loadFromStorage()
+          if (data) {
+            if (data.rules) {
+              for (const rule of data.rules) {
+                this.rules.set(rule.id, rule)
+              }
+            }
+            if (data.groups) {
+              this.groups = data.groups
+            }
+          }
+        } else if (typeof StorageUtils !== 'undefined') {
           const result = await StorageUtils.getLocal(this.config.storageKey)
           if (result?.[this.config.storageKey]) {
             const data = result[this.config.storageKey]
@@ -87,7 +103,12 @@
      */
     async _saveToStorage() {
       try {
-        if (typeof StorageUtils !== 'undefined') {
+        if (_persist) {
+          await _persist._saveToStorage({
+            rules: Array.from(this.rules.values()),
+            groups: this.groups,
+          })
+        } else if (typeof StorageUtils !== 'undefined') {
           await StorageUtils.setLocal({
             [this.config.storageKey]: {
               rules: Array.from(this.rules.values()),

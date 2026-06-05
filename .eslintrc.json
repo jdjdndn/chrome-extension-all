@@ -33,6 +33,7 @@
     "ContentBridge": "readonly",
     "LazyLoader": "readonly",
     "LazyInitManager": "readonly",
+    "PersistableMixin": "readonly",
     "biliSite": "readonly",
     "DEFAULT_HIDE_SELECTORS": "readonly",
     "currentSelectors": "readonly",

@@ -9,6 +9,10 @@
     return
   }
 
+  // 创建持久化方法
+  const _persist =
+    typeof PersistableMixin !== 'undefined' ? PersistableMixin.create('appConfig') : null
+
   /**
    * ConfigManager - 配置管理器
    * 功能：
@@ -77,7 +81,10 @@
      */
     async _loadFromStorage() {
       try {
-        if (typeof StorageUtils !== 'undefined') {
+        if (_persist) {
+          const data = await _persist._loadFromStorage()
+          this.config = data || {}
+        } else if (typeof StorageUtils !== 'undefined') {
           const result = await StorageUtils.getLocal(this.storageKey)
           this.config = result?.[this.storageKey] || {}
         } else if (typeof chrome !== 'undefined' && chrome.storage) {
@@ -97,7 +104,9 @@
      */
     async _saveToStorage() {
       try {
-        if (typeof StorageUtils !== 'undefined') {
+        if (_persist) {
+          await _persist._saveToStorage(this.config)
+        } else if (typeof StorageUtils !== 'undefined') {
           await StorageUtils.setLocal({ [this.storageKey]: this.config })
         } else if (typeof chrome !== 'undefined' && chrome.storage) {
           await new Promise((resolve) => {

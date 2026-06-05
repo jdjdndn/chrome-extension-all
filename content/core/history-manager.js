@@ -9,6 +9,10 @@
     return
   }
 
+  // 创建持久化方法
+  const _persist =
+    typeof PersistableMixin !== 'undefined' ? PersistableMixin.create('operationHistory') : null
+
   /**
    * HistoryManager - 操作历史管理器
    * 功能：
@@ -51,7 +55,12 @@
      */
     async _loadFromStorage() {
       try {
-        if (typeof StorageUtils !== 'undefined') {
+        if (_persist) {
+          const data = await _persist._loadFromStorage()
+          if (data) {
+            this.history = data
+          }
+        } else if (typeof StorageUtils !== 'undefined') {
           const result = await StorageUtils.getLocal(this.config.storageKey)
           if (result?.[this.config.storageKey]) {
             this.history = result[this.config.storageKey]
@@ -67,7 +76,9 @@
      */
     async _saveToStorage() {
       try {
-        if (typeof StorageUtils !== 'undefined') {
+        if (_persist) {
+          await _persist._saveToStorage(this.history)
+        } else if (typeof StorageUtils !== 'undefined') {
           await StorageUtils.setLocal({ [this.config.storageKey]: this.history })
         }
       } catch (error) {
@@ -82,7 +93,9 @@
      * @param {object} options - 选项
      */
     async record(action, data, options = {}) {
-      if (!this.config.enabled) {return}
+      if (!this.config.enabled) {
+        return
+      }
 
       const record = {
         id: `hist_${Date.now()}_${Math.random().toString(36)}`,

@@ -1394,11 +1394,20 @@ async function handleMessage(message, sender, sendResponse) {
     console.log('Background received message:', message)
   }
 
+  // 安全包装器：确保 sendResponse 只被调用一次
+  let responseSent = false
+  const safeSendResponse = (response) => {
+    if (!responseSent) {
+      responseSent = true
+      safeSendResponse(response)
+    }
+  }
+
   try {
     switch (message.type) {
       // ========== 文件下载 ==========
       case 'DOWNLOAD_FILE':
-        console.log('[Background] 收到下载请求:', message.url)
+        console.log('[Background] 收到下载��求:', message.url)
         try {
           chrome.downloads.download(
             {
@@ -1409,16 +1418,16 @@ async function handleMessage(message, sender, sendResponse) {
             (downloadId) => {
               if (chrome.runtime.lastError) {
                 console.error('[Background] 下载失败:', chrome.runtime.lastError.message)
-                sendResponse({ success: false, error: chrome.runtime.lastError.message })
+                safeSendResponse({ success: false, error: chrome.runtime.lastError.message })
               } else {
                 console.log('[Background] 下载已开始, downloadId:', downloadId)
-                sendResponse({ success: true, downloadId })
+                safeSendResponse({ success: true, downloadId })
               }
             }
           )
         } catch (error) {
           console.error('[Background] 下载异常:', error)
-          sendResponse({ success: false, error: error.message })
+          safeSendResponse({ success: false, error: error.message })
         }
         return true // 保持消息通道开放
 
@@ -1438,7 +1447,7 @@ async function handleMessage(message, sender, sendResponse) {
                 tab.url.startsWith('edge://'))
             ) {
               console.log('[Background] 跳过特殊页面:', tab.url)
-              sendResponse({ success: false, error: 'Cannot activate on special pages' })
+              safeSendResponse({ success: false, error: 'Cannot activate on special pages' })
               break
             }
 
@@ -1453,7 +1462,7 @@ async function handleMessage(message, sender, sendResponse) {
                   source: message.source || 'popup',
                 })
                 console.log('[Background] 激活成功, tabId:', tab.id)
-                sendResponse({ success: true, tabId: tab.id })
+                safeSendResponse({ success: true, tabId: tab.id })
                 break
               } catch (error) {
                 lastError = error
@@ -1473,11 +1482,11 @@ async function handleMessage(message, sender, sendResponse) {
               throw lastError
             }
           } else {
-            sendResponse({ success: false, error: 'No active tab' })
+            safeSendResponse({ success: false, error: 'No active tab' })
           }
         } catch (error) {
           console.error('[Background] 激活失败:', error.message)
-          sendResponse({ success: false, error: error.message })
+          safeSendResponse({ success: false, error: error.message })
         }
         break
 
@@ -1490,7 +1499,7 @@ async function handleMessage(message, sender, sendResponse) {
             const tab = await chrome.tabs.get(message.tabId)
             if (tab.url && tab.url.startsWith('chrome-extension://')) {
               console.log('[Background] 跳过扩展内部页面注入:', tab.url)
-              sendResponse({ success: true, skipped: true })
+              safeSendResponse({ success: true, skipped: true })
               break
             }
 
@@ -1506,19 +1515,19 @@ async function handleMessage(message, sender, sendResponse) {
               type: 'DEVTOOLS_ACTIVATE',
               source: 'devtools',
             })
-            sendResponse({ success: true })
+            safeSendResponse({ success: true })
           } else {
-            sendResponse({ success: false, error: 'Missing tabId' })
+            safeSendResponse({ success: false, error: 'Missing tabId' })
           }
         } catch (error) {
           console.error('[Background] DevTools 激活失败:', error)
-          sendResponse({ success: false, error: error.message })
+          safeSendResponse({ success: false, error: error.message })
         }
         break
 
       case 'GET_EXTENSION_INFO':
         const currentDomainForInfo = await getCurrentTabDomain()
-        sendResponse({
+        safeSendResponse({
           name: chrome.runtime.getManifest().name,
           version: chrome.runtime.getManifest().version,
           enabled: true,
@@ -1546,7 +1555,7 @@ async function handleMessage(message, sender, sendResponse) {
             })
 
             if (isDomainBlocked) {
-              sendResponse({
+              safeSendResponse({
                 success: false,
                 error: 'API request blocked - domain in blocked list',
                 blocked: true,
@@ -1564,9 +1573,9 @@ async function handleMessage(message, sender, sendResponse) {
                 body: message.body,
               })
               const data = await response.json()
-              sendResponse({ success: true, data })
+              safeSendResponse({ success: true, data })
             } catch (error) {
-              sendResponse({ success: false, error: error.message })
+              safeSendResponse({ success: false, error: error.message })
             }
           } else {
             // No active tab, proceed without blocking
@@ -1577,9 +1586,9 @@ async function handleMessage(message, sender, sendResponse) {
                 body: message.body,
               })
               const data = await response.json()
-              sendResponse({ success: true, data })
+              safeSendResponse({ success: true, data })
             } catch (error) {
-              sendResponse({ success: false, error: error.message })
+              safeSendResponse({ success: false, error: error.message })
             }
           }
         })
@@ -1588,17 +1597,17 @@ async function handleMessage(message, sender, sendResponse) {
       case 'SET_DEBUG_MODE':
         extensionState.isDebugMode = message.enabled
         await loadSettings()
-        sendResponse({ success: true })
+        safeSendResponse({ success: true })
         break
 
       case 'GET_DEBUG_MODE':
-        sendResponse({ enabled: extensionState.isDebugMode })
+        safeSendResponse({ enabled: extensionState.isDebugMode })
         break
 
       case 'ADD_BLOCKED_DOMAIN':
         const addResult = await addBlockedDomain(message.domain)
         const currentDomain1 = await getCurrentTabDomain()
-        sendResponse({
+        safeSendResponse({
           success: addResult,
           currentDomain: currentDomain1,
           domains: getBlockedDomainsForDomain(currentDomain1),
@@ -1608,7 +1617,7 @@ async function handleMessage(message, sender, sendResponse) {
       case 'REMOVE_BLOCKED_DOMAIN':
         const removeResult = await removeBlockedDomain(message.domain)
         const currentDomain2 = await getCurrentTabDomain()
-        sendResponse({
+        safeSendResponse({
           success: removeResult,
           currentDomain: currentDomain2,
           domains: getBlockedDomainsForDomain(currentDomain2),
@@ -1625,13 +1634,13 @@ async function handleMessage(message, sender, sendResponse) {
               message.requestDomain.endsWith('.' + blockedDomain)
             )
           })
-          sendResponse({
+          safeSendResponse({
             blocked: isBlocked,
             blockedReason: isBlocked ? 'Domain in blocklist' : null,
             blockedDomains: blockedList,
           })
         } else {
-          sendResponse({ blocked: false, error: 'Missing domains' })
+          safeSendResponse({ blocked: false, error: 'Missing domains' })
         }
         break
 
@@ -1643,7 +1652,7 @@ async function handleMessage(message, sender, sendResponse) {
         const blockedResponseDomains = getBlockedResponseDomainsForDomain(currentDomainForResponse)
         console.log('[Background] blockedDomains:', blockedDomains)
         console.log('[Background] blockedResponseDomains:', blockedResponseDomains)
-        sendResponse({
+        safeSendResponse({
           currentDomain: currentDomainForResponse,
           blockedDomains: blockedDomains,
           blockedResponseDomains: blockedResponseDomains,
@@ -1654,19 +1663,22 @@ async function handleMessage(message, sender, sendResponse) {
 
       case 'ADD_DOMAIN_SCRIPT_ENTRY':
         const addEntryResult = await addDomainScriptEntry(message.domain, message.scripts)
-        sendResponse({ success: addEntryResult, domainScriptMap: extensionState.domainScriptMap })
+        safeSendResponse({
+          success: addEntryResult,
+          domainScriptMap: extensionState.domainScriptMap,
+        })
         break
 
       case 'REMOVE_DOMAIN_SCRIPT_ENTRY':
         const removeEntryResult = await removeDomainScriptEntry(message.domain)
-        sendResponse({
+        safeSendResponse({
           success: removeEntryResult,
           domainScriptMap: extensionState.domainScriptMap,
         })
         break
 
       case 'GET_DOMAIN_SCRIPT_MAP':
-        sendResponse({ domainScriptMap: extensionState.domainScriptMap })
+        safeSendResponse({ domainScriptMap: extensionState.domainScriptMap })
         break
 
       case 'REGISTER_BLOCKED_DOMAINS':
@@ -1684,16 +1696,16 @@ async function handleMessage(message, sender, sendResponse) {
           await persistDomainBlockedData()
           // 更新网络规则
           await updateNetworkRules()
-          sendResponse({ success: true })
+          safeSendResponse({ success: true })
         } else {
-          sendResponse({ success: false, error: 'Missing domain or blockedDomains' })
+          safeSendResponse({ success: false, error: 'Missing domain or blockedDomains' })
         }
         break
 
       case 'ADD_BLOCKED_RESPONSE_DOMAIN':
         const addResponseResult = await addBlockedResponseDomain(message.domain)
         const currentDomain3 = await getCurrentTabDomain()
-        sendResponse({
+        safeSendResponse({
           success: addResponseResult,
           currentDomain: currentDomain3,
           domains: getBlockedResponseDomainsForDomain(currentDomain3),
@@ -1703,7 +1715,7 @@ async function handleMessage(message, sender, sendResponse) {
       case 'REMOVE_BLOCKED_RESPONSE_DOMAIN':
         const removeResponseResult = await removeBlockedResponseDomain(message.domain)
         const currentDomain4 = await getCurrentTabDomain()
-        sendResponse({
+        safeSendResponse({
           success: removeResponseResult,
           currentDomain: currentDomain4,
           domains: getBlockedResponseDomainsForDomain(currentDomain4),
@@ -1720,10 +1732,10 @@ async function handleMessage(message, sender, sendResponse) {
           })
           // If we get here, the request wasn't blocked by declarative rules
           const data = await response.json()
-          sendResponse({ success: true, data, blocked: false })
+          safeSendResponse({ success: true, data, blocked: false })
         } catch (error) {
           // Request was likely blocked
-          sendResponse({ success: false, error: error.message, blocked: true })
+          safeSendResponse({ success: false, error: error.message, blocked: true })
         }
         break
 
@@ -1733,9 +1745,9 @@ async function handleMessage(message, sender, sendResponse) {
           mockRules[message.url] = message.response
           console.log('[Mock] Registered mock for:', message.url)
           chrome.storage.local.set({ mockRules }).catch(() => {})
-          sendResponse({ success: true })
+          safeSendResponse({ success: true })
         } else {
-          sendResponse({ success: false, error: 'Missing url or response' })
+          safeSendResponse({ success: false, error: 'Missing url or response' })
         }
         break
 
@@ -1745,34 +1757,34 @@ async function handleMessage(message, sender, sendResponse) {
           delete mockRules[message.url]
           console.log('[Mock] Unregistered mock for:', message.url)
           chrome.storage.local.set({ mockRules }).catch(() => {})
-          sendResponse({ success: true })
+          safeSendResponse({ success: true })
         } else {
-          sendResponse({ success: false, error: 'Missing url' })
+          safeSendResponse({ success: false, error: 'Missing url' })
         }
         break
 
       case 'GET_MOCK_RULES':
-        sendResponse({ success: true, rules: mockRules })
+        safeSendResponse({ success: true, rules: mockRules })
         break
 
       case 'CLEAR_MOCK_RULES':
         mockRules = {}
         chrome.storage.local.set({ mockRules }).catch(() => {})
-        sendResponse({ success: true })
+        safeSendResponse({ success: true })
         break
 
       case 'CHECK_MOCK':
         // Check if a URL has a mock rule
         const mockEntry = mockRules[message.url]
         if (mockEntry && mockEntry.enabled) {
-          sendResponse({
+          safeSendResponse({
             hasMock: true,
             response: mockEntry.response,
             statusCode: mockEntry.statusCode,
             contentType: mockEntry.contentType,
           })
         } else {
-          sendResponse({ hasMock: false })
+          safeSendResponse({ hasMock: false })
         }
         break
 
@@ -1817,16 +1829,16 @@ async function handleMessage(message, sender, sendResponse) {
             })
 
             if (results && results[0]) {
-              sendResponse({ success: true, data: results[0].result })
+              safeSendResponse({ success: true, data: results[0].result })
             } else {
-              sendResponse({ success: false, error: 'No result from script' })
+              safeSendResponse({ success: false, error: 'No result from script' })
             }
           } else {
-            sendResponse({ success: false, error: 'No active tab' })
+            safeSendResponse({ success: false, error: 'No active tab' })
           }
         } catch (error) {
           console.error('[Background] Error getting memory info:', error)
-          sendResponse({ success: false, error: error.message })
+          safeSendResponse({ success: false, error: error.message })
         }
         break
 
@@ -1845,13 +1857,13 @@ async function handleMessage(message, sender, sendResponse) {
               })
               count++
             }
-            sendResponse({ success: true, count })
+            safeSendResponse({ success: true, count })
           } else {
-            sendResponse({ success: false, error: 'No active tab' })
+            safeSendResponse({ success: false, error: 'No active tab' })
           }
         } catch (error) {
           console.error('[Background] Error cleaning cookies:', error)
-          sendResponse({ success: false, error: error.message })
+          safeSendResponse({ success: false, error: error.message })
         }
         break
 
@@ -1862,10 +1874,10 @@ async function handleMessage(message, sender, sendResponse) {
           // chrome.browsingData.remove requires {since: number} as first parameter
           await chrome.browsingData.remove({ since: message.data.since }, message.data.dataTypes)
           console.log('[清除数据] 已清除:', message.data.dataTypes)
-          sendResponse({ success: true })
+          safeSendResponse({ success: true })
         } catch (error) {
           console.error('[清除数据] 清除失败:', error)
-          sendResponse({ success: false, error: error.message })
+          safeSendResponse({ success: false, error: error.message })
         }
         break
 
@@ -1878,10 +1890,10 @@ async function handleMessage(message, sender, sendResponse) {
             body: message.body ? JSON.stringify(message.body) : undefined,
           })
           const data = await response.json()
-          sendResponse({ success: true, data, status: response.status })
+          safeSendResponse({ success: true, data, status: response.status })
         } catch (error) {
           console.error('[本地服务] 请求失败:', error.message)
-          sendResponse({ success: false, error: error.message })
+          safeSendResponse({ success: false, error: error.message })
         }
         break
 
@@ -1893,14 +1905,14 @@ async function handleMessage(message, sender, sendResponse) {
             credentials: 'omit',
           })
           if (!response.ok) {
-            sendResponse({ success: false, error: `HTTP ${response.status}` })
+            safeSendResponse({ success: false, error: `HTTP ${response.status}` })
             return
           }
           const blob = await response.blob()
           // 转为 base64 data URL
           const reader = new FileReader()
           reader.onloadend = () => {
-            sendResponse({
+            safeSendResponse({
               success: true,
               dataUrl: reader.result,
               contentType: blob.type,
@@ -1908,12 +1920,12 @@ async function handleMessage(message, sender, sendResponse) {
             })
           }
           reader.onerror = () => {
-            sendResponse({ success: false, error: 'FileReader error' })
+            safeSendResponse({ success: false, error: 'FileReader error' })
           }
           reader.readAsDataURL(blob)
         } catch (error) {
           console.error('[CORS代理] 图片获取失败:', error.message)
-          sendResponse({ success: false, error: error.message })
+          safeSendResponse({ success: false, error: error.message })
         }
         return true // 保持消息通道开放（FileReader 是异步的）
 
@@ -1957,10 +1969,10 @@ async function handleMessage(message, sender, sendResponse) {
               }
             }
           }
-          sendResponse({ success: true })
+          safeSendResponse({ success: true })
         } catch (error) {
           console.error('[Background] PICKER_MESSAGE_RELAY 错误:', error)
-          sendResponse({ success: false, error: error.message })
+          safeSendResponse({ success: false, error: error.message })
         }
         break
 
@@ -1972,13 +1984,13 @@ async function handleMessage(message, sender, sendResponse) {
         const messages = (globalThis._pickerMessages?.[tabIdForMessages] || []).filter(
           (m) => m.timestamp > since
         )
-        sendResponse({ success: true, messages })
+        safeSendResponse({ success: true, messages })
         break
 
       case 'CLEAR_PICKER_MESSAGES':
         // 清除消息
         globalThis._pickerMessages = []
-        sendResponse({ success: true })
+        safeSendResponse({ success: true })
         break
 
       case 'INJECT_PICKER_LISTENER':
@@ -1986,7 +1998,7 @@ async function handleMessage(message, sender, sendResponse) {
         try {
           const targetTabId = message.tabId || (sender.tab ? sender.tab.id : null)
           if (!targetTabId) {
-            sendResponse({ success: false, error: 'No tabId' })
+            safeSendResponse({ success: false, error: 'No tabId' })
             break
           }
           await chrome.scripting.executeScript({
@@ -2010,10 +2022,10 @@ async function handleMessage(message, sender, sendResponse) {
             },
           })
           console.log('[Background] 已注入 picker 消息转发器, tabId:', targetTabId)
-          sendResponse({ success: true })
+          safeSendResponse({ success: true })
         } catch (error) {
           console.error('[Background] 注入 picker 消息转发器失败:', error)
-          sendResponse({ success: false, error: error.message })
+          safeSendResponse({ success: false, error: error.message })
         }
         break
 
@@ -2031,13 +2043,13 @@ async function handleMessage(message, sender, sendResponse) {
             await new Promise((resolve) => setTimeout(resolve, 100))
             // 发送启动命令
             await chrome.tabs.sendMessage(tabs[0].id, { type: 'START_ELEMENT_PICKER' })
-            sendResponse({ success: true })
+            safeSendResponse({ success: true })
           } else {
-            sendResponse({ success: false, error: 'No active tab' })
+            safeSendResponse({ success: false, error: 'No active tab' })
           }
         } catch (error) {
           console.error('[ElementPicker] 启动失败:', error)
-          sendResponse({ success: false, error: error.message })
+          safeSendResponse({ success: false, error: error.message })
         }
         break
 
@@ -2047,13 +2059,13 @@ async function handleMessage(message, sender, sendResponse) {
           const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
           if (tabs[0]?.id) {
             await chrome.tabs.sendMessage(tabs[0].id, { type: 'STOP_ELEMENT_PICKER' })
-            sendResponse({ success: true })
+            safeSendResponse({ success: true })
           } else {
-            sendResponse({ success: false, error: 'No active tab' })
+            safeSendResponse({ success: false, error: 'No active tab' })
           }
         } catch (error) {
           console.error('[ElementPicker] 停止失败:', error)
-          sendResponse({ success: false, error: error.message })
+          safeSendResponse({ success: false, error: error.message })
         }
         break
 
@@ -2076,7 +2088,7 @@ async function handleMessage(message, sender, sendResponse) {
             }
           }
         }
-        sendResponse({ success: true })
+        safeSendResponse({ success: true })
         break
 
       case 'GET_HIDE_ELEMENTS_SETTINGS':
@@ -2086,14 +2098,14 @@ async function handleMessage(message, sender, sendResponse) {
           const result = await chrome.storage.local.get(['hideElementsSettings'])
           const allSettings = result.hideElementsSettings || {}
           const domainSettings = allSettings[domain] || { enabled: false, selectors: [] }
-          sendResponse({
+          safeSendResponse({
             success: true,
             domain,
             settings: domainSettings,
           })
         } catch (error) {
           console.error('[HideElements] 获取设置失败:', error)
-          sendResponse({ success: false, error: error.message })
+          safeSendResponse({ success: false, error: error.message })
         }
         break
 
@@ -2102,7 +2114,7 @@ async function handleMessage(message, sender, sendResponse) {
         try {
           const domain = await getCurrentTabDomain()
           if (!domain) {
-            sendResponse({ success: false, error: 'Cannot determine domain' })
+            safeSendResponse({ success: false, error: 'Cannot determine domain' })
             break
           }
 
@@ -2130,10 +2142,10 @@ async function handleMessage(message, sender, sendResponse) {
               })
           }
 
-          sendResponse({ success: true, settings: allSettings[domain] })
+          safeSendResponse({ success: true, settings: allSettings[domain] })
         } catch (error) {
           console.error('[HideElements] 更新设置失败:', error)
-          sendResponse({ success: false, error: error.message })
+          safeSendResponse({ success: false, error: error.message })
         }
         break
 
@@ -2142,7 +2154,7 @@ async function handleMessage(message, sender, sendResponse) {
         try {
           const domain = await getCurrentTabDomain()
           if (!domain) {
-            sendResponse({ success: false, error: 'Cannot determine domain' })
+            safeSendResponse({ success: false, error: 'Cannot determine domain' })
             break
           }
 
@@ -2169,10 +2181,10 @@ async function handleMessage(message, sender, sendResponse) {
             }
           }
 
-          sendResponse({ success: true, settings: domainSettings })
+          safeSendResponse({ success: true, settings: domainSettings })
         } catch (error) {
           console.error('[HideElements] 添加选择器失败:', error)
-          sendResponse({ success: false, error: error.message })
+          safeSendResponse({ success: false, error: error.message })
         }
         break
 
@@ -2181,7 +2193,7 @@ async function handleMessage(message, sender, sendResponse) {
         try {
           const domain = await getCurrentTabDomain()
           if (!domain) {
-            sendResponse({ success: false, error: 'Cannot determine domain' })
+            safeSendResponse({ success: false, error: 'Cannot determine domain' })
             break
           }
 
@@ -2208,10 +2220,10 @@ async function handleMessage(message, sender, sendResponse) {
             }
           }
 
-          sendResponse({ success: true, settings: domainSettings })
+          safeSendResponse({ success: true, settings: domainSettings })
         } catch (error) {
           console.error('[HideElements] 移除选择器失败:', error)
-          sendResponse({ success: false, error: error.message })
+          safeSendResponse({ success: false, error: error.message })
         }
         break
 
@@ -2246,7 +2258,7 @@ async function handleMessage(message, sender, sendResponse) {
             )
           }
         }
-        sendResponse({ success: true })
+        safeSendResponse({ success: true })
         break
 
       // 元素被选中消息（来自 content.js，转发给 popup）
@@ -2255,7 +2267,7 @@ async function handleMessage(message, sender, sendResponse) {
         // 如果 popup 打开着，它会通过 chrome.runtime.onMessage 监听
         // 这里只需要返回成功即可
         console.log('[Background] 收到 ELEMENT_PICKED:', message.data?.selector)
-        sendResponse({ success: true })
+        safeSendResponse({ success: true })
         break
 
       // 在侧边栏/拆分视图中打开链接
@@ -2285,32 +2297,32 @@ async function handleMessage(message, sender, sendResponse) {
             })
 
             console.log('[Background] 已在侧边窗口打开:', message.url)
-            sendResponse({ success: true, method: 'sideWindow' })
+            safeSendResponse({ success: true, method: 'sideWindow' })
           } catch (error) {
             console.error('[Background] OPEN_IN_SIDE_PANEL 失败:', error)
             // 出错时回退到新标签页
             chrome.tabs.create({ url: message.url })
-            sendResponse({ success: true, method: 'newTab' })
+            safeSendResponse({ success: true, method: 'newTab' })
           }
         })()
         return true // 保持消息通道开放
 
       // ========== 统计数据消息处理 ==========
       case 'GET_STATS':
-        sendResponse({ success: true, stats: getStats() })
+        safeSendResponse({ success: true, stats: getStats() })
         break
 
       case 'RESET_STATS':
         resetStats()
-        sendResponse({ success: true })
+        safeSendResponse({ success: true })
         break
 
       case 'RECORD_HIDDEN_ELEMENT':
         if (message.domain && message.count) {
           recordHiddenElement(message.domain, message.count)
-          sendResponse({ success: true })
+          safeSendResponse({ success: true })
         } else {
-          sendResponse({ success: false, error: 'Missing domain or count' })
+          safeSendResponse({ success: false, error: 'Missing domain or count' })
         }
         break
 
@@ -2330,7 +2342,7 @@ async function handleMessage(message, sender, sendResponse) {
 
           // 检查是否与最近一条重复
           if (history.length > 0 && history[0].text === message.text) {
-            sendResponse({ success: true, duplicate: true })
+            safeSendResponse({ success: true, duplicate: true })
             break
           }
 
@@ -2342,22 +2354,22 @@ async function handleMessage(message, sender, sendResponse) {
 
           await chrome.storage.local.set({ clipboardHistory: history })
           console.log('[Background] 剪贴板已记录, 当前历史数:', history.length)
-          sendResponse({ success: true, count: history.length })
+          safeSendResponse({ success: true, count: history.length })
         } else {
-          sendResponse({ success: false, error: 'Missing text' })
+          safeSendResponse({ success: false, error: 'Missing text' })
         }
         break
 
       case 'GET_CLIPBOARD_HISTORY':
         {
           const result = await chrome.storage.local.get('clipboardHistory')
-          sendResponse({ success: true, history: result.clipboardHistory || [] })
+          safeSendResponse({ success: true, history: result.clipboardHistory || [] })
         }
         break
 
       case 'CLEAR_CLIPBOARD_HISTORY':
         await chrome.storage.local.set({ clipboardHistory: [] })
-        sendResponse({ success: true })
+        safeSendResponse({ success: true })
         break
 
       // ========== 通知管理 ==========
@@ -2374,16 +2386,16 @@ async function handleMessage(message, sender, sendResponse) {
           // 最多保留20条
           await chrome.storage.local.set({ notifications: notifications.slice(0, 20) })
           console.log('[Background] 通知已添加:', message.message)
-          sendResponse({ success: true })
+          safeSendResponse({ success: true })
         } else {
-          sendResponse({ success: false, error: 'Missing message' })
+          safeSendResponse({ success: false, error: 'Missing message' })
         }
         break
 
       case 'GET_NOTIFICATIONS':
         {
           const result = await chrome.storage.local.get('notifications')
-          sendResponse({ success: true, notifications: result.notifications || [] })
+          safeSendResponse({ success: true, notifications: result.notifications || [] })
         }
         break
 
@@ -2395,22 +2407,22 @@ async function handleMessage(message, sender, sendResponse) {
             notifications[message.index].read = true
             await chrome.storage.local.set({ notifications })
           }
-          sendResponse({ success: true })
+          safeSendResponse({ success: true })
         }
         break
 
       case 'CLEAR_NOTIFICATIONS':
         await chrome.storage.local.set({ notifications: [] })
-        sendResponse({ success: true })
+        safeSendResponse({ success: true })
         break
 
       default:
         console.warn('Unknown message type:', message.type)
-        sendResponse({ error: 'Unknown message type' })
+        safeSendResponse({ error: 'Unknown message type' })
     }
   } catch (error) {
     console.error('[Background] Error handling message:', error)
-    sendResponse({ error: error.message, success: false })
+    safeSendResponse({ error: error.message, success: false })
   }
 }
 

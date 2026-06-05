@@ -9,6 +9,10 @@
     return
   }
 
+  // 创建持久化方法
+  const _persist =
+    typeof PersistableMixin !== 'undefined' ? PersistableMixin.create('keywordManager') : null
+
   /**
    * KeywordManager - 关键词分组管理
    * 功能：
@@ -43,7 +47,9 @@
      * 初始化
      */
     async init(options = {}) {
-      if (this.initialized) {return true}
+      if (this.initialized) {
+        return true
+      }
       this.config = { ...this.config, ...options }
       await this._loadFromStorage()
       this.initialized = true
@@ -56,7 +62,12 @@
      */
     async _loadFromStorage() {
       try {
-        if (typeof StorageUtils !== 'undefined') {
+        if (_persist) {
+          const data = await _persist._loadFromStorage()
+          if (data) {
+            this.keywords = { ...this.keywords, ...data }
+          }
+        } else if (typeof StorageUtils !== 'undefined') {
           const result = await StorageUtils.getLocal(this.config.storageKey)
           if (result?.[this.config.storageKey]) {
             this.keywords = { ...this.keywords, ...result[this.config.storageKey] }
@@ -72,7 +83,9 @@
      */
     async _saveToStorage() {
       try {
-        if (typeof StorageUtils !== 'undefined') {
+        if (_persist) {
+          await _persist._saveToStorage(this.keywords)
+        } else if (typeof StorageUtils !== 'undefined') {
           await StorageUtils.setLocal({ [this.config.storageKey]: this.keywords })
         }
       } catch (error) {
@@ -84,7 +97,9 @@
      * 标准化关键词
      */
     _normalize(keyword) {
-      if (!keyword || typeof keyword !== 'string') {return ''}
+      if (!keyword || typeof keyword !== 'string') {
+        return ''
+      }
       const normalized = keyword.trim()
       return this.config.caseSensitive ? normalized : normalized.toLowerCase()
     },
@@ -117,7 +132,9 @@
      * 从站点移除关键词
      */
     async removeFromSite(site, keywords, type = 'default') {
-      if (!this.keywords.bySite[site]?.[type]) {return []}
+      if (!this.keywords.bySite[site]?.[type]) {
+        return []
+      }
 
       const words = Array.isArray(keywords) ? keywords : [keywords]
       const normalized = words.map((w) => this._normalize(w))
@@ -134,7 +151,9 @@
      * 获取站点关键词
      */
     getSiteKeywords(site, type = null) {
-      if (!this.keywords.bySite[site]) {return []}
+      if (!this.keywords.bySite[site]) {
+        return []
+      }
       if (type) {
         return this.keywords.bySite[site][type] || []
       }
@@ -169,7 +188,9 @@
      * 从类型分组移除
      */
     async removeFromType(type, keywords) {
-      if (!this.keywords.byType[type]) {return []}
+      if (!this.keywords.byType[type]) {
+        return []
+      }
 
       const words = Array.isArray(keywords) ? keywords : [keywords]
       const normalized = words.map((w) => this._normalize(w))
@@ -228,7 +249,9 @@
       // 搜索站点关键词
       if (site && this.keywords.bySite[site]) {
         for (const [kwType, keywords] of Object.entries(this.keywords.bySite[site])) {
-          if (type && kwType !== type) {continue}
+          if (type && kwType !== type) {
+            continue
+          }
           for (const keyword of keywords) {
             if (keyword.includes(normalizedQuery)) {
               results.push({ keyword, source: `site:${site}:${kwType}` })
@@ -239,7 +262,9 @@
 
       // 搜索类型关键词
       for (const [kwType, keywords] of Object.entries(this.keywords.byType)) {
-        if (type && kwType !== type) {continue}
+        if (type && kwType !== type) {
+          continue
+        }
         for (const keyword of keywords) {
           if (keyword.includes(normalizedQuery)) {
             results.push({ keyword, source: `type:${kwType}` })
@@ -270,7 +295,9 @@
       // 检查站点关键词
       if (site && this.keywords.bySite[site]) {
         for (const [type, keywords] of Object.entries(this.keywords.bySite[site])) {
-          if (types && !types.includes(type)) {continue}
+          if (types && !types.includes(type)) {
+            continue
+          }
           for (const keyword of keywords) {
             if (normalizedText.includes(keyword)) {
               matchedKeywords.push({ keyword, type, source: 'site' })
@@ -281,7 +308,9 @@
 
       // 检查类型关键词
       for (const [type, keywords] of Object.entries(this.keywords.byType)) {
-        if (types && !types.includes(type)) {continue}
+        if (types && !types.includes(type)) {
+          continue
+        }
         for (const keyword of keywords) {
           if (normalizedText.includes(keyword)) {
             matchedKeywords.push({ keyword, type, source: 'type' })
