@@ -64,7 +64,9 @@
 
       // 验证插件结构
       const validatedPlugin = this.validatePlugin(plugin)
-      if (!validatedPlugin) {return false}
+      if (!validatedPlugin) {
+        return false
+      }
 
       this.plugins.set(plugin.name, validatedPlugin)
       console.log(`[PluginSystem] 注册插件: ${plugin.name} v${plugin.version || '1.0.0'}`)
@@ -116,6 +118,7 @@
      * @param {string} name - 插件名称
      * @param {object} context - 上下文（通常是站点实例）
      * @param {object} options - 选项
+     * @param {Set} options.initializing - 正在初始化的插件集合（用于循环依赖检测）
      */
     async initPlugin(name, context = {}, options = {}) {
       const plugin = this.plugins.get(name)
@@ -124,8 +127,9 @@
         return null
       }
 
-      // 检查依赖
-      const depsReady = await this.checkDependencies(name)
+      // 检查依赖（传递 initializing 集合检测循环依赖）
+      const initializing = options.initializing || new Set()
+      const depsReady = await this.checkDependencies(name, initializing)
       if (!depsReady) {
         console.error(`[PluginSystem] 插件依赖未满足: ${name}`)
         return null
@@ -177,11 +181,21 @@
     /**
      * 检查插件依赖
      * @param {string} name - 插件名称
+     * @param {Set} initializing - 正在初始化的插件集合（用于循环依赖检测）
      * @returns {boolean}
      */
-    async checkDependencies(name) {
+    async checkDependencies(name, initializing = new Set()) {
       const plugin = this.plugins.get(name)
-      if (!plugin || !plugin.dependencies.length) {return true}
+      if (!plugin || !plugin.dependencies.length) {
+        return true
+      }
+
+      // 循环依赖检测
+      if (initializing.has(name)) {
+        console.warn(`[PluginSystem] 检测到循环依赖: ${name}`)
+        return false
+      }
+      initializing.add(name)
 
       for (const dep of plugin.dependencies) {
         const depName = typeof dep === 'string' ? dep : dep.name
@@ -190,8 +204,8 @@
           return false
         }
         if (!this.instances.has(depName)) {
-          // 尝试初始化依赖
-          await this.initPlugin(depName)
+          // 尝试初始化依赖（传递 initializing 集合）
+          await this.initPlugin(depName, {}, { initializing })
         }
       }
       return true
@@ -204,7 +218,9 @@
      */
     async executeHook(hookName, data) {
       const hookQueue = this.hooks[hookName]
-      if (!hookQueue || !hookQueue.length) {return}
+      if (!hookQueue || !hookQueue.length) {
+        return
+      }
 
       for (const { plugin, handler } of hookQueue) {
         try {
@@ -252,7 +268,9 @@
     async destroy(name) {
       const instance = this.instances.get(name)
       const plugin = this.plugins.get(name)
-      if (!instance || !plugin) {return false}
+      if (!instance || !plugin) {
+        return false
+      }
 
       try {
         await this.executeHook('beforeCleanup', { plugin, instance })
@@ -284,7 +302,9 @@
      */
     setEnabled(name, enabled) {
       const plugin = this.plugins.get(name)
-      if (!plugin) {return false}
+      if (!plugin) {
+        return false
+      }
       plugin.enabled = enabled
       console.log(`[PluginSystem] ${enabled ? '启用' : '禁用'}插件: ${name}`)
       return true
@@ -341,7 +361,9 @@
        * 优化选择器列表
        */
       optimize(selectors) {
-        if (!Array.isArray(selectors)) {return []}
+        if (!Array.isArray(selectors)) {
+          return []
+        }
 
         return selectors
           .filter((s) => s && typeof s === 'string' && s.trim())
@@ -396,7 +418,9 @@
        * 从分组移除关键词
        */
       removeFromGroup(groupName, keywords) {
-        if (!this.settings.groups[groupName]) {return []}
+        if (!this.settings.groups[groupName]) {
+          return []
+        }
         const words = Array.isArray(keywords) ? keywords : [keywords]
         this.settings.groups[groupName] = this.settings.groups[groupName].filter(
           (k) => !words.includes(k)
@@ -481,7 +505,9 @@
        * 结束计时
        */
       timeEnd(label) {
-        if (!this._timers?.[label]) {return null}
+        if (!this._timers?.[label]) {
+          return null
+        }
         const elapsed = performance.now() - this._timers[label]
         this.record(label, elapsed)
         delete this._timers[label]

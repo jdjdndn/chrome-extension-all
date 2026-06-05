@@ -37,6 +37,14 @@
     storageArea: 'local',
     storageKey: 'appState',
 
+    // 防抖保存状态
+    _saveTimer: null,
+    _saveDelay: 50, // ms
+    _saveQueued: false,
+
+    // 存储监听器引用（用于清理）
+    _onStorageChanged: null,
+
     /**
      * 初始化 Store
      * @param {object} options - 配置选项
@@ -93,9 +101,10 @@
     },
 
     /**
-     * 保存状态到存储
+     * 保存状态到存储（实际执行）
      */
-    async _saveToStorage() {
+    async _doSaveToStorage() {
+      this._saveQueued = false
       // 优先使用 StorageBridge
       if (typeof StorageBridge !== 'undefined') {
         await StorageBridge.set({ [this.storageKey]: this.state }, this.storageArea)
@@ -111,6 +120,61 @@
     },
 
     /**
+     * 调度防抖保存
+     */
+    _scheduleSave() {
+      if (this._saveTimer) {
+        clearTimeout(this._saveTimer)
+      }
+      this._saveQueued = true
+      this._saveTimer = setTimeout(() => {
+        this._saveTimer = null
+        this._doSaveToStorage()
+      }, this._saveDelay)
+    },
+
+    /**
+     * 强制立即保存（用于 reset 等关键操作）
+     */
+    async flushSave() {
+      if (this._saveTimer) {
+        clearTimeout(this._saveTimer)
+        this._saveTimer = null
+      }
+      await this._doSaveToStorage()
+    },
+
+    /**
+     * 高效状态比较 - 避免完整 JSON 序列化
+     * 先检查引用相等，再递归结构比较
+     * @param {any} a - 第一个值
+     * @param {any} b - 第二个值
+     * @returns {boolean}
+     */
+    _isStateEqual(a, b) {
+      if (a === b) {return true}
+      if (a == null || b == null) {return a === b}
+      if (typeof a !== 'object' || typeof b !== 'object') {return a === b}
+
+      const keysA = Object.keys(a)
+      const keysB = Object.keys(b)
+      if (keysA.length !== keysB.length) {return false}
+
+      for (const key of keysA) {
+        if (!Object.prototype.hasOwnProperty.call(b, key)) {return false}
+        const valA = a[key]
+        const valB = b[key]
+        if (valA === valB) {continue}
+        if (valA == null || valB == null || typeof valA !== 'object' || typeof valB !== 'object') {
+          return false
+        }
+        // 递归检查嵌套对象/数组
+        if (!this._isStateEqual(valA, valB)) {return false}
+      }
+      return true
+    },
+
+    /**
      * 设置存储变化监听
      */
     _setupStorageWatcher() {
@@ -118,7 +182,7 @@
         StorageBridge.watch(
           this.storageKey,
           (newState) => {
-            if (newState && JSON.stringify(newState) !== JSON.stringify(this.state)) {
+            if (newState && !this._isStateEqual(newState, this.state)) {
               this.state = newState
               this._notifySubscribers('STORAGE_SYNC')
             }
@@ -130,15 +194,16 @@
 
       // 降级到原生监听
       if (typeof chrome !== 'undefined' && chrome.storage) {
-        chrome.storage.onChanged.addListener((changes, areaName) => {
+        this._onStorageChanged = (changes, areaName) => {
           if (areaName === this.storageArea && changes[this.storageKey]) {
             const newState = changes[this.storageKey].newValue
-            if (newState && JSON.stringify(newState) !== JSON.stringify(this.state)) {
+            if (newState && !this._isStateEqual(newState, this.state)) {
               this.state = newState
               this._notifySubscribers('STORAGE_SYNC')
             }
           }
-        })
+        }
+        chrome.storage.onChanged.addListener(this._onStorageChanged)
       }
     },
 
@@ -202,8 +267,8 @@
         const oldState = { ...this.state }
         this.state = reducer(this.state, currentAction.payload)
 
-        // 持久化
-        await this._saveToStorage()
+        // 持久化（防抖）
+        this._scheduleSave()
 
         // 通知订阅者
         this._notifySubscribers(currentAction.type, oldState)
@@ -270,7 +335,7 @@
       }, this.state)
 
       target[lastKey] = value
-      await this._saveToStorage()
+      this._scheduleSave()
       this._notifySubscribers('DIRECT_SET')
     },
 
@@ -280,7 +345,7 @@
      */
     async reset(initialState = {}) {
       this.state = initialState
-      await this._saveToStorage()
+      await this.flushSave()
       this._notifySubscribers('RESET')
     },
 
@@ -289,6 +354,29 @@
      */
     getSnapshot() {
       return JSON.parse(JSON.stringify(this.state))
+    },
+
+    /**
+     * 销毁 Store 并清理所有监听器
+     */
+    destroy() {
+      // 移除存储监听器
+      if (this._onStorageChanged) {
+        chrome.storage.onChanged.removeListener(this._onStorageChanged)
+        this._onStorageChanged = null
+      }
+      // 清除防抖定时器
+      if (this._saveTimer) {
+        clearTimeout(this._saveTimer)
+        this._saveTimer = null
+      }
+      // 清空订阅者和中间件
+      this.subscribers = []
+      this.middlewares = []
+      this.reducers.clear()
+      this.initialized = false
+      this.state = {}
+      console.log('[Store] 已销毁')
     },
   }
 

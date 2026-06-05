@@ -37,11 +37,16 @@
     // 初始化状态
     initialized: false,
 
+    // 批量模式标志（跳过单次存储写入）
+    _batchMode: false,
+
     /**
      * 初始化
      */
     async init(options = {}) {
-      if (this.initialized) {return true}
+      if (this.initialized) {
+        return true
+      }
 
       this.config = { ...this.config, ...options }
       await this._loadFromStorage()
@@ -153,7 +158,9 @@
       }
 
       this.rules.set(id, newRule)
-      await this._saveToStorage()
+      if (!this._batchMode) {
+        await this._saveToStorage()
+      }
 
       console.log(`[RuleManager] 添加规则: ${id}`)
       return newRule
@@ -177,7 +184,9 @@
       }
 
       this.rules.set(id, updated)
-      await this._saveToStorage()
+      if (!this._batchMode) {
+        await this._saveToStorage()
+      }
 
       return updated
     },
@@ -186,10 +195,14 @@
      * 删除规则
      */
     async deleteRule(id) {
-      if (!this.rules.has(id)) {return false}
+      if (!this.rules.has(id)) {
+        return false
+      }
 
       this.rules.delete(id)
-      await this._saveToStorage()
+      if (!this._batchMode) {
+        await this._saveToStorage()
+      }
 
       console.log(`[RuleManager] 删除规则: ${id}`)
       return true
@@ -231,8 +244,12 @@
      * 验证规则
      */
     _validateRule(rule) {
-      if (!rule || typeof rule !== 'object') {return false}
-      if (rule.type && !['selector', 'keyword', 'domain'].includes(rule.type)) {return false}
+      if (!rule || typeof rule !== 'object') {
+        return false
+      }
+      if (rule.type && !['selector', 'keyword', 'domain'].includes(rule.type)) {
+        return false
+      }
       return true
     },
 
@@ -256,7 +273,9 @@
       const ids = Array.isArray(ruleIds) ? ruleIds : [ruleIds]
       this.groups[groupName] = [...new Set([...this.groups[groupName], ...ids])]
 
-      await this._saveToStorage()
+      if (!this._batchMode) {
+        await this._saveToStorage()
+      }
       return this.groups[groupName]
     },
 
@@ -264,12 +283,16 @@
      * 从分组移除
      */
     async removeFromGroup(groupName, ruleIds) {
-      if (!this.groups[groupName]) {return []}
+      if (!this.groups[groupName]) {
+        return []
+      }
 
       const ids = Array.isArray(ruleIds) ? ruleIds : [ruleIds]
       this.groups[groupName] = this.groups[groupName].filter((id) => !ids.includes(id))
 
-      await this._saveToStorage()
+      if (!this._batchMode) {
+        await this._saveToStorage()
+      }
       return this.groups[groupName]
     },
 
@@ -353,34 +376,48 @@
         let skipped = 0
         const errors = []
 
-        for (const rule of parsed.rules) {
-          try {
-            if (validateRules && !this._validateRule(rule)) {
-              skipped++
-              continue
-            }
+        // 启用批量模式 - 延迟存储写入
+        this._batchMode = true
 
-            if (merge && this.rules.has(rule.id)) {
-              await this.updateRule(rule.id, rule)
-            } else {
-              await this.addRule(rule)
-            }
-            imported++
-          } catch (error) {
-            errors.push({ rule: rule.id, error: error.message })
-          }
-        }
+        try {
+          for (const rule of parsed.rules) {
+            try {
+              if (validateRules && !this._validateRule(rule)) {
+                skipped++
+                continue
+              }
 
-        // 导入分组
-        if (parsed.groups) {
-          for (const [name, ids] of Object.entries(parsed.groups)) {
-            if (merge) {
-              await this.addToGroup(name, ids)
-            } else {
-              this.groups[name] = ids
+              if (merge && this.rules.has(rule.id)) {
+                await this.updateRule(rule.id, rule)
+              } else {
+                await this.addRule(rule)
+              }
+              imported++
+            } catch (error) {
+              errors.push({ rule: rule.id, error: error.message })
             }
           }
+
+          // 导入分组
+          if (parsed.groups) {
+            for (const [name, ids] of Object.entries(parsed.groups)) {
+              if (merge) {
+                // 直接赋值避免额外的 _saveToStorage 调用
+                if (!this.groups[name]) {
+                  this.groups[name] = []
+                }
+                const uniqueIds = [...new Set([...this.groups[name], ...ids])]
+                this.groups[name] = uniqueIds
+              } else {
+                this.groups[name] = ids
+              }
+            }
+          }
+
+          // 批量模式结束后一次性写入
           await this._saveToStorage()
+        } finally {
+          this._batchMode = false
         }
 
         console.log(

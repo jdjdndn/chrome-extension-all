@@ -14,7 +14,7 @@
     VirtualList: 'content/modules/VirtualList.js',
     StorageManager: 'content/modules/StorageManager.js',
     SmartRecommender: 'content/modules/SmartRecommender.js',
-    DOMWatcher: 'content/modules/DOMWatcher.js',
+    // DOMWatcher 已废弃，请使用 UnifiedDOMWatcher
     SelectorWorker: 'content/modules/SelectorWorker.js',
     IncrementalUpdater: 'content/modules/IncrementalUpdater.js',
     SelectorPathVisualizer: 'content/modules/SelectorPathVisualizer.js',
@@ -92,7 +92,9 @@
      * 初始化所有模块
      */
     async init() {
-      if (this.initialized) {return}
+      if (this.initialized) {
+        return
+      }
 
       try {
         await this.loader.loadAll()

@@ -10,25 +10,38 @@
   }
 
   /**
-   * 消息缓存管理器
+   * 消息缓存管理器（带 LRU 淘汰）
    */
   const MessageCache = {
     cache: new Map(),
     defaultTTL: 60000, // 1分钟
+    maxSize: 100, // 最大缓存条目数
 
     get(key) {
       const item = this.cache.get(key)
-      if (!item) {return null}
+      if (!item) {
+        return null
+      }
 
       if (Date.now() - item.timestamp > item.ttl) {
         this.cache.delete(key)
         return null
       }
 
+      // LRU：移动到末尾（重新插入更新顺序）
+      this.cache.delete(key)
+      this.cache.set(key, item)
+
       return item.data
     },
 
     set(key, data, ttl = this.defaultTTL) {
+      // 容量满时淘汰最旧条目
+      if (this.cache.size >= this.maxSize && !this.cache.has(key)) {
+        const oldestKey = this.cache.keys().next().value
+        this.cache.delete(oldestKey)
+      }
+
       this.cache.set(key, {
         data,
         timestamp: Date.now(),

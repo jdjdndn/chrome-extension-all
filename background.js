@@ -830,6 +830,8 @@ function setupEventListeners() {
   chrome.tabs.onRemoved.addListener(async (tabId) => {
     // 清理预解析域名匹配缓存，避免内存泄漏
     _tabScriptCache.delete(tabId)
+    // 清理注入标签页内存缓存
+    _injectedTabsCache.delete(tabId)
 
     try {
       const result = await chrome.storage.local.get('injectedTabs')
