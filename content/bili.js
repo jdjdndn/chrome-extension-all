@@ -70,38 +70,62 @@
           defaultNotInterested: [],
         }
 
-        // Feed 卡片选择器
-        this.feedCardSelectors = [
-          '.bili-feed-card',
-          '.feed-card',
-          '.recommend-list__item',
-          '.bili-video-card',
-          '.video-card',
-          '.rank-item',
-          '.bili-rank-list-video',
-          '.popular-video-card',
-          '.history-video-card',
-          '.bili-dyn-video-card',
-          '.floor-single-card',
-        ]
+        // 选择器数据（从JSON文件加载）
+        this.selectorData = null
+        this.feedCardSelectors = []
+        this.baseHideSelectors = []
+      }
 
-        // 基础隐藏选择器
-        this.baseHideSelectors = [
-          '.left-entry>.v-popover-wrap:nth-child(n+2)',
-          '.floor-single-card:has(.living)',
-          '.bili-feed-card:has(.bili-live-card)',
-          '.floor-single-card:has(.floor-title)',
-          '.bili-feed-card:not(:has(a))',
-          '.feed-card:not(:has(a))',
-          '.floor-single-card:has(.badge)',
-          '.bili-video-card.is-rcmd:has(.bili-video-card__info--owner.disable-hover)',
-        ]
+      /**
+       * 加载选择器数据
+       */
+      async loadSelectorData() {
+        try {
+          if (window.SelectorLoader) {
+            this.selectorData = await window.SelectorLoader.load('bili')
+          } else {
+            // 降级：使用默认选择器
+            this.selectorData = {
+              feedCardSelectors: [
+                '.bili-feed-card',
+                '.feed-card',
+                '.recommend-list__item',
+                '.bili-video-card',
+                '.video-card',
+                '.rank-item',
+                '.bili-rank-list-video',
+                '.popular-video-card',
+                '.history-video-card',
+                '.bili-dyn-video-card',
+                '.floor-single-card',
+              ],
+              baseHideSelectors: [
+                '.left-entry>.v-popover-wrap:nth-child(n+2)',
+                '.floor-single-card:has(.living)',
+                '.bili-feed-card:has(.bili-live-card)',
+                '.floor-single-card:has(.floor-title)',
+                '.bili-feed-card:not(:has(a))',
+                '.feed-card:not(:has(a))',
+                '.floor-single-card:has(.badge)',
+                '.bili-video-card.is-rcmd:has(.bili-video-card__info--owner.disable-hover)',
+              ],
+            }
+          }
+
+          this.feedCardSelectors = this.selectorData.feedCardSelectors || []
+          this.baseHideSelectors = this.selectorData.baseHideSelectors || []
+        } catch (error) {
+          console.error('[Bilibili脚本] 加载选择器数据失败:', error)
+        }
       }
 
       /**
        * 自定义初始化
        */
       async customInit() {
+        // 加载选择器数据
+        await this.loadSelectorData()
+
         // 加载关键词
         await this.loadKeywords()
 

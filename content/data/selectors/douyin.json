@@ -1,0 +1,24 @@
+{
+  "domain": "douyin.com",
+  "defaultHideSelectors": [
+    ".qmhaloYp:nth-child(n):not(:nth-child(2)):not(:nth-child(5))",
+    ".ooIf2jbM",
+    "._e7lJDCC",
+    "#island_076c3",
+    ".ai-note-container",
+    ".cursorPointer+*",
+    "xg-right-grid>xg-icon:not([class*=\"automatic-continuous\"]):not([class*=\"xgplayer-volume\"])",
+    ".danmakuContainer",
+    "#douyin-header-menuCt>div>pace-island>div>*:not(:last-child)"
+  ],
+  "notInterestedKeywords": [
+    "抽象", "漫画", "国漫", "修仙", "玄幻", "系统", "动画", "动漫", "小说", "黑神话",
+    "解说", "好剧", "儿童", "孩子", "观影", "案件", "国学", "狗", "猫", "宠物",
+    "娃", "王者荣耀", "射手", "对抗路", "中单", "上单", "打野", "巅峰赛", "游戏日常", "综艺",
+    "游戏", "美食", "测评", "小品", "春晚", "相亲", "恋爱", "情侣日常", "国服", "驾照",
+    "考试", "结婚", "率土之滨", "程序员", "前端", "动物", "电商", "追剧", "军旅", "短剧",
+    "恐怖", "影视", "电影", "司机", "工地", "情侣", "原生家庭", "影娱", "好片", "亲子",
+    "幼儿园", "育儿", "育婴", "宝宝", "母婴", "妈妈", "父母", "爸妈", "早教", "幼教",
+    "学前", "音乐", "热歌", "健身", "分手"
+  ]
+}

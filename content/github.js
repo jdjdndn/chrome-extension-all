@@ -14,20 +14,26 @@ if (window.GithubCopyFileLoaded) {
   let onMouseEnter = null
   let onMouseLeave = null
 
-  const SELECTORS = {
-    // 文件树项目选择器
-    treeItem: [
-      'div[role="treeitem"]',
-      'a.js-navigation-open',
-      'li.js-navigation-item',
-      '[data-path]',
-      'tr.js-navigation-item', // 文件列表行
-      'a.Link--primary', // 文件名链接
-    ].join(', '),
-    // 包含路径属性的元素
+  // 选择器数据（从JSON文件加载）
+  let SELECTORS = {
+    treeItem:
+      'div[role="treeitem"], a.js-navigation-open, li.js-navigation-item, [data-path], tr.js-navigation-item, a.Link--primary',
     pathElement: '[data-path]',
-    // 文件夹图标（用于判断是否是文件夹）
     folderIcon: '.octicon-file-directory, .octicon-file-submodule',
+  }
+
+  // 加载选择器数据
+  async function loadSelectorData() {
+    try {
+      if (window.SelectorLoader) {
+        const data = await window.SelectorLoader.load('github')
+        if (data && data.selectors) {
+          SELECTORS = data.selectors
+        }
+      }
+    } catch (error) {
+      console.warn('[GitHub脚本] 加载选择器数据失败，使用默认值:', error)
+    }
   }
 
   /**
@@ -497,7 +503,7 @@ if (window.GithubCopyFileLoaded) {
   /**
    * 初始化
    */
-  function init() {
+  async function init() {
     if (!document.body) {
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init)
@@ -506,6 +512,9 @@ if (window.GithubCopyFileLoaded) {
       }
       return
     }
+
+    // 加载选择器数据
+    await loadSelectorData()
 
     // 监听键盘事件
     document.addEventListener('keydown', handleKeyDown)

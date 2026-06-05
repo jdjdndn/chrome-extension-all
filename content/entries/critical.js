@@ -19,6 +19,9 @@
 // 安全执行工具 - 统一错误处理
 import '../utils/safe-execute.js'
 
+// 选择器加载器 - 从JSON文件加载站点选择器数据
+import '../utils/selector-loader.js'
+
 // 加载调度器 - 提供 loadCoreBundle 触发能力
 import '../core/load-scheduler.js'
 

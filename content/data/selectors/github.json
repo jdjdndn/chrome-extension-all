@@ -1,0 +1,8 @@
+{
+  "domain": "github.com",
+  "selectors": {
+    "treeItem": "div[role=\"treeitem\"], a.js-navigation-open, li.js-navigation-item, [data-path], tr.js-navigation-item, a.Link--primary",
+    "pathElement": "[data-path]",
+    "folderIcon": ".octicon-file-directory, .octicon-file-submodule"
+  }
+}

@@ -51,107 +51,119 @@
     wheel: null,
   }
 
-  const DEFAULT_HIDE_SELECTORS = [
-    '.qmhaloYp:nth-child(n):not(:nth-child(2)):not(:nth-child(5))',
-    '.ooIf2jbM',
-    '._e7lJDCC',
-    '#island_076c3',
-    '.ai-note-container',
-    '.cursorPointer+*',
-    'xg-right-grid>xg-icon:not([class*="automatic-continuous"]):not([class*="xgplayer-volume"])',
-    '.danmakuContainer',
-    '#douyin-header-menuCt>div>pace-island>div>*:not(:last-child)',
-  ]
-  logger.debug(' DEFAULT_HIDE_SELECTORS 已定义，数量:', DEFAULT_HIDE_SELECTORS.length)
+  // 选择器数据（从JSON文件加载）
+  let DEFAULT_HIDE_SELECTORS = []
+  let NOT_INTERESTED_KEYWORDS = []
+
+  // 加载选择器数据
+  async function loadSelectorData() {
+    try {
+      if (window.SelectorLoader) {
+        const data = await window.SelectorLoader.load('douyin')
+        DEFAULT_HIDE_SELECTORS = data.defaultHideSelectors || []
+        NOT_INTERESTED_KEYWORDS = data.notInterestedKeywords || []
+      } else {
+        // 降级：使用默认选择器
+        DEFAULT_HIDE_SELECTORS = [
+          '.qmhaloYp:nth-child(n):not(:nth-child(2)):not(:nth-child(5))',
+          '.ooIf2jbM',
+          '._e7lJDCC',
+          '#island_076c3',
+          '.ai-note-container',
+          '.cursorPointer+*',
+          'xg-right-grid>xg-icon:not([class*="automatic-continuous"]):not([class*="xgplayer-volume"])',
+          '.danmakuContainer',
+          '#douyin-header-menuCt>div>pace-island>div>*:not(:last-child)',
+        ]
+        NOT_INTERESTED_KEYWORDS = [
+          '抽象',
+          '漫画',
+          '国漫',
+          '修仙',
+          '玄幻',
+          '系统',
+          '动画',
+          '动漫',
+          '小说',
+          '黑神话',
+          '解说',
+          '好剧',
+          '儿童',
+          '孩子',
+          '观影',
+          '案件',
+          '国学',
+          '狗',
+          '猫',
+          '宠物',
+          '娃',
+          '王者荣耀',
+          '射手',
+          '对抗路',
+          '中单',
+          '上单',
+          '打野',
+          '巅峰赛',
+          '游戏日常',
+          '综艺',
+          '游戏',
+          '美食',
+          '测评',
+          '小品',
+          '春晚',
+          '相亲',
+          '恋爱',
+          '情侣日常',
+          '国服',
+          '驾照',
+          '考试',
+          '结婚',
+          '率土之滨',
+          '程序员',
+          '前端',
+          '动物',
+          '电商',
+          '追剧',
+          '军旅',
+          '短剧',
+          '恐怖',
+          '影视',
+          '电影',
+          '司机',
+          '工地',
+          '情侣',
+          '原生家庭',
+          '影娱',
+          '好片',
+          '亲子',
+          '幼儿园',
+          '育儿',
+          '育婴',
+          '宝宝',
+          '母婴',
+          '妈妈',
+          '父母',
+          '爸妈',
+          '早教',
+          '幼教',
+          '学前',
+          '音乐',
+          '热歌',
+          '健身',
+          '分手',
+        ]
+      }
+      logger.debug(' 选择器数据已加载，数量:', DEFAULT_HIDE_SELECTORS.length)
+    } catch (error) {
+      logger.error(' 加载选择器数据失败:', error)
+    }
+  }
 
   const BLOCKED_DOMAINS = [
     // 'mcs.zijieapi.com/list',
     // 'vc-gate-edge.ndcpp.com/sdk/get_peer',
     // 'security.zijieapi.com/api/metrics/emit',
     // 'tnc0-aliec2.zijieapi.com/get_domains',
-  ]
-
-  const NOT_INTERESTED_KEYWORDS = [
-    '抽象',
-    '漫画',
-    '国漫',
-    '修仙',
-    '玄幻',
-    '系统',
-    '动画',
-    '动漫',
-    '小说',
-    '黑神话',
-    '解说',
-    '好剧',
-    '儿童',
-    '孩子',
-    '观影',
-    '案件',
-    '国学',
-    '狗',
-    '猫',
-    '宠物',
-    '娃',
-    '王者荣耀',
-    '射手',
-    '对抗路',
-    '中单',
-    '上单',
-    '打野',
-    '巅峰赛',
-    '游戏日常',
-    '综艺',
-    '游戏',
-    '美食',
-    '测评',
-    '小品',
-    '春晚',
-    '相亲',
-    '恋爱',
-    '情侣日常',
-    '国服',
-    '驾照',
-    '考试',
-    '结婚',
-    '率土之滨',
-    '程序员',
-    '前端',
-    '动物',
-    '电商',
-    '追剧',
-    '军旅',
-    '短剧',
-    '恐怖',
-    '影视',
-    '电影',
-    '司机',
-    '工地',
-    '情侣',
-    '原生家庭',
-    '影娱',
-    '好片',
-    '亲子',
-    '幼儿园',
-    '育儿',
-    '育婴',
-    '宝宝',
-    '母婴',
-    '妈妈',
-    '父母',
-    '爸妈',
-    '早教',
-    '幼教',
-    '学前',
-    '音乐',
-    '热歌',
-    '健身',
-    '分手',
-    '股票',
-    '情感',
-    '驾驶',
-    '街头',
-    '手势',
   ]
 
   const AUTO_FOLLOW_KEYWORDS = ['ootd']
@@ -1164,12 +1176,16 @@
   }
 
   // ========== 主初始化函数（由 ScriptLoader 调用）==========
-  function init() {
+  async function init() {
     logger.debug(' init 函数被调用')
     if (window.DouyinScript.isInitialized) {
       logger.debug(' 已经初始化，跳过重复初始化')
       return
     }
+
+    // 加载选择器数据
+    await loadSelectorData()
+
     window.DouyinScript.isInitialized = true
     logger.debug(' 脚本初始化完成')
 
@@ -1405,7 +1421,9 @@
     VideoChangeChecker.cancelAll()
     // 清理隐藏样式
     const style = document.getElementById(STYLE_TAG_ID)
-    if (style) {style.remove()}
+    if (style) {
+      style.remove()
+    }
     currentSelectors = []
     window.DouyinScript.isInitialized = false
     logger.debug('脚本已销毁')
