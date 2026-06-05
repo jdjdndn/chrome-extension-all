@@ -41,9 +41,19 @@ function init() {
     return
   }
 
-  // 监听 DOM 变化
-  observer = new MutationObserver(autoSubmitPassword)
-  observer.observe(document.body, { childList: true, subtree: true, attributes: true })
+  // 监听 DOM 变化（使用 UnifiedDOMWatcher）
+  if (window.UnifiedDOMWatcher) {
+    window.UnifiedDOMWatcher.subscribe(autoSubmitPassword, {
+      priority: window.UnifiedDOMWatcher.Priority.NORMAL,
+      filter: (mutation) => mutation.type === 'childList' || mutation.type === 'attributes',
+    })
+    console.log('[百度网盘] 使用 UnifiedDOMWatcher 监听 DOM 变化')
+  } else {
+    // 降级：使用独立 MutationObserver
+    observer = new MutationObserver(autoSubmitPassword)
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true })
+    console.log('[百度网盘] 使用独立 MutationObserver 监听 DOM 变化')
+  }
 
   // 初始检查
   autoSubmitPassword()

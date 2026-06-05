@@ -128,8 +128,19 @@ function init() {
 
   injectStyles()
 
-  observer = new MutationObserver(mainLoop)
-  observer.observe(document.body, { childList: true, subtree: true })
+  // 监听 DOM 变化（使用 UnifiedDOMWatcher）
+  if (window.UnifiedDOMWatcher) {
+    window.UnifiedDOMWatcher.subscribe(mainLoop, {
+      priority: window.UnifiedDOMWatcher.Priority.LOW,
+      filter: (mutation) => mutation.type === 'childList' && mutation.addedNodes.length > 0,
+    })
+    console.log('[小红书] 使用 UnifiedDOMWatcher 监听 DOM 变化')
+  } else {
+    // 降级：使用独立 MutationObserver
+    observer = new MutationObserver(mainLoop)
+    observer.observe(document.body, { childList: true, subtree: true })
+    console.log('[小红书] 使用独立 MutationObserver 监听 DOM 变化')
+  }
 
   intervalId = setInterval(mainLoop, 1000)
 

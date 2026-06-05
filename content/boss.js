@@ -137,9 +137,19 @@ function init() {
 
   injectStyles()
 
-  // 监听 DOM 变化（使用节流版本）
-  observer = new MutationObserver(throttledProcessJobList)
-  observer.observe(document.body, { childList: true, subtree: true })
+  // 监听 DOM 变化（使用 UnifiedDOMWatcher）
+  if (window.UnifiedDOMWatcher) {
+    window.UnifiedDOMWatcher.subscribe(throttledProcessJobList, {
+      priority: window.UnifiedDOMWatcher.Priority.LOW,
+      filter: (mutation) => mutation.type === 'childList' && mutation.addedNodes.length > 0,
+    })
+    console.log('[BOSS直聘] 使用 UnifiedDOMWatcher 监听 DOM 变化')
+  } else {
+    // 降级：使用独立 MutationObserver
+    observer = new MutationObserver(throttledProcessJobList)
+    observer.observe(document.body, { childList: true, subtree: true })
+    console.log('[BOSS直聘] 使用独立 MutationObserver 监听 DOM 变化')
+  }
 
   guard.markInitialized()
   console.log('[BOSS直聘] 信息透出脚本已加载')

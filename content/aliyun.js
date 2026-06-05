@@ -67,9 +67,19 @@ function init() {
 
   injectStyles()
 
-  // 监听 DOM 变化
-  observer = new MutationObserver(fixSaveButton)
-  observer.observe(document.body, { childList: true, subtree: true, attributes: true })
+  // 监听 DOM 变化（使用 UnifiedDOMWatcher）
+  if (window.UnifiedDOMWatcher) {
+    window.UnifiedDOMWatcher.subscribe(fixSaveButton, {
+      priority: window.UnifiedDOMWatcher.Priority.NORMAL,
+      filter: (mutation) => mutation.type === 'childList' || mutation.type === 'attributes',
+    })
+    console.log('[阿里云盘] 使用 UnifiedDOMWatcher 监听 DOM 变化')
+  } else {
+    // 降级：使用独立 MutationObserver
+    observer = new MutationObserver(fixSaveButton)
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true })
+    console.log('[阿里云盘] 使用独立 MutationObserver 监听 DOM 变化')
+  }
 
   guard.markInitialized()
   console.log('[阿里云盘] 保存按钮固定脚本已加载')

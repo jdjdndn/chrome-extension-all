@@ -47,32 +47,56 @@ class Hu4Site extends SiteBase {
    * 设置自动点击观察器
    */
   setupAutoClickObserver() {
-    if (this.observer) {
-      this.observer.disconnect()
-      this.observer = null
+    // 清理旧的订阅
+    if (this._unsubscribe) {
+      this._unsubscribe()
+      this._unsubscribe = null
     }
 
-    this.observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        mutation.addedNodes.forEach((node) => {
-          if (node.nodeType === 1) {
-            if (node.id === 'tiaozhuan') {
-              node.click()
-              console.log('[4hu脚本] 已自动点击动态添加的 #tiaozhuan')
-            }
-            const tiaozhuanInChildren = node.querySelectorAll?.('#tiaozhuan')
-            tiaozhuanInChildren?.forEach((el) => {
-              el.click()
-              console.log('[4hu脚本] 已自动点击子节点中的 #tiaozhuan')
-            })
-          }
-        })
+    // 使用 UnifiedDOMWatcher 统一管理
+    if (window.UnifiedDOMWatcher) {
+      this._unsubscribe = window.UnifiedDOMWatcher.subscribe(
+        (mutations) => {
+          this._processAutoClickMutations(mutations)
+        },
+        {
+          priority: window.UnifiedDOMWatcher.Priority.NORMAL,
+          filter: (mutation) => mutation.type === 'childList' && mutation.addedNodes.length > 0,
+        }
+      )
+      console.log('[4hu脚本] 使用 UnifiedDOMWatcher 监听自动点击')
+    } else {
+      // 降级：使用独立 MutationObserver
+      this.observer = new MutationObserver((mutations) => {
+        this._processAutoClickMutations(mutations)
       })
-    })
 
-    this.observer.observe(document.body || document.documentElement, {
-      childList: true,
-      subtree: true,
+      this.observer.observe(document.body || document.documentElement, {
+        childList: true,
+        subtree: true,
+      })
+      console.log('[4hu脚本] 使用独立 MutationObserver 监听自动点击')
+    }
+  }
+
+  /**
+   * 处理自动点击的 DOM 变化
+   */
+  _processAutoClickMutations(mutations) {
+    mutations.forEach((mutation) => {
+      mutation.addedNodes.forEach((node) => {
+        if (node.nodeType === 1) {
+          if (node.id === 'tiaozhuan') {
+            node.click()
+            console.log('[4hu脚本] 已自动点击动态添加的 #tiaozhuan')
+          }
+          const tiaozhuanInChildren = node.querySelectorAll?.('#tiaozhuan')
+          tiaozhuanInChildren?.forEach((el) => {
+            el.click()
+            console.log('[4hu脚本] 已自动点击子节点中的 #tiaozhuan')
+          })
+        }
+      })
     })
   }
 
@@ -81,6 +105,10 @@ class Hu4Site extends SiteBase {
    */
   cleanup() {
     console.log('[4hu脚本] 清理状态...')
+    if (this._unsubscribe) {
+      this._unsubscribe()
+      this._unsubscribe = null
+    }
     if (this.observer) {
       this.observer.disconnect()
       this.observer = null
