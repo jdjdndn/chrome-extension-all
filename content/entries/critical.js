@@ -22,8 +22,8 @@ import '../utils/safe-execute.js'
 // 加载调度器 - 提供 loadCoreBundle 触发能力
 import '../core/load-scheduler.js'
 
-// EventBus - 基础通信总线
-import '../../event-bus-v4.6.js'
+// EventBus Lite - 精简版通信总线（document_start阶段）
+import '../utils/eventbus-lite.js'
 
 // 域名检测 - 域名脚本配置
 import '../domain-config.js'
@@ -65,6 +65,13 @@ import '../domain-config.js'
     observer.observe(document, { childList: true, subtree: true })
   }
 })()
+
+// ========== 初始化 EventBus Lite ==========
+if (window.EventBusLite) {
+  const eventBus = window.EventBusLite()
+  window.EventBus = eventBus
+  eventBus.init()
+}
 
 // ========== 触发懒加载 ==========
 // 使用 LoadScheduler 在浏览器空闲时加载分层 bundle
