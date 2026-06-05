@@ -2,6 +2,42 @@
 document.documentElement.classList.add('critical-css-loaded')
 
 /**
+ * 安全执行函数
+ * @param {Function} fn - 要执行的函数
+ * @param {*} fallback - 出错时返回的默认值
+ * @param {string} context - 执行上下文（用于日志）
+ * @returns {*} 函数返回值或fallback
+ */
+function safeExecute(fn, fallback = null, context = '') {
+  try {
+    return fn()
+  } catch (error) {
+    if (context) {
+      console.debug(`[${context}] 执行失败:`, error.message)
+    }
+    return fallback
+  }
+}
+
+/**
+ * 安全执行异步函数
+ * @param {Function} fn - 要执行的异步函数
+ * @param {*} fallback - 出错时返回的默认值
+ * @param {string} context - 执行上下文（用于日志）
+ * @returns {Promise<*>} 函数返回值或fallback
+ */
+async function safeExecuteAsync(fn, fallback = null, context = '') {
+  try {
+    return await fn()
+  } catch (error) {
+    if (context) {
+      console.debug(`[${context}] 执行失败:`, error.message)
+    }
+    return fallback
+  }
+}
+
+/**
  * 安全获取 DOM 元素（统一空指针保护）
  * 优化路径：下次任何 DOM 操作直接使用此函数，无需重复判空
  * @param {string} id - 元素 ID
@@ -522,16 +558,20 @@ async function loadBookmarks() {
     // 按域名分组
     const domainMap = new Map()
     recentBookmarks.forEach((b) => {
-      try {
-        const domain = new URL(b.url).hostname
-        if (!domainMap.has(domain)) {
-          domainMap.set(domain, { domain, urls: [] })
-        }
-        domainMap.get(domain).urls.push({
-          url: b.url,
-          title: b.title || domain,
-        })
-      } catch (e) {}
+      safeExecute(
+        () => {
+          const domain = new URL(b.url).hostname
+          if (!domainMap.has(domain)) {
+            domainMap.set(domain, { domain, urls: [] })
+          }
+          domainMap.get(domain).urls.push({
+            url: b.url,
+            title: b.title || domain,
+          })
+        },
+        null,
+        'BookmarksGroup'
+      )
     })
 
     // 渲染书签
@@ -839,13 +879,17 @@ async function searchHistory(query) {
     // 按域名分组
     const domainMap = new Map()
     results.forEach((item) => {
-      try {
-        const domain = new URL(item.url).hostname
-        if (!domainMap.has(domain)) {
-          domainMap.set(domain, { domain, urls: [] })
-        }
-        domainMap.get(domain).urls.push(item)
-      } catch (e) {}
+      safeExecute(
+        () => {
+          const domain = new URL(item.url).hostname
+          if (!domainMap.has(domain)) {
+            domainMap.set(domain, { domain, urls: [] })
+          }
+          domainMap.get(domain).urls.push(item)
+        },
+        null,
+        'HistoryGroup'
+      )
     })
 
     renderHistory(Array.from(domainMap.values()))
@@ -1038,10 +1082,14 @@ function initAddLinkBtn() {
 
     // 尝试获取 favicon
     let favicon = ''
-    try {
-      const urlObj = new URL(url)
-      favicon = `${urlObj.origin}/favicon.ico`
-    } catch (e) {}
+    safeExecute(
+      () => {
+        const urlObj = new URL(url)
+        favicon = `${urlObj.origin}/favicon.ico`
+      },
+      null,
+      'Favicon'
+    )
 
     const newLink = { title, url, icon, favicon }
     const linkEl = createQuickLink(newLink)
@@ -2545,7 +2593,9 @@ function initImportBtn() {
       const sel = window.getSelection()
       sel.removeAllRanges()
       sel.addRange(range)
-    } catch (_) {}
+    } catch (_) {
+      // 选区恢复失败，忽略
+    }
   }
 
   function showHint(text) {

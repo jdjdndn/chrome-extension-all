@@ -16,6 +16,9 @@
 
 // ========== 关键模块（立即加载） ==========
 
+// 安全执行工具 - 统一错误处理
+import '../utils/safe-execute.js'
+
 // 加载调度器 - 提供 loadCoreBundle 触发能力
 import '../core/load-scheduler.js'
 

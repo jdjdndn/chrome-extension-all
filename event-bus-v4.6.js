@@ -81,14 +81,15 @@
   const isDevTools = typeof chrome !== 'undefined' && chrome.devtools;
 
   // ==================== 工具函数（精简） ====================
+  // 优先使用全局 SafeExecute，否则使用本地定义
   const Utils = {
     generateId: (prefix = '') => `${prefix}${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
-    safeExecute: (fn, fallback = null, ctx = null) => {
+    safeExecute: globalScope.SafeExecute?.safe || ((fn, fallback = null, ctx = null) => {
       try { return fn.call(ctx); } catch { return fallback; }
-    },
-    async safeExecuteAsync(fn, fallback = null) {
+    }),
+    safeExecuteAsync: globalScope.SafeExecute?.safeAsync || (async (fn, fallback = null) => {
       try { return await fn(); } catch { return fallback; }
-    },
+    }),
     deepClone: (obj) => {
       if (!obj || typeof obj !== 'object') {return obj;}
       if (obj instanceof Date) {return new Date(obj);}
