@@ -690,7 +690,13 @@ if (window.KeyboardPaginationLoaded) {
     clickButton(button, type) {
       // 检查按钮是否仍在 DOM 中（SPA 路由切换后引用可能失效）
       if (!document.body.contains(button)) {
-        this.detectPagination()
+        // 直接重新探测，跳过 hasPaginationSemantics 闸
+        // （点击后按钮失效说明页面一定有分页语义，新 DOM 可能尚未完全渲染）
+        this.prevButton = this.findElement('prev')
+        this.nextButton = this.findElement('next')
+        if (!this.prevButton && !this.nextButton) {
+          this.detectInPaginationContainer()
+        }
         button = type === 'prev' ? this.prevButton : this.nextButton
         if (!button) {
           return

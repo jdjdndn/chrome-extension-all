@@ -405,19 +405,13 @@ if (window.KeyboardClickLoaded) {
       // 向上查找，检查父元素是否有预览/模态框特征
       let current = el
       for (let i = 0; i < 6 && current && current !== document.body; i++) {
-        // 先快速检查 class 和 id（字符串匹配比 getComputedStyle 快得多）
-        if (current.className && this._modalPatterns.some((p) => p.test(current.className))) {
-          return true
-        }
-        if (current.id && this._modalPatterns.some((p) => p.test(current.id))) {
-          return true
-        }
-
         try {
           const style = getComputedStyle(current)
-          // 高 z-index 过滤（> 1000 才是真正的遮罩层，排除画中画等）
           const zIndex = parseInt(style.zIndex, 10) || 0
-          if (style.position === 'fixed' && zIndex > 1000) {
+          const isFixed = style.position === 'fixed'
+          const isAbsolute = style.position === 'absolute'
+
+          if (isFixed && zIndex > 1000) {
             const rect = current.getBoundingClientRect()
             // 坐标校验 + 大尺寸过滤：接近全屏才是真正的遮罩
             if (
@@ -428,9 +422,21 @@ if (window.KeyboardClickLoaded) {
               rect.width >= window.innerWidth * 0.5 &&
               rect.height >= window.innerHeight * 0.5
             ) {
+              // 视觉特征确认：class/id 模式匹配仅作辅助信号
+              const className =
+                current.className && typeof current.className === 'string' ? current.className : ''
+              const id = current.id || ''
+              const hasClassName = this._modalPatterns.some((p) => p.test(className) || p.test(id))
+              if (hasClassName) {
+                return true
+              }
+              // 即使 class 不匹配，fixed + 高 z-index + 全屏 + 坐标命中 → 仍是真遮罩
               return true
             }
           }
+
+          // 非 fixed/absolute 定位的元素：class 名匹配不足以判定为预览模态框
+          // （如 .preview-card、.gallery-item 等普通内容容器不应被误判）
         } catch {
           /* getComputedStyle 可能失败 */
         }
@@ -462,15 +468,6 @@ if (window.KeyboardClickLoaded) {
       const candidates = []
 
       for (let i = 0; i < 8 && current && current !== document.body; i++) {
-        let matched = false
-
-        // 检查 class 和 id
-        if (current.className && maskPatterns.some((p) => p.test(current.className))) {
-          matched = true
-        } else if (current.id && maskPatterns.some((p) => p.test(current.id))) {
-          matched = true
-        }
-
         // 坐标校验：确保 (x, y) 真正在元素边界内
         try {
           const rect = current.getBoundingClientRect()
@@ -480,22 +477,34 @@ if (window.KeyboardClickLoaded) {
           }
 
           const style = getComputedStyle(current)
-          // 高 z-index 优先（> 1000 通常是真正的遮罩层）
           const zIndex = parseInt(style.zIndex, 10) || 0
           const isHighZ = zIndex > 1000
+          const pos = style.position
+          const isFixedOrAbsolute = pos === 'fixed' || pos === 'absolute'
 
-          // cursor: pointer 或有 onclick 或 匹配模式
-          if (style.cursor === 'pointer' || matched || current.hasAttribute?.('onclick')) {
-            const priority = isHighZ ? -1 : matched ? 1 : 2
-            candidates.push({ el: current, priority, zIndex })
-          }
+          // class/id 匹配仅在 fixed/absolute 定位下作为有效信号
+          // （防止 .preview-card、.dialog-content 等普通内容容器被误判）
+          const className =
+            current.className && typeof current.className === 'string' ? current.className : ''
+          const id = current.id || ''
+          const classNameMatch =
+            isFixedOrAbsolute && maskPatterns.some((p) => p.test(className) || p.test(id))
 
           // fixed 全屏容器 + 高 z-index = 最高优先级遮罩
           if (style.position === 'fixed' && isHighZ) {
-            // 接近全屏的固定元素很可能是遮罩容器
             if (rect.width >= window.innerWidth * 0.8 && rect.height >= window.innerHeight * 0.8) {
               candidates.push({ el: current, priority: -2, zIndex })
+              current = current.parentElement
+              continue
             }
+          }
+
+          // cursor: pointer 或有 onclick（需要在坐标范围内已确认）
+          const isClickable = style.cursor === 'pointer' || current.hasAttribute?.('onclick')
+
+          if (classNameMatch || isClickable) {
+            const priority = isHighZ ? -1 : classNameMatch ? 1 : 2
+            candidates.push({ el: current, priority, zIndex })
           }
         } catch {
           /* getComputedStyle 可能失败 */
@@ -519,50 +528,47 @@ if (window.KeyboardClickLoaded) {
         return false
       }
 
-      // 检查常见的遮罩类名/ID
-      const maskPatterns = [
-        /mask/i,
-        /overlay/i,
-        /backdrop/i,
-        /modal/i,
-        /dialog/i,
-        /lightbox/i,
-        /preview/i,
-        /^modal-/i,
-        /^overlay-/i,
-      ]
-
       // 检查元素本身（最多向上5层）
       let current = el
       for (let i = 0; i < 5 && current && current !== document.body; i++) {
-        // 检查 class 和 id
-        if (current.className && maskPatterns.some((p) => p.test(current.className))) {
-          return true
-        }
-        if (current.id && maskPatterns.some((p) => p.test(current.id))) {
-          return true
-        }
+        try {
+          const style = getComputedStyle(current)
+          const zIndex = parseInt(style.zIndex, 10) || 0
+          const pos = style.position
+          const isFixedOrAbsolute = pos === 'fixed' || pos === 'absolute'
 
-        // 检查是否为固定/绝对定位的半透明全屏覆盖层
-        const style = getComputedStyle(current)
-        // 高 z-index 过滤（> 1000 才是真正的遮罩层，排除画中画等）
-        const zIndex = parseInt(style.zIndex, 10) || 0
-        if ((style.position === 'fixed' || style.position === 'absolute') && zIndex > 1000) {
-          const bg = style.backgroundColor
-          // 半透明黑色背景 + 坐标在校 + 大尺寸 = 真正的遮罩
-          if (bg.includes('rgba(0, 0, 0') || bg.includes('rgba(0,0,0')) {
+          if (isFixedOrAbsolute && zIndex > 1000) {
+            const bg = style.backgroundColor
+            const hasDarkBg = bg.includes('rgba(0, 0, 0') || bg.includes('rgba(0,0,0')
             const rect = current.getBoundingClientRect()
-            if (
-              x >= rect.left &&
-              x <= rect.right &&
-              y >= rect.top &&
-              y <= rect.bottom &&
-              rect.width >= window.innerWidth * 0.5 &&
-              rect.height >= window.innerHeight * 0.5
-            ) {
+            const inBounds = x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
+            const isLarge =
+              rect.width >= window.innerWidth * 0.5 && rect.height >= window.innerHeight * 0.5
+
+            // fixed/absolute + 高 z-index + 半透明深色背景 + 大尺寸 + 坐标命中 → 遮罩
+            if (hasDarkBg && inBounds && isLarge) {
+              return true
+            }
+
+            // fixed/absolute + 高 z-index + class/id 匹配遮罩模式 → 辅助判定
+            const className =
+              current.className && typeof current.className === 'string' ? current.className : ''
+            const id = current.id || ''
+            const maskPatterns = [
+              /mask/i,
+              /overlay/i,
+              /backdrop/i,
+              /modal/i,
+              /dialog/i,
+              /lightbox/i,
+              /preview/i,
+            ]
+            if (maskPatterns.some((p) => p.test(className) || p.test(id))) {
               return true
             }
           }
+        } catch {
+          /* getComputedStyle 可能失败 */
         }
 
         current = current.parentElement
