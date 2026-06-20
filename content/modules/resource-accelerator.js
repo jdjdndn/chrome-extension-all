@@ -14,13 +14,6 @@
 
   const LOG_PREFIX = '[ResourceAccelerator]'
 
-  // 单例守卫：防止 bundle 被多次评估（双入口/多 frame）导致重复注册 DOMContentLoaded
-  let _resourceAcceleratorLoaded = false
-  if (_resourceAcceleratorLoaded) {
-    console.log(`${LOG_PREFIX} 已加载，跳过重复评估`)
-    return
-  }
-  _resourceAcceleratorLoaded = true
   const CACHE_KEY = 'resourceAcceleratorCache'
   const CONFIG_KEY = 'resourceAcceleratorConfig'
   const CACHE_TTL = 7 * 24 * 60 * 60 * 1000 // 7天过期

@@ -6,13 +6,13 @@
 (function () {
   'use strict'
 
-  // 防止重复初始化（闭包变量，避免被网站反扩展检测）
-  let _pageHelperInitialized = false
-  if (_pageHelperInitialized) {
+  // 防止重复初始化（非枚举属性，Object.keys 不可见，避免被网站反扩展检测）
+  const _guardKey = '_rc_ph'
+  if (window[_guardKey]) {
     console.log('[PageHelper] 已初始化，跳过')
     return
   }
-  _pageHelperInitialized = true
+  Object.defineProperty(window, _guardKey, { value: true, enumerable: false, configurable: false })
 
   // ========== 工具函数 ==========
 

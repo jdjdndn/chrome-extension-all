@@ -7,13 +7,6 @@
 (function () {
   'use strict'
 
-  // 防止重复注入（闭包变量，避免被网站反扩展检测）
-  let _alreadyInjected = false
-  if (_alreadyInjected) {
-    return
-  }
-  _alreadyInjected = true
-
   console.log('[AI Aggregator Response Watcher] 监听脚本已加载')
 
   /**
