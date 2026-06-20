@@ -122,31 +122,6 @@ class TabManager {
   }
 
   /**
-   * 注入脚本到标签页
-   */
-  async injectScripts(tabId, config) {
-    try {
-      // 注入 injector.js
-      await chrome.scripting.executeScript({
-        target: { tabId },
-        files: ['content/modules/ai-aggregator/injector.js'],
-      })
-
-      // 注入 response-watcher.js
-      await chrome.scripting.executeScript({
-        target: { tabId },
-        files: ['content/modules/ai-aggregator/response-watcher.js'],
-      })
-
-      console.log(`[Tab Manager] 脚本已注入到 tabId: ${tabId}`)
-      return true
-    } catch (error) {
-      console.error(`[Tab Manager] 注入脚本失败:`, error)
-      return false
-    }
-  }
-
-  /**
    * 向标签页发送问题
    */
   async sendQuestion(tabId, config, question) {
