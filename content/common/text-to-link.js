@@ -108,7 +108,21 @@ function initTextToLink() {
       const afterTld = linkStr.slice(tldEndIndex)
       // 如果 TLD 后面紧跟非 URL 字符（如中文），则截断
       if (afterTld && /^[^\w\/\?#\[\]@!$&'()*+,;=%._~-]/.test(afterTld)) {
-        return linkStr.slice(0, tldEndIndex)
+        linkStr = linkStr.slice(0, tldEndIndex)
+      }
+    }
+    // 处理括号内的域名：(www.example.com) -> 移除末尾多余右括号
+    // 正则 linkRegex 的路径部分包含 ()，会把右括号也吃进去
+    const openCount = (linkStr.match(/\(/g) || []).length
+    const closeCount = (linkStr.match(/\)/g) || []).length
+    if (closeCount > openCount) {
+      // 移除末尾多余的右括号（仅移除超出的数量）
+      const excess = closeCount - openCount
+      for (let i = 0; i < excess; i++) {
+        const lastClose = linkStr.lastIndexOf(')')
+        if (lastClose !== -1) {
+          linkStr = linkStr.slice(0, lastClose) + linkStr.slice(lastClose + 1)
+        }
       }
     }
     return linkStr
