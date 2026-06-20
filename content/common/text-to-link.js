@@ -98,6 +98,20 @@ function initTextToLink() {
 
   // 清理链接末尾的非 URL 字符（如中文、日文、韩文等）
   function cleanLinkEnd(linkStr) {
+    // 先移除多余右括号，再做 TLD 截断（否则 ) 会被视为 URL 字符导致截断不生效）
+    // 处理括号内的域名：(www.example.com) -> 移除末尾多余右括号
+    // 正则 linkRegex 的路径部分包含 ()，会把右括号也吃进去
+    const openCount = (linkStr.match(/\(/g) || []).length
+    const closeCount = (linkStr.match(/\)/g) || []).length
+    if (closeCount > openCount) {
+      const excess = closeCount - openCount
+      for (let i = 0; i < excess; i++) {
+        const lastClose = linkStr.lastIndexOf(')')
+        if (lastClose !== -1) {
+          linkStr = linkStr.slice(0, lastClose) + linkStr.slice(lastClose + 1)
+        }
+      }
+    }
     // 匹配 TLD 后直接跟随的非 URL 字符（Unicode 字符但不是有效的 URL 路径字符）
     // 有效 URL 字符包括：字母、数字、-._~:/?#[]@!$&'()*+,;=
     // 问题场景：tiez.name666.top下载 -> 应该只保留 tiez.name666.top
@@ -111,19 +125,11 @@ function initTextToLink() {
         linkStr = linkStr.slice(0, tldEndIndex)
       }
     }
-    // 处理括号内的域名：(www.example.com) -> 移除末尾多余右括号
-    // 正则 linkRegex 的路径部分包含 ()，会把右括号也吃进去
-    const openCount = (linkStr.match(/\(/g) || []).length
-    const closeCount = (linkStr.match(/\)/g) || []).length
-    if (closeCount > openCount) {
-      // 移除末尾多余的右括号（仅移除超出的数量）
-      const excess = closeCount - openCount
-      for (let i = 0; i < excess; i++) {
-        const lastClose = linkStr.lastIndexOf(')')
-        if (lastClose !== -1) {
-          linkStr = linkStr.slice(0, lastClose) + linkStr.slice(lastClose + 1)
-        }
-      }
+    // linkRegex 路径部分含 ()，可能把两个域名吞成一个（如 www.a.com)和(www.b.cn）
+    // 检测多个 TLD 出现则截断到第一个域名的 TLD 结束处
+    const allTlds = [...linkStr.matchAll(new RegExp(`\\.(${TOP_LEVEL_DOMAINS.join('|')})`, 'g'))]
+    if (allTlds.length > 1) {
+      linkStr = linkStr.slice(0, allTlds[0].index + allTlds[0][0].length)
     }
     return linkStr
   }
@@ -183,6 +189,7 @@ function initTextToLink() {
         const len = matchStr.length
         newText = newText.replace(matchStr, ' '.repeat(len))
         match.type = type
+        match.rawLength = len // 保存原始匹配长度，用于 splitText offset 计算
         matchArr.push(match)
       }
       return matchArr
@@ -203,7 +210,9 @@ function initTextToLink() {
       const textObj = { text: text.slice(lastIndex, item.index), type: 'text' }
       const linkObj = { text: link, type: 'link' }
       returnArr.push(textObj, linkObj)
-      lastIndex = item.index + link.length
+      // 使用原始匹配长度计算偏移，cleanLinkEnd 可能缩短了 link 但未改 index
+      const span = item.rawLength || link.length
+      lastIndex = item.index + span
       if (i === arr.length - 1 && lastIndex < text.length) {
         returnArr.push({ text: text.slice(lastIndex), type: 'text' })
       }
