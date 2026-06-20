@@ -582,17 +582,9 @@ if (window.KeyboardPaginationLoaded) {
       const scheduleDetect = () => {
         clearTimeout(this._detectTimer)
         this._detectTimer = setTimeout(() => {
-          // prev+next 都在 DOM 中且未 disabled → 跳过扫描
-          if (
-            this.prevButton &&
-            this.nextButton &&
-            document.body.contains(this.prevButton) &&
-            document.body.contains(this.nextButton) &&
-            !this.prevButton.disabled &&
-            !this.nextButton.disabled
-          ) {
-            return
-          }
+          // SPA 页面切换后按钮仍在 DOM 中但 href/事件已更新，
+          // 旧引用的 contains() 检查会通过，导致跳过扫描。
+          // 始终重新检测，确保引用最新。
           this.detectPagination()
         }, 1500)
       }
@@ -688,19 +680,16 @@ if (window.KeyboardPaginationLoaded) {
     }
 
     clickButton(button, type) {
-      // 检查按钮是否仍在 DOM 中（SPA 路由切换后引用可能失效）
-      if (!document.body.contains(button)) {
-        // 直接重新探测，跳过 hasPaginationSemantics 闸
-        // （点击后按钮失效说明页面一定有分页语义，新 DOM 可能尚未完全渲染）
-        this.prevButton = this.findElement('prev')
-        this.nextButton = this.findElement('next')
-        if (!this.prevButton && !this.nextButton) {
-          this.detectInPaginationContainer()
-        }
-        button = type === 'prev' ? this.prevButton : this.nextButton
-        if (!button) {
-          return
-        }
+      // 每次都重新探测，确保引用最新
+      // （SPA 页面切换后按钮仍在 DOM 中但 href/事件已更新，旧引用 click() 触发旧逻辑）
+      this.prevButton = this.findElement('prev')
+      this.nextButton = this.findElement('next')
+      if (!this.prevButton && !this.nextButton) {
+        this.detectInPaginationContainer()
+      }
+      button = type === 'prev' ? this.prevButton : this.nextButton
+      if (!button) {
+        return
       }
 
       // 高亮按钮
