@@ -6,12 +6,13 @@
 (function () {
   'use strict'
 
-  // 防止重复初始化
-  if (window.__PageHelperInitialized__) {
+  // 防止重复初始化（闭包变量，避免被网站反扩展检测）
+  let _pageHelperInitialized = false
+  if (_pageHelperInitialized) {
     console.log('[PageHelper] 已初始化，跳过')
     return
   }
-  window.__PageHelperInitialized__ = true
+  _pageHelperInitialized = true
 
   // ========== 工具函数 ==========
 
@@ -559,12 +560,5 @@
 
   init()
 
-  // 暴露调试接口
-  window.__PageHelper__ = {
-    DOMHandlers,
-    ExtractHandlers,
-    InfoHandlers,
-    selectElements,
-    getElementInfo,
-  }
+  // 调试接口（闭包变量，不暴露到 window，避免被网站反扩展检测）
 })()

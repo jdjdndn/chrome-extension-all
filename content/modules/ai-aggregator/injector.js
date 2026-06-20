@@ -7,11 +7,12 @@
 (function () {
   'use strict'
 
-  // 防止重复注入
-  if (window.__aiAggregatorInjected) {
+  // 防止重复注入（闭包变量，避免被网站反扩展检测）
+  let _alreadyInjected = false
+  if (_alreadyInjected) {
     return
   }
-  window.__aiAggregatorInjected = true
+  _alreadyInjected = true
 
   console.log('[AI Aggregator Injector] 注入脚本已加载')
 
@@ -60,7 +61,9 @@
    * 应用 AI 特有配置
    */
   async function applyOptions(options) {
-    if (!options) {return}
+    if (!options) {
+      return
+    }
 
     for (const [key, option] of Object.entries(options)) {
       try {

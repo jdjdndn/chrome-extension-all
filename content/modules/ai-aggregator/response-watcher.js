@@ -7,11 +7,12 @@
 (function () {
   'use strict'
 
-  // 防止重复注入
-  if (window.__aiAggregatorResponseWatcher) {
+  // 防止重复注入（闭包变量，避免被网站反扩展检测）
+  let _alreadyInjected = false
+  if (_alreadyInjected) {
     return
   }
-  window.__aiAggregatorResponseWatcher = true
+  _alreadyInjected = true
 
   console.log('[AI Aggregator Response Watcher] 监听脚本已加载')
 

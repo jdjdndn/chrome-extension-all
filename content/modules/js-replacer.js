@@ -26,7 +26,6 @@
       // 内部状态
       this._observer = null
       this._unsubscribe = null
-      this._originalCreateElement = null
       this._processedScripts = new WeakSet()
 
       console.log(`${LOG_PREFIX} 模块初始化完成`)
@@ -46,9 +45,6 @@
 
       // 2. 监听动态script插入
       this._setupMutationObserver()
-
-      // 3. 拦截document.createElement
-      this._interceptCreateElement()
 
       console.log(`${LOG_PREFIX} 初始化完成，开始监听`)
     }
@@ -92,30 +88,22 @@
     }
 
     /**
-     * 拦截document.createElement('script')
-     * 注意：不拦截 script.src，避免触发安全检测
-     * 只在元素被插入到 DOM 时通过 MutationObserver 处理
-     */
-    _interceptCreateElement() {
-      this._originalCreateElement = document.createElement.bind(document)
-
-      document.createElement = (tagName, options) => {
-        const element = this._originalCreateElement(tagName, options)
-        return element
-      }
-    }
-
-    /**
      * 处理单个script标签
      */
     processScript(script) {
-      if (!this.enabled) {return}
+      if (!this.enabled) {
+        return
+      }
 
       const url = script.src
-      if (!url) {return}
+      if (!url) {
+        return
+      }
 
       // 避免重复处理
-      if (this._processedScripts.has(script)) {return}
+      if (this._processedScripts.has(script)) {
+        return
+      }
       this._processedScripts.add(script)
 
       this.stats.total++
@@ -178,7 +166,9 @@
      * 检查排除规则
      */
     shouldExclude(url) {
-      if (!url || typeof url !== 'string') {return true}
+      if (!url || typeof url !== 'string') {
+        return true
+      }
 
       // 默认排除规则
       const defaultExcludes = [
@@ -203,7 +193,9 @@
      * 上报统计到background
      */
     reportReplacement(match) {
-      if (!this.reportEnabled) {return}
+      if (!this.reportEnabled) {
+        return
+      }
 
       try {
         if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
@@ -266,12 +258,6 @@
         this._observer = null
       }
 
-      // 恢复原始 createElement
-      if (this._originalCreateElement) {
-        document.createElement = this._originalCreateElement
-        this._originalCreateElement = null
-      }
-
       // 清理状态
       this.enabled = false
       this._processedScripts = new WeakSet()
@@ -294,7 +280,6 @@
 
         // 重新设置监听
         this._setupMutationObserver()
-        this._interceptCreateElement()
 
         // 清除降级标记
         this.stats.degraded = false

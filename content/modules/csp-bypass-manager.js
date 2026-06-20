@@ -112,7 +112,9 @@ class CSPBypassManager {
           resourceType: type,
         },
         (response) => {
-          if (settled) {return}
+          if (settled) {
+            return
+          }
           clearTimeout(timeout)
 
           if (chrome.runtime.lastError) {
@@ -263,12 +265,7 @@ class CSPBypassManager {
   }
 }
 
-// 创建全局实例
-if (typeof window !== 'undefined') {
-  window.__cspBypassManager = new CSPBypassManager()
-}
-
-// 导出
+// 导出（不暴露到 window，避免被网站检测）
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { CSPBypassManager }
 }
