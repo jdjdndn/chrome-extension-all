@@ -455,12 +455,6 @@ if (window.KeyboardPaginationLoaded) {
         return false
       }
 
-      // 检查是否可见
-      const rect = el.getBoundingClientRect()
-      if (rect.width === 0 || rect.height === 0) {
-        return false
-      }
-
       // 检查是否禁用
       if (el.disabled || el.getAttribute('aria-disabled') === 'true') {
         return false
@@ -469,13 +463,57 @@ if (window.KeyboardPaginationLoaded) {
         return false
       }
 
+      // 检查可见性：宽高为 0 时，允许在分页容器内的元素通过（CSS transition 期间可能出现 0 尺寸）
+      const rect = el.getBoundingClientRect()
+      if (rect.width === 0 || rect.height === 0) {
+        if (!this._isInPaginationContainer(el)) {
+          return false
+        }
+      }
+
       // 检查是否有 href 或 onclick
       const hasHref = el.tagName === 'A' && el.href
       const hasOnClick = el.hasAttribute('onclick')
       const isButton = el.tagName === 'BUTTON'
       const hasRole = el.getAttribute('role') === 'button'
 
-      return hasHref || hasOnClick || isButton || hasRole
+      if (hasHref || hasOnClick || isButton || hasRole) {
+        return true
+      }
+
+      // 放宽：在分页容器内的可交互元素（span/div + JS 事件委托）
+      if (this._isInPaginationContainer(el)) {
+        const interactiveTags = ['A', 'BUTTON', 'SPAN', 'LI', 'DIV']
+        return interactiveTags.includes(el.tagName)
+      }
+
+      return false
+    }
+
+    /** 判断元素是否在已知分页容器内 */
+    _isInPaginationContainer(el) {
+      const containerSelectors = [
+        '.pagination',
+        '.pager',
+        '.fanye',
+        '.page-nav',
+        '.pagenavi',
+        '.layui-laypage',
+        '.ant-pagination',
+        '.el-pagination',
+        '[class*="pagination"]',
+        '[class*="pager"]',
+        'nav[aria-label*="pagination"]',
+        'nav[aria-label*="分页"]',
+      ]
+      for (const sel of containerSelectors) {
+        try {
+          if (el.closest(sel)) {return true}
+        } catch (_) {
+          /* ignore */
+        }
+      }
+      return false
     }
 
     looksLikeNavButton(el, type) {
@@ -586,7 +624,7 @@ if (window.KeyboardPaginationLoaded) {
           // 旧引用的 contains() 检查会通过，导致跳过扫描。
           // 始终重新检测，确保引用最新。
           this.detectPagination()
-        }, 1500)
+        }, 500)
       }
 
       if (window.UnifiedDOMWatcher) {
@@ -680,15 +718,29 @@ if (window.KeyboardPaginationLoaded) {
     }
 
     clickButton(button, type) {
-      // 每次都重新探测，确保引用最新
-      // （SPA 页面切换后按钮仍在 DOM 中但 href/事件已更新，旧引用 click() 触发旧逻辑）
-      this.prevButton = this.findElement('prev')
-      this.nextButton = this.findElement('next')
-      if (!this.prevButton && !this.nextButton) {
+      // 尝试重新探测，但仅在成功时更新引用——
+      // 失败时保留旧引用，避免 null 覆写导致后续按键静默失效。
+      const newPrev = this.findElement('prev')
+      const newNext = this.findElement('next')
+      if (newPrev) {this.prevButton = newPrev}
+      if (newNext) {this.nextButton = newNext}
+      if (!newPrev && !newNext) {
         this.detectInPaginationContainer()
       }
       button = type === 'prev' ? this.prevButton : this.nextButton
       if (!button) {
+        // 首次探测失败：可能页面尚未渲染完毕，延迟重试一次
+        setTimeout(() => {
+          this.detectPagination()
+          const retryBtn = type === 'prev' ? this.prevButton : this.nextButton
+          if (retryBtn) {
+            this.highlightButton(retryBtn)
+            this.showHint(type === 'prev' ? '← 上一页' : '下一页 →')
+            setTimeout(() => {
+              if (document.body.contains(retryBtn)) {retryBtn.click()}
+            }, 50)
+          }
+        }, 300)
         return
       }
 
