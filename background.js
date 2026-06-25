@@ -555,14 +555,12 @@ function registerEventBusHandlers() {
     return { blocked: false }
   })
 
-  // 注册阻止域名
+  // 注册阻止域名（替换模式：content script 是其域名 blocked list 的权威来源）
   EventBus.on('REGISTER_BLOCKED_DOMAINS', async (data) => {
     const { domain, blockedDomains } = data
     if (domain && blockedDomains) {
-      _domainBlockedData.blockedDomains[domain] = mergeAndDedupe(
-        _domainBlockedData.blockedDomains[domain],
-        blockedDomains
-      )
+      // 替换而非合并——content script 始终发送完整列表，旧条目应被清除
+      _domainBlockedData.blockedDomains[domain] = [...blockedDomains]
       console.log(`[Background] 注册阻止域名 ${domain}:`, _domainBlockedData.blockedDomains[domain])
       await persistDomainBlockedData()
       await updateNetworkRules()
@@ -1682,12 +1680,10 @@ async function handleMessage(message, sender, sendResponse) {
         break
 
       case 'REGISTER_BLOCKED_DOMAINS':
-        // 注册 content script 的 blockedDomains 配置（合并去重）
+        // 注册 content script 的 blockedDomains 配置（替换模式：content script 是权威来源）
         if (message.domain && message.blockedDomains) {
-          _domainBlockedData.blockedDomains[message.domain] = mergeAndDedupe(
-            _domainBlockedData.blockedDomains[message.domain],
-            message.blockedDomains
-          )
+          // 替换而非合并——content script 始终发送完整列表，旧条目应被清除
+          _domainBlockedData.blockedDomains[message.domain] = [...message.blockedDomains]
           console.log(
             `[Extension] Registered blockedDomains for ${message.domain}:`,
             _domainBlockedData.blockedDomains[message.domain]
