@@ -115,21 +115,22 @@ function initTextToLink() {
     // 匹配 TLD 后直接跟随的非 URL 字符（Unicode 字符但不是有效的 URL 路径字符）
     // 有效 URL 字符包括：字母、数字、-._~:/?#[]@!$&'()*+,;=
     // 问题场景：tiez.name666.top下载 -> 应该只保留 tiez.name666.top
-    const tldPattern = new RegExp(`\\.(${TOP_LEVEL_DOMAINS.join('|')})`)
-    const match = linkStr.match(tldPattern)
-    if (match) {
-      const tldEndIndex = match.index + match[0].length
-      const afterTld = linkStr.slice(tldEndIndex)
-      // 如果 TLD 后面紧跟非 URL 字符（如中文），则截断
-      if (afterTld && /^[^\w\/\?#\[\]@!$&'()*+,;=%._~-]/.test(afterTld)) {
-        linkStr = linkStr.slice(0, tldEndIndex)
+    // 关键：TLD 后面紧跟非URL字符（中文、括号等）才截断，URL分隔符（/?#）不截断
+    // 找到所有 TLD 匹配（TLD 后面必须紧跟非字母数字字符才算匹配）
+    const allTlds = [...linkStr.matchAll(new RegExp(`\\.(${TOP_LEVEL_DOMAINS.join('|')})(?![a-zA-Z0-9])`, 'g'))]
+    if (allTlds.length > 0) {
+      // 遍历所有 TLD 匹配，找到第一个后面紧跟非URL字符的 TLD 进行截断
+      // 优先处理多TLD场景（如 www.a.com)和(www.b.cn）和单TLD场景（如 tiez.name666.top下载）
+      for (const tldMatch of allTlds) {
+        const tldEndIndex = tldMatch.index + tldMatch[0].length
+        const afterTld = linkStr.slice(tldEndIndex)
+        // 如果 TLD 后面紧跟非 URL 字符（中文、括号等），则截断
+        // 移除 () 从字符集，因为 ) 通常表示链接结束（如 www.a.com)和(www.b.cn）
+        if (afterTld && /^[^\w\/\?#\[\]@!$&'*+,;=%._~-]/.test(afterTld)) {
+          linkStr = linkStr.slice(0, tldEndIndex)
+          break
+        }
       }
-    }
-    // linkRegex 路径部分含 ()，可能把两个域名吞成一个（如 www.a.com)和(www.b.cn）
-    // 检测多个 TLD 出现则截断到第一个域名的 TLD 结束处
-    const allTlds = [...linkStr.matchAll(new RegExp(`\\.(${TOP_LEVEL_DOMAINS.join('|')})`, 'g'))]
-    if (allTlds.length > 1) {
-      linkStr = linkStr.slice(0, allTlds[0].index + allTlds[0][0].length)
     }
     return linkStr
   }
@@ -179,23 +180,46 @@ function initTextToLink() {
   // 获取文本中的链接列表（带位置信息）
   function getTextLinksList(text) {
     const hostRegex = /\b(?!\/\/)((?:www\.)?[a-zA-Z0-9_.-]+(?:\.[a-zA-Z0-9_.-]+)*\.[a-zA-Z]{2,})\b/g
-    let newText = text
 
-    function matchFunc(reg, type) {
-      const matches = newText.matchAll(reg)
-      const matchArr = []
-      for (const match of matches) {
-        const matchStr = match[0]
-        const len = matchStr.length
-        newText = newText.replace(matchStr, ' '.repeat(len))
-        match.type = type
-        match.rawLength = len // 保存原始匹配长度，用于 splitText offset 计算
-        matchArr.push(match)
-      }
-      return matchArr
+    // 获取所有 linkRegex 匹配（基于原始 text）
+    const urlMatches = []
+    for (const match of text.matchAll(linkRegex)) {
+      match.type = 'url'
+      match.rawLength = match[0].length
+      urlMatches.push(match)
     }
 
-    return filterLinks([...matchFunc(linkRegex, 'url'), ...matchFunc(hostRegex, 'host')])
+    // 获取所有 hostRegex 匹配（基于原始 text）
+    const hostMatches = []
+    for (const match of text.matchAll(hostRegex)) {
+      match.type = 'host'
+      match.rawLength = match[0].length
+      hostMatches.push(match)
+    }
+
+    // 过滤掉与 urlMatches 重叠的 hostMatches
+    const filteredHostMatches = hostMatches.filter((hostMatch) => {
+      const hostStart = hostMatch.index
+      const hostEnd = hostStart + hostMatch[0].length
+      return !urlMatches.some((urlMatch) => {
+        const urlStart = urlMatch.index
+        const urlEnd = urlStart + urlMatch[0].length
+        // 检查是否重叠
+        return hostStart < urlEnd && hostEnd > urlStart
+      })
+    })
+
+    const allMatches = [...urlMatches, ...filteredHostMatches]
+    const filtered = filterLinks(allMatches)
+
+    // 更新 rawLength 为 cleanLinkEnd 截断后的实际长度
+    for (const match of filtered) {
+      if (Array.isArray(match)) {
+        match.rawLength = match[0].length
+      }
+    }
+
+    return filtered
   }
 
   // 分割文本为文本和链接段

@@ -1,5 +1,8 @@
 // Popup script runs in the context of the popup window
 
+// 存储键常量，与 background.js 保持一致
+const SETTINE = 'cy_settings'
+
 // ========== 缓存 ==========
 // 避免重复调用 getCurrentDomain 和 localhost 请求
 const _popupCache = {
@@ -18,6 +21,74 @@ async function getCachedDomain() {
   _popupCache.domainPromise = getCurrentDomain()
   _popupCache.domain = await _popupCache.domainPromise
   return _popupCache.domain
+}
+
+/**
+ * 轻量级 Toast 提示（popup 专用）
+ * 替代 alert()，不阻塞 UI 线程
+ * @param {string} message - 提示消息
+ * @param {'info'|'success'|'warning'|'error'} [type='info'] - 类型
+ * @param {number} [duration=2500] - 显示时长(ms)
+ */
+function showToast(message, type = 'info', duration = 2500) {
+  let container = document.getElementById('popup-toast-container')
+  if (!container) {
+    container = document.createElement('div')
+    container.id = 'popup-toast-container'
+    container.style.cssText =
+      'position:fixed;top:8px;right:8px;z-index:99999;display:flex;flex-direction:column;gap:6px;pointer-events:none;'
+    document.body.appendChild(container)
+  }
+  const colors = { info: '#333', success: '#10b981', warning: '#f59e0b', error: '#ef4444' }
+  const el = document.createElement('div')
+  el.textContent = message
+  el.style.cssText = `background:${colors[type] || colors.info};color:#fff;padding:8px 14px;border-radius:6px;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,.25);max-width:260px;word-wrap:break-word;pointer-events:auto;opacity:0;transition:opacity .25s;`
+  container.appendChild(el)
+  requestAnimationFrame(() => (el.style.opacity = '1'))
+  setTimeout(() => {
+    el.style.opacity = '0'
+    setTimeout(() => el.remove(), 300)
+  }, duration)
+}
+
+/**
+ * 轻量级确认对话框（替代 confirm）
+ * @param {string} message - 确认消息
+ * @returns {Promise<boolean>}
+ */
+function showConfirm(message) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div')
+    overlay.style.cssText =
+      'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:99998;display:flex;align-items:center;justify-content:center;'
+    const box = document.createElement('div')
+    box.style.cssText =
+      'background:#fff;padding:16px 20px;border-radius:10px;max-width:280px;font-size:13px;box-shadow:0 4px 20px rgba(0,0,0,.2);color:#333;'
+    box.textContent = message
+    const btnRow = document.createElement('div')
+    btnRow.style.cssText = 'display:flex;gap:8px;margin-top:14px;justify-content:flex-end;'
+    const cancelBtn = document.createElement('button')
+    cancelBtn.textContent = '取消'
+    cancelBtn.style.cssText =
+      'padding:5px 14px;border:1px solid #ddd;border-radius:6px;background:#f8f8f8;cursor:pointer;font-size:12px;'
+    const okBtn = document.createElement('button')
+    okBtn.textContent = '确定'
+    okBtn.style.cssText =
+      'padding:5px 14px;border:none;border-radius:6px;background:#10b981;color:#fff;cursor:pointer;font-size:12px;'
+    cancelBtn.onclick = () => {
+      overlay.remove()
+      resolve(false)
+    }
+    okBtn.onclick = () => {
+      overlay.remove()
+      resolve(true)
+    }
+    btnRow.appendChild(cancelBtn)
+    btnRow.appendChild(okBtn)
+    box.appendChild(btnRow)
+    overlay.appendChild(box)
+    document.body.appendChild(overlay)
+  })
 }
 
 /**
@@ -145,23 +216,26 @@ const clearResponseDomainsBtn = document.getElementById('clear-response-domains-
 
 // Load settings from storage
 async function loadSettings() {
-  const result = await chrome.storage.sync.get('settings')
-  const settings = result.settings || defaultSettings
+  const result = await chrome.storage.sync.get(SETTINE)
+  const settings = result[SETTINE] || defaultSettings
 
   // Update UI
   updateStatus(settings.enabled)
   debugModeCheckbox.checked = settings.debugMode || false
 
-  // 白名单模式
+  // 白名单模式（监听器只注册一次，防止 loadSettings 多次调用导致累积）
   const whitelistCheckbox = document.getElementById('whitelist-mode')
+  if (whitelistCheckbox && !whitelistCheckbox._listenerAttached) {
+    whitelistCheckbox._listenerAttached = true
+    whitelistCheckbox.addEventListener('change', async () => {
+      const result = await chrome.storage.sync.get(SETTINE)
+      const currentSettings = result[SETTINE] || defaultSettings
+      currentSettings.whitelistMode = whitelistCheckbox.checked
+      await chrome.storage.sync.set({ [SETTINE]: currentSettings })
+    })
+  }
   if (whitelistCheckbox) {
     whitelistCheckbox.checked = settings.whitelistMode || false
-    whitelistCheckbox.addEventListener('change', async () => {
-      const result = await chrome.storage.sync.get('settings')
-      const currentSettings = result.settings || defaultSettings
-      currentSettings.whitelistMode = whitelistCheckbox.checked
-      await chrome.storage.sync.set({ settings: currentSettings })
-    })
   }
 
   // Load AI settings
@@ -194,10 +268,10 @@ function loadAISettings(settings) {
 
 // Save settings to storage
 async function saveSettings(settings) {
-  const result = await chrome.storage.sync.get('settings')
-  const currentSettings = result.settings || defaultSettings
+  const result = await chrome.storage.sync.get(SETTINE)
+  const currentSettings = result[SETTINE] || defaultSettings
   const newSettings = { ...currentSettings, ...settings }
-  await chrome.storage.sync.set({ settings: newSettings })
+  await chrome.storage.sync.set({ [SETTINE]: newSettings })
   return newSettings
 }
 
@@ -216,17 +290,17 @@ function updateStatus(enabled) {
 
 // Toggle extension on/off
 async function toggleExtension() {
-  const result = await chrome.storage.sync.get('settings')
-  const settings = result.settings || defaultSettings
+  const result = await chrome.storage.sync.get(SETTINE)
+  const settings = result[SETTINE] || defaultSettings
   const newEnabled = !settings.enabled
 
   const newSettings = await saveSettings({ enabled: newEnabled })
   updateStatus(newSettings.enabled)
 
-  // Notify content scripts (使用 EventBus)
+  // Notify content scripts (通过 background 转发，popup 未加载 EventBus)
   try {
-    await waitForEventBus()
-    await EventBus.publish('TOGGLE_EXTENSION', {
+    await chrome.runtime.sendMessage({
+      type: 'TOGGLE_EXTENSION',
       enabled: newSettings.enabled,
     })
   } catch (error) {
@@ -422,11 +496,11 @@ async function addDomain(domain) {
 
   const result = await sendMessage('ADD_BLOCKED_DOMAIN', { domain })
 
-  if (result.success) {
+  if (result?.success) {
     domainInput.value = ''
     renderBlockedDomains(result.domains)
   } else {
-    alert('Failed to add domain')
+    showToast('Failed to add domain', 'error')
   }
 }
 
@@ -434,11 +508,11 @@ async function addDomain(domain) {
 async function removeDomain(domain) {
   const result = await sendMessage('REMOVE_BLOCKED_DOMAIN', { domain })
 
-  if (result.success) {
+  if (result?.success) {
     const updatedResult = await sendMessage('GET_BLOCKED_DOMAINS')
-    renderBlockedDomains(updatedResult.blockedDomains || [])
+    renderBlockedDomains(updatedResult?.blockedDomains || [])
   } else {
-    alert('Failed to remove domain')
+    showToast('Failed to remove domain', 'error')
   }
 }
 
@@ -450,11 +524,11 @@ async function addResponseDomain(domain) {
 
   const result = await sendMessage('ADD_BLOCKED_RESPONSE_DOMAIN', { domain })
 
-  if (result.success) {
+  if (result?.success) {
     responseDomainInput.value = ''
     renderBlockedResponseDomains(result.domains || [])
   } else {
-    alert('Failed to add response domain')
+    showToast('Failed to add response domain', 'error')
   }
 }
 
@@ -466,7 +540,7 @@ async function addResponseDomains(domains) {
   for (const domain of domains) {
     const result = await sendMessage('ADD_BLOCKED_RESPONSE_DOMAIN', { domain })
 
-    if (result.success) {
+    if (result?.success) {
       addedCount++
     } else {
       failedCount++
@@ -480,7 +554,7 @@ async function addResponseDomains(domains) {
   }
 
   if (failedCount > 0) {
-    alert(`成功添加 ${addedCount} 个域名，失败 ${failedCount} 个`)
+    showToast(`成功添加 ${addedCount} 个域名，失败 ${failedCount} 个`, 'warning')
   } else if (addedCount > 0) {
     // All added successfully
   }
@@ -490,11 +564,11 @@ async function addResponseDomains(domains) {
 async function removeResponseDomain(domain) {
   const result = await sendMessage('REMOVE_BLOCKED_RESPONSE_DOMAIN', { domain })
 
-  if (result.success) {
+  if (result?.success) {
     const updatedResult = await sendMessage('GET_BLOCKED_DOMAINS')
-    renderBlockedResponseDomains(updatedResult.domains || [])
+    renderBlockedResponseDomains(updatedResult?.domains || [])
   } else {
-    alert('Failed to remove response domain')
+    showToast('Failed to remove response domain', 'error')
   }
 }
 
@@ -573,9 +647,6 @@ async function activateContentScript() {
   }
 }
 
-// Initialize popup
-loadSettings().catch(console.error)
-
 // popup 打开时激活 content script
 activateContentScript()
 
@@ -613,7 +684,7 @@ if (addDomainBtn) {
     const domains = parseDomainInput(input)
 
     if (domains.length === 0) {
-      alert('请输入有效的域名（例如: tracking.example.com 或 "api1.com, api2.com"）')
+      showToast('请输入有效的域名（例如: tracking.example.com）', 'warning')
       return
     }
 
@@ -630,7 +701,7 @@ async function addDomains(domains) {
   for (const domain of domains) {
     const result = await sendMessage('ADD_BLOCKED_DOMAIN', { domain })
 
-    if (result.success) {
+    if (result?.success) {
       addedCount++
     } else {
       failedCount++
@@ -644,7 +715,7 @@ async function addDomains(domains) {
   }
 
   if (failedCount > 0) {
-    alert(`成功添加 ${addedCount} 个域名，失败 ${failedCount} 个`)
+    showToast(`成功添加 ${addedCount} 个域名，失败 ${failedCount} 个`, 'warning')
   } else if (addedCount > 0) {
     // All added successfully
   }
@@ -666,7 +737,7 @@ if (addResponseDomainBtn) {
     const domains = parseDomainInput(input)
 
     if (domains.length === 0) {
-      alert('请输入有效的域名（例如: api.example.com 或 "api1.com, api2.com"）')
+      showToast('请输入有效的域名（例如: api.example.com）', 'warning')
       return
     }
 
@@ -1791,6 +1862,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 5. 其他初始化（不依赖模块）
   initQuickNote()
   initShortcutsHelp()
+  initNotificationPanel()
 
   const initDuration = (performance.now() - initStartTime).toFixed(1)
   console.log(`[Popup] 初始化完成, 总耗时: ${initDuration}ms`)
@@ -1839,6 +1911,32 @@ async function requestPreheatData() {
       resolve(null)
     }
   })
+}
+
+/**
+ * 处理从页面选中的元素——将其选择器加入当前域名的"隐藏元素"列表
+ * @param {{ selector: string, tagName?: string }} picked
+ */
+async function handlePickedElement(picked) {
+  if (!picked || !picked.selector) {
+    return
+  }
+  const domain = await getCachedDomain()
+  if (!domain) {
+    return
+  }
+  const result = await chrome.storage.local.get(['hideElementsSettings'])
+  const allSettings = result.hideElementsSettings || {}
+  const domainSettings = allSettings[domain] || { enabled: false, selectors: [] }
+  const existingSelectors = domainSettings.selectors || []
+
+  // 去重
+  if (!existingSelectors.includes(picked.selector)) {
+    existingSelectors.push(picked.selector)
+    await saveHideElementsSettings(existingSelectors)
+    await renderHideSelectorsList()
+    showToast(`已添加隐藏选择器: ${picked.selector}`, 'success')
+  }
 }
 
 /**
@@ -2244,14 +2342,18 @@ async function initClipboardHistory() {
     list.parentNode.insertBefore(searchContainer, list)
 
     const searchInput = document.getElementById('clipboard-search')
+    let _clipboardSearchTimer = null
     searchInput?.addEventListener('input', (e) => {
-      filterClipboardHistory(e.target.value)
+      clearTimeout(_clipboardSearchTimer)
+      _clipboardSearchTimer = setTimeout(() => {
+        filterClipboardHistory(e.target.value)
+      }, 250)
     })
   }
 
   if (clearBtn) {
     clearBtn.addEventListener('click', async () => {
-      if (confirm('确定要清空剪贴板历史吗？')) {
+      if (await showConfirm('确定要清空剪贴板历史吗？')) {
         await chrome.storage.local.remove('clipboardHistory')
         loadClipboardHistory()
       }
@@ -2538,44 +2640,48 @@ if (saveSelectorsBtn) {
 
 if (selectorsEditor) {
   // 实时更新计数（需要重新获取默认和本地服务器选择器来计算总数）
+  let _selectorsEditorTimer = null
   selectorsEditor.addEventListener('input', async () => {
-    const domain = await getCachedDomain()
-    if (!domain) {
-      return
-    }
-
-    const defaultSelectors = await getDefaultHideSelectors()
-    let localServerSelectors = []
-    try {
-      const normalizedDomain = domain.startsWith('www.') ? domain.slice(4) : domain
-      const response = await fetch(`http://localhost:3000/api/data/selectors/${normalizedDomain}`, {
-        signal: AbortSignal.timeout(500),
-      })
-      const data = await response.json()
-      if (data.success && data.data) {
-        if (Array.isArray(data.data)) {
-          localServerSelectors = data.data
-        } else if (typeof data.data === 'string' && data.data.trim()) {
-          localServerSelectors = data.data
-            .split(',')
-            .map((s) => s.trim())
-            .filter((s) => s)
-        }
+    clearTimeout(_selectorsEditorTimer)
+    _selectorsEditorTimer = setTimeout(async () => {
+      const domain = await getCachedDomain()
+      if (!domain) {
+        return
       }
-    } catch (e) {
-      // 忽略本地服务器错误
-    }
 
-    const userSelectors = parseSelectorsFromEditor()
-    const totalSelectors = [
-      ...new Set([...defaultSelectors, ...localServerSelectors, ...userSelectors]),
-    ]
-    updateSelectorsCount(
-      totalSelectors.length,
-      defaultSelectors.length,
-      localServerSelectors.length,
-      userSelectors.length
-    )
+      const defaultSelectors = await getDefaultHideSelectors()
+      let localServerSelectors = []
+      try {
+        const normalizedDomain = domain.startsWith('www.') ? domain.slice(4) : domain
+        const response = await fetch(`http://localhost:3000/api/data/selectors/${normalizedDomain}`, {
+          signal: AbortSignal.timeout(500),
+        })
+        const data = await response.json()
+        if (data.success && data.data) {
+          if (Array.isArray(data.data)) {
+            localServerSelectors = data.data
+          } else if (typeof data.data === 'string' && data.data.trim()) {
+            localServerSelectors = data.data
+              .split(',')
+              .map((s) => s.trim())
+              .filter((s) => s)
+          }
+        }
+      } catch (e) {
+        // 忽略本地服务器错误
+      }
+
+      const userSelectors = parseSelectorsFromEditor()
+      const totalSelectors = [
+        ...new Set([...defaultSelectors, ...localServerSelectors, ...userSelectors]),
+      ]
+      updateSelectorsCount(
+        totalSelectors.length,
+        defaultSelectors.length,
+        localServerSelectors.length,
+        userSelectors.length
+      )
+    }, 300)
   })
 }
 
@@ -2683,6 +2789,15 @@ async function markNotificationsRead() {
   }
 }
 
+async function clearNotifications() {
+  await chrome.storage.local.remove('notifications')
+  await loadNotifications()
+  const badge = document.getElementById('notification-badge')
+  if (badge) {
+    badge.style.display = 'none'
+  }
+}
+
 // 添加通知（供其他模块调用）
 async function addNotification(message, type = 'info') {
   const result = await chrome.storage.local.get('notifications')
@@ -2700,7 +2815,10 @@ async function addNotification(message, type = 'info') {
 // ========== 快速笔记 ==========（已在统一初始化中调用 initQuickNote）
 // ========== 剪贴板历史（增强版） ==========（已在统一初始化中调用 initClipboardHistory）
 
-const currentClipboardFilter = 'all'
+/** 按搜索关键词过滤剪贴板历史 */
+function filterClipboardHistory(query) {
+  loadClipboardHistory(query)
+}
 
 async function loadClipboardHistory(searchQuery = '', filter = 'all') {
   const list = document.getElementById('clipboard-list')
@@ -2961,7 +3079,7 @@ async function initResourceAccelerator() {
               showCacheDetails(response)
             })
             .catch(() => {
-              alert('无法获取缓存信息，请确认页面已加载')
+              showToast('无法获取缓存信息，请确认页面已加载', 'error')
             })
         }
       })
@@ -2969,7 +3087,7 @@ async function initResourceAccelerator() {
   }
   if (cacheClearEl) {
     cacheClearEl.addEventListener('click', async () => {
-      if (confirm('确认清除所有资源加速缓存？')) {
+      if (await showConfirm('确认清除所有资源加速缓存？')) {
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
           if (tabs[0]?.id) {
             chrome.tabs
@@ -3012,8 +3130,8 @@ async function initResourceAccelerator() {
       .map(
         (d) => `
       <div style="display: flex; justify-content: space-between; padding: 2px 0;">
-        <span>${d}</span>
-        <button class="ra-remove-domain" data-domain="${d}" style="border: none; background: none; color: #dc3545; cursor: pointer; font-size: 11px;">✕</button>
+        <span>${escapeHtml(d)}</span>
+        <button class="ra-remove-domain" data-domain="${escapeHtml(d)}" style="border: none; background: none; color: #dc3545; cursor: pointer; font-size: 11px;">✕</button>
       </div>
     `
       )
@@ -3072,17 +3190,17 @@ function showCacheDetails(stats) {
   const lines = []
   if (stats.js?.details?.length) {
     stats.js.details.forEach((d) => {
-      lines.push(`<div style="color: #28a745;">JS: ${d.name} → ${d.cdn}</div>`)
+      lines.push(`<div style="color: #28a745;">JS: ${escapeHtml(d.name)} → ${escapeHtml(d.cdn)}</div>`)
     })
   }
   if (stats.fonts?.details?.length) {
     stats.fonts.details.forEach((d) => {
-      lines.push(`<div style="color: #17a2b8;">字体: ${d.name} → ${d.cdn}</div>`)
+      lines.push(`<div style="color: #17a2b8;">字体: ${escapeHtml(d.name)} → ${escapeHtml(d.cdn)}</div>`)
     })
   }
   if (stats.css?.details?.length) {
     stats.css.details.forEach((d) => {
-      lines.push(`<div style="color: #ffc107;">CSS: ${d.name} → ${d.cdn}</div>`)
+      lines.push(`<div style="color: #ffc107;">CSS: ${escapeHtml(d.name)} → ${escapeHtml(d.cdn)}</div>`)
     })
   }
 

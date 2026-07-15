@@ -33,7 +33,7 @@ function initStatsButtons() {
 
   if (resetBtn) {
     resetBtn.addEventListener('click', async () => {
-      if (confirm('确定要重置所有统计数据吗？')) {
+      if (await showConfirm('确定要重置所有统计数据吗？')) {
         await chrome.storage.local.remove('usageStats')
         loadStatsData()
         drawStatsChart()
@@ -212,7 +212,7 @@ async function exportStatsToCSV() {
   try {
     const response = await chrome.runtime.sendMessage({ type: 'GET_STATS' })
     if (!response?.stats) {
-      alert('暂无数据可导出')
+      showToast('暂无数据可导出', 'info')
       return
     }
 
@@ -232,7 +232,7 @@ async function exportStatsToCSV() {
     URL.revokeObjectURL(url)
   } catch (error) {
     console.error('[导出CSV] 失败:', error)
-    alert('导出失败: ' + error.message)
+    showToast('导出失败: ' + error.message, 'error')
   }
 }
 

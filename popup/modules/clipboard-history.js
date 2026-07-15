@@ -32,7 +32,7 @@ export async function initClipboardHistory() {
 
   if (clearBtn) {
     clearBtn.addEventListener('click', async () => {
-      if (confirm('确定要清空剪贴板历史吗？')) {
+      if (await showConfirm('确定要清空剪贴板历史吗？')) {
         await chrome.storage.local.remove('clipboardHistory')
         loadClipboardHistory()
       }

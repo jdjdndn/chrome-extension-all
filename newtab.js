@@ -2,6 +2,62 @@
 document.documentElement.classList.add('critical-css-loaded')
 
 /**
+ * 轻量级 Toast 提示（newtab 专用）
+ */
+function showToast(message, type = 'info', duration = 2500) {
+  let container = document.getElementById('newtab-toast-container')
+  if (!container) {
+    container = document.createElement('div')
+    container.id = 'newtab-toast-container'
+    container.style.cssText =
+      'position:fixed;top:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:8px;pointer-events:none;'
+    document.body.appendChild(container)
+  }
+  const colors = { info: '#333', success: '#10b981', warning: '#f59e0b', error: '#ef4444' }
+  const el = document.createElement('div')
+  el.textContent = message
+  el.style.cssText = `background:${colors[type] || colors.info};color:#fff;padding:10px 18px;border-radius:8px;font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,.25);max-width:320px;word-wrap:break-word;pointer-events:auto;opacity:0;transition:opacity .25s;`
+  container.appendChild(el)
+  requestAnimationFrame(() => (el.style.opacity = '1'))
+  setTimeout(() => {
+    el.style.opacity = '0'
+    setTimeout(() => el.remove(), 300)
+  }, duration)
+}
+
+/**
+ * 轻量级确认对话框（替代 confirm）
+ * @param {string} message
+ * @returns {Promise<boolean>}
+ */
+function showConfirm(message) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div')
+    overlay.style.cssText =
+      'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99998;display:flex;align-items:center;justify-content:center;'
+    const box = document.createElement('div')
+    box.style.cssText =
+      'background:#fff;padding:20px 24px;border-radius:12px;max-width:340px;font-size:14px;box-shadow:0 4px 24px rgba(0,0,0,.2);color:#333;'
+    box.textContent = message
+    const btnRow = document.createElement('div')
+    btnRow.style.cssText = 'display:flex;gap:10px;margin-top:16px;justify-content:flex-end;'
+    const cancelBtn = document.createElement('button')
+    cancelBtn.textContent = '取消'
+    cancelBtn.style.cssText = 'padding:6px 16px;border:1px solid #ddd;border-radius:6px;background:#f8f8f8;cursor:pointer;font-size:13px;'
+    const okBtn = document.createElement('button')
+    okBtn.textContent = '确定'
+    okBtn.style.cssText = 'padding:6px 16px;border:none;border-radius:6px;background:#10b981;color:#fff;cursor:pointer;font-size:13px;'
+    cancelBtn.onclick = () => { overlay.remove(); resolve(false) }
+    okBtn.onclick = () => { overlay.remove(); resolve(true) }
+    btnRow.appendChild(cancelBtn)
+    btnRow.appendChild(okBtn)
+    box.appendChild(btnRow)
+    overlay.appendChild(box)
+    document.body.appendChild(overlay)
+  })
+}
+
+/**
  * 安全执行函数
  * @param {Function} fn - 要执行的函数
  * @param {*} fallback - 出错时返回的默认值
@@ -342,10 +398,10 @@ function initSettings() {
   const settings = getSettings()
 
   // 设置滑块值
-  columnsRange.value = settings.columns
-  columnsValue.textContent = settings.columns
-  historyCountRange.value = settings.historyCount
-  historyCountValue.textContent = settings.historyCount
+  if (columnsRange) { columnsRange.value = settings.columns }
+  if (columnsValue) { columnsValue.textContent = settings.columns }
+  if (historyCountRange) { historyCountRange.value = settings.historyCount }
+  if (historyCountValue) { historyCountValue.textContent = settings.historyCount }
 
   // 设置搜索引擎选择
   const searchEngineSelect = getEl('searchEngineSelect')
@@ -386,6 +442,9 @@ function safeHostname(url) {
 
 // ========== 历史记录相关 ==========
 const historyContainer = document.getElementById('historyContainer')
+let _historyCache = null
+let _historyCacheTime = 0
+const _historyCacheTTL = 60000
 
 // 获取域名图标URL
 function getDomainIcon(domain) {
@@ -441,13 +500,28 @@ function getDomainEmoji(domain) {
   return defaultIcons[Math.abs(hash) % defaultIcons.length]
 }
 
-// 创建图标元素
+// 创建图标元素（不使用内联 onerror，由委托事件处理加载失败）
 function createDomainIcon(domain) {
   const iconUrl = getDomainIcon(domain)
   const fallbackEmoji = getDomainEmoji(domain)
 
-  return `<img src="${iconUrl}" alt="${escapeHtml(domain)}" style="width: 20px; height: 20px; border-radius: 4px; vertical-align: middle;" onerror="this.style.display='none';this.nextElementSibling.style.display='inline';"><span style="display: none;">${fallbackEmoji}</span>`
+  return `<img src="${iconUrl}" alt="${escapeHtml(domain)}" class="domain-icon-img" style="width: 20px; height: 20px; border-radius: 4px; vertical-align: middle;"><span class="domain-icon-fallback" style="display: none;">${escapeHtml(fallbackEmoji)}</span>`
 }
+
+// 域名图标加载失败时显示备用 emoji（capture 阶段委托，替代被 CSP 拦截的内联 onerror）
+document.addEventListener(
+  'error',
+  (e) => {
+    if (e.target.classList?.contains('domain-icon-img')) {
+      e.target.style.display = 'none'
+      const fallback = e.target.nextElementSibling
+      if (fallback) {
+        fallback.style.display = 'inline'
+      }
+    }
+  },
+  true
+)
 
 // 获取页面标题
 function getPageTitle(url, title) {
@@ -473,12 +547,19 @@ async function loadHistory() {
   const maxDomains = settings.historyCount
 
   try {
-    // 获取最近的历史记录
-    const historyItems = await chrome.history.search({
-      text: '',
-      maxResults: 500,
-      startTime: Date.now() - 7 * 24 * 60 * 60 * 1000, // 最近7天
-    })
+    // 获取最近的历史记录（优先使用缓存）
+    let historyItems
+    if (_historyCache && Date.now() - _historyCacheTime < _historyCacheTTL) {
+      historyItems = _historyCache
+    } else {
+      historyItems = await chrome.history.search({
+        text: '',
+        maxResults: 500,
+        startTime: Date.now() - 7 * 24 * 60 * 60 * 1000, // 最近7天
+      })
+      _historyCache = historyItems
+      _historyCacheTime = Date.now()
+    }
 
     // 按域名分组
     const domainMap = new Map()
@@ -787,6 +868,10 @@ function updateTime() {
   const timeEl = document.getElementById('time')
   const dateEl = document.getElementById('date')
 
+  if (!timeEl || !dateEl) {
+    return
+  }
+
   // 时间
   const hours = String(now.getHours()).padStart(2, '0')
   const minutes = String(now.getMinutes()).padStart(2, '0')
@@ -943,10 +1028,10 @@ function createQuickLink(link) {
   if (link.favicon) {
     linkEl.innerHTML = `
       <div class="quick-link-icon" style="background: #fff; overflow: hidden;">
-        <img src="${link.favicon}" style="width: 100%; height: 100%; object-fit: contain;">
-        <span style="display:none;">${link.icon}</span>
+        <img src="${escapeHtml(link.favicon)}" style="width: 100%; height: 100%; object-fit: contain;">
+        <span style="display:none;">${escapeHtml(link.icon)}</span>
       </div>
-      <span class="quick-link-title">${link.title}</span>
+      <span class="quick-link-title">${escapeHtml(link.title)}</span>
     `
     // CSP 要求：不能使用内联 onerror，改为事件监听
     const img = linkEl.querySelector('.quick-link-icon img')
@@ -958,15 +1043,15 @@ function createQuickLink(link) {
     }
   } else {
     linkEl.innerHTML = `
-      <div class="quick-link-icon">${link.icon}</div>
-      <span class="quick-link-title">${link.title}</span>
+      <div class="quick-link-icon">${escapeHtml(link.icon)}</div>
+      <span class="quick-link-title">${escapeHtml(link.title)}</span>
     `
   }
 
   // 右键删除
-  linkEl.addEventListener('contextmenu', (e) => {
+  linkEl.addEventListener('contextmenu', async (e) => {
     e.preventDefault()
-    if (confirm(`确定要删除 "${link.title}" 吗？`)) {
+    if (await showConfirm(`确定要删除 "${link.title}" 吗？`)) {
       linkEl.remove()
       updateQuickLinksFromDOM()
     }
@@ -1063,41 +1148,11 @@ function loadQuickLinks() {
   })
 }
 
-// 添加新快捷方式
+// 添加新快捷方式（使用模态框替代 prompt，不阻塞主线程）
 function initAddLinkBtn() {
   const addBtn = createAddLinkBtn()
   addBtn.addEventListener('click', () => {
-    const title = prompt('请输入网站名称:')
-    if (!title) {
-      return
-    }
-
-    const url = prompt('请输入网站URL:')
-    if (!url) {
-      return
-    }
-
-    const iconOptions = ['🌐', '🔗', '📌', '⭐', '🚀', '💡', '🎯', '📱', '💻', '🎨']
-    const icon = iconOptions[Math.floor(Math.random() * iconOptions.length)]
-
-    // 尝试获取 favicon
-    let favicon = ''
-    safeExecute(
-      () => {
-        const urlObj = new URL(url)
-        favicon = `${urlObj.origin}/favicon.ico`
-      },
-      null,
-      'Favicon'
-    )
-
-    const newLink = { title, url, icon, favicon }
-    const linkEl = createQuickLink(newLink)
-
-    // 插入到添加按钮之前
-    quickLinksContainer.insertBefore(linkEl, addBtn)
-
-    updateQuickLinksFromDOM()
+    showModal('添加快捷方式', '网站名称', '网站URL', '', 'add-quick-link')
   })
 }
 
@@ -1707,7 +1762,7 @@ function renderLearnResources(categories) {
     <div class="learn-category" data-id="${escapeHtml(category.id)}">
       <div class="learn-category-header">
         <div class="learn-category-title">
-          <span class="learn-category-icon">${category.icon}</span>
+          <span class="learn-category-icon">${escapeHtml(category.icon)}</span>
           <span>${escapeHtml(category.name)}</span>
         </div>
         <div class="learn-category-actions">
@@ -1771,9 +1826,9 @@ function bindLearnEvents() {
 
   // 删除分类
   document.querySelectorAll('[data-action="delete-category"]').forEach((btn) => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const categoryId = btn.dataset.category
-      if (confirm('确定要删除该分类吗？')) {
+      if (await showConfirm('确定要删除该分类吗？')) {
         getLearnResources((categories) => {
           categories = categories.filter((c) => c.id !== categoryId)
           saveLearnResources(categories)
@@ -1864,7 +1919,7 @@ modalConfirm.addEventListener('click', () => {
   const value2 = modalInput2.value.trim()
 
   if (!value1 || !value2) {
-    alert('请填写必要信息')
+    showToast('请填写必要信息', 'warning')
     return
   }
 
@@ -1900,6 +1955,40 @@ modalConfirm.addEventListener('click', () => {
       }
       hideModal()
     })
+  } else if (currentModalAction === 'add-quick-link') {
+    let url = value2
+    if (!url.match(/^https?:\/\//i)) {
+      url = 'https://' + url
+    }
+
+    const iconOptions = ['🌐', '🔗', '📌', '⭐', '🚀', '💡', '🎯', '📱', '💻', '🎨']
+    const icon = iconOptions[Math.floor(Math.random() * iconOptions.length)]
+
+    let favicon = ''
+    try {
+      const urlObj = new URL(url)
+      favicon = `${urlObj.origin}/favicon.ico`
+    } catch (_) {
+      /* ignore */
+    }
+
+    const newLink = { title: value1, url, icon, favicon }
+    const linkEl = createQuickLink(newLink)
+    const addBtn = quickLinksContainer?.querySelector('.add-link-btn')
+    if (addBtn) {
+      quickLinksContainer.insertBefore(linkEl, addBtn)
+    } else if (quickLinksContainer) {
+      quickLinksContainer.appendChild(linkEl)
+    }
+
+    // 持久化到 storage
+    chrome.storage.local.get('quickLinks', (result) => {
+      const links = result.quickLinks || []
+      links.push(newLink)
+      chrome.storage.local.set({ quickLinks: links })
+    })
+
+    hideModal()
   }
 })
 
@@ -1988,13 +2077,11 @@ function extractLinksFromBookmarkNode(node) {
 
 // 从书签导入学习资源
 function importFromBookmarks() {
-  chrome.bookmarks.getTree((bookmarks) => {
+  chrome.bookmarks.getTree(async (bookmarks) => {
     const learnFolders = findLearnBookmarkFolders(bookmarks)
 
     if (learnFolders.length === 0) {
-      alert(
-        '未找到"学习"相关的书签文件夹\n\n请在书签中创建名为"学习"的文件夹，或将已有文件夹重命名包含"学习"、"教程"、"资源"等关键词'
-      )
+      showToast('未找到"学习"相关的书签文件夹，请在书签中创建包含"学习"、"教程"、"资源"等关键词的文件夹', 'warning')
       return
     }
 
@@ -2008,7 +2095,7 @@ function importFromBookmarks() {
       .filter((f) => f.links.length > 0)
 
     if (folderData.length === 0) {
-      alert('学习文件夹中没有找到链接')
+      showToast('学习文件夹中没有找到链接', 'warning')
       return
     }
 
@@ -2016,7 +2103,7 @@ function importFromBookmarks() {
     const totalLinks = folderData.reduce((sum, f) => sum + f.links.length, 0)
     const folderNames = folderData.map((f) => `"${f.title}" (${f.links.length}个)`).join('\n')
 
-    if (!confirm(`找到以下学习文件夹：\n${folderNames}\n\n共 ${totalLinks} 个链接，是否导入？`)) {
+    if (!(await showConfirm(`找到以下学习文件夹：\n${folderNames}\n\n共 ${totalLinks} 个链接，是否导入？`))) {
       return
     }
 
@@ -2052,7 +2139,7 @@ function importFromBookmarks() {
 
       saveLearnResources(categories)
       renderLearnResources(categories)
-      alert(`成功导入 ${importedCount} 个新链接`)
+      showToast(`成功导入 ${importedCount} 个新链接`, 'success')
     })
   })
 }
@@ -2700,6 +2787,9 @@ const DEFAULT_AI_SITES = [
 
 // 初始化 AI 聚合
 function initAIAggregator() {
+  if (initAIAggregator._initialized) return
+  initAIAggregator._initialized = true
+
   const siteSelector = document.getElementById('aiSiteSelector')
   const sendBtn = document.getElementById('aiSendBtn')
   const questionInput = document.getElementById('aiQuestionInput')
@@ -2745,11 +2835,11 @@ function initAIAggregator() {
   sendBtn.addEventListener('click', () => {
     const question = questionInput.value.trim()
     if (!question) {
-      alert('请输入问题')
+      showToast('请输入问题', 'warning')
       return
     }
     if (aiAggregator.selectedSites.size === 0) {
-      alert('请选择至少一个 AI')
+      showToast('请选择至少一个 AI', 'warning')
       return
     }
     sendQuestionToAIs(question)
@@ -2771,7 +2861,7 @@ function renderSiteSelector() {
       (site) => `
     <label class="ai-site-item selected" data-site-id="${site.id}">
       <input type="checkbox" checked>
-      <span>${site.name}</span>
+      <span>${escapeHtml(site.name)}</span>
     </label>
   `
     )
@@ -3210,6 +3300,11 @@ async function injectAndSend(tabId, site, question) {
               }
             })
             observer.observe(observeTarget, { childList: true, subtree: true, characterData: true })
+
+            // 自动断开：防止 Observer 在目标页面无限运行消耗 CPU
+            setTimeout(() => {
+              observer.disconnect()
+            }, 120000)
           } catch (error) {
             sendToAggregator('AI_ERROR', { siteId: siteConfig.id, error: error.message })
           }
@@ -3321,23 +3416,21 @@ function updateResponseCard(siteId, data) {
   if (data.error) {
     body.classList.remove('waiting')
     body.classList.add('error')
-    body.innerHTML = `<span>❌ ${data.message || data.error}</span>`
+    body.innerHTML = `<span>❌ ${escapeHtml(data.message || data.error)}</span>`
     indicator.className = 'ai-status-indicator error'
     statusText.textContent = '失败'
   }
 }
 
-// 格式化 AI 回复（简单的 Markdown 支持）
+// 格式化 AI 回复（先转义再处理换行，防止 XSS）
 function formatAIResponse(content) {
-  return (
-    content
-      // 删除大量空行：将连续3个及以上换行替换为2个换行
-      .replace(/\n{3,}/g, '\n\n')
-      // 删除每行首尾空白
-      .split('\n')
-      .map((line) => line.trim())
-      .join('\n')
-  )
+  return escapeHtml(content)
+    // 删除大量空行：将连续3个及以上换行替换为2个换行
+    .replace(/\n{3,}/g, '\n\n')
+    // 删除每行首尾空白
+    .split('\n')
+    .map((line) => line.trim())
+    .join('\n')
 }
 
 // 更新统计信息

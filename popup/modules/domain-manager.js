@@ -45,7 +45,7 @@ function bindDomainEvents() {
       const input = domainInput.value.trim()
       const domains = parseDomainInput(input)
       if (domains.length === 0) {
-        alert('请输入有效的域名（例如: tracking.example.com 或 "api1.com, api2.com"）')
+        showToast('请输入有效的域名（例如: tracking.example.com 或 "api1.com, api2.com"）', 'warning')
         return
       }
       addDomains(domains)
@@ -65,7 +65,7 @@ function bindDomainEvents() {
       const input = responseDomainInput.value.trim()
       const domains = parseDomainInput(input)
       if (domains.length === 0) {
-        alert('请输入有效的域名（例如: api.example.com 或 "api1.com, api2.com"）')
+        showToast('请输入有效的域名（例如: api.example.com 或 "api1.com, api2.com"）', 'warning')
         return
       }
       addResponseDomains(domains)
@@ -221,7 +221,7 @@ async function addDomains(domains) {
   }
 
   if (failedCount > 0) {
-    alert(`成功添加 ${addedCount} 个域名，失败 ${failedCount} 个`)
+    showToast(`成功添加 ${addedCount} 个域名，失败 ${failedCount} 个`, 'warning')
   }
 }
 
@@ -234,7 +234,7 @@ async function removeDomain(domain) {
     const updatedResult = await sendMessage('GET_BLOCKED_DOMAINS')
     renderBlockedDomains(updatedResult?.blockedDomains || [])
   } else {
-    alert('Failed to remove domain')
+    showToast('Failed to remove domain', 'error')
   }
 }
 
@@ -260,7 +260,7 @@ async function addResponseDomains(domains) {
   }
 
   if (failedCount > 0) {
-    alert(`成功添加 ${addedCount} 个域名，失败 ${failedCount} 个`)
+    showToast(`成功添加 ${addedCount} 个域名，失败 ${failedCount} 个`, 'warning')
   }
 }
 
@@ -273,7 +273,7 @@ async function removeResponseDomain(domain) {
     const updatedResult = await sendMessage('GET_BLOCKED_DOMAINS')
     renderBlockedResponseDomains(updatedResult?.blockedResponseDomains || [])
   } else {
-    alert('Failed to remove response domain')
+    showToast('Failed to remove response domain', 'error')
   }
 }
 

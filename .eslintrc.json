@@ -45,7 +45,7 @@
     "SiteScript": "readonly"
   },
   "parserOptions": {
-    "ecmaVersion": 2020,
+    "ecmaVersion": "latest",
     "sourceType": "module"
   },
   "ignorePatterns": ["*.ts", "*.tsx", "node_modules/**", "dist/**", "build/**", "docs/**"],
@@ -60,6 +60,6 @@
     "no-empty": "warn",
     "no-useless-escape": "off",
     "no-inner-declarations": "off",
-    "no-const-assign": "off"
+    "no-const-assign": "error"
   }
 }

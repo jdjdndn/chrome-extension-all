@@ -50,3 +50,10 @@ export function escapeAttribute(text) {
   }
   return String(text).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
 }
+
+// 全局暴露：供非 ES module 脚本（popup.js, newtab.js）使用
+if (typeof window !== 'undefined' && !window.EscapeHtml) {
+  window.EscapeHtml = escapeHtml
+  window.UnescapeHtml = unescapeHtml
+  window.EscapeAttribute = escapeAttribute
+}

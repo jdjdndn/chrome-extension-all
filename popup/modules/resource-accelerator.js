@@ -152,7 +152,7 @@ export async function initResourceAccelerator() {
               showCacheDetails(response)
             })
             .catch(() => {
-              alert('无法获取缓存信息，请确认页面已加载')
+              showToast('无法获取缓存信息，请确认页面已加载', 'error')
             })
         }
       })
@@ -160,7 +160,7 @@ export async function initResourceAccelerator() {
   }
   if (cacheClearEl) {
     cacheClearEl.addEventListener('click', async () => {
-      if (confirm('确认清除所有资源加速缓存？')) {
+      if (await showConfirm('确认清除所有资源加速缓存？')) {
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
           if (tabs[0]?.id) {
             chrome.tabs

@@ -365,9 +365,12 @@ if (window.KeyboardPaginationLoaded) {
     }
 
     detectPagination() {
-      // 1) 语义明确的选择器
-      this.prevButton = this.findElement('prev')
-      this.nextButton = this.findElement('next')
+      // 1) 语义明确的选择器——仅在成功时更新引用，
+      // 避免 DOM 过渡期间 findElement 返回 null 覆写有效引用。
+      const newPrev = this.findElement('prev')
+      const newNext = this.findElement('next')
+      if (newPrev) {this.prevButton = newPrev}
+      if (newNext) {this.nextButton = newNext}
 
       // 2) 在明确的分页容器内推断（容器本身就是分页语义，可放宽到首/末元素）
       if (!this.prevButton || !this.nextButton) {
@@ -582,6 +585,10 @@ if (window.KeyboardPaginationLoaded) {
 
         // 上一页
         if (this.config.prevKeys.includes(key)) {
+          if (!this.prevButton) {
+            // 兜底：按钮引用丢失（DOM 过渡期间被清空），尝试即时重探测
+            this.detectPagination()
+          }
           if (this.prevButton) {
             e.preventDefault()
             this.clickButton(this.prevButton, 'prev')
@@ -590,6 +597,9 @@ if (window.KeyboardPaginationLoaded) {
 
         // 下一页
         if (this.config.nextKeys.includes(key)) {
+          if (!this.nextButton) {
+            this.detectPagination()
+          }
           if (this.nextButton) {
             e.preventDefault()
             this.clickButton(this.nextButton, 'next')

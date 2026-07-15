@@ -395,9 +395,9 @@ function getBlockedDomainsForDomain(domain) {
   if (_domainBlockedData.blockedDomains[domain]) {
     return _domainBlockedData.blockedDomains[domain]
   }
-  // Then try flexible matching (similar to getScriptsForDomain)
+  // Then try flexible matching (subdomain-aware: "a.example.com" matches "example.com")
   for (const [key, domains] of Object.entries(_domainBlockedData.blockedDomains)) {
-    if (domain.includes(key) || key.includes(domain)) {
+    if (domain === key || domain.endsWith('.' + key) || key.endsWith('.' + domain)) {
       return domains
     }
   }
@@ -705,7 +705,7 @@ async function loadSettings() {
   try {
     const result = await chrome.storage.sync.get(SETTINE)
     const settings = result[SETTINE] || result.settings || { debugMode: true }
-    extensionState.isDebugMode = settings.debugMode || true
+    extensionState.isDebugMode = settings.debugMode || false
 
     // 合并存储数据和默认配置
     const storedDomainData = settings.domainBlockedData || {
@@ -1060,10 +1060,10 @@ function addDomainScriptEntry(domain, scriptFiles) {
   if (!extensionState.domainScriptMap[domain]) {
     extensionState.domainScriptMap[domain] = scriptFiles
     ;(async () => {
-      const settings = await chrome.storage.sync.get(SETTINE)
-      const currentSettings = settings.settings || {}
+      const result = await chrome.storage.sync.get(SETTINE)
+      const currentSettings = result[SETTINE] || {}
       await chrome.storage.sync.set({
-        settings: {
+        [SETTINE]: {
           ...currentSettings,
           domainScriptMap: extensionState.domainScriptMap,
         },
@@ -1084,10 +1084,10 @@ function removeDomainScriptEntry(domain) {
   if (extensionState.domainScriptMap[domain]) {
     delete extensionState.domainScriptMap[domain]
     ;(async () => {
-      const settings = await chrome.storage.sync.get(SETTINE)
-      const currentSettings = settings.settings || {}
+      const result = await chrome.storage.sync.get(SETTINE)
+      const currentSettings = result[SETTINE] || {}
       await chrome.storage.sync.set({
-        settings: {
+        [SETTINE]: {
           ...currentSettings,
           domainScriptMap: extensionState.domainScriptMap,
         },
@@ -1397,7 +1397,7 @@ async function handleMessage(message, sender, sendResponse) {
   const safeSendResponse = (response) => {
     if (!responseSent) {
       responseSent = true
-      safeSendResponse(response)
+      sendResponse(response)
     }
   }
 
@@ -1539,16 +1539,23 @@ async function handleMessage(message, sender, sendResponse) {
         // Get current tab to check if request should be blocked based on current domain
         chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
           if (tabs[0]) {
-            const tabDomain = new URL(tabs[0].url).hostname
-            const requestDomain = new URL(message.url).hostname
+            let tabDomain, requestDomain
+            try {
+              tabDomain = new URL(tabs[0].url).hostname
+              requestDomain = new URL(message.url).hostname
+            } catch (urlError) {
+              safeSendResponse({ success: false, error: 'Invalid URL: ' + urlError.message })
+              return
+            }
 
             // Check if current domain or request domain is blocked
-            const isDomainBlocked = extensionState.blockedDomains.some((blockedDomain) => {
+            const blockedDomains = await extensionState.blockedDomains
+            const isDomainBlocked = blockedDomains.some((blockedDomain) => {
               return (
-                tabDomain.includes(blockedDomain) ||
-                blockedDomain.includes(tabDomain) ||
-                requestDomain.includes(blockedDomain) ||
-                blockedDomain.includes(requestDomain)
+                tabDomain === blockedDomain ||
+                tabDomain.endsWith('.' + blockedDomain) ||
+                requestDomain === blockedDomain ||
+                requestDomain.endsWith('.' + blockedDomain)
               )
             })
 
@@ -1985,7 +1992,7 @@ async function handleMessage(message, sender, sendResponse) {
 
       case 'CLEAR_PICKER_MESSAGES':
         // 清除消息
-        globalThis._pickerMessages = []
+        globalThis._pickerMessages = {}
         safeSendResponse({ success: true })
         break
 

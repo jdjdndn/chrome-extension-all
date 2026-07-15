@@ -80,13 +80,17 @@ self.addEventListener('message', (event) => {
 
   if (type === 'GET_CACHE_STATS') {
     getCacheStats().then((stats) => {
-      event.ports[0].postMessage(stats)
+      if (event.ports[0]) {
+        event.ports[0].postMessage(stats)
+      }
     })
   }
 
   if (type === 'CLEAR_CACHE') {
     caches.delete(CACHE_NAME).then(() => {
-      event.ports[0].postMessage({ success: true })
+      if (event.ports[0]) {
+        event.ports[0].postMessage({ success: true })
+      }
     })
   }
 })

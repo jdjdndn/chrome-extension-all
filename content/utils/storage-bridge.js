@@ -303,7 +303,7 @@ export async function reactive(key, defaultValue = null, area = 'local') {
   }
 
   // 监听外部变化
-  watch(
+  const unwatch = watch(
     key,
     (newValue) => {
       if (newValue !== reactiveObj._value) {
@@ -314,6 +314,14 @@ export async function reactive(key, defaultValue = null, area = 'local') {
     },
     area
   )
+
+  // 暴露清理方法，防止 watch 回调泄漏
+  reactiveObj.dispose = () => {
+    if (typeof unwatch === 'function') {
+      unwatch()
+    }
+    reactiveObj._listeners.length = 0
+  }
 
   return reactiveObj
 }
