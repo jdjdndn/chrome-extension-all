@@ -1,0 +1,184 @@
+{
+  "_comment": "单一真相来源 - 新增脚本只需在此添加一条配置",
+  "_instructions": "新增站点脚本: 1) 创建 content/entries/xxx.js  2) 在 siteBundles 添加一条记录",
+
+  "layers": [
+    {
+      "name": "critical",
+      "entry": "content/entries/critical.js",
+      "outfile": "content/critical-bundle.js",
+      "tier": 0,
+      "description": "最小化关键模块，document_start 立即加载"
+    },
+    {
+      "name": "core-t1",
+      "entry": "content/entries/core-t1.js",
+      "outfile": "content/core-t1-bundle.js",
+      "tier": 1,
+      "description": "资源加速器核心，浏览器空闲时加载"
+    },
+    {
+      "name": "core-t2",
+      "entry": "content/entries/core-t2.js",
+      "outfile": "content/core-t2-bundle.js",
+      "tier": 2,
+      "description": "基础设施模块，core-t1 完成后加载"
+    },
+    {
+      "name": "core-t3",
+      "entry": "content/entries/core-t3.js",
+      "outfile": "content/core-t3-bundle.js",
+      "tier": 3,
+      "description": "辅助功能模块，core-t2 完成后加载"
+    },
+    {
+      "name": "common",
+      "entry": "content/entries/common.js",
+      "outfile": "content/common-bundle.js",
+      "tier": 4,
+      "description": "通用功能模块，所有页面加载"
+    }
+  ],
+
+  "siteBundles": [
+    {
+      "name": "bili",
+      "entry": "content/entries/bili.js",
+      "outfile": "content/bundled/bili.bundle.js",
+      "domains": ["*://*.bilibili.com/*"],
+      "description": "B站"
+    },
+    {
+      "name": "douyin",
+      "entry": "content/entries/douyin.js",
+      "outfile": "content/bundled/douyin.bundle.js",
+      "domains": ["*://*.douyin.com/*"],
+      "runAt": "document_start",
+      "description": "抖音"
+    },
+    {
+      "name": "4hu",
+      "entry": "content/entries/4hu.js",
+      "outfile": "content/bundled/4hu.bundle.js",
+      "domains": ["*://*.4hu.tv/*"],
+      "description": "4hu"
+    },
+    {
+      "name": "weread",
+      "entry": "content/entries/weread.js",
+      "outfile": "content/bundled/weread.bundle.js",
+      "domains": ["*://*.weread.qq.com/*"],
+      "description": "微信读书"
+    },
+    {
+      "name": "quark",
+      "entry": "content/entries/quark.js",
+      "outfile": "content/bundled/quark.bundle.js",
+      "domains": ["*://*.quark.cn/*"],
+      "description": "夸克"
+    },
+    {
+      "name": "comic18",
+      "entry": "content/entries/comic18.js",
+      "outfile": "content/bundled/comic18.bundle.js",
+      "domains": ["*://*.18comic.vip/*"],
+      "description": "禁漫"
+    },
+    {
+      "name": "aliyun",
+      "entry": "content/entries/aliyun.js",
+      "outfile": "content/bundled/aliyun.bundle.js",
+      "domains": ["*://*.aliyundrive.com/*"],
+      "description": "阿里云盘"
+    },
+    {
+      "name": "baiduPan",
+      "entry": "content/entries/baiduPan.js",
+      "outfile": "content/bundled/baiduPan.bundle.js",
+      "domains": ["*://*.baidu.com/*"],
+      "description": "百度网盘"
+    },
+    {
+      "name": "boss",
+      "entry": "content/entries/boss.js",
+      "outfile": "content/bundled/boss.bundle.js",
+      "domains": ["*://*.zhipin.com/*"],
+      "description": "Boss直聘"
+    },
+    {
+      "name": "xiaohongshu",
+      "entry": "content/entries/xiaohongshu.js",
+      "outfile": "content/bundled/xiaohongshu.bundle.js",
+      "domains": ["*://*.xiaohongshu.com/*"],
+      "description": "小红书"
+    },
+    {
+      "name": "dianGong",
+      "entry": "content/entries/dianGong.js",
+      "outfile": "content/bundled/dianGong.bundle.js",
+      "domains": ["*://*.wyaqpx.com/*"],
+      "description": "电工之家"
+    },
+    {
+      "name": "gongkong",
+      "entry": "content/entries/gongkong.js",
+      "outfile": "content/bundled/gongkong.bundle.js",
+      "domains": ["*://*.ymmfa.com/*"],
+      "description": "工控网"
+    },
+    {
+      "name": "youtube",
+      "entry": "content/entries/youtube.js",
+      "outfile": "content/bundled/youtube.bundle.js",
+      "domains": ["*://*.youtube.com/*"],
+      "runAt": "document_start",
+      "description": "YouTube"
+    },
+    {
+      "name": "github",
+      "entry": "content/entries/github.js",
+      "outfile": "content/bundled/github.bundle.js",
+      "domains": ["*://github.com/*", "*://*.github.com/*"],
+      "runAt": "document_start",
+      "description": "GitHub"
+    },
+    {
+      "name": "modelscope",
+      "entry": "content/entries/modelscope.js",
+      "outfile": "content/bundled/modelscope.bundle.js",
+      "domains": ["*://modelscope.cn/models*", "*://*.modelscope.cn/models*"],
+      "description": "ModelScope"
+    }
+  ],
+
+  "webAccessiblePatterns": [
+    "inject.js",
+    "content.js",
+    "content/critical-bundle.js",
+    "content/core-t3-bundle.js",
+    "content/core-t2-bundle.js",
+    "content/core-t1-bundle.js",
+    "content/core-bundle.js",
+    "content/common-bundle.js",
+    "background-csp-bypass.js",
+    "content/*.js",
+    "content/bundled/*.js",
+    "content/common/*.js",
+    "content/utils/*.js",
+    "content/core/*.js",
+    "content/base/*.js",
+    "content/modules/*.js",
+    "content/modules/ai-aggregator/*.js",
+    "content/devtools/*.js",
+    "content/workers/*.js",
+    "shared/*.js",
+    "content/core/load-sampler.js",
+    "devtools/hot-reload-panel.html",
+    "devtools/hot-reload-panel.js",
+    "devtools/hot-reload-panel.css",
+    "popup/*.js",
+    "popup/modules/*.js",
+    "newtab.js",
+    "styles/*.css"
+  ]
+}

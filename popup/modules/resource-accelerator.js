@@ -3,6 +3,19 @@
  * 负责资源加速器的配置和状态显示
  * 按需加载：仅在 page tab 使用
  */
+/* globals showToast, showConfirm */
+
+// 本地 HTML 转义函数，防止 XSS（模块级，供多函数共用）
+const _escHtml = (text) => {
+  if (!text) {
+    return ''
+  }
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
 
 /**
  * 初始化资源加速器控制
@@ -37,7 +50,9 @@ export async function initResourceAccelerator() {
   const qualityValueEl = document.getElementById('ra-quality-value')
   const settingsPanel = document.getElementById('ra-settings')
 
-  if (!enabledEl) {return}
+  if (!enabledEl) {
+    return
+  }
 
   // 检查当前站点是否被排除
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
@@ -48,18 +63,26 @@ export async function initResourceAccelerator() {
     } catch {}
   }
   const isSiteExcluded = config.excludeDomains?.some(
-    d => currentHost === d || currentHost.endsWith('.' + d)
+    (d) => currentHost === d || currentHost.endsWith('.' + d)
   )
 
   enabledEl.checked = config.enabled
-  if (siteEnabledEl) {siteEnabledEl.checked = !isSiteExcluded}
+  if (siteEnabledEl) {
+    siteEnabledEl.checked = !isSiteExcluded
+  }
   jsReplaceEl.checked = config.jsReplace
   fontReplaceEl.checked = config.fontReplace
-  if (cssReplaceEl) {cssReplaceEl.checked = config.cssReplace !== false}
+  if (cssReplaceEl) {
+    cssReplaceEl.checked = config.cssReplace !== false
+  }
   imageLazyEl.checked = config.imageLazyLoad
   imageCompressEl.checked = config.imageCompress
-  if (preloadEl) {preloadEl.checked = config.preloadEnabled !== false}
-  if (dedupEl) {dedupEl.checked = config.dedupEnabled !== false}
+  if (preloadEl) {
+    preloadEl.checked = config.preloadEnabled !== false
+  }
+  if (dedupEl) {
+    dedupEl.checked = config.dedupEnabled !== false
+  }
   qualityEl.value = config.imageQuality * 100
   qualityValueEl.textContent = Math.round(config.imageQuality * 100)
   settingsPanel.style.display = config.enabled ? 'block' : 'none'
@@ -79,13 +102,15 @@ export async function initResourceAccelerator() {
   // 站点级开关
   if (siteEnabledEl) {
     siteEnabledEl.addEventListener('change', async (e) => {
-      if (!config.excludeDomains) {config.excludeDomains = []}
+      if (!config.excludeDomains) {
+        config.excludeDomains = []
+      }
       if (!e.target.checked) {
         if (!config.excludeDomains.includes(currentHost)) {
           config.excludeDomains.push(currentHost)
         }
       } else {
-        config.excludeDomains = config.excludeDomains.filter(d => d !== currentHost)
+        config.excludeDomains = config.excludeDomains.filter((d) => d !== currentHost)
       }
       await saveAndNotify()
     })
@@ -148,7 +173,7 @@ export async function initResourceAccelerator() {
         if (tabs[0]?.id) {
           chrome.tabs
             .sendMessage(tabs[0].id, { type: 'RESOURCE_ACCELERATOR_GET_STATS' })
-            .then(response => {
+            .then((response) => {
               showCacheDetails(response)
             })
             .catch(() => {
@@ -184,30 +209,36 @@ export async function initResourceAccelerator() {
       const isOpen = excludePanel.style.display !== 'none'
       excludePanel.style.display = isOpen ? 'none' : 'block'
       excludeToggle.textContent = isOpen ? '排除域名 ▼' : '排除域名 ▲'
-      if (!isOpen) {renderExcludeList()}
+      if (!isOpen) {
+        renderExcludeList()
+      }
     })
   }
 
   function renderExcludeList() {
-    if (!excludeList) {return}
+    if (!excludeList) {
+      return
+    }
     const domains = config.excludeDomains || []
     if (domains.length === 0) {
       excludeList.innerHTML = '<div style="color: #999;">暂无排除域名</div>'
       return
     }
     excludeList.innerHTML = domains
-      .map(d => `
+      .map(
+        (d) => `
         <div style="display: flex; justify-content: space-between; padding: 2px 0;">
           <span>${d}</span>
           <button class="ra-remove-domain" data-domain="${d}" style="border: none; background: none; color: #dc3545; cursor: pointer; font-size: 11px;">✕</button>
         </div>
-      `)
+      `
+      )
       .join('')
 
-    excludeList.querySelectorAll('.ra-remove-domain').forEach(btn => {
+    excludeList.querySelectorAll('.ra-remove-domain').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const domain = btn.dataset.domain
-        config.excludeDomains = (config.excludeDomains || []).filter(d => d !== domain)
+        config.excludeDomains = (config.excludeDomains || []).filter((d) => d !== domain)
         await saveAndNotify()
         renderExcludeList()
       })
@@ -217,8 +248,12 @@ export async function initResourceAccelerator() {
   if (excludeAdd && excludeInput) {
     excludeAdd.addEventListener('click', async () => {
       const domain = excludeInput.value.trim()
-      if (!domain) {return}
-      if (!config.excludeDomains) {config.excludeDomains = []}
+      if (!domain) {
+        return
+      }
+      if (!config.excludeDomains) {
+        config.excludeDomains = []
+      }
       if (!config.excludeDomains.includes(domain)) {
         config.excludeDomains.push(domain)
         await saveAndNotify()
@@ -247,28 +282,31 @@ export async function initResourceAccelerator() {
  */
 function showCacheDetails(stats) {
   const listEl = document.getElementById('ra-details-list')
-  if (!listEl || !stats) {return}
+  if (!listEl || !stats) {
+    return
+  }
 
   document.getElementById('ra-details-panel').style.display = 'block'
 
   const lines = []
   if (stats.js?.details?.length) {
-    stats.js.details.forEach(d => {
+    stats.js.details.forEach((d) => {
       lines.push(`<div style="color: #28a745;">JS: ${d.name} → ${d.cdn}</div>`)
     })
   }
   if (stats.fonts?.details?.length) {
-    stats.fonts.details.forEach(d => {
+    stats.fonts.details.forEach((d) => {
       lines.push(`<div style="color: #17a2b8;">字体: ${d.name} → ${d.cdn}</div>`)
     })
   }
   if (stats.css?.details?.length) {
-    stats.css.details.forEach(d => {
+    stats.css.details.forEach((d) => {
       lines.push(`<div style="color: #ffc107;">CSS: ${d.name} → ${d.cdn}</div>`)
     })
   }
 
-  listEl.innerHTML = lines.length > 0 ? lines.join('') : '<div style="color: #999;">本次无替换</div>'
+  listEl.innerHTML =
+    lines.length > 0 ? lines.join('') : '<div style="color: #999;">本次无替换</div>'
 }
 
 /**
@@ -293,18 +331,31 @@ async function loadResourceAcceleratorStats() {
   const totalReplacedEl = document.getElementById('ra-total-replaced')
   const dedupRemovedEl = document.getElementById('ra-dedup-removed')
 
-  if (jsCountEl) {jsCountEl.textContent = `(${stats.totalJsReplaced})`}
-  if (fontCountEl) {fontCountEl.textContent = `(${stats.totalFontsReplaced})`}
-  if (cssCountEl) {cssCountEl.textContent = `(${stats.totalCssReplaced || 0})`}
-  if (lazyCountEl) {lazyCountEl.textContent = `(${stats.totalImagesOptimized})`}
-  if (compressCountEl) {compressCountEl.textContent = `(${stats.totalImagesOptimized})`}
-  if (totalReplacedEl)
-    {totalReplacedEl.textContent =
+  if (jsCountEl) {
+    jsCountEl.textContent = `(${stats.totalJsReplaced})`
+  }
+  if (fontCountEl) {
+    fontCountEl.textContent = `(${stats.totalFontsReplaced})`
+  }
+  if (cssCountEl) {
+    cssCountEl.textContent = `(${stats.totalCssReplaced || 0})`
+  }
+  if (lazyCountEl) {
+    lazyCountEl.textContent = `(${stats.totalImagesOptimized})`
+  }
+  if (compressCountEl) {
+    compressCountEl.textContent = `(${stats.totalImagesOptimized})`
+  }
+  if (totalReplacedEl) {
+    totalReplacedEl.textContent =
       (stats.totalJsReplaced || 0) +
       (stats.totalFontsReplaced || 0) +
       (stats.totalCssReplaced || 0) +
-      (stats.totalImagesOptimized || 0)}
-  if (dedupRemovedEl) {dedupRemovedEl.textContent = stats.totalDedupRemoved || 0}
+      (stats.totalImagesOptimized || 0)
+  }
+  if (dedupRemovedEl) {
+    dedupRemovedEl.textContent = stats.totalDedupRemoved || 0
+  }
 }
 
 /**

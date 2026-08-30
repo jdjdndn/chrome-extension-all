@@ -15,6 +15,9 @@ import { execSync } from 'child_process'
 // 增量构建模块
 import { incrementalBuild, clearCache, getStats } from './scripts/incremental-build.js'
 
+// 配置生成器 - 从 build-config.json 自动生成 manifest 和 domain-config
+import { loadConfig, generateBuildBundles } from './scripts/generate-config.js'
+
 // ========== Build Assertions ==========
 // 声明"源码改了什么必须出现在哪个产物里"，构建末尾自动校验
 // 失败即构建退出非 0，杜绝"改了源码但 dist 未更新"的静默失败

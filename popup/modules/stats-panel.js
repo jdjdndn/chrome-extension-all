@@ -3,6 +3,7 @@
  * 负责统计数据的加载、渲染和导出
  * 按需加载：仅在 stats tab 使用
  */
+/* globals showToast, showConfirm */
 
 import { sendMessage } from '../popup-core.js'
 
@@ -69,18 +70,30 @@ function renderStats(stats) {
   const todayHidden = document.getElementById('today-hidden')
   const todayBytes = document.getElementById('today-bytes')
 
-  if (todayBlocked) {todayBlocked.textContent = formatNumber(stats.today?.blocked || 0)}
-  if (todayHidden) {todayHidden.textContent = formatNumber(stats.today?.hidden || 0)}
-  if (todayBytes) {todayBytes.textContent = formatBytes(stats.today?.bytes || 0)}
+  if (todayBlocked) {
+    todayBlocked.textContent = formatNumber(stats.today?.blocked || 0)
+  }
+  if (todayHidden) {
+    todayHidden.textContent = formatNumber(stats.today?.hidden || 0)
+  }
+  if (todayBytes) {
+    todayBytes.textContent = formatBytes(stats.today?.bytes || 0)
+  }
 
   // 累计数据
   const totalBlocked = document.getElementById('total-blocked')
   const totalHidden = document.getElementById('total-hidden')
   const totalBytes = document.getElementById('total-bytes')
 
-  if (totalBlocked) {totalBlocked.textContent = formatNumber(stats.totalBlocked || 0)}
-  if (totalHidden) {totalHidden.textContent = formatNumber(stats.totalHidden || 0)}
-  if (totalBytes) {totalBytes.textContent = formatBytes(stats.estimatedBytesSaved || 0)}
+  if (totalBlocked) {
+    totalBlocked.textContent = formatNumber(stats.totalBlocked || 0)
+  }
+  if (totalHidden) {
+    totalHidden.textContent = formatNumber(stats.totalHidden || 0)
+  }
+  if (totalBytes) {
+    totalBytes.textContent = formatBytes(stats.estimatedBytesSaved || 0)
+  }
 
   // 域名排行
   renderDomainRanking(stats.domainStats || {})
@@ -91,19 +104,22 @@ function renderStats(stats) {
  */
 function renderDomainRanking(domainStats) {
   const container = document.getElementById('domain-ranking')
-  if (!container) {return}
+  if (!container) {
+    return
+  }
 
   const entries = Object.entries(domainStats)
     .map(([domain, data]) => ({
       domain,
       total: (data.blocked || 0) + (data.hidden || 0),
     }))
-    .filter(e => e.total > 0)
+    .filter((e) => e.total > 0)
     .sort((a, b) => b.total - a.total)
     .slice(0, 5)
 
   if (entries.length === 0) {
-    container.innerHTML = '<div style="color: #999; text-align: center; padding: 20px;">暂无数据</div>'
+    container.innerHTML =
+      '<div style="color: #999; text-align: center; padding: 20px;">暂无数据</div>'
     return
   }
 
@@ -133,8 +149,12 @@ function renderDomainRanking(domainStats) {
  * 格式化数字
  */
 function formatNumber(num) {
-  if (num >= 1000000) {return (num / 1000000).toFixed(1) + 'M'}
-  if (num >= 1000) {return (num / 1000).toFixed(1) + 'K'}
+  if (num >= 1000000) {
+    return (num / 1000000).toFixed(1) + 'M'
+  }
+  if (num >= 1000) {
+    return (num / 1000).toFixed(1) + 'K'
+  }
   return String(num)
 }
 
@@ -142,9 +162,15 @@ function formatNumber(num) {
  * 格式化字节
  */
 function formatBytes(bytes) {
-  if (bytes >= 1073741824) {return (bytes / 1073741824).toFixed(1) + 'GB'}
-  if (bytes >= 1048576) {return (bytes / 1048576).toFixed(1) + 'MB'}
-  if (bytes >= 1024) {return (bytes / 1024).toFixed(1) + 'KB'}
+  if (bytes >= 1073741824) {
+    return (bytes / 1073741824).toFixed(1) + 'GB'
+  }
+  if (bytes >= 1048576) {
+    return (bytes / 1048576).toFixed(1) + 'MB'
+  }
+  if (bytes >= 1024) {
+    return (bytes / 1024).toFixed(1) + 'KB'
+  }
   return bytes + 'B'
 }
 
@@ -153,7 +179,9 @@ function formatBytes(bytes) {
  */
 export function drawStatsChart() {
   const canvas = document.getElementById('stats-chart')
-  if (!canvas) {return}
+  if (!canvas) {
+    return
+  }
 
   const ctx = canvas.getContext('2d')
   const width = canvas.offsetWidth
