@@ -1,6 +1,10 @@
 /**
  * 域名脚本配置
  * 统一管理所有域名的脚本加载配置
+ *
+ * 由 scripts/generate-config.js 自动生成，请勿手动编辑
+ * 生成时间: 2026-08-30T04:26:21.694Z
+ * 源配置: scripts/build-config.json
  */
 
 (function () {
@@ -8,7 +12,9 @@
 
   // 域名匹配工具
   function matchDomain(pattern, hostname) {
-    if (pattern === '*') {return true}
+    if (pattern === '*') {
+      return true
+    }
     if (pattern.startsWith('*://')) {
       // *://*.example.com/* -> 匹配 example.com 及其子域名
       const domain = pattern.replace('*://*.', '').replace('*://', '').replace('/*', '')

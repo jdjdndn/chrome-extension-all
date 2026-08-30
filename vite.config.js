@@ -12,9 +12,6 @@ import {
 import { build as esbuildBuild } from 'esbuild'
 import { execSync } from 'child_process'
 
-// 增量构建模块
-import { incrementalBuild, clearCache, getStats } from './scripts/incremental-build.js'
-
 // 配置生成器 - 从 build-config.json 自动生成 manifest 和 domain-config
 import { loadConfig, generateBuildBundles } from './scripts/generate-config.js'
 
@@ -99,73 +96,18 @@ const ENV_CONFIG = {
 
 console.log('[Build] Environment config:', ENV_CONFIG)
 
-// ========== Content script bundles (from build-site-bundles.js) ==========
-const CONTENT_BUNDLES = [
-  { name: 'critical', entry: 'content/entries/critical.js', outfile: 'content/critical-bundle.js' },
-  { name: 'core-t1', entry: 'content/entries/core-t1.js', outfile: 'content/core-t1-bundle.js' },
-  { name: 'core-t2', entry: 'content/entries/core-t2.js', outfile: 'content/core-t2-bundle.js' },
-  { name: 'core-t3', entry: 'content/entries/core-t3.js', outfile: 'content/core-t3-bundle.js' },
-  { name: 'common', entry: 'content/entries/common.js', outfile: 'content/common-bundle.js' },
-  { name: 'bili', entry: 'content/entries/bili.js', outfile: 'content/bundled/bili.bundle.js' },
-  {
-    name: 'douyin',
-    entry: 'content/entries/douyin.js',
-    outfile: 'content/bundled/douyin.bundle.js',
-  },
-  { name: '4hu', entry: 'content/entries/4hu.js', outfile: 'content/bundled/4hu.bundle.js' },
-  {
-    name: 'weread',
-    entry: 'content/entries/weread.js',
-    outfile: 'content/bundled/weread.bundle.js',
-  },
-  {
-    name: 'youtube',
-    entry: 'content/entries/youtube.js',
-    outfile: 'content/bundled/youtube.bundle.js',
-  },
-  {
-    name: 'modelscope',
-    entry: 'content/entries/modelscope.js',
-    outfile: 'content/bundled/modelscope.bundle.js',
-  },
-  { name: 'quark', entry: 'content/entries/quark.js', outfile: 'content/bundled/quark.bundle.js' },
-  {
-    name: 'xiaohongshu',
-    entry: 'content/entries/xiaohongshu.js',
-    outfile: 'content/bundled/xiaohongshu.bundle.js',
-  },
-  {
-    name: 'aliyun',
-    entry: 'content/entries/aliyun.js',
-    outfile: 'content/bundled/aliyun.bundle.js',
-  },
-  {
-    name: 'baiduPan',
-    entry: 'content/entries/baiduPan.js',
-    outfile: 'content/bundled/baiduPan.bundle.js',
-  },
-  { name: 'boss', entry: 'content/entries/boss.js', outfile: 'content/bundled/boss.bundle.js' },
-  {
-    name: 'dianGong',
-    entry: 'content/entries/dianGong.js',
-    outfile: 'content/bundled/dianGong.bundle.js',
-  },
-  {
-    name: 'gongkong',
-    entry: 'content/entries/gongkong.js',
-    outfile: 'content/bundled/gongkong.bundle.js',
-  },
-  {
-    name: 'comic18',
-    entry: 'content/entries/comic18.js',
-    outfile: 'content/bundled/comic18.bundle.js',
-  },
-  {
-    name: 'github',
-    entry: 'content/entries/github.js',
-    outfile: 'content/bundled/github.bundle.js',
-  },
-]
+// ========== Content script bundles (从 build-config.json 自动生成) ==========
+// 新增脚本只需修改 scripts/build-config.json，无需手动维护此数组
+let CONTENT_BUNDLES = []
+try {
+  const buildConfig = loadConfig()
+  CONTENT_BUNDLES = generateBuildBundles(buildConfig)
+  console.log(`[Build] 从 build-config.json 加载 ${CONTENT_BUNDLES.length} 个 bundle 配置`)
+} catch (err) {
+  console.error('[Build] 加载 build-config.json 失败:', err.message)
+  // 降级为空数组，构建时会报错
+  CONTENT_BUNDLES = []
+}
 
 // ========== File sync config (自动扫描) ==========
 
@@ -222,6 +164,8 @@ const FILE_MAPPINGS = [
 
 const STATIC_DIRS = ['icons', 'devtools', 'shared', 'styles', 'popup']
 const SKIP_CONTENT_DIRS = ['entries', 'utils']
+// content 目录下的旧 bundle 产物，不应复制到 dist（由 esbuild 构建覆盖）
+const SKIP_CONTENT_FILES = [/\.bundle\.js$/, /-bundle\.js$/]
 
 // ========== Hot Reload Notification ==========
 async function notifyHotReloadServer() {
@@ -235,15 +179,16 @@ async function notifyHotReloadServer() {
 }
 
 // ========== Helpers ==========
-function copyDir(src, dest, skipDirs = []) {
+function copyDir(src, dest, skipDirs = [], skipFiles = []) {
   if (!existsSync(src)) return
   mkdirSync(dest, { recursive: true })
   for (const entry of readdirSync(src, { withFileTypes: true })) {
     if (entry.isDirectory() && skipDirs.includes(entry.name)) continue
+    if (!entry.isDirectory() && skipFiles.some((pat) => pat.test(entry.name))) continue
     const srcPath = resolve(src, entry.name)
     const destPath = resolve(dest, entry.name)
     if (entry.isDirectory()) {
-      copyDir(srcPath, destPath, skipDirs)
+      copyDir(srcPath, destPath, skipDirs, skipFiles)
     } else {
       copyFileSync(srcPath, destPath)
     }
@@ -279,49 +224,29 @@ function copyAllToDist(dist) {
     if (existsSync(d)) copyDir(resolve(d), resolve(dist, d))
   }
   if (existsSync('content')) {
-    copyDir(resolve('content'), resolve(dist, 'content'), SKIP_CONTENT_DIRS)
+    copyDir(resolve('content'), resolve(dist, 'content'), SKIP_CONTENT_DIRS, SKIP_CONTENT_FILES)
   }
 }
 
 async function buildContentScripts(dist) {
-  // 构建函数
-  const buildFn = async (bundle) => {
+  for (const bundle of CONTENT_BUNDLES) {
     const entry = resolve(bundle.entry)
-    if (!existsSync(entry)) return
+    if (!existsSync(entry)) continue
 
     const outfile = resolve(dist, bundle.outfile)
     mkdirSync(resolve(outfile, '..'), { recursive: true })
 
-    const result = await esbuildBuild({
+    await esbuildBuild({
       entryPoints: [entry],
       bundle: true,
       format: 'iife',
       outfile,
       target: ['chrome100'],
-      sourcemap: true,
+      sourcemap: false,
       minify: false,
-      metafile: true,
       define: { 'process.env.NODE_ENV': '"production"' },
     })
-    // 返回真实依赖列表，供增量缓存记录
-    return Object.keys(result.metafile?.inputs || {}).map((p) => resolve(p))
   }
-
-  // 准备 bundle 配置（调整路径）
-  const bundles = CONTENT_BUNDLES.map((b) => ({
-    ...b,
-    outfile: resolve(dist, b.outfile),
-  }))
-
-  // 使用增量构建
-  const results = await incrementalBuild(bundles, buildFn)
-
-  // 输出统计
-  if (ENV_CONFIG.DEBUG) {
-    console.log('[Build] 增量构建统计:', getStats())
-  }
-
-  return results
 }
 
 // ========== Vite Plugin ==========
@@ -340,6 +265,13 @@ function chromeExtensionPlugin() {
     },
 
     buildStart() {
+      // 从 build-config.json 生成配置（确保 manifest.json 和 domain-config.js 同步）
+      try {
+        execSync('node scripts/generate-config.js', { stdio: 'inherit' })
+      } catch {
+        console.warn('[Build] 配置生成失败，请检查 scripts/build-config.json')
+      }
+
       // watch 模式下重新扫描静态文件
       STATIC_FILES = scanStaticFiles()
 

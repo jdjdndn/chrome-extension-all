@@ -1,7 +1,6 @@
 {
   "_comment": "单一真相来源 - 新增脚本只需在此添加一条配置",
   "_instructions": "新增站点脚本: 1) 创建 content/entries/xxx.js  2) 在 siteBundles 添加一条记录",
-
   "layers": [
     {
       "name": "critical",
@@ -39,7 +38,6 @@
       "description": "通用功能模块，所有页面加载"
     }
   ],
-
   "siteBundles": [
     {
       "name": "bili",
@@ -150,7 +148,6 @@
       "description": "ModelScope"
     }
   ],
-
   "webAccessiblePatterns": [
     "inject.js",
     "content.js",

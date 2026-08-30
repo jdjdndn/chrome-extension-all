@@ -24,28 +24,122 @@ function loadConfig() {
 }
 
 // ========== 生成 domain-config.js ==========
-function generateDomainConfig(config) {
+function generateDomainConfigContent(config) {
   const siteBundles = config.siteBundles || []
 
+  // 生成 DOMAIN_SCRIPTS 数组内容
   const domainScriptsEntries = siteBundles.map((site) => {
-    const entry = {
-      patterns: site.domains,
-      scripts: [site.outfile],
-    }
+    const patterns = site.domains.map((d) => `      '${d}'`).join(',\n')
+    const scripts = `        '${site.outfile}'`
+    let entry = `    {\n      patterns: [\n${patterns}\n      ],\n      scripts: [\n${scripts}\n      ]`
     if (site.runAt) {
-      entry.runAt = site.runAt
+      entry += `,\n      runAt: '${site.runAt}'`
     }
+    entry += '\n    }'
     return entry
   })
 
-  const domainScriptsCode = `
-  // 域名特定脚本配置（自动生成 - 请勿手动编辑）
-  // 生成时间: ${new Date().toISOString()}
-  // 源配置: scripts/build-config.json
-  const DOMAIN_SCRIPTS = ${JSON.stringify(domainScriptsEntries, null, 4)}
-`.trim()
+  const domainScripts = `  const DOMAIN_SCRIPTS = [\n${domainScriptsEntries.join(',\n')}\n  ]`
 
-  return domainScriptsCode
+  // 构建完整的 domain-config.js
+  return `/**
+ * 域名脚本配置
+ * 统一管理所有域名的脚本加载配置
+ *
+ * 由 scripts/generate-config.js 自动生成，请勿手动编辑
+ * 生成时间: ${new Date().toISOString()}
+ * 源配置: scripts/build-config.json
+ */
+
+(function () {
+  'use strict'
+
+  // 域名匹配工具
+  function matchDomain(pattern, hostname) {
+    if (pattern === '*') {return true}
+    if (pattern.startsWith('*://')) {
+      // *://*.example.com/* -> 匹配 example.com 及其子域名
+      const domain = pattern.replace('*://*.', '').replace('*://', '').replace('/*', '')
+      return hostname === domain || hostname.endsWith('.' + domain)
+    }
+    return hostname === pattern || hostname.endsWith('.' + pattern)
+  }
+
+  // 通用脚本配置（所有页面加载 - 已打包为单个 bundle）
+  const COMMON_SCRIPTS = ['content/common-bundle.js']
+
+  // 域名特定脚本配置（所有站点已打包为自包含 bundle）
+${domainScripts}
+
+  /**
+   * 获取当前域名需要加载的脚本配置
+   * @param {string} hostname - 当前页面主机名
+   * @returns {Object} 脚本配置
+   */
+  function getScriptConfig(hostname) {
+    const result = {
+      commonScripts: [...COMMON_SCRIPTS],
+      domainScripts: [],
+      runAtStart: [],
+      eventbusIntegration: false,
+      eventbusScript: 'content/eventbus-integration.js',
+    }
+
+    // 查找匹配的域名配置
+    for (const config of DOMAIN_SCRIPTS) {
+      const matched = config.patterns.some((pattern) => matchDomain(pattern, hostname))
+      if (matched) {
+        // 分离 document_start 和默认脚本
+        if (config.runAt === 'document_start') {
+          result.runAtStart.push(...config.scripts)
+        } else {
+          result.domainScripts.push(...config.scripts)
+        }
+        if (config.eventbusIntegration) {
+          result.eventbusIntegration = true
+        }
+        if (config.eventbusScript) {
+          result.eventbusScript = config.eventbusScript
+        }
+      }
+    }
+
+    return result
+  }
+
+  // 导出配置
+  window.DomainConfig = {
+    getScriptConfig,
+    COMMON_SCRIPTS,
+    DOMAIN_SCRIPTS,
+    matchDomain,
+  }
+
+  console.log('[DomainConfig] 域名配置模块已加载')
+})()
+`
+}
+
+// ========== 更新 domain-config.js ==========
+function updateDomainConfig(config) {
+  const domainConfigPath = join(root, 'content', 'domain-config.js')
+
+  const content = generateDomainConfigContent(config)
+
+  // 比较内容，避免无变化时写入导致无限重建
+  if (existsSync(domainConfigPath)) {
+    const existing = readFileSync(domainConfigPath, 'utf-8')
+    // 忽略时间戳行进行比较（第5行: * 生成时间: ...）
+    const normalize = (str) => str.replace(/生成时间: .+/, '生成时间: skip')
+    if (normalize(existing) === normalize(content)) {
+      console.log('[GenerateConfig] domain-config.js 无需更新')
+      return true
+    }
+  }
+
+  writeFileSync(domainConfigPath, content, 'utf-8')
+  console.log('[GenerateConfig] ✅ domain-config.js 已更新')
+  return true
 }
 
 // ========== 生成 manifest.json web_accessible_resources ==========
@@ -57,31 +151,6 @@ function generateWebAccessibleResources(config) {
       matches: ['<all_urls>'],
     },
   ]
-}
-
-// ========== 更新 domain-config.js ==========
-function updateDomainConfig(config) {
-  const domainConfigPath = join(root, 'content', 'domain-config.js')
-  if (!existsSync(domainConfigPath)) {
-    console.error('[GenerateConfig] domain-config.js 不存在')
-    return false
-  }
-
-  let content = readFileSync(domainConfigPath, 'utf-8')
-
-  // 替换 DOMAIN_SCRIPTS 数组
-  const newDomainScripts = generateDomainConfig(config)
-  const regex = /const DOMAIN_SCRIPTS = \[[\s\S]*?\n {2}\]/
-  if (regex.test(content)) {
-    content = content.replace(regex, newDomainScripts.split('\n').slice(1, -1).join('\n'))
-  } else {
-    console.warn('[GenerateConfig] 未找到 DOMAIN_SCRIPTS 数组，跳过更新')
-    return false
-  }
-
-  writeFileSync(domainConfigPath, content, 'utf-8')
-  console.log('[GenerateConfig] ✅ domain-config.js 已更新')
-  return true
 }
 
 // ========== 更新 manifest.json ==========

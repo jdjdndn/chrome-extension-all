@@ -58,10 +58,12 @@
       "resources": [
         "inject.js",
         "content.js",
+        "content/critical-bundle.js",
         "content/core-t3-bundle.js",
         "content/core-t2-bundle.js",
         "content/core-t1-bundle.js",
         "content/core-bundle.js",
+        "content/common-bundle.js",
         "background-csp-bypass.js",
         "content/*.js",
         "content/bundled/*.js",

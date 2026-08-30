@@ -21,6 +21,7 @@
     'widen-page': false, // 页面宽度扩展（默认关闭）
     'tab-focus': true, // Tab激活时自动focus
     'list-link-split-view': true, // 列表链接拆分视图
+    'copy-link-href': true, // 复制链接时用 href 替代文字
   }
 
   // 缓存的开关状态
@@ -129,12 +130,15 @@
     'widen-page': '页面宽度扩展',
     'tab-focus': 'Tab激活自动聚焦',
     'list-link-split-view': '列表链接拆分视图',
+    'copy-link-href': '复制链接用href替代文字',
   }
 
   // 监听 chrome.storage 变化，运行中改开关也能即时同步缓存与 localStorage
   try {
     chrome.storage.onChanged.addListener((changes, area) => {
-      if (area !== 'local' || !changes[STORAGE_KEY]) {return}
+      if (area !== 'local' || !changes[STORAGE_KEY]) {
+        return
+      }
       const next = changes[STORAGE_KEY].newValue || {}
       cachedSwitches = next
       cacheExpiry = Date.now() + CACHE_TTL

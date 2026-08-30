@@ -25,3 +25,4 @@ import '../common/lang-to-zh.js'
 import '../common/widen-page.js'
 import '../common/tab-focus.js'
 // list-link-split-view.js 已移至 core.js 入口
+import '../common/copy-link-href.js'

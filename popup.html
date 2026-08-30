@@ -679,6 +679,105 @@
         <button id="clear-note" style="flex: 1; background: #6c757d;">清空</button>
       </div>
     </div>
+
+    <!-- Script Switches -->
+    <div class="settings" style="margin-top: 12px;">
+      <h2 style="font-size: 16px; margin: 0 0 12px 0">⚙️ 脚本开关</h2>
+
+      <div class="setting-item">
+        <div class="toggle-container">
+          <label for="script-redirect-links">重定向链接替换</label>
+          <input type="checkbox" id="script-redirect-links" data-script="redirect-links" />
+        </div>
+      </div>
+
+      <div class="setting-item">
+        <div class="toggle-container">
+          <label for="script-text-to-link">文本转链接</label>
+          <input type="checkbox" id="script-text-to-link" data-script="text-to-link" />
+        </div>
+      </div>
+
+      <div class="setting-item">
+        <div class="toggle-container">
+          <label for="script-link-blank">非同源链接新窗口打开</label>
+          <input type="checkbox" id="script-link-blank" data-script="link-blank" />
+        </div>
+      </div>
+
+      <div class="setting-item">
+        <div class="toggle-container">
+          <label for="script-add-title">添加 title 属性</label>
+          <input type="checkbox" id="script-add-title" data-script="add-title" />
+        </div>
+      </div>
+
+      <div class="setting-item">
+        <div class="toggle-container">
+          <label for="script-doc-generator">文档生成器</label>
+          <input type="checkbox" id="script-doc-generator" data-script="doc-generator" />
+        </div>
+      </div>
+
+      <div class="setting-item">
+        <div class="toggle-container">
+          <label for="script-text-collector">文本收集器</label>
+          <input type="checkbox" id="script-text-collector" data-script="text-collector" />
+        </div>
+      </div>
+
+      <div class="setting-item">
+        <div class="toggle-container">
+          <label for="script-keyboard-pagination">键盘翻页</label>
+          <input type="checkbox" id="script-keyboard-pagination" data-script="keyboard-pagination" />
+        </div>
+      </div>
+
+      <div class="setting-item">
+        <div class="toggle-container">
+          <label for="script-panel-position-manager">面板位置管理</label>
+          <input type="checkbox" id="script-panel-position-manager" data-script="panel-position-manager" />
+        </div>
+      </div>
+
+      <div class="setting-item">
+        <div class="toggle-container">
+          <label for="script-widen-page">页面宽度扩展</label>
+          <input type="checkbox" id="script-widen-page" data-script="widen-page" />
+        </div>
+      </div>
+
+      <div class="setting-item" id="widen-page-width-setting" style="display: none; padding-left: 24px;">
+        <label for="widen-page-width" style="font-size: 12px;">宽度百分比: <span id="widen-page-width-value">80</span>%</label>
+        <input type="range" id="widen-page-width" min="50" max="100" value="80" step="5"
+               style="width: 100%; margin-top: 4px; accent-color: #007bff;" />
+      </div>
+
+      <div class="setting-item">
+        <div class="toggle-container">
+          <label for="script-tab-focus">Tab激活自动聚焦</label>
+          <input type="checkbox" id="script-tab-focus" data-script="tab-focus" />
+        </div>
+      </div>
+
+      <div class="setting-item">
+        <div class="toggle-container">
+          <label for="script-keyboard-click">键盘快捷点击</label>
+          <input type="checkbox" id="script-keyboard-click" data-script="keyboard-click" />
+        </div>
+      </div>
+
+      <div class="setting-item">
+        <div class="toggle-container">
+          <label for="script-copy-link-href">复制链接用href替代文字</label>
+          <input type="checkbox" id="script-copy-link-href" data-script="copy-link-href" />
+        </div>
+      </div>
+
+      <div class="info-box" style="margin-top: 8px;">
+        <small>开关修改后需要刷新页面才能生效</small>
+      </div>
+    </div>
     </div><!-- End home-tab -->
 
     <!-- ========== 页面Tab ========== -->
@@ -794,91 +893,6 @@
           <label for="debug-mode">Debug Mode:</label>
           <input type="checkbox" id="debug-mode" />
         </div>
-      </div>
-    </div>
-
-    <!-- Script Switches -->
-    <div class="settings" style="margin-top: 12px;">
-      <h2 style="font-size: 16px; margin: 0 0 12px 0">脚本开关</h2>
-
-      <div class="setting-item">
-        <div class="toggle-container">
-          <label for="script-redirect-links">重定向链接替换</label>
-          <input type="checkbox" id="script-redirect-links" data-script="redirect-links" />
-        </div>
-      </div>
-
-      <div class="setting-item">
-        <div class="toggle-container">
-          <label for="script-text-to-link">文本转链接</label>
-          <input type="checkbox" id="script-text-to-link" data-script="text-to-link" />
-        </div>
-      </div>
-
-      <div class="setting-item">
-        <div class="toggle-container">
-          <label for="script-link-blank">非同源链接新窗口打开</label>
-          <input type="checkbox" id="script-link-blank" data-script="link-blank" />
-        </div>
-      </div>
-
-      <div class="setting-item">
-        <div class="toggle-container">
-          <label for="script-add-title">添加 title 属性</label>
-          <input type="checkbox" id="script-add-title" data-script="add-title" />
-        </div>
-      </div>
-
-      <div class="setting-item">
-        <div class="toggle-container">
-          <label for="script-doc-generator">文档生成器</label>
-          <input type="checkbox" id="script-doc-generator" data-script="doc-generator" />
-        </div>
-      </div>
-
-      <div class="setting-item">
-        <div class="toggle-container">
-          <label for="script-text-collector">文本收集器</label>
-          <input type="checkbox" id="script-text-collector" data-script="text-collector" />
-        </div>
-      </div>
-
-      <div class="setting-item">
-        <div class="toggle-container">
-          <label for="script-keyboard-pagination">键盘翻页</label>
-          <input type="checkbox" id="script-keyboard-pagination" data-script="keyboard-pagination" />
-        </div>
-      </div>
-
-      <div class="setting-item">
-        <div class="toggle-container">
-          <label for="script-panel-position-manager">面板位置管理</label>
-          <input type="checkbox" id="script-panel-position-manager" data-script="panel-position-manager" />
-        </div>
-      </div>
-
-      <div class="setting-item">
-        <div class="toggle-container">
-          <label for="script-widen-page">页面宽度扩展</label>
-          <input type="checkbox" id="script-widen-page" data-script="widen-page" />
-        </div>
-      </div>
-
-      <div class="setting-item" id="widen-page-width-setting" style="display: none; padding-left: 24px;">
-        <label for="widen-page-width" style="font-size: 12px;">宽度百分比: <span id="widen-page-width-value">80</span>%</label>
-        <input type="range" id="widen-page-width" min="50" max="100" value="80" step="5"
-               style="width: 100%; margin-top: 4px; accent-color: #007bff;" />
-      </div>
-
-      <div class="setting-item">
-        <div class="toggle-container">
-          <label for="script-tab-focus">Tab激活自动聚焦</label>
-          <input type="checkbox" id="script-tab-focus" data-script="tab-focus" />
-        </div>
-      </div>
-
-      <div class="info-box" style="margin-top: 8px;">
-        <small>开关修改后需要刷新页面才能生效</small>
       </div>
     </div>
 

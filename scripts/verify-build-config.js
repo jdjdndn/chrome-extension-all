@@ -35,6 +35,7 @@ const EXCLUDED_DIRS = new Set([
   'coverage',
   '_metadata',
   '.claude', // Claude 配置目录
+  '.vscode', // VS Code 配置目录
 ])
 
 /**
