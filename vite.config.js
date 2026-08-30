@@ -29,7 +29,7 @@ const BUILD_ASSERTIONS = [
   },
   {
     src: 'content/core/script-loader.js',
-    needle: 'return Promise.reject',
+    needle: 'Promise.reject',
     dist: 'content/core-t2-bundle.js',
   },
 ]
@@ -207,17 +207,39 @@ function addWatchFilesRecursive(dir, ctx) {
   }
 }
 
-function copyAllToDist(dist) {
+async function minifyJsFile(src, dest) {
+  await esbuildBuild({
+    entryPoints: [src],
+    bundle: false,
+    format: 'iife',
+    outfile: dest,
+    target: ['chrome100'],
+    sourcemap: false,
+    minify: true,
+  })
+}
+
+async function copyAllToDist(dist) {
   mkdirSync(dist, { recursive: true })
 
   for (const f of STATIC_FILES) {
-    if (existsSync(f)) copyFileSync(resolve(f), resolve(dist, f))
+    if (!existsSync(f)) continue
+    const dest = resolve(dist, f)
+    if (f.endsWith('.js')) {
+      await minifyJsFile(resolve(f), dest)
+    } else {
+      copyFileSync(resolve(f), dest)
+    }
   }
   for (const m of FILE_MAPPINGS) {
     if (existsSync(m.src)) {
       const dest = resolve(dist, m.dest)
       mkdirSync(resolve(dest, '..'), { recursive: true })
-      copyFileSync(resolve(m.src), dest)
+      if (m.src.endsWith('.js')) {
+        await minifyJsFile(resolve(m.src), dest)
+      } else {
+        copyFileSync(resolve(m.src), dest)
+      }
     }
   }
   for (const d of STATIC_DIRS) {
@@ -243,7 +265,7 @@ async function buildContentScripts(dist) {
       outfile,
       target: ['chrome100'],
       sourcemap: false,
-      minify: false,
+      minify: true,
       define: { 'process.env.NODE_ENV': '"production"' },
     })
   }
@@ -318,7 +340,7 @@ function chromeExtensionPlugin() {
 
     async generateBundle() {
       const dist = resolve('dist')
-      copyAllToDist(dist)
+      await copyAllToDist(dist)
       await buildContentScripts(dist)
 
       // 校验构建配置完整性
@@ -407,7 +429,7 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: false,
     target: 'chrome100',
-    minify: false,
+    minify: true,
     sourcemap: false,
     rollupOptions: {
       input: { dummy: DUMMY_ID },
