@@ -28,6 +28,10 @@ if (window.TextCollectorLoaded) {
       this.isDragging = false
       this.dragStart = null
       this.panelStart = null
+      this.isIconDragging = false
+      this.iconDragStart = null
+      this.iconStartPos = null
+      this._isIconDragActive = false
       this.init()
     }
 
@@ -169,6 +173,13 @@ if (window.TextCollectorLoaded) {
 
         .yc-float-btn:active {
           transform: scale(0.95);
+        }
+
+        .yc-float-btn.yc-dragging {
+          transition: none;
+          cursor: grabbing;
+          user-select: none;
+          transform: scale(1.1);
         }
 
         .yc-float-btn-badge {
@@ -538,8 +549,14 @@ if (window.TextCollectorLoaded) {
       const floatBtn = document.getElementById(FLOAT_BTN_ID)
       const panel = document.getElementById(PANEL_ID)
 
-      // 浮动按钮点击
-      floatBtn.addEventListener('click', () => this.togglePanel())
+      // 浮动按钮点击（拖拽时不触发）
+      floatBtn.addEventListener('click', () => {
+        if (this._isIconDragActive) {
+          this._isIconDragActive = false
+          return
+        }
+        this.togglePanel()
+      })
 
       // 模式切换
       container.querySelectorAll('.yc-mode-btn').forEach((btn) => {
@@ -579,6 +596,9 @@ if (window.TextCollectorLoaded) {
 
       // 拖拽功能
       this.bindDragEvents(panel)
+
+      // icon 拖拽功能
+      this.bindIconDragEvents(floatBtn)
 
       // 监听复制事件 (Ctrl+C)
       this._boundHandleCopy = (e) => this.handleCopy(e)
@@ -706,6 +726,86 @@ if (window.TextCollectorLoaded) {
         }
       }
       document.addEventListener('mouseup', this._boundPanelDragEnd)
+    }
+
+    // 绑定 icon 拖拽事件
+    bindIconDragEvents(icon) {
+      const DRAG_THRESHOLD = 5
+
+      this._boundIconDragStart = (e) => {
+        // 忽略徽章点击
+        if (e.target.closest('.yc-float-btn-badge')) {return}
+
+        this.isIconDragging = true
+        this.iconDragStart = { x: e.clientX, y: e.clientY }
+        const rect = icon.getBoundingClientRect()
+        this.iconStartPos = {
+          right: window.innerWidth - rect.right,
+          top: rect.top,
+        }
+        e.preventDefault()
+      }
+
+      this._boundIconDragMove = (e) => {
+        if (!this.isIconDragging) {return}
+
+        const dx = this.iconDragStart.x - e.clientX
+        const dy = e.clientY - this.iconDragStart.y
+
+        // 超过阈值才判定为拖拽
+        if (
+          !this._isIconDragActive &&
+          (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD)
+        ) {
+          this._isIconDragActive = true
+          icon.classList.add('yc-dragging')
+          if (window.PanelPositionManager) {
+            window.PanelPositionManager.notifyDragStart('text-collector')
+          }
+        }
+
+        if (!this._isIconDragActive) {return}
+
+        let newRight = this.iconStartPos.right + dx
+        let newTop = this.iconStartPos.top + dy
+
+        const iconWidth = icon.offsetWidth
+        const iconHeight = icon.offsetHeight
+
+        if (window.PanelPositionManager) {
+          const constrained = window.PanelPositionManager.constrainIconPosition(
+            'text-collector',
+            newRight,
+            newTop,
+            iconWidth,
+            iconHeight
+          )
+          newRight = constrained.right
+          newTop = constrained.top
+        } else {
+          newRight = Math.max(20, Math.min(newRight, window.innerWidth - iconWidth - 20))
+          newTop = Math.max(20, Math.min(newTop, window.innerHeight - iconHeight - 20))
+        }
+
+        icon.style.right = `${newRight}px`
+        icon.style.top = `${newTop}px`
+      }
+
+      this._boundIconDragEnd = () => {
+        if (!this.isIconDragging) {return}
+        this.isIconDragging = false
+
+        if (this._isIconDragActive) {
+          icon.classList.remove('yc-dragging')
+          if (window.PanelPositionManager) {
+            window.PanelPositionManager.notifyIconDragEnd('text-collector', icon)
+          }
+        }
+      }
+
+      icon.addEventListener('mousedown', this._boundIconDragStart)
+      document.addEventListener('mousemove', this._boundIconDragMove)
+      document.addEventListener('mouseup', this._boundIconDragEnd)
     }
 
     // 确保面板在可视区域内
@@ -1132,6 +1232,12 @@ if (window.TextCollectorLoaded) {
       }
       if (this._boundPanelDragEnd) {
         document.removeEventListener('mouseup', this._boundPanelDragEnd)
+      }
+      if (this._boundIconDragMove) {
+        document.removeEventListener('mousemove', this._boundIconDragMove)
+      }
+      if (this._boundIconDragEnd) {
+        document.removeEventListener('mouseup', this._boundIconDragEnd)
       }
       if (this._resizeHandler) {
         window.removeEventListener('resize', this._resizeHandler)

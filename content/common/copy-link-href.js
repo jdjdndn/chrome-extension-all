@@ -95,13 +95,25 @@
       return
     }
 
+    // 特殊处理：选区只有单个链接且文字与 href 一致，直接复制 href
+    if (nodes.length === 1 && nodes[0].type === 'link') {
+      const link = nodes[0].link
+      if (link.textContent.trim() === link.href) {
+        e.preventDefault()
+        e.clipboardData.setData('text/plain', link.href)
+        return
+      }
+    }
+
     // 按 DOM 顺序拼接输出
     let text = ''
     let hasContent = false
     for (const item of nodes) {
       if (item.type === 'text') {
         text += item.text
-        if (item.text.trim().length > 0) {hasContent = true}
+        if (item.text.trim().length > 0) {
+          hasContent = true
+        }
       } else {
         const linkText = item.link.textContent
         text += hasContent ? item.link.href : `${linkText}：${item.link.href}`

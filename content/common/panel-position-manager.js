@@ -87,6 +87,7 @@ if (!window.PanelPositionManager) {
       customPositions: {},
       collapsedStates: {},
       userPanelPositions: {}, // 存储用户自定义的 panel 位置
+      userIconPositions: {}, // 存储用户自定义的 icon 位置
       isPositionReady: false,
       isCalculating: false,
       positionsFixed: false,
@@ -289,6 +290,16 @@ if (!window.PanelPositionManager) {
         // 第二步：计算 icon 位置（松散排列在右侧，避开 header + 智能避让）
         let iconTop = startTop
         for (const c of visibleComponents) {
+          // 优先使用用户自定义的 icon 位置
+          if (this.userIconPositions[c.id]) {
+            const userPos = this.userIconPositions[c.id]
+            c._iconTop = userPos.top
+            c._iconRight = userPos.right
+            c._iconOnLeftSide = false
+            const actualH = c.iconEl ? c.iconEl.offsetHeight || iconHeight : iconHeight
+            iconTop = Math.max(iconTop, userPos.top + actualH + iconGap)
+            continue
+          }
           // 使用智能避让寻找最佳位置
           if (this.config.enableSmartAvoidance) {
             const bestPos = this.findBestIconPosition(iconTop, iconRight, c.iconEl)
@@ -2396,19 +2407,88 @@ if (!window.PanelPositionManager) {
         }
       },
 
+      // icon 拖拽结束处理
+      notifyIconDragEnd(id, iconEl) {
+        const c = this.components.find((c) => c.id === id)
+        if (c && iconEl) {
+          const right = parseInt(iconEl.style.right, 10) || 20
+          const top = parseInt(iconEl.style.top, 10) || 20
+          const width = iconEl.offsetWidth
+          const height = iconEl.offsetHeight
+
+          // 保存用户拖拽后的位置
+          this.userIconPositions[id] = { right, top }
+
+          // 更新元素上的位置信息
+          this.recordElementBounds(iconEl, 'icon', id, { right, top, width, height })
+
+          this.saveToStorage()
+
+          // 触发重新计算，让面板和其他 icon 自动调整位置避免重叠
+          this.positionsFixed = false
+          this.scheduleCalculate()
+
+          logger.debug(` icon 拖拽结束: ${id}, 位置已保存`)
+        }
+      },
+
       // 约束面板位置（用于拖拽时的边界检查）
       constrainPanelPosition(id, right, top, width, height) {
         const vh = window.innerHeight
         const vw = window.innerWidth
-        const { edgeMargin, iconWidth, panelAvoidGap } = this.config
+        const { edgeMargin, panelAvoidGap } = this.config
 
-        // icon 在左侧时，panel 不需要避开右侧 icon 区域
-        const scrollbarWidth = this.getScrollbarWidth()
-        const minRight = this.iconOnLeftSide
-          ? edgeMargin + scrollbarWidth
-          : edgeMargin + scrollbarWidth + iconWidth + panelAvoidGap
+        // 视口边界约束
+        const constrainedRight = Math.max(edgeMargin, Math.min(right, vw - width - edgeMargin))
+        let constrainedTop = Math.max(edgeMargin, Math.min(top, vh - height - edgeMargin))
+
+        // 检查是否与任何 icon 重叠，如果是则推开 panel
+        const panelLeft = vw - constrainedRight - width
+        const panelRightEdge = vw - constrainedRight
+        const panelBottom = constrainedTop + height
+
+        for (const c of this.components) {
+          if (c.id === id || !c.iconEl) {continue}
+          const iconRect = c.iconEl.getBoundingClientRect()
+          if (iconRect.width === 0 || iconRect.height === 0) {continue}
+
+          const iconLeft = iconRect.left
+          const iconRightEdge = iconRect.right
+          const iconTop = iconRect.top
+          const iconBottom = iconRect.bottom
+
+          // 检测水平和垂直方向是否重叠
+          const hOverlap =
+            panelLeft < iconRightEdge + panelAvoidGap && panelRightEdge > iconLeft - panelAvoidGap
+          const vOverlap =
+            constrainedTop < iconBottom + panelAvoidGap && panelBottom > iconTop - panelAvoidGap
+
+          if (hOverlap && vOverlap) {
+            // 将 panel 向下推到 icon 下方
+            const pushBelow = iconBottom + panelAvoidGap
+            if (pushBelow + height <= vh - edgeMargin) {
+              constrainedTop = pushBelow
+            } else {
+              // 下方放不下，推到 icon 上方
+              const pushAbove = iconTop - height - panelAvoidGap
+              if (pushAbove >= edgeMargin) {
+                constrainedTop = pushAbove
+              }
+            }
+          }
+        }
+
+        return { right: constrainedRight, top: constrainedTop }
+      },
+
+      // 约束 icon 位置（用于拖拽时的边界检查）
+      constrainIconPosition(id, right, top, width, height) {
+        const vh = window.innerHeight
+        const vw = window.innerWidth
+        const { edgeMargin } = this.config
+
         const maxRight = vw - width - edgeMargin
-        const constrainedRight = Math.max(minRight, Math.min(right, maxRight))
+        const constrainedRight = Math.max(edgeMargin, Math.min(right, maxRight))
 
         const minTop = edgeMargin
         const maxTop = vh - height - edgeMargin
@@ -2432,6 +2512,7 @@ if (!window.PanelPositionManager) {
               customPositions: this.customPositions,
               collapsedStates: this.collapsedStates,
               userPanelPositions: this.userPanelPositions,
+              userIconPositions: this.userIconPositions,
             })
           )
         } catch (e) {
@@ -2457,6 +2538,7 @@ if (!window.PanelPositionManager) {
             this.customPositions = data.customPositions || {}
             this.collapsedStates = data.collapsedStates || {}
             this.userPanelPositions = data.userPanelPositions || {}
+            this.userIconPositions = data.userIconPositions || {}
           }
         } catch (e) {
           // SecurityError: 沙盒环境或跨域限制
