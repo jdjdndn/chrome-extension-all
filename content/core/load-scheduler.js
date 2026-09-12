@@ -434,23 +434,38 @@
   }
 
   /**
-   * 加载 core-t1-bundle.js（资源加速器核心）
-   * 在浏览器空闲时立即加载
+   * 加载 core-t1a-bundle.js（资源拦截基础设施：CDN映射+DOM监听）
+   * 在浏览器空闲时首先加载，体积小、初始化快
    */
-  function loadCoreT1Bundle() {
-    if (state.loaded.has('core-t1-bundle')) {
-      log('core-t1-bundle 已加载')
+  function loadCoreT1aBundle() {
+    if (state.loaded.has('core-t1a-bundle')) {
+      log('core-t1a-bundle 已加载')
       return Promise.resolve()
     }
 
-    state.loaded.add('core-t1-bundle')
-    log('加载 core-t1-bundle（资源加速器核心）')
-    return injectScript('content/core-t1-bundle.js')
+    state.loaded.add('core-t1a-bundle')
+    log('加载 core-t1a-bundle（资源拦截基础设施）')
+    return injectScript('content/core-t1a-bundle.js')
+  }
+
+  /**
+   * 加载 core-t1b-bundle.js（资源加速器主模块）
+   * 在 core-t1a 完成后加载，包含资源加速器等重型模块
+   */
+  function loadCoreT1bBundle() {
+    if (state.loaded.has('core-t1b-bundle')) {
+      log('core-t1b-bundle 已加载')
+      return Promise.resolve()
+    }
+
+    state.loaded.add('core-t1b-bundle')
+    log('加载 core-t1b-bundle（资源加速器主模块）')
+    return injectScript('content/core-t1b-bundle.js')
   }
 
   /**
    * 加载 core-t2-bundle.js（基础设施模块）
-   * 在 core-t1 加载完成后加载
+   * 在 core-t1b 加载完成后加载
    */
   function loadCoreT2Bundle() {
     if (state.loaded.has('core-t2-bundle')) {
@@ -484,22 +499,28 @@
    * 由 critical.js 入口调用
    */
   function triggerLazyLoad() {
-    if (state.loaded.has('core-t1-bundle')) {
+    if (state.loaded.has('core-t1a-bundle')) {
       log('分层 bundle 已在队列中')
       return
     }
 
     log('注册分层 bundle 懒加载任务')
 
-    // Tier 1: 立即加载（资源加速器核心，优先级最高）
-    registerIdle('core-t1-bundle', loadCoreT1Bundle, {
+    // Tier 1a: 立即加载（资源拦截基础设施，体积小、优先级最高）
+    registerIdle('core-t1a-bundle', loadCoreT1aBundle, {
       priority: 20,
     })
 
-    // Tier 2: 空闲加载（基础设施，依赖 T1）
+    // Tier 1b: 空闲加载（资源加速器主模块，依赖 T1a）
+    registerIdle('core-t1b-bundle', loadCoreT1bBundle, {
+      priority: 19,
+      dependencies: ['core-t1a-bundle'],
+    })
+
+    // Tier 2: 空闲加载（基础设施，依赖 T1b）
     registerIdle('core-t2-bundle', loadCoreT2Bundle, {
       priority: 10,
-      dependencies: ['core-t1-bundle'],
+      dependencies: ['core-t1b-bundle'],
     })
 
     // Tier 3: 延迟加载（辅助功能，依赖 T2）
@@ -520,7 +541,8 @@
     registerIdle,
     registerDeferred,
     triggerLazyLoad,
-    loadCoreT1Bundle,
+    loadCoreT1aBundle,
+    loadCoreT1bBundle,
     loadCoreT2Bundle,
     loadCoreT3Bundle,
     isLoaded,

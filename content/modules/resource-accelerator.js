@@ -52,23 +52,6 @@
     minScoreThreshold: 0.1,
   }
 
-  // ========== 缓存预热配置 ==========
-  const CACHE_WARMUP_CONFIG = {
-    // 高频CDN资源列表（预热用）
-    highFrequencyCDNs: [
-      'cdn.jsdelivr.net',
-      'unpkg.com',
-      'cdnjs.cloudflare.com',
-      'fonts.googleapis.com',
-    ],
-    // 预热最大条目数
-    maxWarmupEntries: 50,
-    // 预热间隔（毫秒）
-    warmupInterval: 5 * 60 * 1000, // 5分钟
-    // 是否启用预热
-    enabled: true,
-  }
-
   // ========== 缓存统计配置 ==========
   /**
    * 错误级别枚举
@@ -681,9 +664,6 @@
       // setTimeout 降级路径的 timeoutId 存储（用于销毁时清理）
       this._pendingTimeoutIds = []
 
-      // 缓存应用控制标志
-      this._applyCacheAborted = false
-
       // 原始方法备份
       this._originalProcessScript = null
       this._originalProcessLink = null
@@ -888,20 +868,10 @@
           await this.loadCache()
           this._measure('loadCache')
 
-          // 4. 先用缓存替换页面中已存在的资源
-          this._mark('applyCacheToPage')
-          await this._applyCacheToPage()
-          this._measure('applyCacheToPage')
-
-          // 5. 加载累计统计
+          // 4. 加载累计统计
           this._mark('loadCumulativeStats')
           await this._loadCumulativeStats()
           this._measure('loadCumulativeStats')
-
-          // 6. 启动缓存预热（利用空闲时间预热高频CDN资源）
-          if (CACHE_WARMUP_CONFIG.enabled) {
-            this._startCacheWarmup()
-          }
 
           console.log(`${LOG_PREFIX} 空闲资源加载完成`, {
             jsCacheCount:
@@ -928,162 +898,6 @@
       }
     }
 
-    /**
-     * 启动缓存预热
-     * 利用浏览器空闲时间预热高频CDN资源
-     */
-    _startCacheWarmup() {
-      if (!CACHE_WARMUP_CONFIG.enabled) {
-        return
-      }
-
-      // 收集页面中需要预热的高频CDN资源
-      const warmupTargets = this._collectWarmupTargets()
-      if (warmupTargets.length === 0) {
-        return
-      }
-
-      // 限制预热数量
-      const targetsToWarmup = warmupTargets.slice(0, CACHE_WARMUP_CONFIG.maxWarmupEntries)
-
-      console.log(`${LOG_PREFIX} 缓存预热: 发现 ${targetsToWarmup.length} 个高频CDN资源`)
-
-      // 使用 requestIdleCallback 逐个预热
-      const warmupNext = (index) => {
-        if (this._destroyed) {
-          console.log(`${LOG_PREFIX} 缓存预热已中止（模块已销毁）`)
-          return
-        }
-        if (index >= targetsToWarmup.length) {
-          console.log(`${LOG_PREFIX} 缓存预热完成`)
-          return
-        }
-
-        const target = targetsToWarmup[index]
-
-        // 检查是否已缓存
-        const cachedEntry = this._getCacheEntry(target.type, target.url)
-        if (cachedEntry) {
-          // 已缓存，跳过
-          warmupNext(index + 1)
-          return
-        }
-
-        // 使用 requestIdleCallback 预热
-        if (typeof requestIdleCallback !== 'undefined') {
-          const idleId = requestIdleCallback(
-            () => {
-              this._warmupSingleResource(target)
-                .then(() => {
-                  warmupNext(index + 1)
-                })
-                .catch(() => {
-                  warmupNext(index + 1)
-                })
-            },
-            { timeout: 1000 }
-          )
-          this._idleCallbackIds.push(idleId)
-        } else {
-          // 降级：使用 setTimeout
-          const timeoutId = setTimeout(() => {
-            this._removePendingTimeout(timeoutId)
-            this._warmupSingleResource(target)
-              .then(() => {
-                warmupNext(index + 1)
-              })
-              .catch(() => {
-                warmupNext(index + 1)
-              })
-          }, 100)
-          this._pendingTimeoutIds.push(timeoutId)
-        }
-      }
-
-      // 开始预热
-      warmupNext(0)
-    }
-
-    /**
-     * 收集预热目标
-     * @returns {Array} 预热目标列表
-     */
-    _collectWarmupTargets() {
-      const targets = []
-
-      // 扫描页面中的 script 和 link 标签
-      const scripts = document.querySelectorAll('script[src]')
-      const links = document.querySelectorAll('link[rel="stylesheet"]')
-
-      // 收集 JS 资源
-      scripts.forEach((script) => {
-        const url = script.src
-        if (this._isHighFrequencyCDN(url)) {
-          targets.push({ type: 'js', url })
-        }
-      })
-
-      // 收集 CSS 资源
-      links.forEach((link) => {
-        const url = link.href
-        if (this._isHighFrequencyCDN(url)) {
-          targets.push({ type: 'css', url })
-        }
-      })
-
-      // 收集字体资源
-      const fontLinks = document.querySelectorAll('link[rel="preload"][as="font"]')
-      fontLinks.forEach((link) => {
-        const url = link.href
-        if (this._isHighFrequencyCDN(url)) {
-          targets.push({ type: 'fonts', url })
-        }
-      })
-
-      return targets
-    }
-
-    /**
-     * 检查是否为高频CDN资源
-     * @param {string} url - 资源URL
-     * @returns {boolean}
-     */
-    _isHighFrequencyCDN(url) {
-      if (!url) {
-        return false
-      }
-
-      try {
-        const urlObj = new URL(url)
-        return CACHE_WARMUP_CONFIG.highFrequencyCDNs.some((cdn) => urlObj.hostname.includes(cdn))
-      } catch {
-        return false
-      }
-    }
-
-    /**
-     * 预热单个资源
-     * @param {Object} target - 预热目标
-     * @returns {Promise}
-     */
-    async _warmupSingleResource(target) {
-      try {
-        // 使用 fetch 预热（不处理响应，仅触发网络请求）
-        const response = await fetch(target.url, {
-          method: 'HEAD', // 使用 HEAD 方法减少带宽消耗
-          cache: 'force-cache', // 强制使用缓存
-        })
-
-        if (response.ok) {
-          // 预热成功，更新缓存统计
-          this._cacheStats.warmups++
-          console.log(`${LOG_PREFIX} 缓存预热成功: ${target.url}`)
-        }
-      } catch (error) {
-        // 预热失败，静默处理
-        console.log(`${LOG_PREFIX} 缓存预热失败: ${target.url}`, error.message)
-      }
-    }
     /**
      * 同步配置到子模块（不触发保存）
      * 用于配置从 storage 加载完成后，更新已用默认配置初始化的子模块
@@ -1953,87 +1767,10 @@
     }
 
     /**
-     * 应用缓存到页面已存在的资源
-     * 优化：使用分块处理，每处理一批让出主线程，减少 INP
-     */
-    _applyCacheToPage() {
-      if (!this.config.cacheEnabled) {
-        return
-      }
-
-      // 重置中止标志
-      this._applyCacheAborted = false
-
-      const CHUNK_SIZE = 10
-
-      // 分块处理函数
-      const processInChunks = async (items, processor) => {
-        for (let i = 0; i < items.length; i += CHUNK_SIZE) {
-          // 检查中止标志
-          if (this._applyCacheAborted) {
-            console.log(`${LOG_PREFIX} 缓存应用已中止`)
-            return
-          }
-          const chunk = items.slice(i, i + CHUNK_SIZE)
-          chunk.forEach(processor)
-          // 让出主线程 - 使用 requestIdleCallback 优化 INP
-          await new Promise((resolve) => {
-            if (typeof requestIdleCallback !== 'undefined') {
-              requestIdleCallback(resolve, { timeout: 100 })
-            } else {
-              setTimeout(resolve, 16) // 降级：~60fps
-            }
-          })
-        }
-      }
-
-      // 处理已存在的script标签
-      const jsCacheStats = this._getCacheSizeStats()
-      if (this.config.jsReplace && jsCacheStats.total > 0) {
-        const scripts = document.querySelectorAll('script[src]')
-        processInChunks(Array.from(scripts), (script) => {
-          const originalUrl = script.src
-          const cachedEntry = this._getCacheEntry('js', originalUrl)
-          if (cachedEntry) {
-            const cachedUrl = cachedEntry.url || cachedEntry
-            if (originalUrl !== cachedUrl) {
-              script.src = cachedUrl
-              this.stats.js.cached++
-              this._recordCacheAccess('js', originalUrl, true)
-              console.log(`${LOG_PREFIX} 页面缓存命中(JS): ${cachedUrl}`)
-            }
-          } else {
-            this._recordCacheAccess('js', originalUrl, false)
-          }
-        })
-      }
-
-      // 处理已存在的link标签
-      const fontCacheStats = this._getCacheSizeStats()
-      if (this.config.fontReplace && fontCacheStats.total > 0) {
-        const links = document.querySelectorAll('link[rel="stylesheet"]')
-        processInChunks(Array.from(links), (link) => {
-          const originalUrl = link.href
-          const cachedEntry = this._getCacheEntry('fonts', originalUrl)
-          if (cachedEntry) {
-            const cachedUrl = cachedEntry.url || cachedEntry
-            if (originalUrl !== cachedUrl) {
-              link.href = cachedUrl
-              this.stats.fonts.cached++
-              this._recordCacheAccess('fonts', originalUrl, true)
-              console.log(`${LOG_PREFIX} 页面缓存命中(字体): ${cachedUrl}`)
-            }
-          } else {
-            this._recordCacheAccess('fonts', originalUrl, false)
-          }
-        })
-      }
-    }
-
-    /**
      * 初始化子模块
-     * 如果检测到页面已有优化，会使用空对象模式跳过相应模块
-     * 如果模块初始化失败，会执行降级操作
+     * 使用 requestIdleCallback 分帧调度，避免阻塞主线程。
+     * 每个模块在浏览器空闲时初始化，初始化完成后立即应用 wrap 逻辑。
+     * initModules() 为同步入口，内部触发异步调度后立即返回。
      */
     initModules() {
       // 检查当前域名是否被排除
@@ -2042,181 +1779,160 @@
         return
       }
 
+      // 异步分帧初始化，不阻塞当前调用
+      this._initModulesAsync()
+    }
+
+    /**
+     * 异步分帧初始化子模块
+     * 每个模块通过 requestIdleCallback 调度，避免一帧内创建所有模块阻塞主线程
+     */
+    _initModulesAsync() {
       const excludePatterns = this._buildExcludePatterns()
 
-      // JS替换模块
-      if (this.config.jsReplace && window.JSReplacer) {
-        // 检查是否应该跳过
-        if (this._skippedOptimizations.jsReplace) {
-          this.modules.jsReplacer = NOOP_MODULE
-          console.log(`${LOG_PREFIX} 跳过JS替换（页面已使用CDN）`)
-        } else {
-          try {
-            this.modules.jsReplacer = new window.JSReplacer({
-              enabled: this.config.enabled,
-              excludePatterns,
-            })
-            this.modules.jsReplacer.init()
-            this._wrapJSReplacer()
-            // 注册错误处理器
-            this._registerModuleErrorHandler('jsReplacer')
-          } catch (error) {
-            this.errorHandler.handle(error, {
-              module: 'jsReplacer',
-              operation: 'init',
-              level: ErrorLevel.SEVERE,
-              data: { config: this.config.jsReplace },
-            })
-            this._degradeModule('jsReplacer', '初始化失败: ' + error.message)
+      // yieldHelper: 在浏览器空闲时执行下一个任务
+      const yieldToIdle = () =>
+        new Promise((resolve) => {
+          if (typeof requestIdleCallback !== 'undefined') {
+            requestIdleCallback(resolve, { timeout: 500 })
+          } else {
+            setTimeout(resolve, 16)
           }
-        }
-      }
+        })
 
-      // 字体替换模块
-      if (this.config.fontReplace && window.FontReplacer) {
-        // 检查是否应该跳过
-        if (this._skippedOptimizations.fontReplace) {
-          this.modules.fontReplacer = NOOP_MODULE
-          console.log(`${LOG_PREFIX} 跳过字体替换（页面已优化字体）`)
-        } else {
-          try {
-            this.modules.fontReplacer = new window.FontReplacer({
-              enabled: this.config.enabled,
-              excludePatterns,
-            })
-            this.modules.fontReplacer.init()
-            this._wrapFontReplacer()
-            // 注册错误处理器
-            this._registerModuleErrorHandler('fontReplacer')
-          } catch (error) {
-            this.errorHandler.handle(error, {
-              module: 'fontReplacer',
-              operation: 'init',
-              level: ErrorLevel.SEVERE,
-              data: { config: this.config.fontReplace },
-            })
-            this._degradeModule('fontReplacer', '初始化失败: ' + error.message)
-          }
+      // 初始化单个模块的通用逻辑
+      const initModule = async (name, shouldSkip, skipMsg, factory, wrapFn) => {
+        if (shouldSkip) {
+          this.modules[name] = NOOP_MODULE
+          console.log(`${LOG_PREFIX} 跳过${name}（${skipMsg}）`)
+          return
         }
-      }
-
-      // CSS加速模块
-      if (this.config.cssReplace && window.CSSAccelerator) {
-        // 检查是否应该跳过
-        if (this._skippedOptimizations.cssReplace) {
-          this.modules.cssAccelerator = NOOP_MODULE
-          console.log(`${LOG_PREFIX} 跳过CSS加速（页面已使用CDN）`)
-        } else {
-          try {
-            this.modules.cssAccelerator = new window.CSSAccelerator({
-              enabled: this.config.enabled,
-              excludePatterns,
-            })
-            this.modules.cssAccelerator.init()
-            this._wrapCSSAccelerator()
-            // 注册错误处理器
-            this._registerModuleErrorHandler('cssAccelerator')
-          } catch (error) {
-            this.errorHandler.handle(error, {
-              module: 'cssAccelerator',
-              operation: 'init',
-              level: ErrorLevel.SEVERE,
-              data: { config: this.config.cssReplace },
-            })
-            this._degradeModule('cssAccelerator', '初始化失败: ' + error.message)
-          }
+        if (!factory) {
+          return
         }
-      }
-
-      // 图片优化模块
-      if ((this.config.imageLazyLoad || this.config.imageCompress) && window.ImageOptimizer) {
-        // 检查是否应该跳过懒加载（压缩功能不受影响）
-        if (this._skippedOptimizations.imageLazyLoad && !this.config.imageCompress) {
-          this.modules.imageOptimizer = NOOP_MODULE
-          console.log(`${LOG_PREFIX} 跳过图片优化（页面已有懒加载）`)
-        } else {
-          try {
-            this.modules.imageOptimizer = new window.ImageOptimizer({
-              // 如果检测到页面已有懒加载，禁用懒加载但保留压缩功能
-              lazyLoadEnabled:
-                this.config.imageLazyLoad && !this._skippedOptimizations.imageLazyLoad,
-              lazyLoadThreshold: this.config.lazyLoadThreshold,
-              compressEnabled: this.config.imageCompress,
-              compressQuality: this.config.imageQuality,
-              compressMinSize: this.config.imageMinSize,
-            })
-            this.modules.imageOptimizer.init()
-            // 注册错误处理器
-            this._registerModuleErrorHandler('imageOptimizer')
-          } catch (error) {
-            this.errorHandler.handle(error, {
-              module: 'imageOptimizer',
-              operation: 'init',
-              level: ErrorLevel.SEVERE,
-              data: {
-                config: {
-                  lazyLoad: this.config.imageLazyLoad,
-                  compress: this.config.imageCompress,
-                },
-              },
-            })
-            this._degradeModule('imageOptimizer', '初始化失败: ' + error.message)
-          }
-        }
-      }
-
-      // 资源预加载模块
-      if (this.config.preloadEnabled && window.ResourcePreloader) {
-        // 检查是否应该跳过
-        if (this._skippedOptimizations.preload) {
-          this.modules.preloader = NOOP_MODULE
-          console.log(`${LOG_PREFIX} 跳过资源预加载（页面已有预加载）`)
-        } else {
-          try {
-            this.modules.preloader = new window.ResourcePreloader({
-              enabled: this.config.enabled,
-              preloadJS: this.config.jsReplace,
-              preloadCSS: this.config.cssReplace,
-              preloadFonts: this.config.fontReplace,
-              excludePatterns,
-            })
-            this.modules.preloader.init()
-            // 注册错误处理器
-            this._registerModuleErrorHandler('preloader')
-          } catch (error) {
-            this.errorHandler.handle(error, {
-              module: 'preloader',
-              operation: 'init',
-              level: ErrorLevel.MINOR, // 预加载失败不影响核心功能
-              data: { config: this.config.preloadEnabled },
-            })
-            this._degradeModule('preloader', '初始化失败: ' + error.message)
-          }
-        }
-      }
-
-      // 资源去重模块（始终启用，不受检测影响）
-      if (this.config.dedupEnabled && window.ResourceDeduplicator) {
         try {
-          this.modules.deduplicator = new window.ResourceDeduplicator({
-            enabled: this.config.enabled,
-            dedupJS: this.config.jsReplace,
-            dedupCSS: this.config.cssReplace,
-            excludePatterns,
-          })
-          this.modules.deduplicator.init()
-          // 注册错误处理器
-          this._registerModuleErrorHandler('deduplicator')
+          this.modules[name] = factory()
+          this.modules[name].init()
+          this._registerModuleErrorHandler(name)
+          // wrap 必须在 init 之后调用（依赖模块实例的方法）
+          if (wrapFn) {
+            wrapFn()
+          }
         } catch (error) {
           this.errorHandler.handle(error, {
-            module: 'deduplicator',
+            module: name,
             operation: 'init',
-            level: ErrorLevel.MINOR, // 去重失败不影响核心功能
-            data: { config: this.config.dedupEnabled },
+            level: ErrorLevel.SEVERE,
           })
-          this._degradeModule('deduplicator', '初始化失败: ' + error.message)
+          this._degradeModule(name, '初始化失败: ' + error.message)
         }
       }
+
+      // 定义模块初始化任务（按优先级排序）
+      const tasks = [
+        {
+          name: 'jsReplacer',
+          skip: this._skippedOptimizations.jsReplace,
+          skipMsg: '页面已使用CDN',
+          factory:
+            this.config.jsReplace && window.JSReplacer
+              ? () =>
+                  new window.JSReplacer({
+                    enabled: this.config.enabled,
+                    excludePatterns,
+                  })
+              : null,
+          wrap: () => this._wrapJSReplacer(),
+        },
+        {
+          name: 'fontReplacer',
+          skip: this._skippedOptimizations.fontReplace,
+          skipMsg: '页面已优化字体',
+          factory:
+            this.config.fontReplace && window.FontReplacer
+              ? () =>
+                  new window.FontReplacer({
+                    enabled: this.config.enabled,
+                    excludePatterns,
+                  })
+              : null,
+          wrap: () => this._wrapFontReplacer(),
+        },
+        {
+          name: 'cssAccelerator',
+          skip: this._skippedOptimizations.cssReplace,
+          skipMsg: '页面已使用CDN',
+          factory:
+            this.config.cssReplace && window.CSSAccelerator
+              ? () =>
+                  new window.CSSAccelerator({
+                    enabled: this.config.enabled,
+                    excludePatterns,
+                  })
+              : null,
+          wrap: () => this._wrapCSSAccelerator(),
+        },
+        {
+          name: 'imageOptimizer',
+          skip: this._skippedOptimizations.imageLazyLoad && !this.config.imageCompress,
+          skipMsg: '页面已有懒加载',
+          factory:
+            (this.config.imageLazyLoad || this.config.imageCompress) && window.ImageOptimizer
+              ? () =>
+                  new window.ImageOptimizer({
+                    lazyLoadEnabled:
+                      this.config.imageLazyLoad && !this._skippedOptimizations.imageLazyLoad,
+                    lazyLoadThreshold: this.config.lazyLoadThreshold,
+                    compressEnabled: this.config.imageCompress,
+                    compressQuality: this.config.imageQuality,
+                    compressMinSize: this.config.imageMinSize,
+                  })
+              : null,
+          wrap: null,
+        },
+        {
+          name: 'preloader',
+          skip: this._skippedOptimizations.preload,
+          skipMsg: '页面已有预加载',
+          factory:
+            this.config.preloadEnabled && window.ResourcePreloader
+              ? () =>
+                  new window.ResourcePreloader({
+                    enabled: this.config.enabled,
+                    preloadJS: this.config.jsReplace,
+                    preloadCSS: this.config.cssReplace,
+                    preloadFonts: this.config.fontReplace,
+                    excludePatterns,
+                  })
+              : null,
+          wrap: null,
+        },
+        {
+          name: 'deduplicator',
+          skip: false,
+          skipMsg: '',
+          factory:
+            this.config.dedupEnabled && window.ResourceDeduplicator
+              ? () =>
+                  new window.ResourceDeduplicator({
+                    enabled: this.config.enabled,
+                    dedupJS: this.config.jsReplace,
+                    dedupCSS: this.config.cssReplace,
+                    excludePatterns,
+                  })
+              : null,
+          wrap: null,
+        },
+      ]
+
+      // 逐个在空闲时初始化
+      ;(async () => {
+        for (const task of tasks) {
+          await yieldToIdle()
+          await initModule(task.name, task.skip, task.skipMsg, task.factory, task.wrap)
+        }
+        console.log(`${LOG_PREFIX} 子模块分帧初始化完成`)
+      })()
     }
 
     /**
@@ -3286,9 +3002,6 @@
 
       // 设置停止标志，防止递归调度继续执行
       this._healthProbeStopped = true
-
-      // 设置缓存应用中止标志
-      this._applyCacheAborted = true
 
       // 清理所有 requestIdleCallback
       if (this._idleCallbackIds && this._idleCallbackIds.length > 0) {

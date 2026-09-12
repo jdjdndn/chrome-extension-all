@@ -10,18 +10,25 @@
       "description": "最小化关键模块，document_start 立即加载"
     },
     {
-      "name": "core-t1",
-      "entry": "content/entries/core-t1.js",
-      "outfile": "content/core-t1-bundle.js",
+      "name": "core-t1a",
+      "entry": "content/entries/core-t1a.js",
+      "outfile": "content/core-t1a-bundle.js",
       "tier": 1,
-      "description": "资源加速器核心，浏览器空闲时加载"
+      "description": "资源拦截基础设施（CDN映射+DOM监听），浏览器空闲时首先加载"
+    },
+    {
+      "name": "core-t1b",
+      "entry": "content/entries/core-t1b.js",
+      "outfile": "content/core-t1b-bundle.js",
+      "tier": 1,
+      "description": "资源加速器主模块，t1a完成后加载"
     },
     {
       "name": "core-t2",
       "entry": "content/entries/core-t2.js",
       "outfile": "content/core-t2-bundle.js",
       "tier": 2,
-      "description": "基础设施模块，core-t1 完成后加载"
+      "description": "基础设施模块，core-t1b 完成后加载"
     },
     {
       "name": "core-t3",
@@ -154,7 +161,8 @@
     "content/critical-bundle.js",
     "content/core-t3-bundle.js",
     "content/core-t2-bundle.js",
-    "content/core-t1-bundle.js",
+    "content/core-t1a-bundle.js",
+    "content/core-t1b-bundle.js",
     "content/core-bundle.js",
     "content/common-bundle.js",
     "background-csp-bypass.js",

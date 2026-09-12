@@ -152,7 +152,8 @@ const _domainScriptMap = {
 
 // 所有页面都需要的基础脚本
 const _baseScripts = [
-  'content/core-t1-bundle.js',
+  'content/core-t1a-bundle.js',
+  'content/core-t1b-bundle.js',
   'content/core-t2-bundle.js',
   'content/core-t3-bundle.js',
   'content/common-bundle.js',
