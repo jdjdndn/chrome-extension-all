@@ -121,13 +121,13 @@
 
         if (window.DOMWatcher) {
           this.modules.domWatcher = new window.DOMWatcher({
-            onElementAdded: (element) => {
+            onElementAdded: () => {
               // 处理新元素添加
             },
-            onElementRemoved: (element) => {
+            onElementRemoved: () => {
               // 处理元素移除
             },
-            onAttributeChanged: (element, attr, oldVal, newVal) => {
+            onAttributeChanged: () => {
               // 处理属性变化
             },
           })
@@ -141,10 +141,10 @@
           this.modules.incrementalUpdater = new window.IncrementalUpdater({
             batchSize: 10,
             frameDelay: 1,
-            onUpdate: (batch) => {
+            onUpdate: () => {
               // 批量更新完成
             },
-            onComplete: (stats) => {
+            onComplete: () => {
               // 所有更新完成
             },
           })

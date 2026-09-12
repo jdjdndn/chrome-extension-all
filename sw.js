@@ -4,6 +4,7 @@
  */
 
 const CACHE_NAME = 'resource-accelerator-v1'
+// eslint-disable-next-line no-unused-vars
 const OFFLINE_CACHE_KEY = 'offlineCacheConfig'
 
 // 默认离线缓存配置
@@ -112,10 +113,11 @@ async function handleFetch(request) {
       }
 
     case 'stale-while-revalidate':
-    default:
+    default: {
       // 立即返回缓存，同时更新缓存
       const fetchPromise = fetchAndCache(request).catch(() => cached)
       return cached || fetchPromise
+    }
   }
 }
 

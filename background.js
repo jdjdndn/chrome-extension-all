@@ -1305,7 +1305,7 @@ async function injectAllScriptsForTab(tabId, tabUrl) {
     if (baseScriptsToInject.includes('content/common-bundle.js')) {
       try {
         const bridge = await chrome.storage.local.get(['scriptSwitches', 'widenPageWidth'])
-        if (bridge.scriptSwitches || bridge.widenPageWidth != null) {
+        if (bridge.scriptSwitches || bridge.widenPageWidth !== null) {
           await chrome.scripting.executeScript({
             target: { tabId },
             world: 'ISOLATED',
@@ -1314,10 +1314,12 @@ async function injectAllScriptsForTab(tabId, tabUrl) {
                 if (b.scriptSwitches) {
                   localStorage.setItem('scriptSwitches', JSON.stringify(b.scriptSwitches))
                 }
-                if (b.widenPageWidth != null) {
+                if (b.widenPageWidth !== null) {
                   localStorage.setItem('widenPageWidth', String(b.widenPageWidth))
                 }
-              } catch {}
+              } catch {
+                /* empty */
+              }
             },
             args: [bridge],
           })
@@ -1523,7 +1525,7 @@ async function handleMessage(message, sender, sendResponse) {
         }
         break
 
-      case 'GET_EXTENSION_INFO':
+      case 'GET_EXTENSION_INFO': {
         const currentDomainForInfo = await getCurrentTabDomain()
         safeSendResponse({
           name: chrome.runtime.getManifest().name,
@@ -1534,6 +1536,7 @@ async function handleMessage(message, sender, sendResponse) {
           blockedResponseDomains: getBlockedResponseDomainsForDomain(currentDomainForInfo),
         })
         break
+      }
 
       case 'PERFORM_API_CALL':
         // Get current tab to check if request should be blocked based on current domain
@@ -1609,7 +1612,7 @@ async function handleMessage(message, sender, sendResponse) {
         safeSendResponse({ enabled: extensionState.isDebugMode })
         break
 
-      case 'ADD_BLOCKED_DOMAIN':
+      case 'ADD_BLOCKED_DOMAIN': {
         const addResult = await addBlockedDomain(message.domain)
         const currentDomain1 = await getCurrentTabDomain()
         safeSendResponse({
@@ -1618,8 +1621,9 @@ async function handleMessage(message, sender, sendResponse) {
           domains: getBlockedDomainsForDomain(currentDomain1),
         })
         break
+      }
 
-      case 'REMOVE_BLOCKED_DOMAIN':
+      case 'REMOVE_BLOCKED_DOMAIN': {
         const removeResult = await removeBlockedDomain(message.domain)
         const currentDomain2 = await getCurrentTabDomain()
         safeSendResponse({
@@ -1628,6 +1632,7 @@ async function handleMessage(message, sender, sendResponse) {
           domains: getBlockedDomainsForDomain(currentDomain2),
         })
         break
+      }
 
       case 'CHECK_DOMAIN_BLOCKED':
         // 检查请求域名是否被阻止
@@ -1649,7 +1654,7 @@ async function handleMessage(message, sender, sendResponse) {
         }
         break
 
-      case 'GET_BLOCKED_DOMAINS':
+      case 'GET_BLOCKED_DOMAINS': {
         const currentDomainForResponse = await getCurrentTabDomain()
         console.log('[Background] GET_BLOCKED_DOMAINS - currentDomain:', currentDomainForResponse)
         console.log('[Background] _domainBlockedData:', JSON.stringify(_domainBlockedData))
@@ -1665,22 +1670,25 @@ async function handleMessage(message, sender, sendResponse) {
           allDomainBlockedData: _domainBlockedData,
         })
         break
+      }
 
-      case 'ADD_DOMAIN_SCRIPT_ENTRY':
+      case 'ADD_DOMAIN_SCRIPT_ENTRY': {
         const addEntryResult = await addDomainScriptEntry(message.domain, message.scripts)
         safeSendResponse({
           success: addEntryResult,
           domainScriptMap: extensionState.domainScriptMap,
         })
         break
+      }
 
-      case 'REMOVE_DOMAIN_SCRIPT_ENTRY':
+      case 'REMOVE_DOMAIN_SCRIPT_ENTRY': {
         const removeEntryResult = await removeDomainScriptEntry(message.domain)
         safeSendResponse({
           success: removeEntryResult,
           domainScriptMap: extensionState.domainScriptMap,
         })
         break
+      }
 
       case 'GET_DOMAIN_SCRIPT_MAP':
         safeSendResponse({ domainScriptMap: extensionState.domainScriptMap })
@@ -1705,7 +1713,7 @@ async function handleMessage(message, sender, sendResponse) {
         }
         break
 
-      case 'ADD_BLOCKED_RESPONSE_DOMAIN':
+      case 'ADD_BLOCKED_RESPONSE_DOMAIN': {
         const addResponseResult = await addBlockedResponseDomain(message.domain)
         const currentDomain3 = await getCurrentTabDomain()
         safeSendResponse({
@@ -1714,8 +1722,9 @@ async function handleMessage(message, sender, sendResponse) {
           domains: getBlockedResponseDomainsForDomain(currentDomain3),
         })
         break
+      }
 
-      case 'REMOVE_BLOCKED_RESPONSE_DOMAIN':
+      case 'REMOVE_BLOCKED_RESPONSE_DOMAIN': {
         const removeResponseResult = await removeBlockedResponseDomain(message.domain)
         const currentDomain4 = await getCurrentTabDomain()
         safeSendResponse({
@@ -1724,6 +1733,7 @@ async function handleMessage(message, sender, sendResponse) {
           domains: getBlockedResponseDomainsForDomain(currentDomain4),
         })
         break
+      }
 
       case 'BLOCK_API_CALL':
         // Try to block the request
@@ -1776,7 +1786,7 @@ async function handleMessage(message, sender, sendResponse) {
         safeSendResponse({ success: true })
         break
 
-      case 'CHECK_MOCK':
+      case 'CHECK_MOCK': {
         // Check if a URL has a mock rule
         const mockEntry = mockRules[message.url]
         if (mockEntry && mockEntry.enabled) {
@@ -1790,6 +1800,7 @@ async function handleMessage(message, sender, sendResponse) {
           safeSendResponse({ hasMock: false })
         }
         break
+      }
 
       case 'GET_MEMORY_INFO':
         // 获取当前标签页的性能和内存信息
@@ -1979,7 +1990,7 @@ async function handleMessage(message, sender, sendResponse) {
         }
         break
 
-      case 'GET_PICKER_MESSAGES':
+      case 'GET_PICKER_MESSAGES': {
         // DevTools 获取待处理的消息
         const tabIdForMessages = message.tabId
         const since = message.since || 0
@@ -1989,6 +2000,7 @@ async function handleMessage(message, sender, sendResponse) {
         )
         safeSendResponse({ success: true, messages })
         break
+      }
 
       case 'CLEAR_PICKER_MESSAGES':
         // 清除消息
@@ -3145,7 +3157,9 @@ function recordBlockedRequest(url, tabId) {
           }
           statsData.domainStats[domain].blocked++
           statsData.domainStats[domain].bytes += estimatedBytes
-        } catch (e) {}
+        } catch (e) {
+          /* empty */
+        }
       }
     })
   }

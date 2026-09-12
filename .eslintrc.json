@@ -50,7 +50,7 @@
   },
   "ignorePatterns": ["*.ts", "*.tsx", "node_modules/**", "dist/**", "build/**", "docs/**"],
   "rules": {
-    "no-unused-vars": "warn",
+    "no-unused-vars": ["warn", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
     "no-console": ["warn", { "allow": ["warn", "error", "log"] }],
     "prefer-const": "warn",
     "prefer-arrow-callback": "warn",

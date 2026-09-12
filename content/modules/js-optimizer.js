@@ -435,6 +435,7 @@ function convertToDynamicImport(script) {
 /**
  * 脚本依赖管理
  */
+// eslint-disable-next-line no-unused-vars
 class ScriptDependencyManager {
   constructor() {
     this.dependencyGraph = new Map()

@@ -5,7 +5,6 @@
   let mouseX = 0,
     mouseY = 0
   let spaceHeld = false
-  let spaceDownTime = 0
   let spaceTimer = null
   let selectAnchor = null
   let selectTooltip = null
@@ -48,7 +47,6 @@
           e.preventDefault()
           e.stopImmediatePropagation()
           if (!spaceHeld && !spaceTimer) {
-            spaceDownTime = Date.now()
             // 设置长按定时器，超时后进入选择模式
             spaceTimer = setTimeout(() => {
               startTextSelection()
@@ -195,17 +193,6 @@
     if (!el) {
       return false
     }
-    const patterns = [
-      /modal/i,
-      /dialog/i,
-      /lightbox/i,
-      /preview/i,
-      /gallery/i,
-      /viewer/i,
-      /mask/i,
-      /overlay/i,
-    ]
-
     let current = el
     for (let i = 0; i < 6 && current && current !== document.body; i++) {
       try {
@@ -520,7 +507,9 @@
       const sel = window.getSelection()
       sel.removeAllRanges()
       sel.addRange(range)
-    } catch (_) {}
+    } catch (_) {
+      /* empty */
+    }
   }
 
   function rangeFromPoint(x, y) {

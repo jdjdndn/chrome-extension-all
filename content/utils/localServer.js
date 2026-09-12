@@ -154,7 +154,9 @@ export function readPageMeta(name) {
   if (meta?.content) {
     try {
       return JSON.parse(meta.content)
-    } catch (e) {}
+    } catch (e) {
+      /* empty */
+    }
   }
   return null
 }

@@ -37,6 +37,7 @@ if (window.KeyboardPaginationLoaded) {
           // 标准语义
           'a[rel="prev"]',
           'link[rel="prev"]',
+          '#pnprev',
           '[class*="prev"]:not([class*="preview"])',
           '[class*="Prev"]:not([class*="Preview"])',
           '[class*="previous"]',
@@ -102,6 +103,7 @@ if (window.KeyboardPaginationLoaded) {
           // 标准语义
           'a[rel="next"]',
           'link[rel="next"]',
+          '#pnnext',
           '[aria-label*="下一页"]',
           '[aria-label*="Next"]',
           '[title*="下一页"]',
@@ -365,12 +367,24 @@ if (window.KeyboardPaginationLoaded) {
     }
 
     detectPagination() {
+      // 清除失效引用（SPA 导航后旧节点已脱离文档，保留会导致后续点击静默失败）
+      if (this.prevButton && !document.body.contains(this.prevButton)) {
+        this.prevButton = null
+      }
+      if (this.nextButton && !document.body.contains(this.nextButton)) {
+        this.nextButton = null
+      }
+
       // 1) 语义明确的选择器——仅在成功时更新引用，
       // 避免 DOM 过渡期间 findElement 返回 null 覆写有效引用。
       const newPrev = this.findElement('prev')
       const newNext = this.findElement('next')
-      if (newPrev) {this.prevButton = newPrev}
-      if (newNext) {this.nextButton = newNext}
+      if (newPrev) {
+        this.prevButton = newPrev
+      }
+      if (newNext) {
+        this.nextButton = newNext
+      }
 
       // 2) 在明确的分页容器内推断（容器本身就是分页语义，可放宽到首/末元素）
       if (!this.prevButton || !this.nextButton) {
@@ -453,7 +467,7 @@ if (window.KeyboardPaginationLoaded) {
       }
     }
 
-    isValidButton(el, _type) {
+    isValidButton(el) {
       if (!el) {
         return false
       }
@@ -511,7 +525,9 @@ if (window.KeyboardPaginationLoaded) {
       ]
       for (const sel of containerSelectors) {
         try {
-          if (el.closest(sel)) {return true}
+          if (el.closest(sel)) {
+            return true
+          }
         } catch (_) {
           /* ignore */
         }
@@ -563,53 +579,54 @@ if (window.KeyboardPaginationLoaded) {
       }
       this._eventsBound = true
       this._keydownHandler = (e) => {
-        // 忽略输入框中的按键
-        if (this.isInputFocused()) {
+        const key = e.key
+        const isPrev = this.config.prevKeys.includes(key)
+        const isNext = this.config.nextKeys.includes(key)
+
+        // ── 非翻页键：输入框中时不拦截 ──
+        if (!isPrev && !isNext) {
+          if (this.isInputFocused()) {return}
+          if (key === '?' && e.shiftKey) {
+            e.preventDefault()
+            this.showHelp()
+          }
           return
+        }
+
+        // ── 翻页键处理 ──
+
+        // 字母键（a/d）在输入框中时尊重焦点（允许在搜索框里打字）
+        if (!e.altKey && !e.ctrlKey && !e.metaKey) {
+          const isArrow = key === 'ArrowLeft' || key === 'ArrowRight'
+          if (!isArrow && this.isInputFocused()) {
+            return
+          }
         }
 
         // 检查修饰键
-        if (this.config.requireAlt && !e.altKey) {
-          return
-        }
-        if (this.config.requireCtrl && !e.ctrlKey) {
-          return
-        }
-
-        const key = e.key
+        if (this.config.requireAlt && !e.altKey) {return}
+        if (this.config.requireCtrl && !e.ctrlKey) {return}
 
         // 如果焦点在视频元素上，不拦截左右键（让视频播放器处理快进/快退）
         if ((key === 'ArrowLeft' || key === 'ArrowRight') && this.isVideoFocused()) {
           return
         }
 
+        // 每次按键都重探测——Google 复用 DOM 节点时 contains() 始终
+        // 为 true，无法通过"失效"判断来触发更新，必须无条件刷新引用。
+        this.detectPagination()
+
         // 上一页
-        if (this.config.prevKeys.includes(key)) {
-          if (!this.prevButton) {
-            // 兜底：按钮引用丢失（DOM 过渡期间被清空），尝试即时重探测
-            this.detectPagination()
-          }
-          if (this.prevButton) {
-            e.preventDefault()
-            this.clickButton(this.prevButton, 'prev')
-          }
+        if (isPrev && this.prevButton) {
+          e.preventDefault()
+          this.clickButton(this.prevButton, 'prev')
+          return
         }
 
         // 下一页
-        if (this.config.nextKeys.includes(key)) {
-          if (!this.nextButton) {
-            this.detectPagination()
-          }
-          if (this.nextButton) {
-            e.preventDefault()
-            this.clickButton(this.nextButton, 'next')
-          }
-        }
-
-        // ? 键显示帮助
-        if (key === '?' && e.shiftKey) {
+        if (isNext && this.nextButton) {
           e.preventDefault()
-          this.showHelp()
+          this.clickButton(this.nextButton, 'next')
         }
       }
       document.addEventListener('keydown', this._keydownHandler, true)
@@ -617,8 +634,9 @@ if (window.KeyboardPaginationLoaded) {
       // 监听 DOM 变化，重新检测分页按钮
       this._setupDOMWatch()
 
-      // SPA URL/DOM 兜底统一交给 _setupSPAReinitGuard（init 路径会调用一次）
-      // 此处不再绑 popstate/hashchange，避免与兜底重复双绑。
+      // SPA URL 变化兜底：Google 等 SPA 站点用 pushState 导航，不触发
+      // popstate/hashchange。轮询 URL 变化，在导航完成后重探测 + 移除搜索框焦点。
+      this._setupURLWatch()
     }
 
     /**
@@ -665,6 +683,29 @@ if (window.KeyboardPaginationLoaded) {
         this._observer = new MutationObserver(scheduleDetect)
         this._observer.observe(document.body, { childList: true, subtree: true })
       }
+    }
+
+    /**
+     * SPA URL 变化监听：轮询 location.href，检测 pushState 导航。
+     * Google 搜索等 SPA 站点使用 pushState 而非 popstate，无法被事件监听捕获。
+     * 导航完成后自动重探测按钮 + 移除搜索框焦点。
+     */
+    _setupURLWatch() {
+      this._lastHref = window.location.href
+      this._urlWatchTimer = setInterval(() => {
+        const href = window.location.href
+        if (href !== this._lastHref) {
+          this._lastHref = href
+          // SPA 导航完成，延迟等待 DOM 渲染后重探测 + blur
+          setTimeout(() => {
+            this.detectPagination()
+            const active = document.activeElement
+            if (active && active.tagName === 'INPUT') {
+              active.blur()
+            }
+          }, 500)
+        }
+      }, 500)
     }
 
     isInputFocused() {
@@ -728,16 +769,13 @@ if (window.KeyboardPaginationLoaded) {
     }
 
     clickButton(button, type) {
-      // 尝试重新探测，但仅在成功时更新引用——
-      // 失败时保留旧引用，避免 null 覆写导致后续按键静默失效。
-      const newPrev = this.findElement('prev')
-      const newNext = this.findElement('next')
-      if (newPrev) {this.prevButton = newPrev}
-      if (newNext) {this.nextButton = newNext}
-      if (!newPrev && !newNext) {
-        this.detectInPaginationContainer()
+      // 优先使用调用方传入的有效引用（已被 keydown handler 刷新过）。
+      // 仅当传入引用已脱离文档时才重新探测，避免 DOM 过渡期 findElement
+      // 返回 null 导致有效引用被覆盖。
+      if (!button || !document.body.contains(button)) {
+        this.detectPagination()
+        button = type === 'prev' ? this.prevButton : this.nextButton
       }
-      button = type === 'prev' ? this.prevButton : this.nextButton
       if (!button) {
         // 首次探测失败：可能页面尚未渲染完毕，延迟重试一次
         setTimeout(() => {
@@ -746,9 +784,15 @@ if (window.KeyboardPaginationLoaded) {
           if (retryBtn) {
             this.highlightButton(retryBtn)
             this.showHint(type === 'prev' ? '← 上一页' : '下一页 →')
+            const retryHref = retryBtn.href
             setTimeout(() => {
-              if (document.body.contains(retryBtn)) {retryBtn.click()}
+              if (retryHref) {
+                window.location.href = retryHref
+              } else if (document.body.contains(retryBtn)) {
+                retryBtn.click()
+              }
             }, 50)
+            this._schedulePostNav()
           }
         }, 300)
         return
@@ -761,12 +805,38 @@ if (window.KeyboardPaginationLoaded) {
       const text = type === 'prev' ? '← 上一页' : '下一页 →'
       this.showHint(text)
 
-      // 延迟点击，让用户看到效果
+      // 延迟导航，让用户看到高亮效果
+      // 使用 window.location.href 而非 button.click()：
+      // Google SPA 导航后旧 <a> 节点可能仍在 DOM 中（contains()=true），
+      // 但 click handler 已被移至新节点。button.click() 会静默失败。
+      // 直接赋值 href 可靠触发导航（SPA 站点会拦截 location 变化）。
+      const targetHref = button.href
       setTimeout(() => {
-        if (document.body.contains(button)) {
+        if (targetHref) {
+          window.location.href = targetHref
+        } else if (document.body.contains(button)) {
           button.click()
         }
       }, 100)
+
+      // SPA 导航后：重探测 + 移除搜索框焦点
+      this._schedulePostNav()
+    }
+
+    /**
+     * SPA 导航后清理：重探测按钮引用 + 移除搜索框焦点。
+     * Google 搜索等 SPA 在导航后会自动聚焦搜索输入框，
+     * 导致 isInputFocused()=true，后续键盘快捷键全部被忽略。
+     */
+    _schedulePostNav() {
+      clearTimeout(this._postNavTimer)
+      this._postNavTimer = setTimeout(() => {
+        this.detectPagination()
+        const active = document.activeElement
+        if (active && active.tagName === 'INPUT') {
+          active.blur()
+        }
+      }, 1500)
     }
 
     highlightButton(button) {
@@ -1024,6 +1094,12 @@ if (window.KeyboardPaginationLoaded) {
       }
       if (this._detectTimer) {
         clearTimeout(this._detectTimer)
+      }
+      if (this._postNavTimer) {
+        clearTimeout(this._postNavTimer)
+      }
+      if (this._urlWatchTimer) {
+        clearInterval(this._urlWatchTimer)
       }
       if (this._spaDebounced) {
         window.removeEventListener('popstate', this._spaDebounced)

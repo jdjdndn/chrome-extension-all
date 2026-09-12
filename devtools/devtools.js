@@ -23,7 +23,7 @@ async function activateContentScript() {
 activateContentScript()
 
 // Create Hot Reload panel (开发模式)
-chrome.devtools.panels.create('Hot Reload', null, 'devtools/hot-reload-panel.html', (panel) => {
+chrome.devtools.panels.create('Hot Reload', null, 'devtools/hot-reload-panel.html', (_panel) => {
   console.log('[DevTools] Hot Reload panel created')
 })
 
@@ -32,7 +32,7 @@ chrome.devtools.panels.create(
   'Tool-info',
   null, // Use default icon
   'devtools/console.html',
-  (panel) => {
+  (_panel) => {
     console.log('Console panel created')
   }
 )
@@ -42,7 +42,7 @@ chrome.devtools.panels.create(
   'DevTools Tools',
   null, // Use default icon
   'devtools/tools-panel.html',
-  (panel) => {
+  (_panel) => {
     console.log('DevTools Tools panel created')
   }
 )

@@ -4,7 +4,7 @@
  * 按需加载：仅在 page tab 使用
  */
 
-import { sendMessage, escapeHtml } from '../popup-core.js'
+import { sendMessage, escapeHtml, showToast } from '../popup-core.js'
 
 // Blocked domains UI elements (按需获取)
 let blockedDomainsList = null
@@ -45,7 +45,10 @@ function bindDomainEvents() {
       const input = domainInput.value.trim()
       const domains = parseDomainInput(input)
       if (domains.length === 0) {
-        showToast('请输入有效的域名（例如: tracking.example.com 或 "api1.com, api2.com"）', 'warning')
+        showToast(
+          '请输入有效的域名（例如: tracking.example.com 或 "api1.com, api2.com"）',
+          'warning'
+        )
         return
       }
       addDomains(domains)

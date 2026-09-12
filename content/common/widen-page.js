@@ -283,7 +283,9 @@ function initWidenPage() {
   window.addEventListener('beforeunload', remove)
   try {
     chrome.storage.onChanged.addListener(onStorageChange)
-  } catch {}
+  } catch {
+    /* empty */
+  }
 
   // 清理
   window.WidenPageDestroy = () => {
@@ -292,7 +294,9 @@ function initWidenPage() {
     window.removeEventListener('beforeunload', remove)
     try {
       chrome.storage.onChanged.removeListener(onStorageChange)
-    } catch {}
+    } catch {
+      /* empty */
+    }
     remove()
     window.WidenPageLoaded = false
   }
@@ -305,7 +309,9 @@ function initWidenPage() {
         inject(parseInt(cached, 10) || DEFAULT_WIDTH)
         return
       }
-    } catch (e) {}
+    } catch (e) {
+      /* empty */
+    }
 
     if (window.__widenPageWidth) {
       inject(window.__widenPageWidth)

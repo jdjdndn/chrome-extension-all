@@ -260,10 +260,14 @@
         continue
       }
 
-      if (inString) {continue}
+      if (inString) {
+        continue
+      }
 
       if (char === openChar) {
-        if (depth === 0) {bodyStart = i}
+        if (depth === 0) {
+          bodyStart = i
+        }
         depth++
       } else if (char === closeChar) {
         depth--
@@ -288,7 +292,7 @@
     }
 
     // 表达式体: 找到分号或换行
-    const end = startIndex
+    const _end = startIndex
     let inString = false
     let stringChar = ''
     let parenDepth = 0
@@ -307,10 +311,16 @@
         continue
       }
 
-      if (inString) {continue}
+      if (inString) {
+        continue
+      }
 
-      if (char === '(') {parenDepth++}
-      if (char === ')') {parenDepth--}
+      if (char === '(') {
+        parenDepth++
+      }
+      if (char === ')') {
+        parenDepth--
+      }
 
       if (char === ';' && parenDepth === 0) {
         return code.substring(startIndex, i)

@@ -634,7 +634,7 @@
       }
 
       // 拒绝所有待处理任务
-      for (const [id, task] of this.pendingTasks) {
+      for (const [, task] of this.pendingTasks) {
         task.reject(new Error('ImageCompressorPool 已销毁'))
       }
       this.pendingTasks.clear()
@@ -1064,7 +1064,7 @@
      * 判断是否需要压缩
      * P2优化：移除HEAD请求（节省~100ms延迟），改用事后判断
      */
-    async _shouldCompress(url) {
+    async _shouldCompress() {
       // 直接返回true，移除HEAD请求阻塞
       // 压缩后由 compressImage 判断是否值得保留
       return true
@@ -1479,7 +1479,7 @@
         video.dataset.src = video.src
         video.src = ''
       }
-      sources.forEach((source, i) => {
+      sources.forEach((source) => {
         if (source.src) {
           source.dataset.src = source.src
           source.src = ''
@@ -1532,11 +1532,11 @@
       this.disableLazyLoad()
 
       // 取消待执行的 idleCallback/setTimeout
-      if (this._pendingIdleId != null) {
+      if (this._pendingIdleId !== null) {
         cancelIdleCallback(this._pendingIdleId)
         this._pendingIdleId = null
       }
-      if (this._pendingIdleTimeoutId != null) {
+      if (this._pendingIdleTimeoutId !== null) {
         clearTimeout(this._pendingIdleTimeoutId)
         this._pendingIdleTimeoutId = null
       }
@@ -1603,7 +1603,9 @@
         if (this.compressorPool) {
           try {
             this.compressorPool.destroy()
-          } catch {}
+          } catch {
+            /* empty */
+          }
           this.compressorPool = null
         }
       }
@@ -1617,35 +1619,45 @@
         if (this.observer) {
           try {
             this.observer.disconnect()
-          } catch {}
+          } catch {
+            /* empty */
+          }
           this.observer = null
         }
 
         if (this._unsubscribe) {
           try {
             this._unsubscribe()
-          } catch {}
+          } catch {
+            /* empty */
+          }
           this._unsubscribe = null
         }
 
         if (this._videoUnsubscribe) {
           try {
             this._videoUnsubscribe()
-          } catch {}
+          } catch {
+            /* empty */
+          }
           this._videoUnsubscribe = null
         }
 
         if (this._videoObserver) {
           try {
             this._videoObserver.disconnect()
-          } catch {}
+          } catch {
+            /* empty */
+          }
           this._videoObserver = null
         }
 
         if (this._mutationObserver) {
           try {
             this._mutationObserver.disconnect()
-          } catch {}
+          } catch {
+            /* empty */
+          }
           this._mutationObserver = null
         }
       }

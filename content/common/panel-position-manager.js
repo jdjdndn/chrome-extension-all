@@ -603,7 +603,7 @@ if (!window.PanelPositionManager) {
 
       // 解决所有面板之间的重叠
       resolveAllOverlaps(expandedPanels, panelPositions, vh, vw) {
-        const { edgeMargin, minPanelHeight, panelGap } = this.config
+        const { edgeMargin, panelGap } = this.config
 
         // 检查每对面板是否有重叠
         for (let i = 0; i < expandedPanels.length; i++) {
@@ -1183,7 +1183,7 @@ if (!window.PanelPositionManager) {
       },
 
       // 智能避让建议（找到遮挡最少的备选位置）
-      suggestAvoidancePosition(componentId, maxAttempts = 10) {
+      suggestAvoidancePosition(componentId) {
         const c = this.components.find((c) => c.id === componentId)
         if (!c || !c.panelEl) {
           return null
@@ -1314,7 +1314,6 @@ if (!window.PanelPositionManager) {
           includeOurComponents = false, // 是否包含我们自己的组件
           minZIndex = 1000, // 最小 z-index 阈值
           minArea = 1000, // 最小面积阈值（过滤小元素）
-          checkContentOnly = true, // 仅检测遮挡内容的情况
         } = options
 
         const results = {
@@ -1596,9 +1595,7 @@ if (!window.PanelPositionManager) {
         const { width, height } = currentBounds
         const vw = window.innerWidth
         const vh = window.innerHeight
-        const { edgeMargin, iconWidth, panelAvoidGap } = this.config
-        const scrollbarWidth = this.getScrollbarWidth()
-        const minRight = edgeMargin + scrollbarWidth + iconWidth + panelAvoidGap
+        const { edgeMargin } = this.config
 
         const excludeElements = [c.iconEl, c.panelEl].filter(Boolean)
 
@@ -1857,7 +1854,6 @@ if (!window.PanelPositionManager) {
       // 检测页面顶部固定定位的 header 高度
       // 返回: header 底部的 Y 坐标（如果没有固定 header，返回 0）
       detectFixedHeaderHeight() {
-        const vh = window.innerHeight
         let maxHeaderBottom = 0
 
         // 常见的 header 选择器
@@ -2448,9 +2444,13 @@ if (!window.PanelPositionManager) {
         const panelBottom = constrainedTop + height
 
         for (const c of this.components) {
-          if (c.id === id || !c.iconEl) {continue}
+          if (c.id === id || !c.iconEl) {
+            continue
+          }
           const iconRect = c.iconEl.getBoundingClientRect()
-          if (iconRect.width === 0 || iconRect.height === 0) {continue}
+          if (iconRect.width === 0 || iconRect.height === 0) {
+            continue
+          }
 
           const iconLeft = iconRect.left
           const iconRightEdge = iconRect.right
@@ -2566,8 +2566,8 @@ if (!window.PanelPositionManager) {
       },
 
       debug() {
+        const { edgeMargin, spaceUsageRatio } = this.config
         const vh = window.innerHeight
-        const { edgeMargin, panelGap, spaceUsageRatio } = this.config
 
         const hasH = this.hasHTags()
         const expandedPanels = this.components.filter((c) => {
@@ -2701,7 +2701,6 @@ if (!window.PanelPositionManager) {
        */
       findBestIconPosition(preferredTop, preferredRight, iconEl = null) {
         const vh = window.innerHeight
-        const vw = window.innerWidth
         const {
           iconWidth,
           iconHeight,
@@ -2820,15 +2819,7 @@ if (!window.PanelPositionManager) {
       findBestPanelPosition(panelEl, preferredRight, preferredTop, width, height) {
         const vh = window.innerHeight
         const vw = window.innerWidth
-        const {
-          edgeMargin,
-          searchStepX,
-          searchStepY,
-          maxSearchAttempts,
-          iconWidth,
-          panelAvoidGap,
-        } = this.config
-        const scrollbarWidth = this.getScrollbarWidth()
+        const { edgeMargin, searchStepX, searchStepY, maxSearchAttempts } = this.config
 
         // 排除自身
         const excludeElements = [panelEl]

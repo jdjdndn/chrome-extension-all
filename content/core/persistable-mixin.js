@@ -15,7 +15,7 @@
    * @param {string} storageArea - 存储区域 ('local' 或 'sync')
    * @returns {object} { _loadFromStorage, _saveToStorage }
    */
-  function createPersistable(storageKey, storageArea = 'local') {
+  function createPersistable(storageKey) {
     return {
       /**
        * 从存储加载数据

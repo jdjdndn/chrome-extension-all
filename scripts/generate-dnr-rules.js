@@ -926,7 +926,7 @@ function generateDNRRules() {
   const rules = []
   let ruleId = 4001
 
-  for (const [libName, config] of Object.entries(JS_CDN_MAP)) {
+  for (const [_libName, config] of Object.entries(JS_CDN_MAP)) {
     const { package: pkg, file, defaultVersion, cdnOrder, sourcePatterns } = config
 
     // 获取首选CDN
@@ -1007,7 +1007,7 @@ function generateDNRRules() {
  * 构建版本捕获正则
  * 例：code.jquery.com/jquery-3.7.1.min.js → ^https?://code\.jquery\.com/jquery-([\d.]+)(?:\.min)?\.js$
  */
-function buildVersionRegex(sourcePattern, pkg, file, versionPattern) {
+function buildVersionRegex(sourcePattern, pkg, _file, _versionPattern) {
   // 转义域名中的特殊字符
   const domain = sourcePattern.split('/')[0]
   const escapedDomain = domain.replace(/\./g, '\\.')
@@ -1066,6 +1066,7 @@ function escapedPattern(pattern) {
 }
 
 // 转义正则特殊字符
+// eslint-disable-next-line no-unused-vars
 function escapeRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
@@ -1137,7 +1138,7 @@ function main() {
 
     // 统计CDN分布
     const cdn =
-      Object.entries(CDN_SOURCES).find(([id, config]) =>
+      Object.entries(CDN_SOURCES).find(([_id, config]) =>
         url.includes(config.baseUrl.replace('https://', '').split('/')[0])
       )?.[0] || 'unknown'
 

@@ -86,10 +86,14 @@ function getMtime(filePath) {
 
 function isBundleStaleByMtime(bundle) {
   const outPath = resolvePath(bundle.outfile)
-  if (!fs.existsSync(outPath)) {return true}
+  if (!fs.existsSync(outPath)) {
+    return true
+  }
   const outMtime = getMtime(outPath)
   const deps = BuildCache.bundleDependencies.get(bundle.name)
-  if (!deps || deps.size === 0) {return true}
+  if (!deps || deps.size === 0) {
+    return true
+  }
   for (const dep of deps) {
     if (getMtime(dep) > outMtime) {
       if (CONFIG.debug) {
@@ -172,6 +176,7 @@ function clearCache() {
 }
 
 // ========== 依赖分析 ==========
+// eslint-disable-next-line no-unused-vars
 function analyzeBundleDependencies(entryFile, builtFiles) {
   const dependencies = new Set()
 
@@ -319,7 +324,9 @@ async function incrementalBuild(bundles, buildFn) {
   // mtime 守卫：检测 bundle 输出旧于其依赖的情况（防御 metafile 缓存吞改动）
   const staleByMtimeBundles = new Set()
   for (const bundle of bundles) {
-    if (missingOutputBundles.has(bundle.name)) {continue}
+    if (missingOutputBundles.has(bundle.name)) {
+      continue
+    }
     if (isBundleStaleByMtime(bundle)) {
       staleByMtimeBundles.add(bundle.name)
     }
@@ -367,7 +374,9 @@ async function incrementalBuild(bundles, buildFn) {
         // 同步把所有依赖的 hash 记入 fileHashes，下次才能检出变化
         for (const dep of dependencies) {
           const h = computeFileHash(dep)
-          if (h) {BuildCache.fileHashes.set(dep, h)}
+          if (h) {
+            BuildCache.fileHashes.set(dep, h)
+          }
         }
 
         // 更新输出 hash
@@ -431,7 +440,9 @@ async function fullBuild(bundles, buildFn, results) {
       BuildCache.bundleDependencies.set(bundle.name, dependencies)
       for (const dep of dependencies) {
         const h = computeFileHash(dep)
-        if (h) {BuildCache.fileHashes.set(dep, h)}
+        if (h) {
+          BuildCache.fileHashes.set(dep, h)
+        }
       }
 
       // 记录输出 hash

@@ -5,18 +5,6 @@
  */
 /* globals showToast, showConfirm */
 
-// 本地 HTML 转义函数，防止 XSS（模块级，供多函数共用）
-const _escHtml = (text) => {
-  if (!text) {
-    return ''
-  }
-  return String(text)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-}
-
 /**
  * 初始化资源加速器控制
  */
@@ -60,7 +48,9 @@ export async function initResourceAccelerator() {
   if (tab?.url) {
     try {
       currentHost = new URL(tab.url).hostname
-    } catch {}
+    } catch {
+      /* empty */
+    }
   }
   const isSiteExcluded = config.excludeDomains?.some(
     (d) => currentHost === d || currentHost.endsWith('.' + d)

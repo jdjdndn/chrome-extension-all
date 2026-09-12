@@ -376,7 +376,9 @@ class SiteScript {
     if (this._boundStorageChange) {
       try {
         chrome.storage.onChanged.removeListener(this._boundStorageChange)
-      } catch {}
+      } catch {
+        /* empty */
+      }
       this._boundStorageChange = null
     }
     const styleEl = document.getElementById(this.options.styleId)

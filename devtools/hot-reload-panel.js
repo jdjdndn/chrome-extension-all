@@ -11,10 +11,8 @@
 
   // 状态
   let ws = null
-  let isConnected = false
   const buildHistory = []
   let lastBuildTime = null
-  let lastBuildDuration = null
 
   // DOM 元素
   const statusEl = document.getElementById('status')
@@ -31,7 +29,6 @@
    * 更新连接状态 UI
    */
   function updateStatus(connected) {
-    isConnected = connected
     statusDot.className = 'status-dot ' + (connected ? 'connected' : 'disconnected')
     statusText.textContent = connected ? '已连接' : '未连接'
     btnForceReload.disabled = !connected
@@ -103,7 +100,6 @@
    */
   function updateBuildInfo(data) {
     lastBuildTime = data.timestamp
-    lastBuildDuration = data.duration || null
 
     lastBuildEl.textContent = formatRelativeTime(data.timestamp)
     buildDurationEl.textContent = data.duration ? `${data.duration}ms` : '-'

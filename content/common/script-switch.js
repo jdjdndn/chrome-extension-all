@@ -63,7 +63,9 @@
       // 同时更新 localStorage 作为快速缓存
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(switches))
-      } catch (e) {}
+      } catch (e) {
+        /* empty */
+      }
 
       const enabled = switches[scriptName]
       return enabled !== undefined ? enabled : DEFAULT_SWITCHES[scriptName] !== false
@@ -88,7 +90,9 @@
       // 同时更新 localStorage
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(switches))
-      } catch (e) {}
+      } catch (e) {
+        /* empty */
+      }
 
       return true
     } catch (e) {
@@ -144,9 +148,13 @@
       cacheExpiry = Date.now() + CACHE_TTL
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
-      } catch {}
+      } catch {
+        /* empty */
+      }
     })
-  } catch {}
+  } catch {
+    /* empty */
+  }
 
   console.log('[ScriptSwitch] 脚本开关模块已加载')
 })()

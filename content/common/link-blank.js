@@ -143,14 +143,18 @@ function initLinkBlank() {
   }
   try {
     chrome.storage.onChanged.addListener(onStorageChange)
-  } catch {}
+  } catch {
+    /* empty */
+  }
 
   window.LinkBlankDestroy = () => {
     disable()
     window.removeEventListener('beforeunload', disable)
     try {
       chrome.storage.onChanged.removeListener(onStorageChange)
-    } catch {}
+    } catch {
+      /* empty */
+    }
     window.LinkBlankLoaded = false
   }
 }

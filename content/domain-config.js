@@ -3,7 +3,7 @@
  * 统一管理所有域名的脚本加载配置
  *
  * 由 scripts/generate-config.js 自动生成，请勿手动编辑
- * 生成时间: 2026-08-30T13:34:00.831Z
+ * 生成时间: 2026-09-11T02:51:57.996Z
  * 源配置: scripts/build-config.json
  */
 

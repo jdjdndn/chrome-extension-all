@@ -883,7 +883,9 @@ if (window.DocGeneratorLoaded) {
 
       this._boundIconDragStart = (e) => {
         // 忽略按钮点击
-        if (e.target.closest('button')) {return}
+        if (e.target.closest('button')) {
+          return
+        }
 
         this.isIconDragging = true
         this.iconDragStart = { x: e.clientX, y: e.clientY }
@@ -896,7 +898,9 @@ if (window.DocGeneratorLoaded) {
       }
 
       this._boundIconDragMove = (e) => {
-        if (!this.isIconDragging) {return}
+        if (!this.isIconDragging) {
+          return
+        }
 
         const dx = this.iconDragStart.x - e.clientX
         const dy = e.clientY - this.iconDragStart.y
@@ -912,7 +916,9 @@ if (window.DocGeneratorLoaded) {
           }
         }
 
-        if (!this._isIconDragActive) {return}
+        if (!this._isIconDragActive) {
+          return
+        }
 
         let newRight = this.iconStartPos.right + dx
         let newTop = this.iconStartPos.top + dy
@@ -940,7 +946,9 @@ if (window.DocGeneratorLoaded) {
       }
 
       this._boundIconDragEnd = () => {
-        if (!this.isIconDragging) {return}
+        if (!this.isIconDragging) {
+          return
+        }
         this.isIconDragging = false
 
         if (this._isIconDragActive) {
@@ -1731,7 +1739,6 @@ if (window.DocGeneratorLoaded) {
 
       let html = '<ul class="yc-doc-github-list">'
       this.githubRepos.forEach((repo, index) => {
-        const escapedText = this.escapeHtml(repo.text)
         const escapedUrl = this.escapeHtml(repo.url)
         const displayText = repo.text || `${repo.owner}/${repo.repo}`
 
@@ -1868,7 +1875,6 @@ if (window.DocGeneratorLoaded) {
 
       let html = '<ul class="yc-doc-link-list">'
       this.collectedLinks.forEach((link, index) => {
-        const escapedText = this.escapeHtml(link.text)
         const escapedUrl = this.escapeHtml(link.url)
         const displayText = link.text || link.url
 

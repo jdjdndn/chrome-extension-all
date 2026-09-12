@@ -94,6 +94,7 @@ function showConfirm(message) {
 /**
  * 从 localhost 获取选择器（带缓存）
  */
+// eslint-disable-next-line no-unused-vars
 async function fetchLocalhostSelectors(domain) {
   if (_popupCache.localhostResponses.has(domain)) {
     return _popupCache.localhostResponses.get(domain)
@@ -180,6 +181,7 @@ async function sendMessageToContentScript(message) {
 /**
  * 广播消息到所有组件（通过 background）
  */
+// eslint-disable-next-line no-unused-vars
 async function broadcastMessage(message) {
   await sendMessage('BROADCAST_MESSAGE', message)
 }
@@ -489,6 +491,7 @@ function escapeHtml(text) {
 }
 
 // Add blocked domain
+// eslint-disable-next-line no-unused-vars
 async function addDomain(domain) {
   if (!domain) {
     return
@@ -517,6 +520,7 @@ async function removeDomain(domain) {
 }
 
 // Add blocked response domain
+// eslint-disable-next-line no-unused-vars
 async function addResponseDomain(domain) {
   if (!domain) {
     return
@@ -651,6 +655,7 @@ async function activateContentScript() {
 activateContentScript()
 
 // Listen for messages from other parts of the extension
+// eslint-disable-next-line no-unused-vars
 chrome.runtime.onMessage.addListener((message, _sender, _sendResponse) => {
   if (message.type === 'UPDATE_STATUS') {
     updateStatus(message.enabled)
@@ -916,6 +921,7 @@ function formatKeywords(keywords) {
 /**
  * Load keywords from storage
  */
+// eslint-disable-next-line no-unused-vars
 async function loadKeywords() {
   // Only load keywords for Douyin domains
   const domain = await getCachedDomain()
@@ -1077,6 +1083,7 @@ async function saveAutoFollowKeywords() {
 
 // ========== Hide Elements Management ==========
 const hideElementsEnabledCheckbox = document.getElementById('hide-elements-enabled')
+// eslint-disable-next-line no-unused-vars
 const hideElementsEditor = document.getElementById('hide-elements-editor')
 const batchAddPanel = document.getElementById('batch-add-panel')
 const batchSelectorsInput = document.getElementById('batch-selectors-input')
@@ -1085,6 +1092,7 @@ const closeBatchPanelBtn = document.getElementById('close-batch-panel-btn')
 const confirmBatchAddBtn = document.getElementById('confirm-batch-add-btn')
 
 // Default hide elements selectors
+// eslint-disable-next-line no-unused-vars
 const defaultHideElementsSelectors = []
 
 /**
@@ -1182,6 +1190,7 @@ function parseSelectors(text) {
  * Format selectors for display (newline-separated, easier to read)
  * Each selector on its own line
  */
+// eslint-disable-next-line no-unused-vars
 function formatSelectors(selectors) {
   return selectors.join('\n')
 }
@@ -2132,6 +2141,7 @@ function isBilibiliDomain(domain) {
 }
 
 // Show/hide Douyin keywords section based on current domain
+// eslint-disable-next-line no-unused-vars
 async function updateDouyinKeywordsVisibility() {
   const domain = await getCachedDomain()
   const douyinSection = document.getElementById('douyin-keywords-section')
@@ -2177,6 +2187,7 @@ const defaultBiliNotInterestedKeywords = [
 /**
  * Load Bilibili keywords from storage
  */
+// eslint-disable-next-line no-unused-vars
 async function loadBiliKeywords() {
   // Only load keywords for Bilibili domains
   const domain = await getCachedDomain()
@@ -2251,6 +2262,7 @@ async function saveBiliKeywords() {
 }
 
 // Show/hide Bilibili keywords section based on current domain
+// eslint-disable-next-line no-unused-vars
 async function updateBilibiliKeywordsVisibility() {
   const domain = await getCachedDomain()
   const biliSection = document.getElementById('bili-keywords-section')
@@ -2280,6 +2292,7 @@ async function initNotificationPanel() {
   const panel = document.getElementById('notification-panel')
   const closeBtn = document.getElementById('close-notifications')
   const clearBtn = document.getElementById('clear-notifications')
+  // eslint-disable-next-line no-unused-vars
   const badge = document.getElementById('notification-badge')
 
   await loadNotifications()
@@ -2327,6 +2340,7 @@ async function initQuickNote() {
   }
 }
 
+// eslint-disable-next-line no-unused-vars
 async function initClipboardHistory() {
   const list = document.getElementById('clipboard-list')
   const clearBtn = document.getElementById('clear-clipboard')
@@ -2653,9 +2667,12 @@ if (selectorsEditor) {
       let localServerSelectors = []
       try {
         const normalizedDomain = domain.startsWith('www.') ? domain.slice(4) : domain
-        const response = await fetch(`http://localhost:3000/api/data/selectors/${normalizedDomain}`, {
-          signal: AbortSignal.timeout(500),
-        })
+        const response = await fetch(
+          `http://localhost:3000/api/data/selectors/${normalizedDomain}`,
+          {
+            signal: AbortSignal.timeout(500),
+          }
+        )
         const data = await response.json()
         if (data.success && data.data) {
           if (Array.isArray(data.data)) {
@@ -2727,7 +2744,7 @@ function initNavigation() {
   // 为每个Tab按钮添加点击事件
   tabBtns.forEach((btn) => {
     console.log('[Tab] Adding click listener to:', btn.dataset.tab)
-    btn.addEventListener('click', (e) => {
+    btn.addEventListener('click', (_e) => {
       console.log('[Tab] Clicked:', btn.dataset.tab)
       const tabName = btn.dataset.tab
       showTab(tabName)
@@ -2767,7 +2784,7 @@ async function loadNotifications() {
 
   list.innerHTML = notifications
     .map(
-      (n, i) => `
+      (n, _i) => `
     <div style="padding: 8px; margin-bottom: 8px; background: ${n.read ? '#f8f9fa' : '#e3f2fd'}; border-radius: 6px; border-left: 3px solid ${n.type === 'success' ? '#28a745' : n.type === 'warning' ? '#ffc107' : '#007bff'};">
       <div style="font-size: 12px; color: #666; margin-bottom: 4px;">${new Date(n.time).toLocaleString('zh-CN')}</div>
       <div style="font-size: 13px;">${escapeHtml(n.message)}</div>
@@ -2777,6 +2794,7 @@ async function loadNotifications() {
     .join('')
 }
 
+// eslint-disable-next-line no-unused-vars
 async function markNotificationsRead() {
   const result = await chrome.storage.local.get('notifications')
   const notifications = result.notifications || []
@@ -2799,6 +2817,7 @@ async function clearNotifications() {
 }
 
 // 添加通知（供其他模块调用）
+// eslint-disable-next-line no-unused-vars
 async function addNotification(message, type = 'info') {
   const result = await chrome.storage.local.get('notifications')
   const notifications = result.notifications || []
@@ -2904,6 +2923,7 @@ function escapeRegex(string) {
 }
 
 // 记录剪贴板内容（供content script调用）
+// eslint-disable-next-line no-unused-vars
 async function recordClipboard(text) {
   if (!text || text.length > 1000) {
     return
@@ -2924,6 +2944,7 @@ async function recordClipboard(text) {
 // ========== 快捷键帮助面板 ==========（已在统一初始化中调用 initShortcutsHelp）
 
 // ========== 资源加速器控制 ==========
+// eslint-disable-next-line no-unused-vars
 async function initResourceAccelerator() {
   const result = await chrome.storage.local.get('resourceAcceleratorConfig')
   const config = result.resourceAcceleratorConfig || {
@@ -2962,7 +2983,9 @@ async function initResourceAccelerator() {
   if (tab?.url) {
     try {
       currentHost = new URL(tab.url).hostname
-    } catch {}
+    } catch {
+      /* empty */
+    }
   }
   const isSiteExcluded = config.excludeDomains?.some(
     (d) => currentHost === d || currentHost.endsWith('.' + d)
@@ -3190,17 +3213,23 @@ function showCacheDetails(stats) {
   const lines = []
   if (stats.js?.details?.length) {
     stats.js.details.forEach((d) => {
-      lines.push(`<div style="color: #28a745;">JS: ${escapeHtml(d.name)} → ${escapeHtml(d.cdn)}</div>`)
+      lines.push(
+        `<div style="color: #28a745;">JS: ${escapeHtml(d.name)} → ${escapeHtml(d.cdn)}</div>`
+      )
     })
   }
   if (stats.fonts?.details?.length) {
     stats.fonts.details.forEach((d) => {
-      lines.push(`<div style="color: #17a2b8;">字体: ${escapeHtml(d.name)} → ${escapeHtml(d.cdn)}</div>`)
+      lines.push(
+        `<div style="color: #17a2b8;">字体: ${escapeHtml(d.name)} → ${escapeHtml(d.cdn)}</div>`
+      )
     })
   }
   if (stats.css?.details?.length) {
     stats.css.details.forEach((d) => {
-      lines.push(`<div style="color: #ffc107;">CSS: ${escapeHtml(d.name)} → ${escapeHtml(d.cdn)}</div>`)
+      lines.push(
+        `<div style="color: #ffc107;">CSS: ${escapeHtml(d.name)} → ${escapeHtml(d.cdn)}</div>`
+      )
     })
   }
 

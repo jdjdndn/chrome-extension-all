@@ -152,24 +152,43 @@
      * @returns {boolean}
      */
     _isStateEqual(a, b) {
-      if (a === b) {return true}
-      if (a == null || b == null) {return a === b}
-      if (typeof a !== 'object' || typeof b !== 'object') {return a === b}
+      if (a === b) {
+        return true
+      }
+      if (a === null || b === null) {
+        return a === b
+      }
+      if (typeof a !== 'object' || typeof b !== 'object') {
+        return a === b
+      }
 
       const keysA = Object.keys(a)
       const keysB = Object.keys(b)
-      if (keysA.length !== keysB.length) {return false}
+      if (keysA.length !== keysB.length) {
+        return false
+      }
 
       for (const key of keysA) {
-        if (!Object.prototype.hasOwnProperty.call(b, key)) {return false}
+        if (!Object.prototype.hasOwnProperty.call(b, key)) {
+          return false
+        }
         const valA = a[key]
         const valB = b[key]
-        if (valA === valB) {continue}
-        if (valA == null || valB == null || typeof valA !== 'object' || typeof valB !== 'object') {
+        if (valA === valB) {
+          continue
+        }
+        if (
+          valA === null ||
+          valB === null ||
+          typeof valA !== 'object' ||
+          typeof valB !== 'object'
+        ) {
           return false
         }
         // 递归检查嵌套对象/数组
-        if (!this._isStateEqual(valA, valB)) {return false}
+        if (!this._isStateEqual(valA, valB)) {
+          return false
+        }
       }
       return true
     },
@@ -328,7 +347,7 @@
       const keys = path.split('.')
       const lastKey = keys.pop()
       const target = keys.reduce((obj, key) => {
-        if (obj[key] == null || typeof obj[key] !== 'object') {
+        if (obj[key] === null || typeof obj[key] !== 'object') {
           obj[key] = {}
         }
         return obj[key]

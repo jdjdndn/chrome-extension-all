@@ -1383,7 +1383,9 @@
             let mergedMatchCount = 0
             try {
               mergedMatchCount = document.querySelectorAll(mergedSelector).length
-            } catch (e) {}
+            } catch (e) {
+              /* empty */
+            }
             this.sendMessage({
               type: 'ELEMENT_SELECTION_CHANGED',
               elements,
@@ -1402,7 +1404,9 @@
       let mergedMatchCount = 0
       try {
         mergedMatchCount = mergedSelector ? document.querySelectorAll(mergedSelector).length : 0
-      } catch (e) {}
+      } catch (e) {
+        /* empty */
+      }
       this.sendMessage({
         type: 'ELEMENT_SELECTION_CHANGED',
         elements,
@@ -1465,7 +1469,9 @@
             matchInfo.textContent = `(${matches.length} 匹配)`
             this.sizeTooltip.appendChild(matchInfo)
           }
-        } catch (e) {}
+        } catch (e) {
+          /* empty */
+        }
 
         this.sizeTooltip.style.display = 'block'
 
@@ -2647,7 +2653,9 @@
           if (node.matches(':disabled')) {
             pseudos.push(':disabled')
           }
-        } catch (e) {}
+        } catch (e) {
+          /* empty */
+        }
         return pseudos
       }
 
@@ -3467,6 +3475,7 @@
       if (item) {
         this.removeElementByUid(item.pickerUid)
       } else {
+        /* empty */
       }
     }
 

@@ -56,7 +56,9 @@
             document.querySelectorAll(selector).forEach((el) => {
               el.style.display = 'none'
             })
-          } catch (e) {}
+          } catch (e) {
+            /* empty */
+          }
         })
       }
     }

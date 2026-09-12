@@ -58,7 +58,7 @@
       return
     }
 
-    for (const [key, option] of Object.entries(options)) {
+    for (const [, option] of Object.entries(options)) {
       try {
         const element = await waitForElement(option.selector, 3000)
 

@@ -482,7 +482,7 @@
      */
     cleanup() {
       let cleaned = 0
-      for (const { target, type, listener, options } of this._listenerList) {
+      for (const { target, type, listener } of this._listenerList) {
         try {
           if (this._isChromeEvent(target)) {
             target.removeListener(listener)

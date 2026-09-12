@@ -5,7 +5,7 @@
  */
 /* globals showToast, showConfirm */
 
-import { sendMessage } from '../popup-core.js'
+import '../popup-core.js'
 
 /**
  * 初始化统计面板

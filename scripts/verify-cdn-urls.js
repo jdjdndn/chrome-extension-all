@@ -3,7 +3,7 @@
  * 验证替换后的 CDN URL 是否能正常加载 JS 库
  */
 
-import { readFileSync, writeFileSync } from 'fs'
+import { writeFileSync } from 'fs'
 import { resolve } from 'path'
 
 const ROOT = resolve('.')

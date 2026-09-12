@@ -64,13 +64,17 @@ function initTabFocus() {
   }
   try {
     chrome.storage.onChanged.addListener(onStorageChange)
-  } catch {}
+  } catch {
+    /* empty */
+  }
 
   window.TabFocusDestroy = () => {
     disable()
     try {
       chrome.storage.onChanged.removeListener(onStorageChange)
-    } catch {}
+    } catch {
+      /* empty */
+    }
     window.TabFocusLoaded = false
   }
 }

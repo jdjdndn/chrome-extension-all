@@ -448,7 +448,7 @@
         if (target?.tabId && this.sendToPort(target.tabId, message)) {return;}
 
         if (isDevTools && this.port) {
-          try { this.port.postMessage(message); return; } catch {}
+          try { this.port.postMessage(message); return; } catch { /* empty */ }
         }
 
         if (ENV === 'content_script') {return await chrome.runtime.sendMessage(message);}
@@ -478,7 +478,7 @@
         } else if (ENV === 'background') {
           const tabs = await chrome.tabs.query({});
           for (const tab of tabs) {
-            try { await chrome.tabs.sendMessage(tab.id, message); } catch {}
+            try { await chrome.tabs.sendMessage(tab.id, message); } catch { /* empty */ }
           }
           for (const [tabId, port] of this.ports) {
             try { port.postMessage(message); } catch { this.ports.delete(tabId); }

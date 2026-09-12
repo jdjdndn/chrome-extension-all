@@ -42,7 +42,6 @@ async function initEventBus() {
 }
 
 // ========== StorageBridge 初始化 ==========
-let storageBridgeReady = false
 
 function initStorageBridge() {
   if (typeof StorageBridge === 'undefined') {
@@ -56,7 +55,6 @@ function initStorageBridge() {
     return true
   } catch (error) {
     console.warn('[DevTools] StorageBridge 初始化失败:', error)
-    storageBridgeReady = false
     return false
   }
 }
@@ -161,29 +159,8 @@ async function _fetchBufferedPickerMessages() {
 }
 
 /**
- * 通过 Port 发送消息
- */
-function sendPortMessage(message) {
-  if (!backgroundPort) {
-    connectToBackground()
-  }
-
-  if (backgroundPort) {
-    try {
-      backgroundPort.postMessage(message)
-      return true
-    } catch (error) {
-      console.error('[DevTools] 发送消息失败:', error)
-      backgroundPort = null
-      return false
-    }
-  }
-  return false
-}
-
-/**
  * 统一发送消息函数（EventBus 优先，降级原生）
- * 用于一次性消息，Port 连接仍使用 sendPortMessage
+ * 用于一次性消息
  * @param {string} type - 消息类型
  * @param {object} data - 消息数据
  * @returns {Promise<any>}
@@ -233,7 +210,6 @@ let batchSelectedInfo
 let batchSelectedCount
 let batchSelectedList
 let batchMergedSelectorSection
-let batchMergedSelector
 let copyMergedSelectorBtn
 let applyHideBtn
 
@@ -250,14 +226,8 @@ let bookmarksList
 let bookmarksSearchInput
 let bookmarksCount
 let bookmarksRefreshBtn
-let bookmarksViewModeSelect
 
 // History DOM 元素引用
-let historyList
-let historySearchInput
-let historyCount
-let historyRefreshBtn
-let historyTimeFilter
 
 // 字符串截断限制（字符数）
 const TRUNCATE_LIMIT = 200
@@ -365,7 +335,6 @@ function safeInit() {
   batchSelectedCount = document.getElementById('batch-selected-count')
   batchSelectedList = document.getElementById('batch-selected-list')
   batchMergedSelectorSection = document.getElementById('batch-merged-selector-section')
-  batchMergedSelector = document.getElementById('batch-merged-selector')
   copyMergedSelectorBtn = document.getElementById('copy-merged-selector-btn')
   applyHideBtn = document.getElementById('apply-hide-btn')
 
@@ -1094,6 +1063,7 @@ function getAllCombinedSelector() {
 /**
  * 解析选择器为层级数组
  */
+// eslint-disable-next-line no-unused-vars
 function parseSelectorParts(selector) {
   // 处理 :is() 中的逗号，避免被错误分割
   const isPattern = /:is\([^)]+\)/g
@@ -1147,6 +1117,7 @@ function isEssentialPart(part) {
  * 尝试共同祖先合并
  * 找出所有元素的共同祖先，然后使用后代选择器
  */
+// eslint-disable-next-line no-unused-vars
 function tryCommonAncestorMerge(elements) {
   if (elements.length < 2) {
     return null
@@ -1290,6 +1261,7 @@ function tryMergeLayerByParts(parts) {
  * 尝试使用 :is() 合并
  * 增强版：支持路径分析、确定性属性过滤
  */
+// eslint-disable-next-line no-unused-vars
 function tryIsMerge(elements) {
   if (elements.length < 2) {
     return null
@@ -1398,6 +1370,7 @@ function tryIsMerge(elements) {
 /**
  * 尝试使用共同类名合并
  */
+// eslint-disable-next-line no-unused-vars
 function tryCommonClassMerge(elements) {
   if (elements.length < 2) {
     return null
@@ -1887,6 +1860,7 @@ function getValueTypeClass(value) {
 }
 
 // 计算字符串行数
+// eslint-disable-next-line no-unused-vars
 function countLines(str) {
   return str.split('\n').length
 }
@@ -1900,6 +1874,7 @@ function generateId() {
 let editorCounter = 0
 
 // 简单的JSON语法高亮
+// eslint-disable-next-line no-unused-vars
 function highlightJson(jsonStr) {
   return jsonStr
     .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?)/g, (match) => {
@@ -1918,7 +1893,8 @@ function highlightJson(jsonStr) {
 }
 
 // 渲染带行号和折叠功能的代码编辑器风格JSON
-function renderCodeEditor(jsonStr, maxLines = 10, editable = false) {
+// eslint-disable-next-line no-unused-vars
+function renderCodeEditor(jsonStr, maxLines = 10, _editable = false) {
   if (!jsonStr) {
     return '<div class="code-editor-empty">(无数据)</div>'
   }
@@ -2050,6 +2026,7 @@ window.copyCodeEditor = function (id) {
 let previewCounter = 0
 
 // 获取折叠值的预览文本
+// eslint-disable-next-line no-unused-vars
 function getPreviewText(value, maxLength = 50) {
   if (value === null) {
     return 'null'
@@ -2083,7 +2060,7 @@ function getPreviewText(value, maxLength = 50) {
 }
 
 // 将JSON值渲染为Chrome DevTools预览树
-function renderJsonPreviewValue(value, depth = 0, key = null) {
+function renderJsonPreviewValue(value, depth = 0, _key = null) {
   const indent = depth * 12
   const previewId = `json-preview-${++previewCounter}`
 
@@ -2132,7 +2109,6 @@ function renderJsonPreviewValue(value, depth = 0, key = null) {
       return `<span class="json-bracket">[]</span>`
     }
 
-    const previewText = `Array(${value.length})`
     const items = value
       .map((item, index) => {
         // 检查子项是否可展开
@@ -2593,6 +2569,7 @@ function setupEditableJsonEvents(container, textareaId) {
 }
 
 // Render collapsible textarea for mock editing
+// eslint-disable-next-line no-unused-vars
 function renderEditableCodeEditor(value, textareaId, maxLines = 10) {
   if (!value) {
     return `<textarea id="${textareaId}" class="code-textarea" placeholder="输入 Mock 响应数据 (JSON)"></textarea>`
@@ -2602,7 +2579,9 @@ function renderEditableCodeEditor(value, textareaId, maxLines = 10) {
   try {
     const parsed = typeof value === 'string' ? JSON.parse(value) : value
     formatted = JSON.stringify(parsed, null, 2)
-  } catch (e) {}
+  } catch (e) {
+    /* empty */
+  }
 
   const lines = formatted.split('\n')
   const lineCount = lines.length
@@ -3201,6 +3180,7 @@ function matchesTypeFilter(reqType, filter) {
 }
 
 // 从存储加载mock过滤设置
+// eslint-disable-next-line no-unused-vars
 async function loadMockFilterSettings() {
   try {
     const result = await chrome.storage.local.get('mockFilterSettings')
@@ -3409,6 +3389,7 @@ async function loadBlockedDomainsToExclude() {
 }
 
 // 获取URL路径（不包含查询字符串，用于匹配）
+// eslint-disable-next-line no-unused-vars
 function getUrlPath(url) {
   try {
     const urlObj = new URL(url)
@@ -3670,7 +3651,7 @@ function renderMockListWithRules(filter, forceAnimate, filterByDomain, maxCount,
 
   // Items wrapper for proper alternating colors
   const itemsHtml = finalDisplayRequests
-    .map((req, index) => {
+    .map((req, _index) => {
       // 检查页面上下文中的 mock 规则来判断是否已 mock
       const mockKey = `${req.method}:${req.url}`
       const hasMockRule = mockRules[mockKey] === true
@@ -3988,7 +3969,9 @@ function renderMockEditor(req) {
   try {
     const parsed = JSON.parse(responseBody)
     formattedBody = JSON.stringify(parsed, null, 2)
-  } catch (e) {}
+  } catch (e) {
+    /* empty */
+  }
 
   // Mock textarea default value
   const mockTextareaValue = formattedBody
@@ -4228,6 +4211,7 @@ function autoMockOnBlur(req) {
 }
 
 // 获取所有 mock 规则
+// eslint-disable-next-line no-unused-vars
 function getMockRules() {
   const code = `
     (function() {
@@ -4257,6 +4241,7 @@ function getMockRules() {
 }
 
 // 切换 mock 开关
+// eslint-disable-next-line no-unused-vars
 function toggleMockRule(method, url, enabled) {
   const mockKey = `${method}:${url}`
   const code = `
@@ -4282,6 +4267,7 @@ function toggleMockRule(method, url, enabled) {
 }
 
 // 刷新 mock 规则列表（如果需要显示）
+// eslint-disable-next-line no-unused-vars
 function refreshMockRulesList() {
   // 这里可以添加更新 UI 的代码
   console.log('[DevTools] 刷新 mock 规则列表')
@@ -4324,7 +4310,7 @@ function handleRequest(harEntry) {
   // console.log('[DevTools Network] Processing XHR/Fetch request:', method, url, 'hostname:', requestHostname);
 
   // Get response content via getContent() method
-  harEntry.getContent((content, encoding) => {
+  harEntry.getContent((content, _encoding) => {
     // Get response info from harEntry.response
     const response = harEntry.response || {}
 
@@ -4781,6 +4767,7 @@ function initResourcesTab() {
 }
 
 // Initialize network monitoring
+// eslint-disable-next-line no-unused-vars
 function initNetworkMonitoring() {
   // console.log('[DevTools] Initializing network monitoring...');
 
@@ -4793,7 +4780,6 @@ function initNetworkMonitoring() {
 
   // ========== Mock 总开关初始化 ==========
   const mockGlobalSwitch = document.getElementById('mock-global-switch')
-  const mockGlobalStatus = document.getElementById('mock-global-status')
 
   if (mockGlobalSwitch) {
     // 从 storage 加载开关状态
@@ -5034,6 +5020,7 @@ function countBookmarkItems(node) {
 }
 
 // Find bookmark node by id in tree
+// eslint-disable-next-line no-unused-vars
 function findBookmarkNode(node, id) {
   if (node.id === id) {
     return node
@@ -5298,7 +5285,7 @@ if (bookmarksRefreshBtn) {
   bookmarksRefreshBtn.addEventListener('click', loadBookmarks)
 }
 
-bookmarksViewModeSelect = document.getElementById('bookmarks-view-mode')
+const bookmarksViewModeSelect = document.getElementById('bookmarks-view-mode')
 if (bookmarksViewModeSelect) {
   bookmarksViewModeSelect.addEventListener('change', (e) => {
     bookmarksViewMode = e.target.value
@@ -5764,7 +5751,7 @@ function handleDragStart(e) {
   setTimeout(() => document.body.removeChild(dragImage), 0)
 }
 
-function handleDragEnd(e) {
+function handleDragEnd(_e) {
   if (draggedItem) {
     draggedItem.classList.remove('dragging')
     draggedItem = null
@@ -6054,11 +6041,11 @@ window.loadBookmarks = async function () {
 // ============================================
 // History Tab Functionality
 // ============================================
-historyList = document.getElementById('history-list')
-historySearchInput = document.getElementById('history-search-input')
+const historyList = document.getElementById('history-list')
+const historySearchInput = document.getElementById('history-search-input')
 const historyTimeRange = document.getElementById('history-time-range')
-historyCount = document.getElementById('history-count')
-historyRefreshBtn = document.getElementById('history-refresh-btn')
+const historyCount = document.getElementById('history-count')
+const historyRefreshBtn = document.getElementById('history-refresh-btn')
 const historyClearBtn = document.getElementById('history-clear-btn')
 
 let allHistory = []

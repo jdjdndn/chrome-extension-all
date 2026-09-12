@@ -4,6 +4,8 @@
  * 按需加载：仅在 home tab 使用
  */
 
+import { showConfirm } from '../popup-core.js'
+
 /**
  * 初始化剪贴板历史
  */
@@ -47,27 +49,33 @@ export async function initClipboardHistory() {
  */
 export async function loadClipboardHistory(searchQuery = '', filter = 'all') {
   const list = document.getElementById('clipboard-list')
-  if (!list) {return}
+  if (!list) {
+    return
+  }
 
   const result = await chrome.storage.local.get('clipboardHistory')
   let history = result.clipboardHistory || []
 
   // 分类检测
   const categorize = (text) => {
-    if (/^https?:\/\//i.test(text)) {return 'url'}
-    if (/[\{\}\[\]\(\);=>]/.test(text) && text.includes('\n')) {return 'code'}
+    if (/^https?:\/\//i.test(text)) {
+      return 'url'
+    }
+    if (/[\{\}\[\]\(\);=>]/.test(text) && text.includes('\n')) {
+      return 'code'
+    }
     return 'text'
   }
 
   // 筛选
   if (filter !== 'all') {
-    history = history.filter(item => categorize(item.text) === filter)
+    history = history.filter((item) => categorize(item.text) === filter)
   }
 
   // 搜索
   if (searchQuery) {
     const query = searchQuery.toLowerCase()
-    history = history.filter(item => item.text.toLowerCase().includes(query))
+    history = history.filter((item) => item.text.toLowerCase().includes(query))
   }
 
   if (history.length === 0) {
@@ -78,7 +86,8 @@ export async function loadClipboardHistory(searchQuery = '', filter = 'all') {
   list.innerHTML = history
     .map((item, i) => {
       const category = categorize(item.text)
-      const categoryColor = category === 'url' ? '#17a2b8' : category === 'code' ? '#28a745' : '#6c757d'
+      const categoryColor =
+        category === 'url' ? '#17a2b8' : category === 'code' ? '#28a745' : '#6c757d'
       const categoryLabel = category === 'url' ? 'URL' : category === 'code' ? '代码' : '文本'
 
       let displayText = escapeHtml(item.text.slice(0, 100))
@@ -103,7 +112,7 @@ export async function loadClipboardHistory(searchQuery = '', filter = 'all') {
     .join('')
 
   // 点击复制
-  list.querySelectorAll('.clipboard-item').forEach(el => {
+  list.querySelectorAll('.clipboard-item').forEach((el) => {
     el.addEventListener('click', async () => {
       const index = parseInt(el.dataset.index)
       const text = history[index]?.text

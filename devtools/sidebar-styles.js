@@ -2,7 +2,6 @@
 'use strict'
 
 // ========== EventBus V4.6 初始化 ==========
-let eventBusReady = false
 
 async function initEventBus() {
   if (typeof EventBus === 'undefined') {
@@ -13,12 +12,10 @@ async function initEventBus() {
   try {
     const state = EventBus.getState ? EventBus.getState() : null
     if (state && state.isReady) {
-      eventBusReady = true
       return true
     }
 
     await EventBus.init()
-    eventBusReady = true
     console.log('[Sidebar] EventBus V4.6 初始化完成')
     return true
   } catch (error) {
@@ -118,6 +115,7 @@ function showStatus(message, type = '') {
 }
 
 // Clear status
+// eslint-disable-next-line no-unused-vars
 function clearStatus() {
   if (selectorStatusEl) {
     selectorStatusEl.textContent = ''
@@ -146,6 +144,7 @@ function escapeHtml(text) {
 }
 
 // Generate unique CSS selector for an element
+// eslint-disable-next-line no-unused-vars
 function generateUniqueSelector(el, document) {
   if (!el || el === document.body) {
     return 'body'
@@ -208,6 +207,7 @@ function generateUniqueSelector(el, document) {
 }
 
 // Get element path (ancestors)
+// eslint-disable-next-line no-unused-vars
 function getElementPath(el, document) {
   const path = []
   let current = el
@@ -1993,7 +1993,7 @@ async function aiAnalyzeElement() {
  */
 function generateLocalSuggestions(context) {
   const suggestions = []
-  const { basic, position, ancestors, siblings } = context
+  const { basic, position, ancestors = [] } = context
 
   // 策略1: ID 选择器
   if (basic.id && !basic.id.includes(' ') && !/^\d/.test(basic.id)) {
@@ -2111,7 +2111,7 @@ function generateLocalSuggestions(context) {
  * 本地分析元素（当 AI 服务不可用时）
  */
 function generateLocalAnalysis(context) {
-  const { basic, position, ancestors, siblings, children, text } = context
+  const { basic, position, children, text } = context
   const analysis = []
 
   // 元素类型分析
@@ -2195,7 +2195,7 @@ function renderAiSuggestions(result) {
       '<div style="color: #888; font-size: 10px; margin-bottom: 8px;">⚠️ AI 服务不可用，使用本地规则生成</div>'
   }
 
-  suggestions.forEach((suggestion, index) => {
+  suggestions.forEach((suggestion, _index) => {
     const scoreClass = suggestion.score >= 80 ? '' : suggestion.score >= 60 ? 'medium' : 'low'
 
     html += `
@@ -2549,7 +2549,6 @@ const batchBtn = document.getElementById('batch-btn')
 const batchClose = document.getElementById('batch-close')
 const batchAction = document.getElementById('batch-action')
 const batchParams = document.getElementById('batch-params')
-const batchClassName = document.getElementById('batch-class-name')
 const batchSelector = document.getElementById('batch-selector')
 const batchPreview = document.getElementById('batch-preview')
 const batchExecute = document.getElementById('batch-execute')
@@ -2782,8 +2781,8 @@ function filterStyles(keyword) {
   }
 
   const useTag = filterTag?.checked ?? true
-  const useClass = filterClass?.checked ?? true
-  const useId = filterId?.checked ?? true
+  const _useClass = filterClass?.checked ?? true
+  const _useId = filterId?.checked ?? true
 
   sections.forEach((section) => {
     const selectorName = section.querySelector('.selector-name')?.textContent || ''
@@ -2982,7 +2981,9 @@ function loadSettings() {
   if (saved) {
     try {
       Object.assign(settings, JSON.parse(saved))
-    } catch (e) {}
+    } catch (e) {
+      /* empty */
+    }
   }
 
   // 应用到 UI
@@ -3029,7 +3030,7 @@ function saveSettings() {
 ].forEach((id) => {
   const el = document.getElementById(id)
   if (el) {
-    el.addEventListener('change', (e) => {
+    el.addEventListener('change', (_e) => {
       const key = id.replace('setting-', '').replace(/-([a-z])/g, (_, c) => c.toUpperCase())
       settings[key] = el.type === 'checkbox' ? el.checked : el.value
       saveSettings()
@@ -3062,7 +3063,6 @@ const optimizeMergedBtn = document.getElementById('optimize-selector-btn')
 
 // 旧的面板元素（可能不存在）
 const selectedCountEl = document.getElementById('selected-count')
-const selectedPanelContent = document.getElementById('selected-panel-content')
 const mergedSelectorDisplay = document.getElementById('merged-selector-display')
 
 console.log('[Sidebar] 选中元素面板元素检查:', {
@@ -3271,7 +3271,7 @@ function startElementPicker() {
       return { needInject: true };
     })()
   `,
-    (result, error) => {
+    (result, _error) => {
       if (result && result.needInject) {
         // 需要注入拾取器
         chrome.runtime.sendMessage({ type: 'START_ELEMENT_PICKER' })
@@ -4083,7 +4083,6 @@ function tryOnlyMerge(selectors) {
     const uniqueParents = [...new Set(parents)]
     if (uniqueParents.length === 1 && uniqueParents[0]) {
       // 检查是 :only-child 还是 :only-of-type
-      const hasOnlyChild = selectors.some((s) => s.includes(':only-child'))
       const hasOnlyOfType = selectors.some((s) => s.includes(':only-of-type'))
       const pseudo = hasOnlyOfType ? ':only-of-type' : ':only-child'
       return uniqueParents[0] + ' > ' + uniqueBase[0] + pseudo
@@ -5481,6 +5480,7 @@ function tryAttrContainsMergeGlobal(selectors) {
 /**
  * 更新合并选择器显示
  */
+// eslint-disable-next-line no-unused-vars
 function updateMergedSelector(selector) {
   if (!mergedSelectorDisplay) {
     return
@@ -5499,6 +5499,7 @@ function updateMergedSelector(selector) {
 /**
  * 高亮元素
  */
+// eslint-disable-next-line no-unused-vars
 function highlightElement(id) {
   const element = selectedElements.find((el) => el.id === id)
   if (!element) {
@@ -5558,6 +5559,7 @@ function highlightElement(id) {
 /**
  * 复制所有选择器
  */
+// eslint-disable-next-line no-unused-vars
 function copyAllSelectors() {
   if (selectedElements.length === 0) {
     showToast('没有选中元素', true)
@@ -5571,6 +5573,7 @@ function copyAllSelectors() {
 /**
  * 复制合并选择器
  */
+// eslint-disable-next-line no-unused-vars
 function copyMergedSelector() {
   const selector = generateMergedSelector()
   if (!selector) {
@@ -5583,6 +5586,7 @@ function copyMergedSelector() {
 /**
  * 导出选择器
  */
+// eslint-disable-next-line no-unused-vars
 function exportSelectors() {
   if (selectedElements.length === 0) {
     showToast('没有选中元素', true)
@@ -5607,6 +5611,7 @@ function exportSelectors() {
 /**
  * 优化合并选择器
  */
+// eslint-disable-next-line no-unused-vars
 function optimizeMergedSelector() {
   const selector = generateMergedSelector()
   if (!selector) {
@@ -5624,6 +5629,7 @@ function optimizeMergedSelector() {
 /**
  * 切换面板折叠（已废弃 - 面板现在在批量操作区域内）
  */
+// eslint-disable-next-line no-unused-vars
 function togglePanelCollapse() {
   // 面板已移至批量操作区域内，此函数保留以兼容
 }
@@ -5707,6 +5713,7 @@ document.addEventListener('keydown', (e) => {
 /**
  * 简易虚拟滚动实现
  */
+// eslint-disable-next-line no-unused-vars
 class VirtualScroller {
   constructor(container, itemHeight = 24) {
     this.container = container

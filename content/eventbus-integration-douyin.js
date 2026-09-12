@@ -55,14 +55,14 @@
       return { success: true, selectors: [] }
     })
 
-    EventBus.on('UPDATE_KEYWORDS', (data) => {
+    EventBus.on('UPDATE_KEYWORDS', () => {
       // 如果有现有的 UPDATE_KEYWORDS 处理逻辑，这里可以调用它
       console.log('[EventBus集成] 收到 UPDATE_KEYWORDS')
       // 返回成功表示消息已处理
       return { success: true }
     })
 
-    EventBus.on('UPDATE_HIDE_ELEMENTS', (data) => {
+    EventBus.on('UPDATE_HIDE_ELEMENTS', () => {
       console.log('[EventBus集成] 收到 UPDATE_HIDE_ELEMENTS')
       return { success: true }
     })

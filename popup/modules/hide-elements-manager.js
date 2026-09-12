@@ -68,6 +68,7 @@ const DEFAULT_SELECTORS_BY_DOMAIN = {
 
 // DOM elements
 let hideElementsEnabledCheckbox = null
+// eslint-disable-next-line no-unused-vars
 let hideElementsEditor = null
 let selectorsEditor = null
 let selectorsCount = null

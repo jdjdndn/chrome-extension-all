@@ -43,12 +43,20 @@ function showConfirm(message) {
     btnRow.style.cssText = 'display:flex;gap:10px;margin-top:16px;justify-content:flex-end;'
     const cancelBtn = document.createElement('button')
     cancelBtn.textContent = '取消'
-    cancelBtn.style.cssText = 'padding:6px 16px;border:1px solid #ddd;border-radius:6px;background:#f8f8f8;cursor:pointer;font-size:13px;'
+    cancelBtn.style.cssText =
+      'padding:6px 16px;border:1px solid #ddd;border-radius:6px;background:#f8f8f8;cursor:pointer;font-size:13px;'
     const okBtn = document.createElement('button')
     okBtn.textContent = '确定'
-    okBtn.style.cssText = 'padding:6px 16px;border:none;border-radius:6px;background:#10b981;color:#fff;cursor:pointer;font-size:13px;'
-    cancelBtn.onclick = () => { overlay.remove(); resolve(false) }
-    okBtn.onclick = () => { overlay.remove(); resolve(true) }
+    okBtn.style.cssText =
+      'padding:6px 16px;border:none;border-radius:6px;background:#10b981;color:#fff;cursor:pointer;font-size:13px;'
+    cancelBtn.onclick = () => {
+      overlay.remove()
+      resolve(false)
+    }
+    okBtn.onclick = () => {
+      overlay.remove()
+      resolve(true)
+    }
     btnRow.appendChild(cancelBtn)
     btnRow.appendChild(okBtn)
     box.appendChild(btnRow)
@@ -69,6 +77,7 @@ function safeExecute(fn, fallback = null, context = '') {
     return fn()
   } catch (error) {
     if (context) {
+      // eslint-disable-next-line no-console
       console.debug(`[${context}] 执行失败:`, error.message)
     }
     return fallback
@@ -82,11 +91,13 @@ function safeExecute(fn, fallback = null, context = '') {
  * @param {string} context - 执行上下文（用于日志）
  * @returns {Promise<*>} 函数返回值或fallback
  */
+// eslint-disable-next-line no-unused-vars
 async function safeExecuteAsync(fn, fallback = null, context = '') {
   try {
     return await fn()
   } catch (error) {
     if (context) {
+      // eslint-disable-next-line no-console
       console.debug(`[${context}] 执行失败:`, error.message)
     }
     return fallback
@@ -109,6 +120,7 @@ function getEl(id) {
  * @param {*} defaultValue - 元素不存在时的默认值
  * @returns {HTMLElement|*} 元素或默认值
  */
+// eslint-disable-next-line no-unused-vars
 function getElSafe(id, defaultValue = null) {
   return getEl(id) || defaultValue
 }
@@ -118,6 +130,7 @@ function getElSafe(id, defaultValue = null) {
  * @param {string} id - 元素 ID
  * @param {string} text - 文本内容
  */
+// eslint-disable-next-line no-unused-vars
 function setText(id, text) {
   const el = getEl(id)
   if (el) {
@@ -131,6 +144,7 @@ function setText(id, text) {
  * @param {string} defaultValue - 默认值
  * @returns {string} 文本内容或默认值
  */
+// eslint-disable-next-line no-unused-vars
 function getText(id, defaultValue = '') {
   const el = getEl(id)
   return el ? el.textContent : defaultValue
@@ -242,6 +256,7 @@ async function loadWeather() {
     iconEl.textContent = getWeatherIcon(code)
   } catch (error) {
     // 静默失败，不影响用户体验
+    // eslint-disable-next-line no-console
     console.debug('天气加载失败:', error.message)
     tempEl.textContent = '--°C'
     descEl.textContent = '获取失败'
@@ -398,10 +413,18 @@ function initSettings() {
   const settings = getSettings()
 
   // 设置滑块值
-  if (columnsRange) { columnsRange.value = settings.columns }
-  if (columnsValue) { columnsValue.textContent = settings.columns }
-  if (historyCountRange) { historyCountRange.value = settings.historyCount }
-  if (historyCountValue) { historyCountValue.textContent = settings.historyCount }
+  if (columnsRange) {
+    columnsRange.value = settings.columns
+  }
+  if (columnsValue) {
+    columnsValue.textContent = settings.columns
+  }
+  if (historyCountRange) {
+    historyCountRange.value = settings.historyCount
+  }
+  if (historyCountValue) {
+    historyCountValue.textContent = settings.historyCount
+  }
 
   // 设置搜索引擎选择
   const searchEngineSelect = getEl('searchEngineSelect')
@@ -2081,7 +2104,10 @@ function importFromBookmarks() {
     const learnFolders = findLearnBookmarkFolders(bookmarks)
 
     if (learnFolders.length === 0) {
-      showToast('未找到"学习"相关的书签文件夹，请在书签中创建包含"学习"、"教程"、"资源"等关键词的文件夹', 'warning')
+      showToast(
+        '未找到"学习"相关的书签文件夹，请在书签中创建包含"学习"、"教程"、"资源"等关键词的文件夹',
+        'warning'
+      )
       return
     }
 
@@ -2103,7 +2129,11 @@ function importFromBookmarks() {
     const totalLinks = folderData.reduce((sum, f) => sum + f.links.length, 0)
     const folderNames = folderData.map((f) => `"${f.title}" (${f.links.length}个)`).join('\n')
 
-    if (!(await showConfirm(`找到以下学习文件夹：\n${folderNames}\n\n共 ${totalLinks} 个链接，是否导入？`))) {
+    if (
+      !(await showConfirm(
+        `找到以下学习文件夹：\n${folderNames}\n\n共 ${totalLinks} 个链接，是否导入？`
+      ))
+    ) {
       return
     }
 
@@ -2161,6 +2191,7 @@ function initImportBtn() {
     mouseY = 0
   let spaceHeld = false
   let spaceTimer = null
+  // eslint-disable-next-line no-unused-vars
   let spaceDownTime = 0
   let selectAnchor = null
   let selectTooltip = null
@@ -2787,15 +2818,17 @@ const DEFAULT_AI_SITES = [
 
 // 初始化 AI 聚合
 function initAIAggregator() {
-  if (initAIAggregator._initialized) return
+  if (initAIAggregator._initialized) {
+    return
+  }
   initAIAggregator._initialized = true
 
-  const siteSelector = document.getElementById('aiSiteSelector')
+  const _siteSelector = document.getElementById('aiSiteSelector')
   const sendBtn = document.getElementById('aiSendBtn')
   const questionInput = document.getElementById('aiQuestionInput')
 
   // 监听来自注入脚本的消息
-  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  chrome.runtime.onMessage.addListener((message, _sender, _sendResponse) => {
     if (message._aiAggregator) {
       console.log('[AI Aggregator] 收到消息:', message.type, message.siteId)
       if (message.type === 'AI_RESPONSE') {
@@ -3424,13 +3457,15 @@ function updateResponseCard(siteId, data) {
 
 // 格式化 AI 回复（先转义再处理换行，防止 XSS）
 function formatAIResponse(content) {
-  return escapeHtml(content)
-    // 删除大量空行：将连续3个及以上换行替换为2个换行
-    .replace(/\n{3,}/g, '\n\n')
-    // 删除每行首尾空白
-    .split('\n')
-    .map((line) => line.trim())
-    .join('\n')
+  return (
+    escapeHtml(content)
+      // 删除大量空行：将连续3个及以上换行替换为2个换行
+      .replace(/\n{3,}/g, '\n\n')
+      // 删除每行首尾空白
+      .split('\n')
+      .map((line) => line.trim())
+      .join('\n')
+  )
 }
 
 // 更新统计信息
@@ -3485,6 +3520,7 @@ function resetAggregator() {
 }
 
 // 显示网站配置（最小可用：启用开关 + URL 编辑）
+// eslint-disable-next-line no-unused-vars
 async function showSiteConfig(siteId) {
   const site = DEFAULT_AI_SITES.find((s) => s.id === siteId)
   if (!site) {

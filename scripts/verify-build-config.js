@@ -192,7 +192,9 @@ function getLatestMtime(dir, maxDepth = 2) {
           if (mtime > latest) {
             latest = mtime
           }
-        } catch {}
+        } catch {
+          /* empty */
+        }
       }
     }
   }

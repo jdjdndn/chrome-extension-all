@@ -38,6 +38,7 @@
   /**
    * 从URL中提取文件名部分
    */
+  // eslint-disable-next-line no-unused-vars
   function extractFile(url) {
     try {
       const pathname = new URL(url).pathname
@@ -550,7 +551,7 @@
         this._stats.successfulProbes++
         return { healthy: true, latency, timestamp: Date.now() }
       } catch (e) {
-        const latency = Math.round(performance.now() - start)
+        const _latency = Math.round(performance.now() - start)
         this._stats.failedProbes++
         return { healthy: false, latency: Infinity, timestamp: Date.now() }
       }

@@ -13,7 +13,7 @@
  * - 误判率 <5%
  */
 
-;(function () {
+(function () {
   'use strict'
 
   if (window.PageOptimizationDetector) {
@@ -71,14 +71,7 @@
       'data-source',
     ],
     // class 特征
-    classes: [
-      'lazyload',
-      'lazy-load',
-      'lazy',
-      'lozad',
-      'lazyloaded',
-      'lazy-image',
-    ],
+    classes: ['lazyload', 'lazy-load', 'lazy', 'lozad', 'lazyloaded', 'lazy-image'],
     // 事件特征
     events: ['lazybeforeunload', 'lazyloaded'],
   }
@@ -107,12 +100,7 @@
     // 字体优化属性
     fontDisplayValues: ['swap', 'fallback', 'optional'],
     // 字体优化库特征
-    fontLibraries: [
-      'font-display',
-      'fontfaceobserver',
-      'webfontloader',
-      'font-spider',
-    ],
+    fontLibraries: ['font-display', 'fontfaceobserver', 'webfontloader', 'font-spider'],
   }
 
   /**
@@ -121,10 +109,10 @@
   const CSS_OPT_INDICATORS = {
     // CSS 压缩特征（minified CSS）
     minifiedPatterns: [
-      /;\}/g,                    // 压缩后缺少空格
-      /\{[^ ]/g,                 // 左括号后无空格
-      /:[^ ]/g,                  // 冒号后无空格
-      /\n\s*\n/g,                // 连续空行（反向特征）
+      /;\}/g, // 压缩后缺少空格
+      /\{[^ ]/g, // 左括号后无空格
+      /:[^ ]/g, // 冒号后无空格
+      /\n\s*\n/g, // 连续空行（反向特征）
     ],
     // CSS CDN 域名
     cssCDNs: [
@@ -136,13 +124,7 @@
       'unpkg.com',
     ],
     // CSS 框架特征
-    cssFrameworks: [
-      'tailwindcss',
-      'bootstrap',
-      'bulma',
-      'foundation',
-      'materialize',
-    ],
+    cssFrameworks: ['tailwindcss', 'bootstrap', 'bulma', 'foundation', 'materialize'],
     // CSS 变量特征（现代 CSS 框架标志）
     cssVariablePattern: /--[\w-]+\s*:/,
   }
@@ -161,19 +143,9 @@
       'precache',
     ],
     // Cache API 使用特征
-    cachePatterns: [
-      'caches.open',
-      'caches.match',
-      'cache.put',
-      'cache.add',
-      'cache.addAll',
-    ],
+    cachePatterns: ['caches.open', 'caches.match', 'cache.put', 'cache.add', 'cache.addAll'],
     // 预缓存特征
-    precachePatterns: [
-      'precache',
-      'precacheAndRoute',
-      ' precache(',
-    ],
+    precachePatterns: ['precache', 'precacheAndRoute', ' precache('],
   }
 
   /**
@@ -184,8 +156,8 @@
     LAZY_LOAD: 'lazyLoad',
     PRELOAD: 'preload',
     FONT_OPT: 'fontOpt',
-    CSS_OPT: 'cssOpt',           // CSS优化检测
-    SW_CACHE: 'swCache',         // Service Worker缓存检测
+    CSS_OPT: 'cssOpt', // CSS优化检测
+    SW_CACHE: 'swCache', // Service Worker缓存检测
   }
 
   /**
@@ -203,10 +175,10 @@
     static _cache = {}
     // 缓存统计
     static _cacheStats = {
-      hits: 0,      // 缓存命中次数
-      misses: 0,    // 缓存未命中次数（首次检测）
-      expired: 0,   // 缓存过期后重新检测次数
-      total: 0,     // 总检测次数
+      hits: 0, // 缓存命中次数
+      misses: 0, // 缓存未命中次数（首次检测）
+      expired: 0, // 缓存过期后重新检测次数
+      total: 0, // 总检测次数
     }
     // 缓存过期时间：5分钟（页面可能动态变化）
     static CACHE_TTL = 5 * 60 * 1000
@@ -380,9 +352,7 @@
 
       // 1. 检查已知 CDN 域名匹配（中置信度）
       for (const url of resourceUrls) {
-        const matchedDomain = CDN_DOMAINS.find((domain) =>
-          url.toLowerCase().includes(domain)
-        )
+        const matchedDomain = CDN_DOMAINS.find((domain) => url.toLowerCase().includes(domain))
         if (matchedDomain) {
           evidenceCount.medium++
           evidence.push(`CDN域名匹配: ${matchedDomain} (${url})`)
@@ -407,9 +377,7 @@
       const maxPreconnectToCheck = 20 // 限制检查数量
       for (let i = 0; i < Math.min(preconnectLinks.length, maxPreconnectToCheck); i++) {
         const href = preconnectLinks[i].href || ''
-        const matchedDomain = CDN_DOMAINS.find((domain) =>
-          href.toLowerCase().includes(domain)
-        )
+        const matchedDomain = CDN_DOMAINS.find((domain) => href.toLowerCase().includes(domain))
         if (matchedDomain) {
           evidenceCount.low++
           evidence.push(`CDN preconnect: ${matchedDomain}`)
@@ -419,7 +387,8 @@
 
       // 4. 基于证据多样性计算置信度
       // 多证据加权：避免单一证据过度影响
-      const evidenceScore = evidenceCount.high * 0.4 + evidenceCount.medium * 0.35 + evidenceCount.low * 0.2
+      const evidenceScore =
+        evidenceCount.high * 0.4 + evidenceCount.medium * 0.35 + evidenceCount.low * 0.2
       confidence = Math.min(evidenceScore, 1.0)
 
       // 至少有一个证据才判定为已优化
@@ -497,7 +466,8 @@
 
       // 5. 基于证据多样性计算置信度
       // 多证据加权：避免单一证据过度影响
-      const evidenceScore = evidenceCount.high * 0.4 + evidenceCount.medium * 0.3 + evidenceCount.low * 0.2
+      const evidenceScore =
+        evidenceCount.high * 0.4 + evidenceCount.medium * 0.3 + evidenceCount.low * 0.2
       confidence = Math.min(evidenceScore, 1.0)
 
       // 至少有一个证据才判定为已优化
@@ -579,7 +549,8 @@
 
       // 3. 基于证据多样性计算置信度
       // 多证据加权：避免单一证据过度影响
-      const evidenceScore = evidenceCount.high * 0.4 + evidenceCount.medium * 0.3 + evidenceCount.low * 0.2
+      const evidenceScore =
+        evidenceCount.high * 0.4 + evidenceCount.medium * 0.3 + evidenceCount.low * 0.2
       confidence = Math.min(evidenceScore, 1.0)
 
       // 至少有一个证据才判定为已优化
@@ -626,8 +597,9 @@
       const maxStylesToCheck = 30 // 限制检查数量
       for (let i = 0; i < Math.min(styleElements.length, maxStylesToCheck); i++) {
         const content = styleElements[i].textContent || ''
-        const hasFontDisplay = FONT_OPT_INDICATORS.fontDisplayValues.some((val) =>
-          content.includes(`font-display:${val}`) || content.includes(`font-display: ${val}`)
+        const hasFontDisplay = FONT_OPT_INDICATORS.fontDisplayValues.some(
+          (val) =>
+            content.includes(`font-display:${val}`) || content.includes(`font-display: ${val}`)
         )
         if (hasFontDisplay) {
           evidenceCount.medium++
@@ -641,9 +613,7 @@
       const maxScriptsToCheck = 50 // 限制检查数量
       for (let i = 0; i < Math.min(scripts.length, maxScriptsToCheck); i++) {
         const src = (scripts[i].src || '').toLowerCase()
-        const hasFontLib = FONT_OPT_INDICATORS.fontLibraries.some((lib) =>
-          src.includes(lib)
-        )
+        const hasFontLib = FONT_OPT_INDICATORS.fontLibraries.some((lib) => src.includes(lib))
         if (hasFontLib) {
           evidenceCount.low++
           evidence.push(`字体优化库: ${src}`)
@@ -663,7 +633,8 @@
 
       // 5. 基于证据多样性计算置信度
       // 多证据加权：避免单一证据过度影响
-      const evidenceScore = evidenceCount.high * 0.4 + evidenceCount.medium * 0.3 + evidenceCount.low * 0.2
+      const evidenceScore =
+        evidenceCount.high * 0.4 + evidenceCount.medium * 0.3 + evidenceCount.low * 0.2
       confidence = Math.min(evidenceScore, 1.0)
 
       // 至少有一个证据才判定为已优化
@@ -700,7 +671,8 @@
 
       for (let i = 0; i < Math.min(styleElements.length, maxStylesToCheck); i++) {
         const content = styleElements[i].textContent || ''
-        if (content.length > 100) { // 只检查有实质内容的 style
+        if (content.length > 100) {
+          // 只检查有实质内容的 style
           const hasMinified = CSS_OPT_INDICATORS.minifiedPatterns.some((pattern) =>
             pattern.test(content)
           )
@@ -775,7 +747,8 @@
 
       // 5. 基于证据多样性计算置信度
       // 多证据加权：避免单一证据过度影响
-      const evidenceScore = evidenceCount.high * 0.4 + evidenceCount.medium * 0.3 + evidenceCount.low * 0.2
+      const evidenceScore =
+        evidenceCount.high * 0.4 + evidenceCount.medium * 0.3 + evidenceCount.low * 0.2
       confidence = Math.min(evidenceScore, 1.0)
 
       // 至少有一个证据才判定为已优化
@@ -874,7 +847,8 @@
 
       // 5. 基于证据多样性计算置信度
       // 多证据加权：避免单一证据过度影响
-      const evidenceScore = evidenceCount.high * 0.4 + evidenceCount.medium * 0.3 + evidenceCount.low * 0.2
+      const evidenceScore =
+        evidenceCount.high * 0.4 + evidenceCount.medium * 0.3 + evidenceCount.low * 0.2
       confidence = Math.min(evidenceScore, 1.0)
 
       // 至少有一个证据才判定为已优化
@@ -985,9 +959,13 @@
      */
     shouldOptimize(type) {
       const result = this.results[type]
-      if (!result) return true
+      if (!result) {
+        return true
+      }
       // 检测失败时始终返回 true（降级策略）
-      if (this._detectionFailed) return true
+      if (this._detectionFailed) {
+        return true
+      }
       return !result.detected
     }
 
@@ -1035,12 +1013,12 @@
     constructor(detector, config = {}) {
       this.detector = detector
       this.config = {
-        cdnSkipThreshold: 0.6,       // CDN替换跳过阈值
-        lazyLoadSkipThreshold: 0.7,  // 懒加载跳过阈值
-        preloadSkipCount: 3,         // 预加载跳过数量阈值
-        fontOptSkipThreshold: 0.5,   // 字体优化跳过阈值
-        cssOptSkipThreshold: 0.6,    // CSS优化跳过阈值
-        swCacheSkipThreshold: 0.5,   // SW缓存跳过阈值
+        cdnSkipThreshold: 0.6, // CDN替换跳过阈值
+        lazyLoadSkipThreshold: 0.7, // 懒加载跳过阈值
+        preloadSkipCount: 3, // 预加载跳过数量阈值
+        fontOptSkipThreshold: 0.5, // 字体优化跳过阈值
+        cssOptSkipThreshold: 0.6, // CSS优化跳过阈值
+        swCacheSkipThreshold: 0.5, // SW缓存跳过阈值
         ...config,
       }
 
@@ -1065,8 +1043,13 @@
         enable: () => {},
         disable: () => {},
         getStats: () => ({
-          total: 0, replaced: 0, skipped: 0, errors: 0, details: [],
-          enabled: false, skippedByDetector: true,
+          total: 0,
+          replaced: 0,
+          skipped: 0,
+          errors: 0,
+          details: [],
+          enabled: false,
+          skippedByDetector: true,
         }),
         enabled: false,
         _processedLinks: { has: () => true, add: () => {} },
@@ -1119,7 +1102,10 @@
           case 'imageLazyLoad': {
             // 图片懒加载：如果页面已有懒加载，跳过
             const lazyResult = detectorResults[DetectionType.LAZY_LOAD]
-            if (lazyResult?.detected && lazyResult.confidence >= this.config.lazyLoadSkipThreshold) {
+            if (
+              lazyResult?.detected &&
+              lazyResult.confidence >= this.config.lazyLoadSkipThreshold
+            ) {
               shouldSkip = true
               reason = `页面已有懒加载 (置信度: ${lazyResult.confidence.toFixed(2)})`
             }
@@ -1139,7 +1125,10 @@
           case 'cssOpt': {
             // CSS优化：如果页面已有CSS优化，跳过
             const cssOptResult = detectorResults[DetectionType.CSS_OPT]
-            if (cssOptResult?.detected && cssOptResult.confidence >= this.config.cssOptSkipThreshold) {
+            if (
+              cssOptResult?.detected &&
+              cssOptResult.confidence >= this.config.cssOptSkipThreshold
+            ) {
               shouldSkip = true
               reason = `页面已有CSS优化 (置信度: ${cssOptResult.confidence.toFixed(2)})`
             }
@@ -1149,7 +1138,10 @@
           case 'swCache': {
             // SW缓存：如果页面已有SW缓存，跳过
             const swCacheResult = detectorResults[DetectionType.SW_CACHE]
-            if (swCacheResult?.detected && swCacheResult.confidence >= this.config.swCacheSkipThreshold) {
+            if (
+              swCacheResult?.detected &&
+              swCacheResult.confidence >= this.config.swCacheSkipThreshold
+            ) {
               shouldSkip = true
               reason = `页面已有SW缓存 (置信度: ${swCacheResult.confidence.toFixed(2)})`
             }
@@ -1165,7 +1157,10 @@
         return shouldSkip
       } catch (error) {
         // 降级：检测异常时不跳过
-        console.warn(`${LOG_PREFIX} [OptimizationSkipper] 判断异常，不跳过 ${optimizationType}:`, error)
+        console.warn(
+          `${LOG_PREFIX} [OptimizationSkipper] 判断异常，不跳过 ${optimizationType}:`,
+          error
+        )
         this._recordSkip(optimizationType, false, `检测异常: ${error.message}`)
         return false
       }
@@ -1201,7 +1196,7 @@
      */
     getSkippedOptimizations() {
       return Object.entries(this.skipStats)
-        .filter(([_, stat]) => stat.skipped)
+        .filter(([, stat]) => stat.skipped)
         .map(([type]) => type)
     }
 
@@ -1211,7 +1206,7 @@
      */
     getActiveOptimizations() {
       return Object.entries(this.skipStats)
-        .filter(([_, stat]) => !stat.skipped)
+        .filter(([, stat]) => !stat.skipped)
         .map(([type]) => type)
     }
   }

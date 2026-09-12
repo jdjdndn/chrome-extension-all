@@ -177,7 +177,9 @@
     if (isEventBusReady()) {
       try {
         await EventBus.publish('__eb_heartbeat__', heartbeatData)
-      } catch (e) {}
+      } catch (e) {
+        /* empty */
+      }
     }
 
     // 同时使用原生方式（兼容性）

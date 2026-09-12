@@ -282,7 +282,7 @@
       const normalSubscribers = []
       const lowSubscribers = []
 
-      for (const [callback, info] of this._subscribers) {
+      for (const [, info] of this._subscribers) {
         switch (info.priority) {
           case Priority.CRITICAL:
             criticalSubscribers.push(info)

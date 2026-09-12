@@ -409,7 +409,6 @@ if (window.KeyboardClickLoaded) {
           const style = getComputedStyle(current)
           const zIndex = parseInt(style.zIndex, 10) || 0
           const isFixed = style.position === 'fixed'
-          const isAbsolute = style.position === 'absolute'
 
           if (isFixed && zIndex > 1000) {
             const rect = current.getBoundingClientRect()

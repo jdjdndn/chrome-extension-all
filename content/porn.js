@@ -75,6 +75,7 @@ function updateHideElements(selectors) {
   }
 }
 
+// eslint-disable-next-line no-unused-vars
 function injectHideStyle() {
   updateHideElements(DEFAULT_HIDE_SELECTORS)
 }
@@ -88,6 +89,7 @@ function clickOver18Button() {
   }
 }
 
+// eslint-disable-next-line no-unused-vars
 function cleanup() {
   console.log('[Pornhub脚本] 清理状态...')
   styleInjector.remove()

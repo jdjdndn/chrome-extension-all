@@ -98,13 +98,6 @@
 
   // ========== 日志系统 ==========
   function addLog(level, action, details = {}) {
-    const logEntry = {
-      timestamp: Date.now(),
-      level,
-      action,
-      details,
-    }
-
     if (level === 'error') {
       console.error(`${LOG_PREFIX} ${action}:`, details)
     } else if (level === 'warn') {

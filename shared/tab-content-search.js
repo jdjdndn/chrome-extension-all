@@ -32,7 +32,7 @@ const TabContentSearch = {
     }
 
     const tabs = await this.getAllTabs()
-    const results = []
+    const _results = []
 
     // 并行搜索所有标签页
     const searchPromises = tabs.map(async (tab) => {
@@ -78,7 +78,7 @@ const TabContentSearch = {
   /**
    * 在页面中搜索的函数（注入到页面执行）
    */
-  _searchInPage: function (query, caseSensitive, wholeWord) {
+  _searchInPage: function (query, caseSensitive, _wholeWord) {
     const searchQuery = caseSensitive ? query : query.toLowerCase()
 
     // 获取页面文本内容
@@ -86,7 +86,9 @@ const TabContentSearch = {
       acceptNode: function (node) {
         // 排除脚本、样式等
         const parent = node.parentElement
-        if (!parent) {return NodeFilter.FILTER_REJECT}
+        if (!parent) {
+          return NodeFilter.FILTER_REJECT
+        }
         const tag = parent.tagName.toLowerCase()
         if (['script', 'style', 'noscript', 'iframe', 'svg'].includes(tag)) {
           return NodeFilter.FILTER_REJECT

@@ -558,14 +558,18 @@
     let _cachedCurrentDomain = null
     try {
       _cachedCurrentDomain = window.location.hostname
-    } catch {}
+    } catch {
+      /* empty */
+    }
 
     // 快速提取 hostname（避免构造 URL 对象）
     function _extractHostname(urlStr) {
       try {
         // 简单字符串提取，避免 new URL() 的开销
         const protocolEnd = urlStr.indexOf('://')
-        if (protocolEnd === -1) {return null}
+        if (protocolEnd === -1) {
+          return null
+        }
         const start = protocolEnd + 3
         const pathStart = urlStr.indexOf('/', start)
         const host = pathStart === -1 ? urlStr.substring(start) : urlStr.substring(start, pathStart)
@@ -580,7 +584,9 @@
     window.fetch = async function (url, options = {}) {
       try {
         const urlString = typeof url === 'string' ? url : url?.url
-        if (!urlString) {return window._originalFetch(url, options)}
+        if (!urlString) {
+          return window._originalFetch(url, options)
+        }
 
         // Domain blocking check（使用缓存域名）
         const requestDomain = _extractHostname(urlString)
@@ -607,7 +613,9 @@
           if (collectedUrls.size > 1000) {
             const now = Date.now()
             for (const [u, t] of collectedUrls) {
-              if (now - t > 60000) {collectedUrls.delete(u)} // 60秒过期
+              if (now - t > 60000) {
+                collectedUrls.delete(u)
+              } // 60秒过期
             }
           }
           throttledPrintUrls()
