@@ -206,14 +206,25 @@ if (window.KeyboardPaginationLoaded) {
     init() {
       // 分页容器存在性闸：页面上完全没有"分页语义"节点 → 不绑定任何事件、不注入样式。
       // SPA 场景由轻量 popstate/hashchange 兜底（仅重新探测+按需绑定，初次不绑）。
-      if (!this.hasPaginationSemantics()) {
-        this._setupSPAReinitGuard()
-        return
+      const hasDomPagination = this.hasPaginationSemantics()
+
+      if (!hasDomPagination) {
+        // 兜底：URL 页码探测（无 DOM 分页按钮但 URL 含页码参数）
+        this._detectUrlPageNumber()
+        if (!this.prevButton && !this.nextButton) {
+          this._setupSPAReinitGuard()
+          return
+        }
+        // URL 页码成功构造了虚拟按钮 → 继续绑定
+      } else {
+        this.detectPagination()
       }
 
-      this.detectPagination()
+      // 探测后若仍未找到任一按钮 → 尝试 URL 页码兜底
+      if (!this.prevButton && !this.nextButton) {
+        this._detectUrlPageNumber()
+      }
 
-      // 探测后若仍未找到任一按钮 → 同样不绑全局 keydown。
       if (!this.prevButton && !this.nextButton) {
         this._setupSPAReinitGuard()
         return
@@ -227,6 +238,208 @@ if (window.KeyboardPaginationLoaded) {
         prev: this.prevButton ? this.getButtonInfo(this.prevButton) : null,
         next: this.nextButton ? this.getButtonInfo(this.nextButton) : null,
       })
+    }
+
+    // ── URL 页码探测 ──
+
+    /**
+     * URL 页码模式表。
+     * - param: 查询参数名，值为页码数字
+     * - path: 路径中 /page/N 或 /N.html 等模式
+     * 每条规则的 buildURL(currentPage) 返回新的完整 URL。
+     */
+    static URL_PAGE_PATTERNS = [
+      // 常见查询参数
+      { type: 'param', key: 'page', rebuild: true },
+      { type: 'param', key: 'p', rebuild: true },
+      { type: 'param', key: 'pn', rebuild: true },
+      { type: 'param', key: 'currentPage', rebuild: true },
+      { type: 'param', key: 'cp', rebuild: true },
+      // offset-based（start=0, start=20, start=40...）
+      { type: 'offset', key: 'start', step: 20 },
+      { type: 'offset', key: 'offset', step: 20 },
+      { type: 'offset', key: 'from', step: 20 },
+    ]
+
+    /**
+     * 从 URL 中探测页码，若找到则构造虚拟 prev/next 按钮。
+     * 仅在 DOM 分页探测失败时调用。
+     */
+    _detectUrlPageNumber() {
+      // 已有虚拟按钮则跳过，避免重复创建
+      if (this._urlPageSource) {
+        return
+      }
+      const url = new URL(window.location.href)
+
+      // 1) 查询参数匹配（?page=3, ?p=2 等）
+      for (const pattern of KeyboardPagination.URL_PAGE_PATTERNS) {
+        if (pattern.type === 'param') {
+          const val = parseInt(url.searchParams.get(pattern.key), 10)
+          if (val > 1) {
+            this._createVirtualPagination({
+              type: 'param',
+              key: pattern.key,
+              currentPage: val,
+              baseUrl: url,
+            })
+            return
+          }
+          if (val === 1) {
+            // 当前是第1页，只需"下一页"
+            this._createVirtualPagination({
+              type: 'param',
+              key: pattern.key,
+              currentPage: val,
+              baseUrl: url,
+              prevOnly: false,
+              nextOnly: true,
+            })
+            return
+          }
+        }
+
+        if (pattern.type === 'offset') {
+          const val = parseInt(url.searchParams.get(pattern.key), 10)
+          if (val > 0) {
+            this._createVirtualPagination({
+              type: 'offset',
+              key: pattern.key,
+              step: pattern.step,
+              currentOffset: val,
+              baseUrl: url,
+            })
+            return
+          }
+        }
+      }
+
+      // 2) 路径模式匹配：/page/3, /3.html, /p/3/ 等
+      const pathMatch = url.pathname.match(/\/page\/(\d+)/i)
+      if (pathMatch) {
+        const page = parseInt(pathMatch[1], 10)
+        if (page > 0) {
+          this._createVirtualPagination({
+            type: 'path',
+            segment: 'page',
+            currentPage: page,
+            baseUrl: url,
+          })
+          return
+        }
+      }
+
+      // /p/N/ 或 /t/N/ 等单字母段
+      const shortPathMatch = url.pathname.match(/\/([a-z])\/(\d+)/i)
+      if (shortPathMatch) {
+        const seg = shortPathMatch[1]
+        const page = parseInt(shortPathMatch[2], 10)
+        if (page > 0 && /^[a-z]$/i.test(seg)) {
+          this._createVirtualPagination({
+            type: 'path',
+            segment: seg,
+            currentPage: page,
+            baseUrl: url,
+          })
+          return
+        }
+      }
+
+      // /N.html 或 /N.htm
+      const htmlMatch = url.pathname.match(/\/(\d+)\.html?$/i)
+      if (htmlMatch) {
+        const page = parseInt(htmlMatch[1], 10)
+        if (page > 0) {
+          this._createVirtualPagination({
+            type: 'path-html',
+            currentPage: page,
+            baseUrl: url,
+          })
+          return
+        }
+      }
+    }
+
+    /**
+     * 根据 URL 页码信息构造虚拟 prev/next 按钮（<a> 元素，带 href）。
+     */
+    _createVirtualPagination(info) {
+      const { type, baseUrl } = info
+      let prevHref = null
+      let nextHref = null
+
+      if (type === 'param') {
+        const { key, currentPage } = info
+        if (currentPage > 1) {
+          prevHref = this._buildUrlWithParam(baseUrl, key, currentPage - 1)
+        }
+        nextHref = this._buildUrlWithParam(baseUrl, key, currentPage + 1)
+      } else if (type === 'offset') {
+        const { key, step, currentOffset } = info
+        if (currentOffset > 0) {
+          prevHref = this._buildUrlWithParam(baseUrl, key, Math.max(0, currentOffset - step))
+        }
+        nextHref = this._buildUrlWithParam(baseUrl, key, currentOffset + step)
+      } else if (type === 'path') {
+        const { segment, currentPage } = info
+        if (currentPage > 1) {
+          prevHref = this._buildUrlWithPathSegment(baseUrl, segment, currentPage - 1)
+        }
+        nextHref = this._buildUrlWithPathSegment(baseUrl, segment, currentPage + 1)
+      } else if (type === 'path-html') {
+        const { currentPage } = info
+        if (currentPage > 1) {
+          prevHref = this._buildUrlWithHtmlPage(baseUrl, currentPage - 1)
+        }
+        nextHref = this._buildUrlWithHtmlPage(baseUrl, currentPage + 1)
+      }
+
+      if (prevHref) {
+        this.prevButton = document.createElement('a')
+        this.prevButton.href = prevHref
+        this.prevButton.setAttribute('aria-label', '上一页')
+        this.prevButton.textContent = '‹'
+        this.prevButton.style.cssText =
+          'position:absolute;left:-9999px;width:0;height:0;overflow:hidden;'
+        document.body.appendChild(this.prevButton)
+      }
+
+      if (nextHref) {
+        this.nextButton = document.createElement('a')
+        this.nextButton.href = nextHref
+        this.nextButton.setAttribute('aria-label', '下一页')
+        this.nextButton.textContent = '›'
+        this.nextButton.style.cssText =
+          'position:absolute;left:-9999px;width:0;height:0;overflow:hidden;'
+        document.body.appendChild(this.nextButton)
+      }
+
+      this._urlPageSource = type
+      console.log('[键盘翻页] URL 页码探测', { type, prevHref, nextHref })
+    }
+
+    /** 构造替换/追加查询参数的 URL */
+    _buildUrlWithParam(baseUrl, key, value) {
+      const url = new URL(baseUrl.href)
+      url.searchParams.set(key, value)
+      return url.href
+    }
+
+    /** 构造路径中 /segment/N 的 URL */
+    _buildUrlWithPathSegment(baseUrl, segment, page) {
+      const url = new URL(baseUrl.href)
+      url.pathname = url.pathname.replace(
+        new RegExp(`/${segment}/\\d+`, 'i'),
+        `/${segment}/${page}`
+      )
+      return url.href
+    }
+
+    /** 构造路径末尾 /N.html 的 URL */
+    _buildUrlWithHtmlPage(baseUrl, page) {
+      const url = new URL(baseUrl.href)
+      url.pathname = url.pathname.replace(/\/\d+\.html?$/i, `/${page}.html`)
+      return url.href
     }
 
     // 单源真相：闸用 this.selectors 的并集，避免与 detectPagination 出现死路径
@@ -285,10 +498,16 @@ if (window.KeyboardPaginationLoaded) {
         if (this._eventsBound) {
           return // 已经绑过事件，无需再走 init
         }
-        if (!this.hasPaginationSemantics()) {
-          return
+        // DOM 分页语义 或 URL 页码，任一命中即可尝试激活
+        const hasDom = this.hasPaginationSemantics()
+        if (!hasDom) {
+          this._detectUrlPageNumber()
+          if (!this.prevButton && !this.nextButton) {
+            return
+          }
+        } else {
+          this.detectPagination()
         }
-        this.detectPagination()
         if (this.prevButton || this.nextButton) {
           this.bindEvents()
           this.createHint()
@@ -368,10 +587,11 @@ if (window.KeyboardPaginationLoaded) {
 
     detectPagination() {
       // 清除失效引用（SPA 导航后旧节点已脱离文档，保留会导致后续点击静默失败）
-      if (this.prevButton && !document.body.contains(this.prevButton)) {
+      // 但保留 URL 页码虚拟按钮——它们始终在 DOM 中（hidden），不应被清除
+      if (this.prevButton && !document.body.contains(this.prevButton) && !this._urlPageSource) {
         this.prevButton = null
       }
-      if (this.nextButton && !document.body.contains(this.nextButton)) {
+      if (this.nextButton && !document.body.contains(this.nextButton) && !this._urlPageSource) {
         this.nextButton = null
       }
 
@@ -381,14 +601,26 @@ if (window.KeyboardPaginationLoaded) {
       const newNext = this.findElement('next')
       if (newPrev) {
         this.prevButton = newPrev
+        // DOM 按钮优先于虚拟按钮，清除 URL 页码标记
+        if (this._urlPageSource) {
+          this._urlPageSource = null
+        }
       }
       if (newNext) {
         this.nextButton = newNext
+        if (this._urlPageSource) {
+          this._urlPageSource = null
+        }
       }
 
       // 2) 在明确的分页容器内推断（容器本身就是分页语义，可放宽到首/末元素）
       if (!this.prevButton || !this.nextButton) {
         this.detectInPaginationContainer()
+      }
+
+      // 3) DOM 探测仍缺失 → 尝试 URL 页码兜底
+      if (!this.prevButton || !this.nextButton) {
+        this._detectUrlPageNumber()
       }
       // 已移除：detectByText —— 全站 a/button 文本扫描会把任意"next/上一个"
       // 按钮误判为翻页按钮，导致没有分页组件的页面也响应左右键。
@@ -585,7 +817,9 @@ if (window.KeyboardPaginationLoaded) {
 
         // ── 非翻页键：输入框中时不拦截 ──
         if (!isPrev && !isNext) {
-          if (this.isInputFocused()) {return}
+          if (this.isInputFocused()) {
+            return
+          }
           if (key === '?' && e.shiftKey) {
             e.preventDefault()
             this.showHelp()
@@ -604,8 +838,12 @@ if (window.KeyboardPaginationLoaded) {
         }
 
         // 检查修饰键
-        if (this.config.requireAlt && !e.altKey) {return}
-        if (this.config.requireCtrl && !e.ctrlKey) {return}
+        if (this.config.requireAlt && !e.altKey) {
+          return
+        }
+        if (this.config.requireCtrl && !e.ctrlKey) {
+          return
+        }
 
         // 如果焦点在视频元素上，不拦截左右键（让视频播放器处理快进/快退）
         if ((key === 'ArrowLeft' || key === 'ArrowRight') && this.isVideoFocused()) {
@@ -1147,6 +1385,16 @@ if (window.KeyboardPaginationLoaded) {
       const help = document.querySelector('.yc-pagination-help')
       if (help) {
         help.remove()
+      }
+      // 清理 URL 页码虚拟按钮
+      if (this._urlPageSource) {
+        if (this.prevButton && this.prevButton.getAttribute('aria-label') === '上一页') {
+          this.prevButton.remove()
+        }
+        if (this.nextButton && this.nextButton.getAttribute('aria-label') === '下一页') {
+          this.nextButton.remove()
+        }
+        this._urlPageSource = null
       }
     }
   }

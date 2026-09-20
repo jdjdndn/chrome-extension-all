@@ -32,9 +32,9 @@ function initTextToLink() {
 
   const YC_ATTR = 'yc-text-link-processed'
 
-  // 匹配链接（支持无协议，支持中文等 Unicode 字符路径）
+  // 匹配链接（支持无协议，支持中文等 Unicode 字符路径） 能匹配端口号
   const linkRegex =
-    /((https?:\/\/)?|(\/\/))?(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&\/\/=\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]*)/g
+    /((https?:\/\/)?|(\/\/))?(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&\/\/:=\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]*)/g
 
   // 常用顶级域名列表
   const TOP_LEVEL_DOMAINS = [
@@ -117,7 +117,9 @@ function initTextToLink() {
     // 问题场景：tiez.name666.top下载 -> 应该只保留 tiez.name666.top
     // 关键：TLD 后面紧跟非URL字符（中文、括号等）才截断，URL分隔符（/?#）不截断
     // 找到所有 TLD 匹配（TLD 后面必须紧跟非字母数字字符才算匹配）
-    const allTlds = [...linkStr.matchAll(new RegExp(`\\.(${TOP_LEVEL_DOMAINS.join('|')})(?![a-zA-Z0-9])`, 'g'))]
+    const allTlds = [
+      ...linkStr.matchAll(new RegExp(`\\.(${TOP_LEVEL_DOMAINS.join('|')})(?![a-zA-Z0-9])`, 'g')),
+    ]
     if (allTlds.length > 0) {
       // 遍历所有 TLD 匹配，找到第一个后面紧跟非URL字符的 TLD 进行截断
       // 优先处理多TLD场景（如 www.a.com)和(www.b.cn）和单TLD场景（如 tiez.name666.top下载）
