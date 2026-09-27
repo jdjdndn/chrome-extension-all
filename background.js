@@ -481,13 +481,6 @@ async function initialize() {
   // Listen for extension events
   setupEventListeners()
 
-  // 注册 JS 重定向规则（Service Worker 唤醒后重新注册）
-  if (typeof self.registerJSRedirectRules === 'function') {
-    self.registerJSRedirectRules().catch((e) => {
-      console.error('[Background] JS 重定向规则注册失败:', e)
-    })
-  }
-
   // 处理浏览器启动时已存在的标签页
   // 延迟执行，确保 service worker 完全就绪
   // 使用延迟注入模式：只注入当前激活的 tab，其他 tab 等激活时再注入

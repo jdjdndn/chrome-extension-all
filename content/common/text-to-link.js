@@ -98,12 +98,21 @@ function initTextToLink() {
 
   // 清理链接末尾的非 URL 字符（如中文、日文、韩文等）
   function cleanLinkEnd(linkStr) {
-    // 先移除多余右括号，再做 TLD 截断（否则 ) 会被视为 URL 字符导致截断不生效）
-    // 处理括号内的域名：(www.example.com) -> 移除末尾多余右括号
-    // 正则 linkRegex 的路径部分包含 ()，会把右括号也吃进去
+    // 错误案例 1："(www.example.com)" 不应被截断为 "(www.example.com"
+    //   原因：括号匹配时需要移除外层括号，否则 TLD 截断会错误地移除右括号
+    // 错误案例 2："article-site部署到www.wcblll.cc" 不应被截断为 "article-site"
+    //   原因：正则表达式会将 "-site" 误识别为 TLD（因为 - 不是字母数字字符）
+    //   修复：使用 (?<=\\.) lookbehind 确保 TLD 前面必须是点号
+    // 处理策略：先检查是否整个 URL 被括号包裹，如果是则移除括号
+    // 再移除多余右括号，最后做 TLD 截断
     const openCount = (linkStr.match(/\(/g) || []).length
     const closeCount = (linkStr.match(/\)/g) || []).length
-    if (closeCount > openCount) {
+
+    // 如果括号匹配且 URL 以 ( 开头、) 结尾，移除外层括号
+    if (openCount === closeCount && linkStr.startsWith('(') && linkStr.endsWith(')')) {
+      linkStr = linkStr.slice(1, -1)
+    } else if (closeCount > openCount) {
+      // 移除多余的右括号
       const excess = closeCount - openCount
       for (let i = 0; i < excess; i++) {
         const lastClose = linkStr.lastIndexOf(')')
@@ -112,13 +121,19 @@ function initTextToLink() {
         }
       }
     }
+
     // 匹配 TLD 后直接跟随的非 URL 字符（Unicode 字符但不是有效的 URL 路径字符）
     // 有效 URL 字符包括：字母、数字、-._~:/?#[]@!$&'()*+,;=
-    // 问题场景：tiez.name666.top下载 -> 应该只保留 tiez.name666.top
+    // 问题场景1：tiez.name666.top下载 -> 应该只保留 tiez.name666.top
+    // 问题场景2：https://ycs.nan78.top/毅创设 -> 应该只保留 https://ycs.nan78.top/
     // 关键：TLD 后面紧跟非URL字符（中文、括号等）才截断，URL分隔符（/?#）不截断
-    // 找到所有 TLD 匹配（TLD 后面必须紧跟非字母数字字符才算匹配）
+    // 但是：如果URL分隔符后面紧跟中文字符，也应该截断（如 /毅创设）
+    // 找到所有 TLD 匹配（TLD 前面必须是 .，后面必须紧跟非字母数字字符才算匹配）
+    // 注意：\\\\. 在字符串中表示 \\.，即正则表达式中的 \.（转义的点号）
     const allTlds = [
-      ...linkStr.matchAll(new RegExp(`\\.(${TOP_LEVEL_DOMAINS.join('|')})(?![a-zA-Z0-9])`, 'g')),
+      ...linkStr.matchAll(
+        new RegExp(`(?<=\\\\.)(${TOP_LEVEL_DOMAINS.join('|')})(?![a-zA-Z0-9])`, 'g')
+      ),
     ]
     if (allTlds.length > 0) {
       // 遍历所有 TLD 匹配，找到第一个后面紧跟非URL字符的 TLD 进行截断
@@ -128,9 +143,20 @@ function initTextToLink() {
         const afterTld = linkStr.slice(tldEndIndex)
         // 如果 TLD 后面紧跟非 URL 字符（中文、括号等），则截断
         // 移除 () 从字符集，因为 ) 通常表示链接结束（如 www.a.com)和(www.b.cn）
-        if (afterTld && /^[^\w\/\?#\[\]@!$&'*+,;=%._~-]/.test(afterTld)) {
-          linkStr = linkStr.slice(0, tldEndIndex)
-          break
+        // 特殊处理：如果后面是 /中文，也应该截断（如 /毅创设）
+        if (afterTld) {
+          // 检查是否紧跟非URL字符
+          if (/^[^\w\/\?#\[\]@!$&'*+,;=%._~-]/.test(afterTld)) {
+            linkStr = linkStr.slice(0, tldEndIndex)
+            break
+          }
+          // 检查是否是 /中文 的格式（如 /毅创设）
+          const slashChineseMatch = afterTld.match(/^\/[一-鿿]/)
+          if (slashChineseMatch) {
+            // 截断到 / 之前（保留 /）
+            linkStr = linkStr.slice(0, tldEndIndex + 1)
+            break
+          }
         }
       }
     }
@@ -142,35 +168,48 @@ function initTextToLink() {
     if (!links) {
       return []
     }
-    return links.filter((link) => {
-      if (!link) {
-        return false
-      }
-      // 支持字符串数组或匹配对象数组
-      let linkStr = Array.isArray(link) ? link[0] : link
-      if (typeof linkStr !== 'string') {
-        return false
-      }
-      // 清理链接末尾的非 URL 字符
-      linkStr = cleanLinkEnd(linkStr)
-      // 更新原数组中的值
-      if (Array.isArray(link)) {
-        link[0] = linkStr
-      }
-      // 检查是否为 IPv4
-      const ipv4Parts = linkStr.split('.')
-      const isIpv4 =
-        ipv4Parts.length >= 4 &&
-        ipv4Parts.every((part) => {
-          const num = Number(part)
-          return num === num && num >= 0 && num <= 255
-        })
-      if (isIpv4) {
-        return true
-      }
-      // 检查是否包含顶级域名
-      return TOP_LEVEL_DOMAINS.some((tld) => linkStr.includes(`.${tld}`))
-    })
+    return links
+      .map((link) => {
+        if (!link) {
+          return null
+        }
+        // 支持字符串数组或匹配对象数组
+        let linkStr = Array.isArray(link) ? link[0] : link
+        if (typeof linkStr !== 'string') {
+          return null
+        }
+        // 清理链接末尾的非 URL 字符
+        linkStr = cleanLinkEnd(linkStr)
+        // 更新原数组中的值
+        if (Array.isArray(link)) {
+          link[0] = linkStr
+        } else {
+          link = linkStr
+        }
+        return link
+      })
+      .filter((link) => {
+        if (!link) {
+          return false
+        }
+        const linkStr = Array.isArray(link) ? link[0] : link
+        if (typeof linkStr !== 'string') {
+          return false
+        }
+        // 检查是否为 IPv4
+        const ipv4Parts = linkStr.split('.')
+        const isIpv4 =
+          ipv4Parts.length >= 4 &&
+          ipv4Parts.every((part) => {
+            const num = Number(part)
+            return num === num && num >= 0 && num <= 255
+          })
+        if (isIpv4) {
+          return true
+        }
+        // 检查是否包含顶级域名
+        return TOP_LEVEL_DOMAINS.some((tld) => linkStr.includes(`.${tld}`))
+      })
   }
 
   // 获取文本中的链接

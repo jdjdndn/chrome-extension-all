@@ -84,12 +84,20 @@ function initRedirectLinks() {
 
   /**
    * 解码URL参数值（支持多次嵌套编码）
+   * 错误案例：知乎链接的target参数经过多次编码
+   *   https://link.zhihu.com/?target=http%3A//%25E6%25AF%2585%25E5%2588%259B%25E8%25AE%25BE...
+   *   需要解码多次才能得到真实URL
    */
   function decodeUrlValue(value) {
     let decoded = value
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 5; i++) {
       const prev = decoded
-      decoded = decodeURIComponent(decoded)
+      try {
+        decoded = decodeURIComponent(decoded)
+      } catch (e) {
+        // 解码失败（不是有效的编码字符串），停止
+        break
+      }
       if (prev === decoded) {
         break
       }
@@ -99,10 +107,18 @@ function initRedirectLinks() {
 
   /**
    * 从解码后的字符串中提取URL
+   * 错误案例：解码后可能是 "http://毅创设（多站合一资源网24小时自动更新）链接..."
+   * 需要提取有效的URL部分（到第一个非URL字符为止）
    */
   function extractUrlFromString(decoded) {
     // 完整URL
     if (decoded.startsWith('http://') || decoded.startsWith('https://')) {
+      // 提取有效的URL部分（到第一个非URL字符为止）
+      // 非URL字符：中文、括号等
+      const urlMatch = decoded.match(/^(https?:\/\/[^\s[\]()一-鿿]+)/)
+      if (urlMatch) {
+        return urlMatch[1]
+      }
       return decoded
     }
 
@@ -214,14 +230,45 @@ function initRedirectLinks() {
       const originalHref = link.href
       const realUrl = extractTargetUrl(originalHref)
       if (realUrl && realUrl !== originalHref) {
-        link.href = realUrl
-        replacedCount++
-        logger.debug(
-          '替换重定向链接:',
-          originalHref.substring(0, 60) + '...',
-          '->',
-          realUrl.substring(0, 60) + '...'
-        )
+        // 检查提取的URL是否有效（不是中文描述）
+        const isRealUrlValid = !/[一-鿿]/.test(realUrl)
+        if (isRealUrlValid) {
+          link.href = realUrl
+          replacedCount++
+          logger.debug(
+            '替换重定向链接:',
+            originalHref.substring(0, 60) + '...',
+            '->',
+            realUrl.substring(0, 60) + '...'
+          )
+          return
+        }
+        // 提取的URL包含中文，跳到下一步使用textContent
+      }
+
+      // 错误案例1：href="https://link.zhihu.com/?target=..." 但textContent是 "https://ycs.nan78.top/"
+      //   原因：知乎重定向链接的target参数经过多次编码，解码后仍是中文描述
+      // 错误案例2：href="http://毅创设（多站合一资源网24小时自动更新）" title="https://ycs.nan78.top/"
+      //   原因：某些网站使用中文描述作为href，真正的URL在textContent或title中
+      //   特征：hostname包含中文字符（如"毅创设"），浏览器会转为Punycode但原始href保留中文
+      // 处理：如果textContent是有效URL，则替换href
+      const textContent = link.textContent.trim()
+      if (textContent && textContent !== originalHref) {
+        try {
+          const textUrl = new URL(textContent)
+          if (textUrl.protocol === 'http:' || textUrl.protocol === 'https:') {
+            link.href = textContent
+            replacedCount++
+            logger.debug(
+              '使用textContent替换href:',
+              originalHref.substring(0, 60) + '...',
+              '->',
+              textContent.substring(0, 60) + '...'
+            )
+          }
+        } catch (e) {
+          // textContent不是有效URL，跳过
+        }
       }
     })
 
