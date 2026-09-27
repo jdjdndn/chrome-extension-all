@@ -2591,6 +2591,37 @@ const CDN_REDIRECT_DOMAINS = [
   'cdn.staticfile.org',
   'lf3-cdn-tos.bytecdntp.com',
   'cdn.jsdelivr.net',
+  // 新增目标域名（Google/Gravatar 镜像）
+  'fonts.loli.net',
+  'themes.loli.net',
+  'gravatar.loli.net',
+  'www.gstatic.cn',
+  'www.recaptcha.net',
+  'cdn.jsdmirror.com',
+  'cdn.jsdmirror.cn',
+  'jsd.cdn.zzko.cn',
+  'jsd.onmicrosoft.cn',
+  'quantil.jsdelivr.net',
+  'jsdelivr.b-cdn.net',
+  'unpkg.zhimg.com',
+  'npm.elemecdn.com',
+  'pkg.mini1.cn',
+  'gravatar.cat.net',
+  'gh.ddzds.com',
+  'ghproxy.com',
+  'fonts.font.im',
+  'fonts.googleapis.cn',
+  'storage.googleapis.cn',
+  'nuget.cdn.azure.cn',
+  'nuget.jiayoushe.com',
+  'recaptcha.lug.ustc.edu.cn',
+  'recaptcha.mirrors.ihwx.cn',
+  'google-themes.lug.ustc.edu.cn',
+  'gstatic.aby.pub',
+  'cdn.staticfile.net',
+  'lib.sinaapp.com',
+  'fontawesome.mirrors.ihwx.cn',
+  'jsdelivr.mirrors.ihwx.cn',
 ]
 
 /**
@@ -2766,6 +2797,127 @@ const CDN_REDIRECT_RULES = [
     regex: '^https://code\\.jquery\\.com/mobile/(\\d+\\.\\d+\\.\\d+)/(.*)\\.css',
     sub: 'https://cdn.bootcdn.net/ajax/libs/jquery-mobile/\\1/\\2.css',
   },
+  // ===== Google/Gravatar 镜像重定向 =====
+  // Google Fonts 字体文件（fonts.googleapis.com CSS 中引用的 font-url）
+  {
+    id: 3030,
+    regex: '^https://fonts\\.gstatic\\.com/(.*)',
+    sub: 'https://fonts.loli.net/gstatic/\\1',
+    resourceTypes: ['font'],
+  },
+  // Google 用户头像
+  {
+    id: 3031,
+    regex: '^https://themes\\.googleusercontent\\.com/(.*)',
+    sub: 'https://themes.loli.net/\\1',
+    resourceTypes: ['image'],
+  },
+  // Gravatar 头像
+  {
+    id: 3032,
+    regex: '^https://secure\\.gravatar\\.com/(.*)',
+    sub: 'https://gravatar.loli.net/\\1',
+    resourceTypes: ['image'],
+  },
+  // Google 静态资源
+  {
+    id: 3033,
+    regex: '^https://www\\.gstatic\\.com/(.*)',
+    sub: 'https://www.gstatic.cn/\\1',
+    resourceTypes: ['script'],
+  },
+  // reCAPTCHA
+  {
+    id: 3034,
+    regex: '^https://www\\.google\\.com/recaptcha/(.*)',
+    sub: 'https://www.recaptcha.net/recaptcha/\\1',
+    resourceTypes: ['script'],
+  },
+  // ===== 其他公共库 CDN 重定向 =====
+  // D3.js
+  {
+    id: 3040,
+    regex: '^https://cdn\\.d3js\\.org/(.*)',
+    sub: 'https://cdn.bootcdn.net/ajax/libs/d3/\\1',
+    resourceTypes: ['script'],
+  },
+  // Highcharts
+  {
+    id: 3041,
+    regex: '^https://cdn\\.highcharts\\.com/(.*)',
+    sub: 'https://cdn.bootcdn.net/ajax/libs/highcharts/\\1',
+    resourceTypes: ['script'],
+  },
+  // Leaflet (JS + CSS)
+  {
+    id: 3042,
+    regex: '^https://cdn\\.leafletjs\\.com/(.*)',
+    sub: 'https://cdn.bootcdn.net/ajax/libs/leaflet/\\1',
+    resourceTypes: ['script', 'stylesheet'],
+  },
+  // MathJax
+  {
+    id: 3043,
+    regex: '^https://cdn\\.mathjax\\.org/(.*)',
+    sub: 'https://cdn.bootcdn.net/ajax/libs/mathjax/\\1',
+    resourceTypes: ['script'],
+  },
+  // CKEditor
+  {
+    id: 3044,
+    regex: '^https://cdn\\.ckeditor\\.com/(.*)',
+    sub: 'https://cdn.bootcdn.net/ajax/libs/ckeditor/\\1',
+    resourceTypes: ['script'],
+  },
+  // amCharts
+  {
+    id: 3045,
+    regex: '^https://cdn\\.amcharts\\.com/(.*)',
+    sub: 'https://cdn.bootcdn.net/ajax/libs/amcharts/\\1',
+    resourceTypes: ['script'],
+  },
+  // Plotly
+  {
+    id: 3046,
+    regex: '^https://cdn\\.plot\\.ly/(.*)',
+    sub: 'https://cdn.bootcdn.net/ajax/libs/plotly.js/\\1',
+    resourceTypes: ['script'],
+  },
+  // SheetJS
+  {
+    id: 3047,
+    regex: '^https://cdn\\.sheetjs\\.com/(.*)',
+    sub: 'https://cdn.bootcdn.net/ajax/libs/xlsx/\\1',
+    resourceTypes: ['script'],
+  },
+  // ASP.NET CDN
+  {
+    id: 3048,
+    regex: '^https://ajax\\.aspnetcdn\\.com/ajax/(.*)',
+    sub: 'https://cdn.bootcdn.net/ajax/libs/\\1',
+    resourceTypes: ['script'],
+  },
+  // PageCDN
+  {
+    id: 3049,
+    regex: '^https://pagecdn\\.io/lib/(.*)',
+    sub: 'https://cdn.bootcdn.net/ajax/libs/\\1',
+    resourceTypes: ['script'],
+  },
+  // GitHub Raw Content → jsDelivr
+  {
+    id: 3050,
+    regex: '^https://raw\\.githubusercontent\\.com/([^/]+/[^/]+)/(.*)',
+    sub: 'https://cdn.jsdelivr.net/gh/\\1/\\2',
+    resourceTypes: ['script', 'stylesheet', 'image'],
+  },
+  // ESM.sh → jsdmirror
+  {
+    id: 3051,
+    regex: '^https://esm\\.sh/(.*)',
+    sub: 'https://cdn.jsdelivr.net/npm/\\1',
+    resourceTypes: ['script'],
+  },
 ]
 
 async function updateCDNRedirectRules() {
@@ -2788,7 +2940,7 @@ async function updateCDNRedirectRules() {
       },
       condition: {
         regexFilter: r.regex,
-        resourceTypes: ['stylesheet', 'font'],
+        resourceTypes: r.resourceTypes || ['stylesheet', 'font'],
         excludedRequestDomains: CDN_REDIRECT_DOMAINS,
       },
     }))

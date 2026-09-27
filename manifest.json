@@ -27,6 +27,11 @@
         "id": "ruleset_1",
         "enabled": true,
         "path": "rules.json"
+      },
+      {
+        "id": "ruleset_csp_remove",
+        "enabled": true,
+        "path": "rules-csp-remove.json"
       }
     ]
   },

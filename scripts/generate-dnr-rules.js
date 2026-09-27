@@ -21,6 +21,7 @@ const EXCLUDED_INITIATOR_DOMAINS = [
   'qq.com',
   'weread.qq.com',
   'weixin.qq.com',
+  'mp.weixin.qq.com', // 微信公众号后台，子域名需单独列出（excludedInitiatorDomains 精确匹配）
   'wechat.com',
   'tencent.com',
   // 阿里系：自有CDN
